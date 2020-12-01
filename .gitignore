@@ -1,0 +1,4 @@
+.idea/
+terraform-provider-megaport
+bin/
+go.sum

@@ -1,0 +1,7 @@
+.idea/
+.terraform/
+terraform.d/
+providers.tf
+production/full/gcp-credentials.json
+*terraform.tfstate*
+crash.log
