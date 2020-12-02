@@ -16,5 +16,5 @@ Documentation is maintained in the [docs](../tree/main/docs) directory
 A suite of tested examples is in the [examples](../tree/main/examples) directory
 
 # Contributions
-Contribution Guidelines and workflow are in the [Contributioning](Contributioning) wiki.
+Contribution Guidelines and workflow are in the [Contributing](Contributing) wiki.
 

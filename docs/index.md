@@ -12,15 +12,14 @@ Megaport's product and services using the [Megaport API](https://dev.megaport.co
 
 This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software 
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports, Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs 
-(for the full list, see [Resources](Resources_Overview)).
 
 # Essentials
  To learn about the project essentials, read these topics:   
-* [Environments](Environments) - Testing your Terraform before committing to a purchase
-* [Getting Started](GettingStarted) - Creating your account  
-* [Installation](Installation) - Setting up the Provider  
-* [Configuration](Configuration) - Required configuration and provider authentication
-* [Examples](Examples) - A suite of tested examples are maintained in the repository
+* [Environments](Environments.md) - Testing your Terraform before committing to a purchase
+* [Getting Started](GettingStarted.md) - Creating your account  
+* [Installation](Installation.md) - Setting up the Provider  
+* [Configuration](Configuration.md) - Required configuration and provider authentication
+* [Examples](https://github.com/megaport/terraform-provider-megaport/tree/main/examples) - A suite of tested examples are maintained in the repository
 
 To manage your account, go to the 
 [Megaport Portal](https://portal.megaport.com/). For information about the technical details of Megaport's 
@@ -33,13 +32,14 @@ any part of the official paid product and is not eligible for support through cu
 in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy/) and 
 [Global Services Agreement](https://www.megaport.com/legal/global-services-agreement/).
 
-| **[Data Sources](Data_Sources_Overview)**                             | **[Resources](Resources_Overview)**                               |
+# Data Sources & Resources
+
+| **Data Sources**                                                      | **Resources**                               |
 | ---                                                                   | ---                                                               |
-| [megaport_partner_port](data-sources/megaport_partner_port)           |                                                                   |
-| [megaport_location](data-sources/megaport_azure_connection)           |                                                                   |
-| [megaport_port](data-sources/megaport_port)                           | [megaport_port](resources/megaport_port)                          |
-| [megaport_mcr](data-sources/megaport_mcr)                             | [megaport_mcr](resources/megaport_mcr)                            |
-| [megaport_vxc](data-sources/megaport_vxc)                             | [megaport_vxc](resources/megaport_vxc)                            |
-| [megaport_aws_connection](data-sources/megaport_aws_connection)       | [megaport_aws_connection](resources/megaport_aws_connection)      |
-| [megaport_azure_connection](data-sources/megaport_azure_connection)   | [megaport_azure_connection](resources/megaport_azure_connection)  |
-| [megaport_gcp_connection](data-sources/megaport_gcp_connection)       | [megaport_gcp_connection](resources/megaport_gcp_connection)      |
+| [megaport_location](data-sources/megaport_azure_connection.md)           |                                                                   |
+| [megaport_port](data-sources/megaport_port.md)                           | [megaport_port](resources/megaport_port.md)                          |
+| [megaport_mcr](data-sources/megaport_mcr.md)                             | [megaport_mcr](resources/megaport_mcr.md)                            |
+| [megaport_vxc](data-sources/megaport_vxc.md)                             | [megaport_vxc](resources/megaport_vxc.md)                            |
+| [megaport_aws_connection](data-sources/megaport_aws_connection.md)       | [megaport_aws_connection](resources/megaport_aws_connection.md)      |
+| [megaport_azure_connection](data-sources/megaport_azure_connection.md)   | [megaport_azure_connection](resources/megaport_azure_connection.md)  |
+| [megaport_gcp_connection](data-sources/megaport_gcp_connection.md)       | [megaport_gcp_connection](resources/megaport_gcp_connection.md)      |

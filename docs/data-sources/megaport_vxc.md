@@ -1,4 +1,5 @@
-Use this data source to find an existing VXC to use in resource calls.
+# Data Source Megaport VXC
+Use this data source to find an existing Virtual Cross Connect (VXC) to use in resource calls.
 
 ## Example Usage
 ```

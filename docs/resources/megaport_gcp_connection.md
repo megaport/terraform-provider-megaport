@@ -1,3 +1,4 @@
+# Resource Megaport GCP Connection
 Adds a connection to Google Compute Cloud on a Port or an MCR. 
 
 To provision this connection, you need a partner key from the Google Cloud Console. You can get this key by adding a new VLAN attachment and selecting "Megaport" as the interconnect partner.

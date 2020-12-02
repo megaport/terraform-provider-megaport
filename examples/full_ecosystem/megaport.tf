@@ -105,10 +105,12 @@ resource megaport_vxc vxc {
 
   a_end {
     port_id = megaport_port.tf_test.id
+    requested_vlan = 180
   }
 
   b_end {
     port_id = megaport_port.port_2.id
+    requested_vlan = 180
   }
 }
 
@@ -118,9 +120,11 @@ resource megaport_vxc mcr_vxc {
 
   a_end {
     port_id = megaport_port.tf_test.id
+    requested_vlan = 181
   }
 
   b_end {
     port_id = megaport_mcr.test.id
+    requested_vlan = 181
   }
 }

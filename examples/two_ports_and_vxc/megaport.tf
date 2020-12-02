@@ -41,9 +41,11 @@ resource megaport_vxc vxc {
 
   a_end {
     port_id = megaport_port.port_1.id
+    requested_vlan = 180
   }
 
   b_end {
     port_id = megaport_port.port_2.id
+    requested_vlan = 180
   }
 }

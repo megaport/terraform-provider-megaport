@@ -1,3 +1,4 @@
+# Resource Megaport AWS Connection
 Adds a connection to AWS on either a Port or a MCR. This connection can be one of the following:
 
  - **Hosted VIF** - A single VIF that is added to the target AWS account.

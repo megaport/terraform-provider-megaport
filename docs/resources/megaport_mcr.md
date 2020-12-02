@@ -1,3 +1,4 @@
+# Resource Megaport MCR
 Creates a Megaport Cloud Router (MCR). An MCR is a virtual Layer 3 router that enables interconnection between resources in Megaport's network. Common connection scenarios include:
 
  - **Multi-cloud** - Use an MCR to connect networks between two or more separate cloud service providers.

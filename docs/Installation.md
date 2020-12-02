@@ -1,3 +1,4 @@
+# Installation
 There are two methods of installing the provider: 
 
 * [Pre-built releases](#installing-a-pre-built-release) (suitable for most use cases)

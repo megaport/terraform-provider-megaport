@@ -1,3 +1,4 @@
+# Resource Megaport VXC
 Creates a Virtual Cross Connect (VXC), which is a connection between two Megaport services. Common connection scenarios include:
 
  - **Port-to-Port** - Create a VXC between two Ports to enable multi-data center connectivity.

@@ -1,3 +1,4 @@
+# Resource Megaport Port
 Creates a Port, which is a physical Port in a Megaport-enabled location. Common connection scenarios include:
 
  - **Port-to-Port** - Create a VXC between two Ports to enable cross-data center connectivity.

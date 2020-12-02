@@ -1,3 +1,4 @@
+# Configuration
 Setting up the provider configuration for the Megaport Terraform Provider is a simple process. To start, specify the following values:
 
  - `username` [**string**] - (Required) Your email address used to log in to the Megaport Portal.

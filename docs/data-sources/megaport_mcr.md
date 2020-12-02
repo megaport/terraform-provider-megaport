@@ -1,4 +1,5 @@
-Use this data source to find an existing MCR to use in resource calls.
+# Data Source Megaport MCR
+Use this data source to find an existing Megaport Cloud Router (MCR) to use in resource calls.
 
 ## Example Usage (Single)
 ```

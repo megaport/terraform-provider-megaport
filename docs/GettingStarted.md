@@ -1,3 +1,4 @@
+# Getting Started
 Getting Started with `terraform-provider-megaport` is easy! 
 
 # Requirements

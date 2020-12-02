@@ -84,6 +84,10 @@ resource megaport_azure_connection test {
   csp_settings {
     attached_to = megaport_mcr.test.id
     service_key = "12345678-b4d5-424b-976a-7b0de65a1b62"
+    peerings {
+	  private_peer = true
+	  microsoft_peer = true
+	}
   }
 }
 
