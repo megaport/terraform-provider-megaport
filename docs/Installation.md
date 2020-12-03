@@ -17,7 +17,7 @@ mkdir -p $PLUGIN_DIRECTORY
 echo $PLUGIN_DIRECTORY
 ```
 
-Download the relevant binary for your system from the [releases](https://github.com/megaport/terraform-provider/megaport/releases). Once the download is complete, 
+Download the relevant binary for your system from the [releases](https://github.com/megaport/terraform-provider-megaport/releases). Once the download is complete, 
 rename it to `terraform-provider-megaport`. Copy the executable into the location specified by `$PLUGIN_DIRECTORY`.
 
 In your Terraform code, include a mapping for the locally hosted provider: 
@@ -43,7 +43,7 @@ mkdir -p $PLUGIN_DIRECTORY
 echo $PLUGIN_DIRECTORY
 ```
 
-Download the relevant binary for your system from the [releases](../releases). Once the download is complete, 
+Download the relevant binary for your system from the [releases](https://github.com/megaport/terraform-provider-megaport/releases). Once the download is complete, 
 rename it to `terraform-provider-megaport`. Copy the executable into the location specified by `$PLUGIN_DIRECTORY`.
 
 ## Installing from Source

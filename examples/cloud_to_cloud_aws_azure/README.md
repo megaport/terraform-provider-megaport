@@ -4,7 +4,7 @@ requires account credentials for Megaport, Amazon Web Services, and Azure.
 This example requires some prior understanding of AWS and Azure platforms, as well as usage of SSH and key pairs.  
 
 ## Before you begin
-  * Complete all the [Setup Steps](/wiki#setup-steps).  
+  * Complete all the [Essential Steps](https://github.com/megaport/terraform-provider-megaport/blob/main/docs/index.md#essentials).  
     - The `providers` block is included in `providers.tf` and does not require duplicating in your Megaport credentials file.
   * You will also need to authenticate to Azure using one of the methods supported by the Azure
     Resource Manager Provider. A full list of these are available 
