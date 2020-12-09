@@ -1,8 +1,5 @@
 ---
-layout: "megaport"
 page_title: "Provider: Megaport"
-description: |-
-  The Megaport provider is used to interact with the many resources supported by Megaport. The provider needs to be configured with the proper credentials before it can be used.
 ---
 
 # Megaport Terraform Provider
@@ -10,36 +7,73 @@ description: |-
 The `terraform-provider-megaport` or Megaport Terraform Provider lets you create and manage 
 Megaport's product and services using the [Megaport API](https://dev.megaport.com).
 
-This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software 
-Defined Network (SDN). Using the Terraform provider, you can create and manage Ports, Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs 
+This provides an opportunity for multi-cloud or cloud to DC hybrid environments supported by Megaport's Software 
+Defined Network (SDN). Using the Terraform provider, you can create and manage Ports, Virtual Cross Connects (VXCs), 
+Megaport Cloud Routers (MCRs), and Partner VXCs 
 
-# Essentials
- To learn about the project essentials, read these topics:   
-* [Environments](Environments.md) - Testing your Terraform before committing to a purchase
-* [Getting Started](GettingStarted.md) - Creating your account  
-* [Installation](Installation.md) - Setting up the Provider  
-* [Configuration](Configuration.md) - Required configuration and provider authentication
-* [Examples](https://github.com/megaport/terraform-provider-megaport/tree/main/examples) - A suite of tested examples are maintained in the repository
+## Essentials
+To learn about Megaport essentials, read these guides:   
+* [Environments](guides/environments) - Testing your Terraform before committing to a purchase
+* [Getting Started](guides/gettingstarted) - Creating your account  
+* [Examples](guides/examples) - A suite of 
+  tested examples are maintained in the guides
 
-To manage your account, go to the 
-[Megaport Portal](https://portal.megaport.com/). For information about the technical details of Megaport's 
-offerings, explore the [Megaport Documentation](https://docs.megaport.com/).
+->**Note:** The Megaport Terraform Provider is released as a tool for use with the Megaport API. It does not constitute
+part of the official product and is not eligible for support through customer channels.
 
-The Megaport Terraform Provider is released as a tool for use with the Megaport API. It does not constitute
-any part of the official paid product and is not eligible for support through customer channels.
-
-**Important:** The usage of the Megaport Terraform Provider constitutes your acceptance of the terms available
+~>**Important:** The usage of the Megaport Terraform Provider constitutes your acceptance of the terms available
 in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy/) and 
 [Global Services Agreement](https://www.megaport.com/legal/global-services-agreement/).
 
-# Data Sources & Resources
+## Installation & Configuration
 
-| **Data Sources**                                                      | **Resources**                               |
-| ---                                                                   | ---                                                               |
-| [megaport_location](data-sources/megaport_azure_connection.md)           |                                                                   |
-| [megaport_port](data-sources/megaport_port.md)                           | [megaport_port](resources/megaport_port.md)                          |
-| [megaport_mcr](data-sources/megaport_mcr.md)                             | [megaport_mcr](resources/megaport_mcr.md)                            |
-| [megaport_vxc](data-sources/megaport_vxc.md)                             | [megaport_vxc](resources/megaport_vxc.md)                            |
-| [megaport_aws_connection](data-sources/megaport_aws_connection.md)       | [megaport_aws_connection](resources/megaport_aws_connection.md)      |
-| [megaport_azure_connection](data-sources/megaport_azure_connection.md)   | [megaport_azure_connection](resources/megaport_azure_connection.md)  |
-| [megaport_gcp_connection](data-sources/megaport_gcp_connection.md)       | [megaport_gcp_connection](resources/megaport_gcp_connection.md)      |
+Setting up the provider configuration for the Megaport Terraform Provider is a simple process.
+```
+terraform {
+  required_providers {
+    megaport = {
+      source = "megaport/megaport"
+      version = "0.1.1"
+    }
+  }
+}
+
+provider "megaport" {
+    username                = "my.test.user@example.org"
+    password                = "n0t@re4lPassw0rd"
+    mfa_otp_key             = "ABCDEFGHIJK01234"
+    accept_purchase_terms   = true
+    delete_ports            = true
+    environment             = "staging"
+}
+```
+### Configuration Reference
+
+ - `username` [**string**] - (Required) Your email address used to log in to the Megaport Portal.
+ - `password` [**string**] - (Required) Your Megaport Portal password.
+ - `mfa_otp_key` [**string**] - (Optional) The multi-factor authentication (MFA) key displayed in the Megaport Portal when you set up MFA on your account. For details, see [Requirements](guides/gettingstarted)).
+ - `accept_purchase_terms` [**boolean**] - (Required) Indicates your acceptance of all terms for using Megaport's services.
+ - `delete_ports` [**boolean**] - (Optional) Indicates whether to delete any Ports provisioned by Terraform.
+ - `environment` [**string**] - (Optional) For details, see [Environments](guides/environments).
+
+The default `environment` is Staging, which is the test platform. To make changes to production systems, set the `environment` to `production`.
+
+## Example Usage
+
+See the [guides](guides/examples) for more detailed examples including Cloud Service Providers and MCR configuration.
+
+### Simple Port Example
+```
+data megaport_location ndc_b1 {
+  name    = "NextDC B1"
+  has_mcr = false
+}
+
+resource megaport_port tf_test {
+  port_name   = "Test Port"
+  port_speed  = 1000
+  location_id = data.megaport_location.ndc_b1.id
+  term        = 1
+}
+```
+

@@ -9,12 +9,18 @@ This provides an opportunity for true multi-cloud hybrid environments supported 
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports, Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs 
 (for the full list, see [Resources](Resources_Overview)).
 
-# Documentation
-Documentation is maintained in the [docs](../tree/main/docs) directory
+## Documentation
+Documentation is published on the [Terraform Provider Megaport](https://registry.terraform.io/providers/megaport/megaport/latest/docs) website.
 
-# Examples
+## Installation
+[Installation options](Installation), including local builds and older versions of Terraform
+
+## Configuration
+[Configuration](Configuration) reference
+
+## Examples
 A suite of tested examples is in the [examples](../tree/main/examples) directory
 
-# Contributions
+## Contributions
 Contribution Guidelines and workflow are in the [Contributing](Contributing) wiki.
 

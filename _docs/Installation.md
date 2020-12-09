@@ -1,8 +1,22 @@
 # Installation
-There are two methods of installing the provider: 
+There are three methods of installing the provider: 
 
+* [From the Terraform Provider Registry](https://registry.terraform.io/providers/megaport/megaport/latest) (preferred)
 * [Pre-built releases](#installing-a-pre-built-release) (suitable for most use cases)
 * [Install from source](#installing-from-source)
+
+## Install from the Terraform Provider Registry
+Include the provider block in your code and run `terraform init`
+```
+terraform {
+  required_providers {
+    megaport = {
+      source = "megaport/megaport"
+      version = "0.1.1"
+    }
+  }
+}
+```
 
 ## Installing a Pre-Built Release
 

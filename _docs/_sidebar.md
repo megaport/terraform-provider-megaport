@@ -4,12 +4,9 @@
 
 **Documentation**
 
-[Documentation](../tree/main/docs/)  
-
----
-
-**Examples**
-
+[Documentation](https://registry.terraform.io/providers/megaport/megaport/latest/docs)  
+[Installation](Installation)  
+[Configuration](Configuration)   
 [Examples](../tree/main/examples)  
 
 ---

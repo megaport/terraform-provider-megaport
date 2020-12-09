@@ -1,4 +1,4 @@
-## 0.1.1-beta (Unreleased)
+## 0.1.2-beta (December 10, 2020)
 
 Notes:
 
@@ -7,6 +7,7 @@ Notes:
 DOCUMENTATION UPDATES:
 
 * Documentation updates (links, etc)
+* Reformat Documentation for Terraform Provider Registry
 * Added `requested_vlan` into `full_ecosystem` and `two_ports_and_vxc` examples.
 * Added `peerings` block into `mcr_and_csp_vxcs` example.
 

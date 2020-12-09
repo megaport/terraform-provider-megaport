@@ -1,9 +1,9 @@
 # Examples
 
 This folder contains examples that demonstrate the functionality of the Megaport Terraform Provider. 
-To use each of these examples, you need to complete all the [Project Essentials](https://github.com/megaport/terraform-provider-megaport/blob/main/docs/index.md#essentials).  
+To use each of these examples, you need to complete all the [Getting Started](https://registry.terraform.io/providers/megaport/megaport/latest/docs/guides/gettingstarted) Requirements.
 
-Include the credentials in the `provider` block, which can be in its own file as per the [Configuration Documentation](https://github.com/megaport/terraform-provider-megaport/blob/main/docs/Configuration.md).
+Update the credentials in the `provider` block, which can be moved to its own file.
 
 All examples assume you have prior knowledge and understanding of how to use Terraform.  
 
