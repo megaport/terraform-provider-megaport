@@ -1,8 +1,14 @@
+## 0.1.3-beta (December, 2020)
+
+Notes
+
+* Documentation and example updates (no functionality changes)
+
 ## 0.1.2-beta (December 10, 2020)
 
 Notes:
 
-* Documentation and examples update (no functionality changes).
+* Documentation and example updates (no functionality changes).
 
 DOCUMENTATION UPDATES:
 

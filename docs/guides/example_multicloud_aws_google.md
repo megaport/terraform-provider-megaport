@@ -1,9 +1,9 @@
 ---
-page_title: "MultiCloud AWS to Azure"
+page_title: "MultiCloud AWS to Google"
 subcategory: "Examples"
 ---
 
-# MultiCloud AWS to Azure
+# MultiCloud AWS to Google
 This examples provisions a full multi-cloud demonstration environment including networking and compute instances. It 
 requires account credentials for Megaport, Amazon Web Services, and Google Cloud Platform.
 

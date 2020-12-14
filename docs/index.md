@@ -60,7 +60,7 @@ The default `environment` is Staging, which is the test platform. To make change
 
 ## Example Usage
 
-See the [guides](guides/examples) for more detailed examples including Cloud Service Providers and MCR configuration.
+See the [examples](guides/examples) for more detailed examples including Cloud Service Providers and MCR configuration.
 
 ### Simple Port Example
 ```

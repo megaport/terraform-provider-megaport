@@ -4,7 +4,7 @@ subcategory: "Examples"
 ---
 
 # MCR and CSP VXC's
-This will provision an MCR (Megaport Cloud Router) connected to AWS, Azure and GCP using Megaport VXC's (Virtual Cross Connects).
+This will provision a MCR (Megaport Cloud Router) connected to AWS, Azure and GCP using Megaport VXC's (Virtual Cross Connects).
 
 ```
 terraform {

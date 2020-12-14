@@ -1,9 +1,9 @@
 ---
-page_title: "Full Cloud to Cloud AWS-Azure"
+page_title: "MultiCloud AWS to Azure"
 subcategory: "Examples"
 ---
 
-# Full Cloud to Cloud AWS-Azure
+# MultiCloud AWS to Azure
 This examples provisions a full multi-cloud demonstration environment including networking and compute instances. It 
 requires account credentials for Megaport, Amazon Web Services, and Azure.
 

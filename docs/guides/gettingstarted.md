@@ -11,7 +11,7 @@ Before using the Megaport Terraform Provider, you will need a valid Megaport acc
 
 To create a new account, follow the [Quick Start Guide](https://docs.megaport.com/getting-started/). Complete
 the [Create an account](https://docs.megaport.com/setting-up/registering/), 
-[Add company profile](https://docs.megaport.com/setting-up/registering/#adding-a-company-profile) and 
+[Add a company profile](https://docs.megaport.com/setting-up/registering/#adding-a-company-profile) and 
 [Specify your billing market](https://docs.megaport.com/setting-up/registering/#enabling-a-billing-market) procedures.
 
 ->**Note:**If you use a Social Login (such as your Google account), you will need to set up a password on your account to use this 

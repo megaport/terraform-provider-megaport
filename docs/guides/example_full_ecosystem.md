@@ -1,11 +1,11 @@
 ---
-page_title: "Examples"
-subcategory: "Full Ecosystem"
+page_title: "Full Ecosystem"
+subcategory: "Examples"
 ---
 
 # Full Ecosystem
 
-This will provision one of everything
+Provision one of everything!
 
 ```
 terraform {
