@@ -6,6 +6,8 @@ subcategory: "Examples"
 # Lag Port
 This will provision a Megaport with 5 Lagged ports
 
+Replace the `username`, `password` and optional `mfa_otp_key` with your own credentials.
+
 ```
 terraform {
   required_providers {

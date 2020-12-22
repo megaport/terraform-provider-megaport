@@ -7,6 +7,13 @@ subcategory: "Examples"
 
 Provision one of everything!
 
+Replace the `username`, `password` and optional `mfa_otp_key` with your own credentials.
+
+This configuration will deploy on the staging environment. To use this on production, valid CSP attributes are required:
++ `megaport_aws_connection.amazon_account`
++ `megaport_gcp_connection.pairing_key`
++ `megaport_azure_connection.service_key`
+
 ```
 terraform {
   required_providers {

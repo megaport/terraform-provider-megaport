@@ -21,7 +21,7 @@ data megaport_location my_loc {
 This will return the location identifier for the NextDC B1 data center.
 
 ## Argument Reference
- - `name` - (Optional) The name of the data center to search for.
+ - `name` - (Optional) The name of the data center to search for. These can be found on the [Megaport Enabled Locations](https://www.megaport.com/megaport-enabled-locations/) page.
  - `market_code` - (Optional) The short market code of the country you want to search for. These can be found [here](https://api.megaport.com/v2/networkRegions).
  - `has_mcr` - (Optional) If set to true, only MCR-enabled locations will be displayed.
  - `match_exact` - (Optional) If set to true, the name search return must be an exact match or no results will be displayed. Other filters will not be applied.

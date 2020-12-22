@@ -5,6 +5,8 @@ subcategory: "Examples"
 # Two Ports and VXC
 This will provision two Megaports in different locations linked by a VXC (Virtual Cross Connect)
 
+Replace the `username`, `password` and optional `mfa_otp_key` with your own credentials.
+
 ```
 terraform {
   required_providers {

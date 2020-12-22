@@ -4,7 +4,9 @@ subcategory: "Examples"
 ---
 
 # Single Port
-This will provision a single Megaport. It is useful for confirming the Megaport Terraform provider is installed and configured correctly.
+This will provision a single Megaport. It is useful for confirming the Megaport Terraform provider is installed and configured correctly.  
+
+Replace the `username`, `password` and optional `mfa_otp_key` with your own credentials.
 
 ```
 terraform {

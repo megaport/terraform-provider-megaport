@@ -18,7 +18,7 @@ Each error contains the exact text of the error, the cause, and a potential solu
 1. [ProductNameFilterTooStrictError](#productnamefiltertoostricterror)
 1. [ConnectTypeFilterTooStrictError](#connecttypefiltertoostricterror)
 1. [NoMatchingPartnerPortsAtLocationError](#nomatchingpartnerportsatlocationerror)
-1. [CompanyNameFilterTooStrictError](#companynametiltertoostricterror)
+1. [CompanyNameFilterTooStrictError](#companynamefiltertoostricterror)
 1. [TooManyPartnerPortsError](#toomanypartnerportserror)
 1. [NoLocationsFoundError](#nolocationsfounderror)
 1. [TooManyLocationsError](#toomanylocationserror)

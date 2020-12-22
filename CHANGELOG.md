@@ -1,4 +1,4 @@
-## 0.1.3-beta (December, 2020)
+## 0.1.3-beta (December 22, 2020)
 
 Notes
 
