@@ -1,3 +1,12 @@
+## 0.1.4-beta (January 12, 2021)
+
+Notes
+
+* Updated `megaport-go` library.
+    * Changed the WaitForPortProvisioning function so that it 
+      considers "LIVE" or "CONFIGURED" as an active status.
+* Fix: Ports will create correctly at the CONFIGURED stage.
+
 ## 0.1.3-beta (December 22, 2020)
 
 Notes

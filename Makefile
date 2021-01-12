@@ -2,7 +2,7 @@ HOSTNAME=megaport.com
 NAMESPACE=terraform
 NAME=megaport
 BINARY=terraform-provider-${NAME}
-VERSION=1.0.14-rc.3
+VERSION=0.1.4
 OS_ARCH=$$(go version | cut -d" " -f4 | sed 's/\//_/g')
 ZIP_FILE=terraform-provider-${NAME}_${VERSION}_${OS_ARCH}.zip
 
@@ -32,4 +32,4 @@ release:
 
 install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
-	mv ${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
+	mv bin/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
