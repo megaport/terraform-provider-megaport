@@ -1,3 +1,9 @@
+## 0.1.5-beta (February 10, 2021)
+
+Notes
+
+* Fix: Resources can now be imported.
+
 ## 0.1.4-beta (January 12, 2021)
 
 Notes

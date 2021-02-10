@@ -31,6 +31,9 @@ func MegaportPort() *schema.Resource {
 		Update: resourceMegaportPortUpdate,
 		Delete: resourceMegaportPortDelete,
 		Schema: schema_megaport.ResourcePortSchema(),
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 	}
 }
 

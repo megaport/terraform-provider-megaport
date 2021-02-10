@@ -27,6 +27,9 @@ func MegaportGcpConnection() *schema.Resource {
 		Update: resourceMegaportGcpConnectionUpdate,
 		Delete: resourceMegaportGcpConnectionDelete,
 		Schema: schema_megaport.ResourceGcpConnectionVXCSchema(),
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 	}
 }
 

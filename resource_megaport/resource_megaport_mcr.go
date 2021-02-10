@@ -27,6 +27,9 @@ func MegaportAWS() *schema.Resource {
 		Update: resourceMegaportMCRUpdate,
 		Delete: resourceMegaportMCRDelete,
 		Schema: schema_megaport.ResourceMegaportMCRSchema(),
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 	}
 }
 

@@ -27,6 +27,9 @@ func MegaportVXC() *schema.Resource {
 		Update: ResourceMegaportVXCUpdate,
 		Delete: ResourceMegaportVXCDelete,
 		Schema: schema_megaport.ResourceVXCSchema(),
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 	}
 }
 
