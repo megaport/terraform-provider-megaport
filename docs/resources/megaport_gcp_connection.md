@@ -60,9 +60,3 @@ resource megaport_gcp_connection test {
     - `name` - The name of the B-End port.
     - `location` - The location name for the B-End port.
     - `assigned_vlan` - The VLAN assigned by Megaport to the B-End port.
-
-## Import
-VXCs can be imported using the `uid`, for example:
- ```shell script
-# terraform import megaport_gcp_connection.example_gcp a5b5464b-b5c5-41b4-85b2-86560bb85207
-```

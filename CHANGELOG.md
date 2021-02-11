@@ -1,3 +1,14 @@
+## 0.1.6-beta (February 11, 2021)
+
+Notes
+
+* Fix: MCR import now works.
+* Documentation:
+  * Removed import sections from `megaport_aws_connection`.
+  * Removed import sections from `megaport_azure_connection`.  
+  * Removed import sections from `megaport_gcp_connection`.
+  * Removed import sections from `megaport_vxc_connection`.
+
 ## 0.1.5-beta (February 10, 2021)
 
 Notes

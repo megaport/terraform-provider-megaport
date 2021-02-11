@@ -28,9 +28,6 @@ func MegaportAzureConnection() *schema.Resource {
 		Update: resourceMegaportAzureConnectionUpdate,
 		Delete: resourceMegaportAzureConnectionDelete,
 		Schema: schema_megaport.ResourceAzureConnectionVXCSchema(),
-		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
-		},
 	}
 }
 

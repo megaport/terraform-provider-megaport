@@ -72,9 +72,3 @@ resource megaport_vxc vxc {
     - `location` - The name of the data center where the Port is located.
     - `assigned_vlan` - The VLAN assigned by Megaport to the B-End Port.
  
-
-## Import
-VXCs can be imported using the `uid`, for example:
- ```shell script
-# terraform import megaport_vxc.example_vxc 522b1d65-d232-404c-bae9-bb8643cd4b3e
-```

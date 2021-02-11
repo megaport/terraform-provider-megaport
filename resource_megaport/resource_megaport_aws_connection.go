@@ -29,9 +29,6 @@ func MegaportAWSConnection() *schema.Resource {
 		Update: resourceMegaportAWSConnectionUpdate,
 		Delete: resourceMegaportAWSConnectionUpdateDelete,
 		Schema: schema_megaport.ResourceAWSConnectionVXCSchema(),
-		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
-		},
 	}
 }
 

@@ -23,7 +23,6 @@ Documentation is published on the [Terraform Provider Megaport](https://registry
 The preferred installation method is via the [Terraform Provider Megaport](https://registry.terraform.io/providers/megaport/megaport/latest/docs)
 registry.
 
- 
 Alternative [Installation options](../../wiki/Installation), including local builds and older versions of Terraform are in the [Wiki](../../wiki/Installation)
 
 ## Configuration

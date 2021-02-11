@@ -84,9 +84,3 @@ resource megaport_aws_connection test {
     - `assigned_vlan` - The VLAN assigned by Megaport to the B-End port.
 - `csp_settings`:
     - `assigned_asn` - The ASN assigned by Megaport for this connection.
-
-## Import
-You can import VXCs using the `uid`, for example:
- ```shell script
-# terraform import megaport_aws_connection.example_aws b69367d1-cc36-4c01-a5ac-9c5c39b1e1e1
-```

@@ -27,9 +27,6 @@ func MegaportVXC() *schema.Resource {
 		Update: ResourceMegaportVXCUpdate,
 		Delete: ResourceMegaportVXCDelete,
 		Schema: schema_megaport.ResourceVXCSchema(),
-		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
-		},
 	}
 }
 
@@ -58,8 +55,8 @@ func resourceMegaportVXCCreate(d *schema.ResourceData, m interface{}) error {
 
 func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 	vxcDetails, retrievalErr := vxc.GetVXCDetails(d.Id())
-	aVlan := 0
-	bVlan := 0
+	aVlan := vxcDetails.AEndConfiguration.VLAN
+	bVlan := vxcDetails.BEndConfiguration.VLAN
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
 		aVlan = aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int)

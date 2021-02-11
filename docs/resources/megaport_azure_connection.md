@@ -69,9 +69,3 @@ resource megaport_azure_connection test {
     - `name` - The name of the B-End port.
     - `location` - The location name for the B-End port.
     - `assigned_vlan` - The VLAN that was assigned by Megaport to the B-End port.
-
-## Import
-VXCs can be imported using the `uid`, for example:
- ```shell script
-# terraform import megaport_azure_connection.example_expressroute 2bea989c-4329-4a79-ae07-3522eb148c8f
-```

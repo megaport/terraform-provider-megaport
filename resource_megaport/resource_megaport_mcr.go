@@ -15,9 +15,9 @@
 package resource_megaport
 
 import (
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/megaportgo/mcr"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func MegaportAWS() *schema.Resource {
@@ -52,8 +52,14 @@ func resourceMegaportMCRCreate(d *schema.ResourceData, m interface{}) error {
 
 func resourceMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 	mcrDetails, retrievalErr := mcr.GetMCRDetails(d.Id())
-	myConf := d.Get("router").(*schema.Set).List()[0].(map[string]interface{})
-	mcrAsn := myConf["requested_asn"].(int)
+	isImport := len(d.Get("router").(*schema.Set).List()) == 0
+	var myConf map[string]interface{}
+	mcrAsn := mcrDetails.Resources.VirtualRouter.ASN
+
+	if !isImport {
+		myConf = d.Get("router").(*schema.Set).List()[0].(map[string]interface{})
+		mcrAsn = myConf["requested_asn"].(int)
+	}
 
 	if retrievalErr != nil {
 		return retrievalErr
