@@ -49,12 +49,12 @@ provider "megaport" {
 ```
 ### Configuration Reference
 
- - `username` [**string**] - (Required) Your email address used to log in to the Megaport Portal.
- - `password` [**string**] - (Required) Your Megaport Portal password.
- - `mfa_otp_key` [**string**] - (Optional) The multi-factor authentication (MFA) key displayed in the Megaport Portal when you set up MFA on your account. For details, see [Requirements](guides/gettingstarted)).
+ - `username` [**string**] - (Required) Your email address used to log in to the Megaport Portal. This can also be provided by the `MEGAPORT_USERNAME` environment variable.
+ - `password` [**string**] - (Required) Your Megaport Portal password. This can also be provided by the `MEGAPORT_PASSWORD` environment variable.
+ - `mfa_otp_key` [**string**] - (Optional) The multi-factor authentication (MFA) key displayed in the Megaport Portal when you set up MFA on your account. For details, see [Requirements](guides/gettingstarted)). This can also be provided by the `MEGAPORT_MFA_OTP_KEY` environment variable.
  - `accept_purchase_terms` [**boolean**] - (Required) Indicates your acceptance of all terms for using Megaport's services.
  - `delete_ports` [**boolean**] - (Optional) Indicates whether to delete any Ports provisioned by Terraform.
- - `environment` [**string**] - (Optional) For details, see [Environments](guides/environments).
+ - `environment` [**string**] - (Optional) For details, see [Environments](guides/environments). This can also be provided by the `MEGAPORT_ENVIRONMENT` environment variable.
 
 The default `environment` is Staging, which is the test platform. To make changes to production systems, set the `environment` to `production`.
 
@@ -77,3 +77,10 @@ resource megaport_port tf_test {
 }
 ```
 
+### Environment Variable Example:
+```
+export MEGAPORT_USERNAME="my.test.user@example.org"
+export MEGAPORT_PASSWORD="n0t@re4lPassw0rd"
+export MEGAPORT_MFA_OTP_KEY="ABCDEFGHIJK01234"
+export MEGAPORT_ENVIRONMENT="staging"
+```

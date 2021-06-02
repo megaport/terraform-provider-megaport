@@ -46,7 +46,7 @@ func Provider() *schema.Provider {
 			"username": {
 				Type:     schema.TypeString,
 				Required: true,
-				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USER", nil),
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USERNAME", nil),
 			},
 			"password": {
 				Type:     schema.TypeString,
@@ -56,6 +56,7 @@ func Provider() *schema.Provider {
 			"mfa_otp_key": {
 				Type:     schema.TypeString,
 				Optional: true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_MFA_OTP_KEY", nil),
 			},
 			"delete_ports": {
 				Type:     schema.TypeBool,
