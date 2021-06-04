@@ -2,7 +2,7 @@ HOSTNAME=registry.terraform.io
 NAMESPACE=megaport
 NAME=megaport
 BINARY=terraform-provider-${NAME}
-VERSION=0.1.6
+VERSION=0.1.7
 OS_ARCH=$$(go version | cut -d" " -f4 | sed 's/\//_/g')
 ZIP_FILE=terraform-provider-${NAME}_${VERSION}_${OS_ARCH}.zip
 

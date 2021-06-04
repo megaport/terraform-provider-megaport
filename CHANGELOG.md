@@ -1,3 +1,8 @@
+## 0.1.7-beta (June 4, 2021)
+Notes
+
+* Add support for credentials as Environment Variables. Credit @angryninja48
+
 ## 0.1.6-beta (February 11, 2021)
 
 Notes

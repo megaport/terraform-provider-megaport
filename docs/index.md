@@ -77,7 +77,7 @@ resource megaport_port tf_test {
 }
 ```
 
-### Environment Variable Example:
+### Environment Variable Example
 ```
 export MEGAPORT_USERNAME="my.test.user@example.org"
 export MEGAPORT_PASSWORD="n0t@re4lPassw0rd"
