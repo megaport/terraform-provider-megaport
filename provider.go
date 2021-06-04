@@ -29,6 +29,7 @@ import (
 
 const ERR_USER_NOT_ACCEPT_TOS = "sorry, you haven't accepted the Megaport terms of service"
 
+
 func Provider() *schema.Provider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -36,6 +37,7 @@ func Provider() *schema.Provider {
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "staging",
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_ENVIRONMENT", nil),
 			},
 			"accept_purchase_terms": {
 				Type:     schema.TypeBool,
@@ -44,14 +46,17 @@ func Provider() *schema.Provider {
 			"username": {
 				Type:     schema.TypeString,
 				Required: true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USERNAME", nil),
 			},
 			"password": {
 				Type:     schema.TypeString,
 				Required: true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_PASSWORD", nil),
 			},
 			"mfa_otp_key": {
 				Type:     schema.TypeString,
 				Optional: true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_MFA_OTP_KEY", nil),
 			},
 			"delete_ports": {
 				Type:     schema.TypeBool,
