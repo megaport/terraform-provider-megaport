@@ -29,6 +29,19 @@ data "megaport_partner_port" "aws_test_sydney_2" {
 }
 ```
 
+## Example Usage (Google Connection)
+```
+data megaport_location equinix_se2 {
+  name = "Equinix SE2"
+}
+
+data "megaport_partner_port" "google_test_seattle_us_1" {
+  company_name = "Google Inc"
+  product_name = "Seattle (sea-zone1-86)"
+  location_id = data.megaport_location.equinix_se2.id
+}
+```
+
 ## Argument Reference
  - `connect_type` - (Optional) The type of connection you will create. In the case of AWS, specify `AWS` for a Hosted VIF or `AWSHC` for a Hosted Connection).
  - `company_name` - (Optional) The company name to search for (from the company's Megaport Marketplace profile).

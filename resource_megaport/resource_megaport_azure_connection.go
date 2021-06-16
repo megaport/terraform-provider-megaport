@@ -15,10 +15,11 @@
 package resource_megaport
 
 import (
+	"time"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/megaportgo/vxc"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"time"
 )
 
 func MegaportAzureConnection() *schema.Resource {
@@ -58,11 +59,10 @@ func resourceMegaportAzureConnectionCreate(d *schema.ResourceData, m interface{}
 	}
 
 	peers := map[string]bool{
-		"private": private,
-		"public": public,
+		"private":   private,
+		"public":    public,
 		"microsoft": microsoft,
 	}
-
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
 		if newVlan, aOk := aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int); aOk {
