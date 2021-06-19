@@ -64,7 +64,7 @@ func ResourceGcpConnectionVXCSchema() map[string]*schema.Schema {
 		},
 		"csp_settings": ResourceGcpConnectionCspSettings(),
 		"vxc_internal_type": {
-			Type:	  schema.TypeString,
+			Type:     schema.TypeString,
 			Optional: true,
 			Default:  "gcp",
 		},
@@ -85,6 +85,11 @@ func ResourceGcpConnectionCspSettings() *schema.Schema {
 				"pairing_key": {
 					Type:     schema.TypeString,
 					Required: true,
+					ForceNew: true,
+				},
+				"requested_product_id": {
+					Type:     schema.TypeString,
+					Optional: true,
 					ForceNew: true,
 				},
 			},

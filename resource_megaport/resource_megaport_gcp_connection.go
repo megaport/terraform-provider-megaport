@@ -15,9 +15,9 @@
 package resource_megaport
 
 import (
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/megaportgo/vxc"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func MegaportGcpConnection() *schema.Resource {
@@ -31,13 +31,16 @@ func MegaportGcpConnection() *schema.Resource {
 }
 
 func resourceMegaportGcpConnectionCreate(d *schema.ResourceData, m interface{}) error {
+	var buyErr error
 	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	vlan := 0
+	vxcId := ""
 
 	attachToId := cspSettings["attached_to"].(string)
 	name := d.Get("vxc_name").(string)
 	rateLimit := d.Get("rate_limit").(int)
 	pairingKey := cspSettings["pairing_key"].(string)
+	requestedProductID := cspSettings["requested_product_id"].(string)
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
 		if newVlan, aOk := aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int); aOk {
@@ -45,7 +48,11 @@ func resourceMegaportGcpConnectionCreate(d *schema.ResourceData, m interface{}) 
 		}
 	}
 
-	vxcId, buyErr := vxc.BuyGoogleInterconnect(attachToId, name, rateLimit, vlan, pairingKey)
+	if requestedProductID != "" {
+		vxcId, buyErr = vxc.BuyGoogleInterconnectLocation(attachToId, name, rateLimit, vlan, pairingKey, requestedProductID)
+	} else {
+		vxcId, buyErr = vxc.BuyGoogleInterconnect(attachToId, name, rateLimit, vlan, pairingKey)
+	}
 
 	if buyErr != nil {
 		return buyErr
