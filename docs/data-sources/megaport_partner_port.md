@@ -36,6 +36,7 @@ data megaport_location equinix_se2 {
 }
 
 data "megaport_partner_port" "google_test_seattle_us_1" {
+  connect_type = "GOOGLE"
   company_name = "Google Inc"
   product_name = "Seattle (sea-zone1-86)"
   location_id = data.megaport_location.equinix_se2.id

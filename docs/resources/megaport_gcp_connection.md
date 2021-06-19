@@ -41,6 +41,7 @@ data megaport_location nextdc_s1 {
 }
 
 data megaport_partner_port google_sydney_1 {
+  connect_type = "GOOGLE"
   company_name = "Google Inc"
   product_name = "Sydney (syd-zone1-1660)"
   location_id = data.megaport_location.nextdc_s1.id

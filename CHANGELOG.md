@@ -1,3 +1,9 @@
+## 0.1.8-beta (June 19, 2021)
+Notes
+
+* Enable Google Partner port location selection. Credit @kdw174
+
+
 ## 0.1.7-beta (June 4, 2021)
 Notes
 
