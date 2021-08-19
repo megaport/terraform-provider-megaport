@@ -16,9 +16,10 @@ package data_megaport
 
 import (
 	"errors"
-	"github.com/megaport/megaportgo/partner"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportPartnerPort() *schema.Resource {
@@ -29,6 +30,8 @@ func MegaportPartnerPort() *schema.Resource {
 }
 
 func dataMegaportPartnerPortRead(d *schema.ResourceData, m interface{}) error {
+	partner := m.(*terraform_utility.MegaportClient).Partner
+
 	partnerPorts, retrievalErr := partner.GetAllPartnerMegaports()
 
 	if retrievalErr != nil {

@@ -16,8 +16,8 @@ package resource_megaport
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/megaport/megaportgo/vxc"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportGcpConnection() *schema.Resource {
@@ -32,6 +32,8 @@ func MegaportGcpConnection() *schema.Resource {
 
 func resourceMegaportGcpConnectionCreate(d *schema.ResourceData, m interface{}) error {
 	var buyErr error
+
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	vlan := 0
 	vxcId := ""
@@ -68,6 +70,7 @@ func resourceMegaportGcpConnectionRead(d *schema.ResourceData, m interface{}) er
 }
 
 func resourceMegaportGcpConnectionUpdate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	aVlan := 0
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {

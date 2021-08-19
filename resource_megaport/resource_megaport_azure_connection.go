@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/megaport/megaportgo/vxc"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportAzureConnection() *schema.Resource {
@@ -33,6 +33,8 @@ func MegaportAzureConnection() *schema.Resource {
 }
 
 func resourceMegaportAzureConnectionCreate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	vlan := 0
 
@@ -87,6 +89,7 @@ func resourceMegaportAzureConnectionRead(d *schema.ResourceData, m interface{}) 
 }
 
 func resourceMegaportAzureConnectionUpdate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	aVlan := 0
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {

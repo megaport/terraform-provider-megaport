@@ -16,10 +16,11 @@ package resource_megaport
 
 import (
 	"errors"
-	"github.com/megaport/megaportgo/types"
-	"github.com/megaport/megaportgo/vxc"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/megaportgo/types"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportAWSConnection() *schema.Resource {
@@ -33,6 +34,8 @@ func MegaportAWSConnection() *schema.Resource {
 }
 
 func resourceMegaportAWSConnectionCreate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	vlan := 0
 
@@ -74,6 +77,8 @@ func resourceMegaportAWSConnectionCreate(d *schema.ResourceData, m interface{}) 
 }
 
 func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	vxcDetails, retrievalErr := vxc.GetVXCDetails(d.Id())
 
 	if retrievalErr != nil {
@@ -107,6 +112,7 @@ func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) er
 }
 
 func resourceMegaportAWSConnectionUpdate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	aVlan := 0
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {

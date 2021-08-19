@@ -15,9 +15,9 @@
 package resource_megaport
 
 import (
-	"github.com/megaport/megaportgo/vxc"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportVXC() *schema.Resource {
@@ -31,6 +31,8 @@ func MegaportVXC() *schema.Resource {
 }
 
 func resourceMegaportVXCCreate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	vxcName := d.Get("vxc_name").(string)
 	rateLimit := d.Get("rate_limit").(int)
 
@@ -54,6 +56,8 @@ func resourceMegaportVXCCreate(d *schema.ResourceData, m interface{}) error {
 }
 
 func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	vxcDetails, retrievalErr := vxc.GetVXCDetails(d.Id())
 	aVlan := vxcDetails.AEndConfiguration.VLAN
 	bVlan := vxcDetails.BEndConfiguration.VLAN
@@ -120,6 +124,7 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 //       ** This is the expected behaviour of StackSet - the item is hashed and changes are across
 //       ** the whole StackSet. I need to think about the structure of data to pick up the modifications better.
 func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	aVlan := 0
 	bVlan := 0
 
@@ -150,6 +155,7 @@ func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func ResourceMegaportVXCDelete(d *schema.ResourceData, m interface{}) error {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	vxc.DeleteVXC(d.Id(), true)
 	return nil
 }

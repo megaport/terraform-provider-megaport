@@ -16,14 +16,13 @@ package data_megaport
 
 import (
 	"errors"
-	"github.com/megaport/megaportgo/types"
 	"strconv"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
-	"github.com/megaport/megaportgo/location"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/megaportgo/types"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
-
-
 
 func MegaportLocation() *schema.Resource {
 	return &schema.Resource{
@@ -35,6 +34,8 @@ func MegaportLocation() *schema.Resource {
 func dataMegaportLocationRead(d *schema.ResourceData, m interface{}) error {
 	var locations []types.Location
 	var foundLocation *types.Location = nil
+
+	location := m.(*terraform_utility.MegaportClient).Location
 
 	if v, ok := d.GetOk("name"); ok {
 		exactLocation, exactErr := location.GetLocationByName(v.(string))

@@ -16,12 +16,10 @@ package resource_megaport
 
 import (
 	"errors"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
-
-	"github.com/megaport/megaportgo/location"
-	"github.com/megaport/megaportgo/port"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func MegaportPort() *schema.Resource {
@@ -41,6 +39,9 @@ func resourceMegaportPortCreate(d *schema.ResourceData, m interface{}) error {
 	var portId string
 	var portErr error
 
+	port := m.(*terraform_utility.MegaportClient).Port
+	location := m.(*terraform_utility.MegaportClient).Location
+
 	portName := d.Get("port_name").(string)
 	term := d.Get("term").(int)
 	portSpeed := d.Get("port_speed").(int)
@@ -48,13 +49,13 @@ func resourceMegaportPortCreate(d *schema.ResourceData, m interface{}) error {
 	marketplaceVisibility := d.Get("marketplace_visibility").(bool)
 	isLag := d.Get("lag").(bool)
 	numberOfPorts := d.Get("lag_port_count").(int)
-	location, locationErr := location.GetLocationByID(locationId)
+	loc, locationErr := location.GetLocationByID(locationId)
 
 	if locationErr != nil {
 		return locationErr
 	}
 
-	marketCode := location.Market
+	marketCode := loc.Market
 
 	if isLag {
 		portId, portErr = port.BuyLAGPort(portName, term, portSpeed, locationId, marketCode, numberOfPorts, !marketplaceVisibility)
@@ -72,6 +73,7 @@ func resourceMegaportPortCreate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportPortRead(d *schema.ResourceData, m interface{}) error {
+	port := m.(*terraform_utility.MegaportClient).Port
 	portDetails, retrievalErr := port.GetPortDetails(d.Id())
 
 	if retrievalErr != nil {
@@ -100,6 +102,8 @@ func resourceMegaportPortRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportPortUpdate(d *schema.ResourceData, m interface{}) error {
+	port := m.(*terraform_utility.MegaportClient).Port
+
 	if d.HasChange("port_name") || d.HasChange("marketplace_visibility") {
 		_, nameErr := port.ModifyPort(d.Id(),
 			d.Get("port_name").(string),
@@ -139,8 +143,9 @@ func resourceMegaportPortUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportPortDelete(d *schema.ResourceData, m interface{}) error {
+	port := m.(*terraform_utility.MegaportClient).Port
 	// we don't want to automatically delete resources as this has physical ramifications and can't be undone.
-	if m.(terraform_utility.MegaportClient).DeletePorts {
+	if m.(*terraform_utility.MegaportClient).DeletePorts {
 		port.DeletePort(d.Id(), true)
 	} else {
 		port.DeletePort(d.Id(), false)

@@ -16,27 +16,22 @@ package main
 
 import (
 	"errors"
-	"github.com/megaport/megaportgo/authentication"
-	"github.com/megaport/megaportgo/types"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/data_megaport"
 	"github.com/megaport/terraform-provider-megaport/resource_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
-	"github.com/engi-fyi/go-credentials/credential"
-	"github.com/engi-fyi/go-credentials/factory"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"strconv"
 )
 
 const ERR_USER_NOT_ACCEPT_TOS = "sorry, you haven't accepted the Megaport terms of service"
-
 
 func Provider() *schema.Provider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"environment": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "staging",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "staging",
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_ENVIRONMENT", nil),
 			},
 			"accept_purchase_terms": {
@@ -44,18 +39,18 @@ func Provider() *schema.Provider {
 				Required: true,
 			},
 			"username": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:        schema.TypeString,
+				Required:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USERNAME", nil),
 			},
 			"password": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:        schema.TypeString,
+				Required:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_PASSWORD", nil),
 			},
 			"mfa_otp_key": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_MFA_OTP_KEY", nil),
 			},
 			"delete_ports": {
@@ -74,63 +69,41 @@ func Provider() *schema.Provider {
 		},
 		ConfigureFunc: providerConfigure,
 		DataSourcesMap: map[string]*schema.Resource{
-			"megaport_port":           data_megaport.MegaportPort(),
-			"megaport_location":       data_megaport.MegaportLocation(),
-			"megaport_vxc":            data_megaport.MegaportVXC(),
-			"megaport_partner_port":   data_megaport.MegaportPartnerPort(),
-			"megaport_aws_connection": data_megaport.MegaportAWSConnection(),
+			"megaport_port":             data_megaport.MegaportPort(),
+			"megaport_location":         data_megaport.MegaportLocation(),
+			"megaport_vxc":              data_megaport.MegaportVXC(),
+			"megaport_partner_port":     data_megaport.MegaportPartnerPort(),
+			"megaport_aws_connection":   data_megaport.MegaportAWSConnection(),
 			"megaport_gcp_connection":   data_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": data_megaport.MegaportAzureConnection(),
-			"megaport_mcr":            data_megaport.MegaportMCR(),
+			"megaport_mcr":              data_megaport.MegaportMCR(),
 		},
 	}
 }
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	if acceptTerms, ato := d.GetOk("accept_purchase_terms"); ato {
-		if acceptTerms.(bool) {
-			username, password, otpKey := checkAuthVariables(d)
-			megaportUrl := getEnvironmentUrl(d)
-			deletePorts := shouldDeletePorts(d)
+	acceptTerms, ato := d.GetOk("accept_purchase_terms")
 
-			megaportClient := terraform_utility.MegaportClient{}
-			credFactory, factErr := factory.New(types.APPLICATION_SHORT_NAME)
-
-			if factErr != nil {
-				return nil, factErr
-			}
-
-			myCredentials, credErr := credential.New(credFactory, username, password)
-
-			if credErr != nil {
-				return nil, credErr
-			}
-
-			if otpKey != "" {
-				setErr := myCredentials.Section("otp").SetAttribute("key", otpKey)
-
-				if setErr != nil {
-					return nil, setErr
-				}
-			}
-
-			myCredentials.SetAttribute("megaport_url", megaportUrl)
-			myCredentials.Section("options").SetAttribute("delete_ports", strconv.FormatBool(deletePorts))
-			myCredentials.Save()
-			var authErr error
-			megaportClient.Credentials, authErr = authentication.Login(true)
-			megaportClient.Url = megaportUrl
-			megaportClient.DeletePorts = deletePorts
-
-			if authErr != nil {
-				return nil, authErr
-			}
-
-			return megaportClient, nil
-		}
+	if !ato || !acceptTerms.(bool) {
+		return nil, errors.New(ERR_USER_NOT_ACCEPT_TOS)
 	}
 
-	return nil, errors.New(ERR_USER_NOT_ACCEPT_TOS)
+	username, password, otpKey := checkAuthVariables(d)
+	megaportUrl := getEnvironmentUrl(d)
+	deletePorts := shouldDeletePorts(d)
+
+	megaportClient := terraform_utility.MegaportClient{
+		DeletePorts: deletePorts,
+		Url:         megaportUrl,
+	}
+
+	err := megaportClient.ConfigureServices(username, password, otpKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &megaportClient, nil
 }
 
 func checkAuthVariables(d *schema.ResourceData) (string, string, string) {

@@ -16,8 +16,8 @@ package resource_megaport
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/megaport/megaportgo/mcr"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportAWS() *schema.Resource {
@@ -34,6 +34,8 @@ func MegaportAWS() *schema.Resource {
 }
 
 func resourceMegaportMCRCreate(d *schema.ResourceData, m interface{}) error {
+	mcr := m.(*terraform_utility.MegaportClient).Mcr
+
 	routerConfiguration := d.Get("router").(*schema.Set).List()[0].(map[string]interface{})
 	locationId := d.Get("location_id").(int)
 	mcrName := d.Get("mcr_name").(string)
@@ -51,6 +53,7 @@ func resourceMegaportMCRCreate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
+	mcr := m.(*terraform_utility.MegaportClient).Mcr
 	mcrDetails, retrievalErr := mcr.GetMCRDetails(d.Id())
 	isImport := len(d.Get("router").(*schema.Set).List()) == 0
 	var myConf map[string]interface{}
@@ -93,6 +96,8 @@ func resourceMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportMCRUpdate(d *schema.ResourceData, m interface{}) error {
+	mcr := m.(*terraform_utility.MegaportClient).Mcr
+
 	if d.HasChange("mcr_name") || d.HasChange("marketplace_visibility") {
 		_, nameErr := mcr.ModifyMCR(d.Id(),
 			d.Get("mcr_name").(string),
@@ -108,6 +113,7 @@ func resourceMegaportMCRUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceMegaportMCRDelete(d *schema.ResourceData, m interface{}) error {
+	mcr := m.(*terraform_utility.MegaportClient).Mcr
 	mcr.DeleteMCR(d.Id(), true)
 	return nil
 }

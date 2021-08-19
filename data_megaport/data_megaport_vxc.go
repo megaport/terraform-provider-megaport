@@ -15,9 +15,9 @@
 package data_megaport
 
 import (
-	"github.com/megaport/megaportgo/vxc"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportVXC() *schema.Resource {
@@ -30,6 +30,9 @@ func MegaportVXC() *schema.Resource {
 func DataMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 	vxcId := d.Get("vxc_id").(string)
 	d.SetId(vxcId)
+
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	vxcDetails, retrievalErr := vxc.GetVXCDetails(d.Id())
 
 	if retrievalErr != nil {

@@ -15,11 +15,58 @@
 package terraform_utility
 
 import (
-	"github.com/engi-fyi/go-credentials/credential"
+	"github.com/megaport/megaportgo/config"
+	"github.com/megaport/megaportgo/service/authentication"
+	"github.com/megaport/megaportgo/service/location"
+	"github.com/megaport/megaportgo/service/mcr"
+	"github.com/megaport/megaportgo/service/partner"
+	"github.com/megaport/megaportgo/service/port"
+	"github.com/megaport/megaportgo/service/product"
+	"github.com/megaport/megaportgo/service/vxc"
 )
 
 type MegaportClient struct {
-	Url         string
-	Credentials *credential.Credential
+	*MegaportServices
 	DeletePorts bool
+	Url         string
+}
+
+type MegaportServices struct {
+	Authentication *authentication.Authentication
+	Location       *location.Location
+	Mcr            *mcr.MCR
+	Partner        *partner.Partner
+	Port           *port.Port
+	Product        *product.Product
+	Vxc            *vxc.VXC
+}
+
+func (m *MegaportClient) ConfigureServices(username string, password string, oneTimePassword string) error {
+	logger := NewMegaportLogger()
+	cfg := config.Config{
+		Log:      logger,
+		Endpoint: m.Url,
+	}
+
+	auth := authentication.New(&cfg, username, password, oneTimePassword)
+	token, loginErr := auth.Login()
+
+	if loginErr != nil {
+		logger.Error("Unable to Authenticate user")
+		return loginErr
+	}
+
+	cfg.SessionToken = token
+
+	m.MegaportServices = &MegaportServices{
+		Authentication: auth,
+		Location:       location.New(&cfg),
+		Mcr:            mcr.New(&cfg),
+		Partner:        partner.New(&cfg),
+		Port:           port.New(&cfg),
+		Product:        product.New(&cfg),
+		Vxc:            vxc.New(&cfg),
+	}
+
+	return nil
 }

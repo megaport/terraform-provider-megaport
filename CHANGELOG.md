@@ -1,3 +1,8 @@
+# 0.1.9-beta (August 19, 2021)
+
+## Changes
+ - Fix marshalling issue with VirtualRouter in VXCResource.
+
 ## 0.1.8-beta (June 19, 2021)
 Notes
 

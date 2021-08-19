@@ -15,9 +15,9 @@
 package data_megaport
 
 import (
-	"github.com/megaport/megaportgo/mcr"
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportMCR() *schema.Resource {
@@ -30,6 +30,9 @@ func MegaportMCR() *schema.Resource {
 func DataMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 	mcrId := d.Get("mcr_id").(string)
 	d.SetId(mcrId)
+
+	mcr := m.(*terraform_utility.MegaportClient).Mcr
+
 	mcrDetails, retrievalErr := mcr.GetMCRDetails(d.Id())
 
 	if retrievalErr != nil {
@@ -52,8 +55,8 @@ func DataMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("admin_locked", mcrDetails.AdminLocked)
 
 	virtualRouterConfiguration := []interface{}{map[string]interface{}{
-		"assigned_asn":           mcrDetails.Resources.VirtualRouter.ASN,
-		"port_speed":    mcrDetails.Resources.VirtualRouter.Speed,
+		"assigned_asn": mcrDetails.Resources.VirtualRouter.ASN,
+		"port_speed":   mcrDetails.Resources.VirtualRouter.Speed,
 	}}
 
 	if routerErr := d.Set("router", virtualRouterConfiguration); routerErr != nil {
