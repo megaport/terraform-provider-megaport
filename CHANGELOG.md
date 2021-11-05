@@ -1,7 +1,14 @@
-# 0.1.9-beta (August 19, 2021)
+# 0.1.10-beta (November 5, 2021)
 
 ## Changes
- - Fix marshalling issue with VirtualRouter in VXCResource.
+  * Feature: BGP Connection support for AWS VXC Connections
+    * Added `partner_configuration` into `megaport_aws_connection` resource.
+    * Documentation and example updates
+
+## 0.1.9-beta (August 19, 2021)
+
+Notes
+ * Fix marshalling issue with VirtualRouter in VXCResource.
 
 ## 0.1.8-beta (June 19, 2021)
 Notes

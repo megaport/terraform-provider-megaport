@@ -79,9 +79,9 @@ func DataLocationSchema() map[string]*schema.Schema {
 			Computed: true,
 		},
 		"match_exact": {
-			Type: 	   schema.TypeBool,
-			Optional:  true,
-			Default:   false,
+			Type:     schema.TypeBool,
+			Optional: true,
+			Default:  false,
 		},
 	}
 }

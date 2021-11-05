@@ -15,6 +15,9 @@
 package resource_megaport
 
 import (
+	"log"
+	"time"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
@@ -157,5 +160,7 @@ func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
 func ResourceMegaportVXCDelete(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
 	vxc.DeleteVXC(d.Id(), true)
+	log.Println("Wait for resource cleanup...")
+	time.Sleep(40 * time.Second)
 	return nil
 }

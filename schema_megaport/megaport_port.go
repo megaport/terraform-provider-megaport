@@ -68,7 +68,7 @@ func ResourcePortSchema() map[string]*schema.Schema {
 			Type:     schema.TypeInt,
 			Optional: true,
 			ForceNew: true,
-			Default: 1,
+			Default:  1,
 		},
 		"lag_primary": {
 			Type:     schema.TypeBool,

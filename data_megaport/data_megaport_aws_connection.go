@@ -15,8 +15,8 @@
 package data_megaport
 
 import (
-	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 )
 
 func MegaportAWSConnection() *schema.Resource {
@@ -26,7 +26,7 @@ func MegaportAWSConnection() *schema.Resource {
 	}
 }
 
-func dataMegaportAwsConnectionRead(d *schema.ResourceData, m interface{})  error {
+func dataMegaportAwsConnectionRead(d *schema.ResourceData, m interface{}) error {
 	readErr := DataMegaportVXCRead(d, m)
 
 	if readErr != nil {

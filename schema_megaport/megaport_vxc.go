@@ -63,7 +63,7 @@ func ResourceVXCSchema() map[string]*schema.Schema {
 			Computed: true,
 		},
 		"vxc_internal_type": {
-			Type:	  schema.TypeString,
+			Type:     schema.TypeString,
 			Optional: true,
 			Default:  "vxc",
 		},
@@ -179,10 +179,6 @@ func ResourcePartnerConnectionEndConfiguration() *schema.Schema {
 					Type:     schema.TypeString,
 					Computed: true,
 				},
-				"requested_vlan": {
-					Type:     schema.TypeInt,
-					Required: true,
-				},
 				"assigned_vlan": {
 					Type:     schema.TypeInt,
 					Computed: true,
@@ -190,6 +186,10 @@ func ResourcePartnerConnectionEndConfiguration() *schema.Schema {
 				"assigned_asn": {
 					Type:     schema.TypeInt,
 					Computed: true,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Required: true,
 				},
 			},
 		},

@@ -64,7 +64,7 @@ func ResourceAzureConnectionVXCSchema() map[string]*schema.Schema {
 		},
 		"csp_settings": ResourceAzureConnectionCspSettings(),
 		"vxc_internal_type": {
-			Type:	  schema.TypeString,
+			Type:     schema.TypeString,
 			Optional: true,
 			Default:  "azure",
 		},
@@ -102,19 +102,19 @@ func ResourceAzureConnectionCspSettingsPeerings() *schema.Schema {
 				"private_peer": {
 					Type:     schema.TypeBool,
 					Optional: true,
-					Default: false,
+					Default:  false,
 					ForceNew: false,
 				},
 				"public_peer": {
 					Type:     schema.TypeBool,
 					Optional: true,
-					Default: false,
+					Default:  false,
 					ForceNew: false,
 				},
 				"microsoft_peer": {
 					Type:     schema.TypeBool,
 					Optional: true,
-					Default: false,
+					Default:  false,
 					ForceNew: false,
 				},
 			},

@@ -24,20 +24,21 @@ func ResourceAWSConnectionVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Required: true,
 		},
-		"vxc_type": {
-			Type:     schema.TypeString,
-			Computed: true,
-		},
 		"rate_limit": {
 			Type:     schema.TypeInt,
 			Required: true,
+		},
+		"a_end":        AWSConnectionEndConfiguration(),
+		"b_end":        DataVxcEndConfiguration(),
+		"csp_settings": ResourceAwsConnectionCspSettings(),
+		"vxc_type": {
+			Type:     schema.TypeString,
+			Computed: true,
 		},
 		"provisioning_status": {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
-		"a_end": ResourcePartnerConnectionEndConfiguration(),
-		"b_end": DataVxcEndConfiguration(),
 		"created_by": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -62,15 +63,155 @@ func ResourceAWSConnectionVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeBool,
 			Computed: true,
 		},
-		"csp_settings": ResourceAwsConnectionCspSettings(),
 		"aws_id": {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
 		"vxc_internal_type": {
-			Type:	  schema.TypeString,
+			Type:     schema.TypeString,
 			Optional: true,
 			Default:  "aws",
+		},
+	}
+}
+
+func AWSConnectionEndConfiguration() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"port_id": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"owner_uid": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"name": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"location": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"assigned_vlan": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"assigned_asn": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"partner_configuration": ResourceAwsConnectionPartnerConfigurationSettings(),
+			},
+		},
+	}
+}
+
+func ResourceAwsConnectionPartnerConfigurationSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		Computed: true,
+		ForceNew: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"ip_addresses": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"bfd_configuration": ResourceAwsConnectionBfdConfigSettings(),
+				"bgp_connection":    ResourceAwsConnectionBgpConnectionSettings(),
+			},
+		},
+	}
+}
+
+func ResourceAwsConnectionBfdConfigSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"tx_internal": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"rx_internal": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"multiplier": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceAwsConnectionBgpConnectionSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		Optional: true,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"peer_asn": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"local_ip_address": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"peer_ip_address": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"password": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+				"shutdown": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
+				},
+				"description": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Default:  "",
+				},
+				"med_in": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
+				},
+				"med_out": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
+				},
+				"bfd_enabled": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
+				},
+			},
 		},
 	}
 }
