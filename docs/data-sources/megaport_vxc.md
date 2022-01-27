@@ -3,8 +3,8 @@ Use this data source to find an existing Virtual Cross Connect (VXC) to use in r
 
 ## Example Usage
 ```
-data megaport_vxc vxc {
-    vxc_id = "522b1d65-d232-404c-bae9-bb8643cd4b3e"
+data "megaport_vxc" "vxc" {
+  vxc_id = "522b1d65-d232-404c-bae9-bb8643cd4b3e"
 }
 ```
 

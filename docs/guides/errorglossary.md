@@ -242,40 +242,40 @@ Ensure that you use the full name of the data center location you are trying to 
 #### Proper Usage
 
 ```
-data megaport_location my_loc {
-    name        = "NextDC B1"
-    market_code = "AU"
-    has_mcr     = true
+data "megaport_location" "my_loc" {
+  name        = "NextDC B1"
+  market_code = "AU"
+  has_mcr     = true
 }
 ```
 
 ```
-data megaport_location my_loc {
-    name        = "Equinix SY3"
-    market_code = "AU"
+data "megaport_location" "my_loc" {
+  name        = "Equinix SY3"
+  market_code = "AU"
 }
 ```
 
 #### Incorrect Usage
 
 ```
-data megaport_location my_loc {
-    name        = "NextDC B"
-    market_code = "AU"
+data "megaport_location" "my_loc" {
+  name        = "NextDC B"
+  market_code = "AU"
 }
 ```
 
 ```
-data megaport_location my_loc {
-    name        = "Equinix SY"
-    market_code = "AU"
+data "megaport_location" "my_loc" {
+  name        = "Equinix SY"
+  market_code = "AU"
 }
 ```
 
 ```
-data megaport_location my_loc {
-    name        = "Equinix"
-    market_code = "AU"
+data "megaport_location" "my_loc" {
+  name        = "Equinix"
+  market_code = "AU"
 }
 ```
 

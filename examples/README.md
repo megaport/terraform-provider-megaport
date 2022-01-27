@@ -17,5 +17,6 @@ Here's a description of each example:
    Cloud Service Providers via a MCR (Megaport Cloud Router). _This will only work when executed in Production_.
 1. [cloud_to_cloud_aws_google](cloud_to_cloud_aws_google): Create a fully functional example network linking AWS & Google 
    Cloud Service Providers via a MCR (Megaport Cloud Router). _This will only work when executed in Production_.
-1. [mcr_and_csp_vxcs](mcr_and_csp_vxcs): Create the Megaport portion of a Mult-Cloud, AWS, Azure, and GCP network.
+1. [mcr_and_csp_vxcs](mcr_and_csp_vxcs): Create the Megaport portion of a Multi-Cloud, AWS, Azure, and GCP network.
+1. [mcr_with_bgp_vxcs](mcr_with_bgp_vxcs): Create an MCR connected to AWS over a Hosted Connection with BGP and BFD configuration.
 1. [full_ecosystem](full_ecosystem): Generate all the resources exposed by the Terraform provider.

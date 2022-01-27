@@ -75,5 +75,9 @@ func DataMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 		return bEndErr
 	}
 
+	if mcrAEndConfiguration, err := vxc.UnmarshallMcrAEndConfig(vxcDetails); err == nil && mcrAEndConfiguration != nil {
+		d.Set("a_end_mcr_configuration", mcrAEndConfiguration)
+	}
+
 	return nil
 }

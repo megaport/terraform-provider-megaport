@@ -7,19 +7,19 @@ Installation and Configuration is normally via the Terraform Provider Registry
 terraform {
   required_providers {
     megaport = {
-      source = "megaport/megaport"
-      version = "0.1.1"
+      source  = "megaport/megaport"
+      version = ">=0.1.4"
     }
   }
 }
 
 provider "megaport" {
-    username                = "my.test.user@example.org"
-    password                = "n0t@re4lPassw0rd"
-    mfa_otp_key             = "ABCDEFGHIJK01234"
-    accept_purchase_terms   = true
-    delete_ports            = true
-    environment             = "staging"
+  username              = "my.test.user@example.org"
+  password              = "n0t@re4lPassw0rd"
+  mfa_otp_key           = "ABCDEFGHIJK01234"
+  accept_purchase_terms = true
+  delete_ports          = true
+  environment           = "staging"
 }
 ```
 ## Attribute Reference
@@ -32,5 +32,3 @@ provider "megaport" {
 atest/docs/guides/environments).
 
 The default `environment` is Staging, which is the test platform. To make changes to production systems, set the `environment` to `production`.
-
-

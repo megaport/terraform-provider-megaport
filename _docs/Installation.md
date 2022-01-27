@@ -11,8 +11,8 @@ Include the provider block in your code and run `terraform init`
 terraform {
   required_providers {
     megaport = {
-      source = "megaport/megaport"
-      version = "0.1.1"
+      source  = "megaport/megaport"
+      version = ">=0.1.4"
     }
   }
 }
@@ -26,7 +26,7 @@ Create the `.terraform.d/` directory in your home folder.
 ```
 cd ~
 ARCH=$(go version | cut -d" " -f4 | sed 's/\//_/g')
-PLUGIN_DIRECTORY="$(pwd)/.terraform.d/plugins/megaport/megaport/0.1.0/${ARCH}/"
+PLUGIN_DIRECTORY="$(pwd)/.terraform.d/plugins/megaport/megaport/0.1.11/${ARCH}/"
 mkdir -p $PLUGIN_DIRECTORY
 echo $PLUGIN_DIRECTORY
 ```
@@ -40,7 +40,7 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport.com/megaport/megaport"
-      version = "0.1.0"
+      version = ">=0.1.4"
     }
   }
 }
@@ -62,19 +62,32 @@ rename it to `terraform-provider-megaport`. Copy the executable into the locatio
 
 ## Installing from Source
 
-1. Ensure that Go is installed (at least `v1.13`). You can do this by running the command: 
+Ensure that Go is installed (at least `v1.13`). You can do this by running the command: 
 ```
 $ go version
 go version go1.13.8 linux/amd64
 ```
 
-1. Clone the repository to your local machine. 
-1. Run `./build.sh`, which will build the provider and return the location of the executable file.
+Clone the repository to your local machine.
+
+Run `./build.sh`, which will build the provider and return the location of the executable file.
 ```
 $ ./build.sh 
-Provider built at 'bin/terraform-provider-megaport_beta0.1-11-g3987118'.
+Provider built at 'bin/terraform-provider-megaport_v0.1.11'.
 Symbolic link created from build directory to terraform.d. < 0.13
 Symbolic link created from build directory to terraform.d. >= 0.13
+```
+
+In your Terraform code, include a mapping for the locally hosted provider: 
+```
+terraform {
+  required_providers {
+    megaport = {
+      source  = "megaport.com/megaport/megaport"
+      version = ">=0.1.4"
+    }
+  }
+}
 ```
 That's it!
 
@@ -84,7 +97,7 @@ To use the provider, initialize it and ensure that it is up and running. Then, e
 
 Perform these steps in the directory of your Terraform project:
 
-1. Run `terraform init` and verify that the provider was installed with `terraform version`.
+Run `terraform init` and verify that the provider was installed with `terraform version`.
 ```
 $ terraform init
 
@@ -105,4 +118,3 @@ $ terraform version
 Terraform v0.13.0
 + provider.megaport (unversioned)
 ```
-

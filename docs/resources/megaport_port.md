@@ -11,15 +11,16 @@ Creates a Port, which is a physical Port in a Megaport-enabled location. Common 
 
 ## Example Usage (Single)
 ```
-data megaport_location nextdc_brisbane_1 {
-    name = "NextDC B1"
+data "megaport_location" "bne_nxt1" {
+  name    = "NextDC B1"
+  has_mcr = false
 }
 
-resource megaport_port my_port {
-    port_name       = "My Example Port"
-    port_speed      = 10000
-    location_id     = data.megaport_location.nextdc_brisbane_1.id
-    term            = 12
+resource "megaport_port" "port" {
+  port_name   = "Terraform Example - Port"
+  port_speed  = 10000
+  location_id = data.megaport_location.bne_nxt1.id
+  term        = 12
 }
 ```
 
@@ -28,22 +29,22 @@ speed of 10 Gbps.
 
 ## Example Usage (Link Aggregation Group)
 ```
-data megaport_location nextdc_brisbane_1 {
-    name = "NextDC B1"
+data "megaport_location" "bne_nxt1" {
+  name    = "NextDC B1"
 }
 
-resource megaport_port my_lag_port {
-    port_name       = "My Example LAG Port"
-    port_speed      = 10000
-    location_id     = data.megaport_location.nextdc_brisbane_1.id
-    term            = 1
-    lag             = true
-    lag_port_count  = 4
+resource "megaport_port" "lag_port" {
+  port_name      = "Terraform Example - LAG Port"
+  port_speed     = 10000
+  location_id    = data.megaport_location.bne_nxt1.id
+  term           = 1
+  lag            = true
+  lag_port_count = 3
 }
 ```
 
-This example results in the creation of a LAG Port with 4 Ports located at NextDC Brisbane 1, under a 1 month term with 
-an aggregate speed of 40 Gbps.
+This example results in the creation of a LAG Port with 3 Ports located at NextDC Brisbane 1, under a 1 month term with 
+an aggregate speed of 30 Gbps.
 
 ## Argument Reference
 

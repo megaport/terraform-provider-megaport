@@ -8,19 +8,19 @@ Unlike [Ports](Resource_megaport_port), MCRs are not available at all locations.
 
 ## Example Usage
 ```
-data megaport_location nextdc_brisbane_1 {
-    name    = "NextDC B1"
-    has_mcr = true
+data "megaport_location" "bne_nxt1" {
+  name    = "NextDC B1"
+  has_mcr = true
 }
 
-resource megaport_mcr test {
-    mcr_name = "Terraform Test - MCR"
-    location_id = data.megaport_location.ndc_b1.id
+resource "megaport_mcr" "mcr" {
+  mcr_name    = "Terraform Example - MCR"
+  location_id = data.megaport_location.bne_nxt1.id
 
-    router {
-        port_speed = 10000
-        requested_asn = 64555
-    }
+  router {
+    port_speed    = 5000
+    requested_asn = 64555
+  }
 }
 ```
 

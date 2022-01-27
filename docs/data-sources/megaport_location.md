@@ -4,17 +4,17 @@ will be used in other resource calls.
 
 ## Example Usage
 ```
-data megaport_location my_loc {
-    name        = "NextDC B"
-    market_code = "AU"
-    has_mcr     = true
+data "megaport_location" "my_loc" {
+  name        = "NextDC B"
+  market_code = "AU"
+  has_mcr     = true
 }
 ```
 This will return the location details for `NextDC B1` as it is the only MCR-enabled location in Brisbane.
 
 ```
-data megaport_location my_loc {
-    name        = "NextDC B1"
+data "megaport_location" "my_loc" {
+  name = "NextDC B1"
 }
 ```
 

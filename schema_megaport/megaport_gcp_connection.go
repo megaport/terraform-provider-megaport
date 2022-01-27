@@ -36,8 +36,10 @@ func ResourceGcpConnectionVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
-		"a_end": ResourcePartnerConnectionEndConfiguration(),
-		"b_end": DataVxcEndConfiguration(),
+		"a_end":                   ResourceVxcEndConfiguration(),
+		"b_end":                   DataVxcEndConfiguration(),
+		"csp_settings":            ResourceGcpConnectionCspSettings(),
+		"a_end_mcr_configuration": ResourceMcrConfigurationSettings(),
 		"created_by": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -62,7 +64,6 @@ func ResourceGcpConnectionVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeBool,
 			Computed: true,
 		},
-		"csp_settings": ResourceGcpConnectionCspSettings(),
 		"vxc_internal_type": {
 			Type:     schema.TypeString,
 			Optional: true,
@@ -77,11 +78,6 @@ func ResourceGcpConnectionCspSettings() *schema.Schema {
 		Required: true,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
-				"attached_to": {
-					Type:     schema.TypeString,
-					Required: true,
-					ForceNew: true,
-				},
 				"pairing_key": {
 					Type:     schema.TypeString,
 					Required: true,

@@ -1,6 +1,29 @@
-# 0.1.10-beta (November 5, 2021)
+# 0.2.0-beta (January 27, 2022)
 
 ## Changes
+  * Feature: BGP Connection support for all VXC Connections with MCR A End
+    * Resource: `megaport_vxc_connection`
+      * Added optional `a_end_mcr_configuration` configuration 
+    * Resource: `megaport_aws_connection`
+      * Added optional `a_end_mcr_configuration` configuration 
+    * Resource: `megaport_azure_connection`
+      * Added optional `a_end_mcr_configuration` configuration 
+    * Resource: `megaport_gcp_connection`
+      * Added optional `a_end_mcr_configuration` configuration 
+    * Documentation and example updates
+
+## Breaking Changes
+  * Resource: `megaport_aws_connection`
+    * Removed `megaport_aws_connection.a_end.partner_configuration` in lieu of the `megaport_aws_connection.a_end_mcr_configuration` block added to all VXC resources.
+    * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other.
+  * Resource: `megaport_azure_connection`
+    * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other.
+  * Resource: `megaport_gcp_connection`
+    * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other. 
+
+## 0.1.10-beta (November 5, 2021)
+
+Notes
   * Feature: BGP Connection support for AWS VXC Connections
     * Added `partner_configuration` into `megaport_aws_connection` resource.
     * Documentation and example updates

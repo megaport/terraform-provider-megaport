@@ -15,27 +15,27 @@
  */
 
 // megaport locations used for ports and mcr
-data "megaport_location" "nextdc_b1" {
+data "megaport_location" "bne_nxt1" {
   name    = "NextDC B1"
   has_mcr = true
 }
 
-data "megaport_location" "gs_syd" {
+data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
 
 // aws partner port
-data "megaport_partner_port" "aws_syd_port" {
+data "megaport_partner_port" "aws_port" {
   connect_type = "AWS"
   company_name = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-  location_id  = data.megaport_location.gs_syd.id
+  location_id  = data.megaport_location.syd_gs.id
 }
 
 // mcr
-resource "megaport_mcr" "example" {
-  mcr_name    = "${var.prefix} Terraform Test - MCR"
-  location_id = data.megaport_location.nextdc_b1.id
+resource "megaport_mcr" "mcr" {
+  mcr_name    = "${var.prefix} Terraform Example - MCR"
+  location_id = data.megaport_location.bne_nxt1.id
 
   router {
     port_speed    = 5000
@@ -44,34 +44,34 @@ resource "megaport_mcr" "example" {
 }
 
 // mcr to aws vxc
-resource "megaport_aws_connection" "example" {
-  vxc_name   = "${var.prefix} Terraform Test - AWS VXC"
+resource "megaport_aws_connection" "aws_vxc" {
+  vxc_name   = "${var.prefix} Terraform Example - AWS VXC"
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_mcr.mcr.id
     requested_vlan = 191
   }
 
   csp_settings {
-    attached_to          = megaport_mcr.example.id
-    requested_product_id = data.megaport_partner_port.aws_syd_port.id
+    requested_product_id = data.megaport_partner_port.aws_port.id
     requested_asn        = 64550
-    amazon_asn           = aws_dx_gateway.tf_test.amazon_side_asn
+    amazon_asn           = aws_dx_gateway.dx_gateway.amazon_side_asn
     amazon_account       = data.aws_caller_identity.current.account_id
   }
 }
 
 // mcr to gcp vxc
-resource "megaport_gcp_connection" "example" {
-  vxc_name   = "${var.prefix} Terraform Test - GCP VXC"
+resource "megaport_gcp_connection" "gcp_vxc" {
+  vxc_name   = "${var.prefix} Terraform Example - GCP VXC"
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_mcr.mcr.id
     requested_vlan = 182
   }
 
   csp_settings {
-    attached_to = megaport_mcr.example.id
-    pairing_key = google_compute_interconnect_attachment.tf_test.pairing_key
+    pairing_key = google_compute_interconnect_attachment.interconnect_attachment.pairing_key
   }
 }

@@ -3,43 +3,43 @@ Use this data source to find Partner Ports from the Megaport Marketplace. This i
 
 ## Example Usage (AWS Hosted VIF)
 ```
-data megaport_location glb_switch_sydney {
+data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
 
-data "megaport_partner_port" "aws_test_sydney_1" {
+data "megaport_partner_port" "aws_port_1" {
   connect_type = "AWS"
   company_name = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-  location_id = data.megaport_location.glb_switch_sydney.id
+  location_id = data.megaport_location.syd_gs.id
 }
 ```
 
 ## Example Usage (AWS Hosted Connection)
 ```
-data megaport_location glb_switch_sydney {
+data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
 
-data "megaport_partner_port" "aws_test_sydney_2" {
+data "megaport_partner_port" "aws_port_2" {
   connect_type = "AWSHC"
   company_name = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-  location_id = data.megaport_location.glb_switch_sydney.id
+  location_id = data.megaport_location.syd_gs.id
 }
 ```
 
 ## Example Usage (Google Connection)
 ```
-data megaport_location equinix_se2 {
+data "megaport_location" "sea_eq2" {
   name = "Equinix SE2"
 }
 
-data "megaport_partner_port" "google_test_seattle_us_1" {
+data "megaport_partner_port" "google_port" {
   connect_type = "GOOGLE"
   company_name = "Google Inc"
   product_name = "Seattle (sea-zone1-86)"
-  location_id = data.megaport_location.equinix_se2.id
+  location_id = data.megaport_location.sea_eq2.id
 }
 ```
 

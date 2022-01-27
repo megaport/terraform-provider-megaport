@@ -15,13 +15,13 @@
  */
 
 output "aws_instance_ip" {
-  value = aws_instance.tf_test.private_ip
+  value = aws_instance.instance.private_ip
 }
 
 output "gcp_instance_ip" {
-  value = google_compute_instance.tf_test.network_interface.0.network_ip
+  value = google_compute_instance.instance.network_interface.0.network_ip
 }
 
 output "ssh_command" {
-  value = format("ssh -i ~/.ssh/%s	ec2-user@%s", aws_instance.tf_test.key_name, aws_instance.tf_test.private_ip)
+  value = format("ssh -i ~/.ssh/%s	ec2-user@%s", aws_instance.instance.key_name, aws_instance.instance.private_ip)
 }

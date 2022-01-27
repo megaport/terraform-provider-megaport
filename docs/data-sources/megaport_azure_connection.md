@@ -6,7 +6,7 @@ Use this data source to query an Azure ExpressRoute in your account.
 
 ## Example Usage
 ```
-data "megaport_azure_connection" "test" {
+data "megaport_azure_connection" "azure_vxc" {
   vxc_id = "f2ff815a-ecba-440c-af7e-45a1585df3c1"
 }
 ```

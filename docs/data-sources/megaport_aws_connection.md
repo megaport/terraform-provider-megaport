@@ -10,7 +10,7 @@ Use this data source to query an AWS connection in your account. This connection
 
 ## Example Usage
 ```
-data "megaport_aws_connection" "test" {
+data "megaport_aws_connection" "aws_vxc" {
   vxc_id = "deb28049-a881-4066-b2fd-27bca092f3d3"
 }
 ```

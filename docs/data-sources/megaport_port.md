@@ -3,8 +3,8 @@ Use this data source to find an existing Port to use in resource calls.
 
 ## Example Usage (Single)
 ```
-data megaport_port example_port {
-    port_id = "e7bcbc04-be2d-4947-98b6-55b72a88e25b"
+data "megaport_port" "port" {
+  port_id = "e7bcbc04-be2d-4947-98b6-55b72a88e25b"
 }
 ```
 
@@ -31,4 +31,3 @@ The following arguments are supported:
  - `lag_id` - The LAG identifier.
  - `locked` - Indicates whether the resource has been locked by a user.
  - `admin_locked` - Indicates whether the resource has been locked by an administrator.
-

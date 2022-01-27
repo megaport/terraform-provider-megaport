@@ -3,8 +3,8 @@ Use this data source to find an existing Megaport Cloud Router (MCR) to use in r
 
 ## Example Usage (Single)
 ```
-data megaport_mcr example_mcr {
-    mcr_id = "e7bcbc04-be2d-4947-98b6-55b72a88e25b"
+data "megaport_mcr" "mcr" {
+  mcr_id = "e7bcbc04-be2d-4947-98b6-55b72a88e25b"
 }
 ```
 

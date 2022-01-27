@@ -16,12 +16,12 @@
 
 # aws variables
 variable "aws_region" {
-  description = "The AWS region to create resources in"
+  description = "The AWS region to create resources in."
   default     = "ap-southeast-2"
 }
 
 variable "aws_vpc_cidr" {
-  description = "The CIDR block for the AWS VPC"
+  description = "The CIDR block for the AWS VPC."
   default     = "172.16.1.0/24"
 }
 
@@ -31,27 +31,27 @@ variable "aws_dx_gateway_asn" {
 }
 
 variable "aws_ec2_instance_type" {
-  description = "The type of EC2 instance to be deployed into the AWS VPC"
+  description = "The type of EC2 instance to be deployed into the AWS VPC."
   default     = "t3.micro"
 }
 
 # Azure Region
-variable azure_region {
+variable "azure_region" {
   description = "The region to create the resource group and resources in on Azure."
-  default = "Australia East"
+  default     = "Australia East"
 }
 
-variable prefix {
-  description = "A prefix to add to all the environments"
+variable "prefix" {
+  description = "A prefix to add to all the environments."
   default     = "DemoEnv"
 }
 
-variable aws_ec2_key_pair_name {
+variable "aws_ec2_key_pair_name" {
   description = "The name of a keypair you have created in the AWS account."
   default     = "terraform-testing"
 }
 
-variable azure_expressroute_bandwidth {
+variable "azure_expressroute_bandwidth" {
   description = "Bandwidth required on the ExpressConnect circuit/connection."
-  default = 1000
+  default     = 1000
 }

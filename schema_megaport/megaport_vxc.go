@@ -36,8 +36,9 @@ func ResourceVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
-		"a_end": ResourceVxcEndConfiguration(),
-		"b_end": ResourceVxcEndConfiguration(),
+		"a_end":                   ResourceVxcEndConfiguration(),
+		"b_end":                   ResourceVxcEndConfiguration(),
+		"a_end_mcr_configuration": ResourceMcrConfigurationSettings(),
 		"created_by": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -94,11 +95,115 @@ func ResourceVxcEndConfiguration() *schema.Schema {
 				},
 				"requested_vlan": {
 					Type:     schema.TypeInt,
-					Required: true,
+					Optional: true,
+					Default:  0,
 				},
 				"assigned_vlan": {
 					Type:     schema.TypeInt,
 					Computed: true,
+				},
+				"assigned_asn": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceMcrConfigurationSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		ForceNew: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"ip_addresses": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"bfd_configuration": ResourceBfdConfigSettings(),
+				"bgp_connection":    ResourceBgpConnectionSettings(),
+			},
+		},
+	}
+}
+
+func ResourceBfdConfigSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"tx_internal": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"rx_internal": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"multiplier": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceBgpConnectionSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		Optional: true,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"peer_asn": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"local_ip_address": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"peer_ip_address": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"password": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+				"shutdown": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
+				},
+				"description": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Default:  "",
+				},
+				"med_in": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
+				},
+				"med_out": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
+				},
+				"bfd_enabled": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
 				},
 			},
 		},
@@ -127,8 +232,9 @@ func DataVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
-		"a_end": DataVxcEndConfiguration(),
-		"b_end": DataVxcEndConfiguration(),
+		"a_end":                   DataVxcEndConfiguration(),
+		"b_end":                   DataVxcEndConfiguration(),
+		"a_end_mcr_configuration": DataMcrConfigurationSettings(),
 		"created_by": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -152,46 +258,6 @@ func DataVXCSchema() map[string]*schema.Schema {
 		"admin_locked": {
 			Type:     schema.TypeBool,
 			Computed: true,
-		},
-	}
-}
-
-func ResourcePartnerConnectionEndConfiguration() *schema.Schema {
-	return &schema.Schema{
-		Type:     schema.TypeSet,
-		Optional: true,
-		Computed: true,
-		Elem: &schema.Resource{
-			Schema: map[string]*schema.Schema{
-				"port_id": {
-					Type:     schema.TypeString,
-					Computed: true,
-				},
-				"owner_uid": {
-					Type:     schema.TypeString,
-					Computed: true,
-				},
-				"name": {
-					Type:     schema.TypeString,
-					Computed: true,
-				},
-				"location": {
-					Type:     schema.TypeString,
-					Computed: true,
-				},
-				"assigned_vlan": {
-					Type:     schema.TypeInt,
-					Computed: true,
-				},
-				"assigned_asn": {
-					Type:     schema.TypeInt,
-					Computed: true,
-				},
-				"requested_vlan": {
-					Type:     schema.TypeInt,
-					Required: true,
-				},
-			},
 		},
 	}
 }
@@ -228,6 +294,96 @@ func DataVxcEndConfiguration() *schema.Schema {
 				},
 				"assigned_asn": {
 					Type:     schema.TypeInt,
+					Computed: true,
+				},
+			},
+		},
+	}
+}
+
+func DataMcrConfigurationSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"ip_addresses": {
+					Type:     schema.TypeList,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"bfd_configuration": DataBfdConfigSettings(),
+				"bgp_connection":    DataBgpConnectionSettings(),
+			},
+		},
+	}
+}
+
+func DataBfdConfigSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"tx_internal": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"rx_internal": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"multiplier": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+			},
+		},
+	}
+}
+
+func DataBgpConnectionSettings() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"peer_asn": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"local_ip_address": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"peer_ip_address": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"password": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"shutdown": {
+					Type:     schema.TypeBool,
+					Computed: true,
+				},
+				"description": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"med_in": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"med_out": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"bfd_enabled": {
+					Type:     schema.TypeBool,
 					Computed: true,
 				},
 			},

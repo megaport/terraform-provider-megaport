@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
@@ -36,21 +37,29 @@ func MegaportVXC() *schema.Resource {
 func resourceMegaportVXCCreate(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
 
-	vxcName := d.Get("vxc_name").(string)
-	rateLimit := d.Get("rate_limit").(int)
+	// assemble a end
+	aEndConfiguration, aEndPortId, _ := ResourceMegaportVXCCreate_generate_AEnd(d, m)
 
-	aEndConfiguration := d.Get("a_end").(*schema.Set).List()[0].(map[string]interface{})
-	aEndPortId := aEndConfiguration["port_id"].(string)
-	aEndVLAN := aEndConfiguration["requested_vlan"].(int)
+	// convert schema ends to map for access
+	bEndSchemaMap := d.Get("b_end").(*schema.Set).List()[0].(map[string]interface{})
 
-	bEndConfiguration := d.Get("b_end").(*schema.Set).List()[0].(map[string]interface{})
-	bEndPortId := bEndConfiguration["port_id"].(string)
-	bEndVLAN := bEndConfiguration["requested_vlan"].(int)
+	// assemble b end
+	bEndConfiguration := types.VXCOrderBEndConfiguration{
+		ProductUID: bEndSchemaMap["port_id"].(string),
+		VLAN:       bEndSchemaMap["requested_vlan"].(int),
+	}
 
-	vxcId, vxcErr := vxc.BuyVXC(aEndPortId, bEndPortId, vxcName, rateLimit, aEndVLAN, bEndVLAN)
+	// make order
+	vxcId, buyErr := vxc.BuyVXC(
+		aEndPortId,
+		d.Get("vxc_name").(string),
+		d.Get("rate_limit").(int),
+		aEndConfiguration,
+		bEndConfiguration,
+	)
 
-	if vxcErr != nil {
-		return vxcErr
+	if buyErr != nil {
+		return buyErr
 	}
 
 	d.SetId(vxcId)
@@ -62,19 +71,19 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
 
 	vxcDetails, retrievalErr := vxc.GetVXCDetails(d.Id())
-	aVlan := vxcDetails.AEndConfiguration.VLAN
-	bVlan := vxcDetails.BEndConfiguration.VLAN
+	if retrievalErr != nil {
+		return retrievalErr
+	}
+
+	requested_a_vlan := vxcDetails.AEndConfiguration.VLAN
+	requested_b_vlan := vxcDetails.BEndConfiguration.VLAN
 
 	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
-		aVlan = aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int)
+		requested_a_vlan = aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int)
 	}
 
 	if bEndConfiguration, ok := d.GetOk("b_end"); ok && d.Get("vxc_internal_type") == "vxc" {
-		bVlan = bEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int)
-	}
-
-	if retrievalErr != nil {
-		return retrievalErr
+		requested_b_vlan = bEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int)
 	}
 
 	d.Set("uid", vxcDetails.UID)
@@ -96,7 +105,7 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 		"name":           vxcDetails.AEndConfiguration.Name,
 		"location":       vxcDetails.AEndConfiguration.Location,
 		"assigned_vlan":  vxcDetails.AEndConfiguration.VLAN,
-		"requested_vlan": aVlan,
+		"requested_vlan": requested_a_vlan,
 	}}
 
 	if aEndErr := d.Set("a_end", aEndConfiguration); aEndErr != nil {
@@ -109,15 +118,15 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 		"name":           vxcDetails.BEndConfiguration.Name,
 		"location":       vxcDetails.BEndConfiguration.Location,
 		"assigned_vlan":  vxcDetails.AEndConfiguration.VLAN,
-		"requested_vlan": bVlan,
+		"requested_vlan": requested_b_vlan,
 	}}
-
-	if d.Get("vxc_internal_type") == "vxc" {
-		bEndConfiguration[0].(map[string]interface{})["requested_vlan"] = bVlan
-	}
 
 	if bEndErr := d.Set("b_end", bEndConfiguration); bEndErr != nil {
 		return bEndErr
+	}
+
+	if mcrAEndConfiguration, err := vxc.UnmarshallMcrAEndConfig(vxcDetails); err == nil && mcrAEndConfiguration != nil {
+		d.Set("a_end_mcr_configuration", mcrAEndConfiguration)
 	}
 
 	return nil
@@ -128,6 +137,7 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 //       ** the whole StackSet. I need to think about the structure of data to pick up the modifications better.
 func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
 	aVlan := 0
 	bVlan := 0
 
@@ -163,4 +173,33 @@ func ResourceMegaportVXCDelete(d *schema.ResourceData, m interface{}) error {
 	log.Println("Wait for resource cleanup...")
 	time.Sleep(40 * time.Second)
 	return nil
+}
+
+func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface{}) (types.VXCOrderAEndConfiguration, string, error) {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
+
+	// convert schema to map for param access
+	aEndSchemaMap := d.Get("a_end").(*schema.Set).List()[0].(map[string]interface{})
+
+	// vlan
+	aEndVlan := 0
+	if newVlan, v_ok := aEndSchemaMap["requested_vlan"].(int); v_ok {
+		aEndVlan = newVlan
+	}
+
+	// MCR configuration
+	interfaces := []types.PartnerConfigInterface{}
+	mcrInterface, _ := vxc.MarshallMcrAEndConfig(d)
+	interfaces = append(interfaces, mcrInterface)
+
+	// assemble a end
+	aEndConfiguration := types.VXCOrderAEndConfiguration{
+		VLAN: aEndVlan,
+		PartnerConfig: types.VXCOrderAEndPartnerConfig{
+			Interfaces: interfaces,
+		},
+	}
+
+	//
+	return aEndConfiguration, aEndSchemaMap["port_id"].(string), nil
 }

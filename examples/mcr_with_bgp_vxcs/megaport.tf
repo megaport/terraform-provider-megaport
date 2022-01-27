@@ -37,15 +37,15 @@ data "megaport_location" "bne_nxt1" {
   has_mcr = true
 }
 
-data "megaport_location" "syd_gs" {
-  name = "Global Switch Sydney West"
+data "megaport_location" "syd_sy3" {
+  name = "Equinix SY3"
 }
 
 data "megaport_partner_port" "aws_port" {
-  connect_type = "AWS"
+  connect_type = "AWSHC"
   company_name = "AWS"
-  product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-  location_id  = data.megaport_location.syd_gs.id
+  product_name = "Asia Pacific (Sydney) (ap-southeast-2) [DZ-BLUE]"
+  location_id  = data.megaport_location.syd_sy3.id
 }
 
 resource "megaport_mcr" "mcr" {
@@ -53,56 +53,44 @@ resource "megaport_mcr" "mcr" {
   location_id = data.megaport_location.bne_nxt1.id
 
   router {
-    port_speed    = 5000
+    port_speed    = 2500
     requested_asn = 64555
   }
 }
 
 resource "megaport_aws_connection" "aws_vxc" {
-  vxc_name   = "Terraform Example - AWS VXC"
+  vxc_name   = "Terraform Example - AWSHC VXC"
   rate_limit = 1000
 
   a_end {
     port_id        = megaport_mcr.mcr.id
-    requested_vlan = 2191
+    requested_vlan = 0
+  }
+
+  a_end_mcr_configuration {
+    ip_addresses = ["10.0.0.1/30"]
+    bfd_configuration {
+      tx_internal = 500
+      rx_internal = 400
+      multiplier  = 5
+    }
+    bgp_connection {
+      peer_asn         = 64512
+      local_ip_address = "10.0.0.1"
+      peer_ip_address  = "10.0.0.2"
+      password         = "notARealPassword"
+      shutdown         = false
+      med_in           = 100
+      med_out          = 100
+      bfd_enabled      = true
+    }
   }
 
   csp_settings {
     requested_product_id = data.megaport_partner_port.aws_port.id
     requested_asn        = 64550
     amazon_asn           = 64551
-    amazon_account       = "123456789012"
-  }
-}
-
-resource "megaport_gcp_connection" "gcp_vxc" {
-  vxc_name   = "Terraform Example - GCP VXC"
-  rate_limit = 1000
-
-  a_end {
-    port_id        = megaport_mcr.mcr.id
-    requested_vlan = 182
-  }
-
-  csp_settings {
-    pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
-  }
-}
-
-resource "megaport_azure_connection" "azure_vxc" {
-  vxc_name   = "Terraform Example - Azure VXC"
-  rate_limit = 1000
-
-  a_end {
-    port_id        = megaport_mcr.mcr.id
-    requested_vlan = 3191
-  }
-
-  csp_settings {
-    service_key = "12345678-b4d5-424b-976a-7b0de65a1b62"
-    peerings {
-      private_peer   = true
-      microsoft_peer = true
-    }
+    amazon_account       = "684021030471"
+    hosted_connection    = true
   }
 }

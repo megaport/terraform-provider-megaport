@@ -6,7 +6,7 @@ Use this data source to query a Google Cloud Platform (GCP) connection in your a
 
 ## Example Usage
 ```
-data "megaport_gcp_connection" "test" {
+data "megaport_gcp_connection" "gcp_vxc" {
   vxc_id = "10b03cf2-e3c3-46fb-85c5-3ea4121d9178"
 }
 ```

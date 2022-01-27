@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	vxc_service "github.com/megaport/megaportgo/service/vxc"
+	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
@@ -35,44 +37,40 @@ func MegaportAzureConnection() *schema.Resource {
 func resourceMegaportAzureConnectionCreate(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
 
-	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
-	vlan := 0
+	// assemble a end
+	aEndConfiguration, aEndPortId, _ := ResourceMegaportVXCCreate_generate_AEnd(d, m)
 
-	attachToId := cspSettings["attached_to"].(string)
-	name := d.Get("vxc_name").(string)
+	// csp settings
+	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	rateLimit := d.Get("rate_limit").(int)
 	serviceKey := cspSettings["service_key"].(string)
 	peerings := cspSettings["peerings"].(*schema.Set).List()[0].(map[string]interface{})
 
-	private := false
-	public := false
-	microsoft := false
-
-	if v, ok := peerings["private_peer"].(bool); ok && v {
-		private = true
+	// get partner port
+	partnerPortId, partnerLookupErr := vxc.LookupPartnerPorts(serviceKey, rateLimit, vxc_service.PARTNER_AZURE, "")
+	if partnerLookupErr != nil {
+		return partnerLookupErr
 	}
 
-	if v, ok := peerings["public_peer"].(bool); ok && v {
-		public = true
+	// get partner config
+	partnerConfig, partnerConfigErr := vxc.MarshallPartnerConfig(serviceKey, vxc_service.PARTNER_AZURE, peerings)
+	if partnerConfigErr != nil {
+		return partnerConfigErr
 	}
 
-	if v, ok := peerings["microsoft_peer"].(bool); ok && v {
-		microsoft = true
+	// assemble b end
+	bEndConfiguration := types.PartnerOrderBEndConfiguration{
+		PartnerPortID: partnerPortId,
+		PartnerConfig: partnerConfig,
 	}
 
-	peers := map[string]bool{
-		"private":   private,
-		"public":    public,
-		"microsoft": microsoft,
-	}
-
-	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
-		if newVlan, aOk := aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int); aOk {
-			vlan = newVlan
-		}
-	}
-
-	vxcId, buyErr := vxc.BuyAzureExpressRoute(attachToId, name, rateLimit, vlan, serviceKey, peers)
+	vxcId, buyErr := vxc.BuyPartnerVXC(
+		aEndPortId,
+		d.Get("vxc_name").(string),
+		rateLimit,
+		aEndConfiguration,
+		bEndConfiguration,
+	)
 
 	if buyErr != nil {
 		return buyErr

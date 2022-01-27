@@ -61,12 +61,12 @@ variable "gcp_machine_type" {
   default     = "n1-standard-1"
 }
 
-variable prefix {
+variable "prefix" {
   description = "A prefix to add to all the environments"
   default     = "DemoEnv"
 }
 
-variable aws_ec2_key_pair_name {
+variable "aws_ec2_key_pair_name" {
   description = "The name of a keypair you have created in the AWS account."
   default     = "terraform-testing"
 }

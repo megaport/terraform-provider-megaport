@@ -4,18 +4,18 @@ Private and Microsoft peerings.
 
 ## Example Usage
 ```
-data megaport_location glb_switch_sydney {
+data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
 
-resource megaport_port my_port {
-    port_name       = "My Example Port"
-    port_speed      = 1000
-    location_id     = data.megaport_location.glb_switch_sydney.id
+resource "megaport_port" "port" {
+  port_name   = "Terraform Example - Port"
+  port_speed  = 1000
+  location_id = data.megaport_location.syd_gs.id
 }
 
-resource megaport_azure_connection test {
-  vxc_name = "My Example ExpressRoute"
+resource "megaport_azure_connection" "azure_vxc" {
+  vxc_name   = "Terraform Example - Azure VXC"
   rate_limit = 1000
 
   a_end {
@@ -23,11 +23,11 @@ resource megaport_azure_connection test {
   }
 
   csp_settings {
-    attached_to = megaport_port.my_port.id
+    attached_to = megaport_port.port.id
     service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 
     peerings {
-      private = true
+      private   = true
       microsoft = true
     }
   }
@@ -37,10 +37,9 @@ resource megaport_azure_connection test {
 ## Argument Reference
 - `vxc_name` - (Required) The name of the VXC.
 - `rate_limit` - (Required) The speed of the VXC in Mbps.
-- `a_end`
-    - `requested_vlan` - (Required) The VLAN to assign to the A-End Port.
+- `a_end` - (Required) ** See VXC Documentation
+- `a_end_mcr_configuration` - (Optional) ** See VXC Documentation
 - `csp_settings`:
-    - `attached_to` - (Required) The identifier of the product (Port/MCR) to attach the connection to.
     - `service_key` - (Required) The service key for the new ExpressRoute generated from your Azure subscription.
     - `peerings`:
         - `private`: (Optional, default false) enable private peering between your Megaport Resources and internal Azure

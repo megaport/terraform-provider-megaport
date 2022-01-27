@@ -1,4 +1,4 @@
-This will provision an MCR (Megaport Cloud Router) connected to AWS over a Hosted Connection with BGP and BFD configuration
+This will provision an MCR (Megaport Cloud Router) connected to AWS over a Hosted Connection with BGP and BFD configuration.
 
 Before you begin, you need to have completed the [Getting Started Requirements](https://registry.terraform.io/providers/megaport/megaport/latest/docs/guides/gettingstarted)  
 

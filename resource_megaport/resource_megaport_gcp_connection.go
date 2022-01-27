@@ -15,7 +15,11 @@
 package resource_megaport
 
 import (
+	"time"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	vxc_service "github.com/megaport/megaportgo/service/vxc"
+	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
@@ -32,29 +36,42 @@ func MegaportGcpConnection() *schema.Resource {
 
 func resourceMegaportGcpConnectionCreate(d *schema.ResourceData, m interface{}) error {
 	var buyErr error
-
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
-	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
-	vlan := 0
-	vxcId := ""
 
-	attachToId := cspSettings["attached_to"].(string)
-	name := d.Get("vxc_name").(string)
+	// assemble a end
+	aEndConfiguration, aEndPortId, _ := ResourceMegaportVXCCreate_generate_AEnd(d, m)
+
+	// csp settings
+	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	rateLimit := d.Get("rate_limit").(int)
 	pairingKey := cspSettings["pairing_key"].(string)
 	requestedProductID := cspSettings["requested_product_id"].(string)
 
-	if aEndConfiguration, ok := d.GetOk("a_end"); ok {
-		if newVlan, aOk := aEndConfiguration.(*schema.Set).List()[0].(map[string]interface{})["requested_vlan"].(int); aOk {
-			vlan = newVlan
-		}
+	// get partner port
+	partnerPortId, partnerLookupErr := vxc.LookupPartnerPorts(pairingKey, rateLimit, vxc_service.PARTNER_GOOGLE, requestedProductID)
+	if partnerLookupErr != nil {
+		return partnerLookupErr
 	}
 
-	if requestedProductID != "" {
-		vxcId, buyErr = vxc.BuyGoogleInterconnectLocation(attachToId, name, rateLimit, vlan, pairingKey, requestedProductID)
-	} else {
-		vxcId, buyErr = vxc.BuyGoogleInterconnect(attachToId, name, rateLimit, vlan, pairingKey)
+	// get partner config
+	partnerConfig, partnerConfigErr := vxc.MarshallPartnerConfig(pairingKey, vxc_service.PARTNER_GOOGLE, nil)
+	if partnerConfigErr != nil {
+		return partnerConfigErr
 	}
+
+	// assemble b end
+	bEndConfiguration := types.PartnerOrderBEndConfiguration{
+		PartnerPortID: partnerPortId,
+		PartnerConfig: partnerConfig,
+	}
+
+	vxcId, buyErr := vxc.BuyPartnerVXC(
+		aEndPortId,
+		d.Get("vxc_name").(string),
+		rateLimit,
+		aEndConfiguration,
+		bEndConfiguration,
+	)
 
 	if buyErr != nil {
 		return buyErr
@@ -62,6 +79,7 @@ func resourceMegaportGcpConnectionCreate(d *schema.ResourceData, m interface{}) 
 
 	d.SetId(vxcId)
 	vxc.WaitForVXCProvisioning(vxcId)
+	time.Sleep(60 * time.Second) // wait so that the vLANs will be available.
 	return resourceMegaportGcpConnectionRead(d, m)
 }
 

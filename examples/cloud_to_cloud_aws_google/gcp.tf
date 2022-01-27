@@ -15,18 +15,18 @@
  */
 
 data "google_compute_zones" "available" {
-  region = google_compute_subnetwork.tf_test.region
+  region = google_compute_subnetwork.subnetwork.region
 }
 
 // networking
-resource "google_compute_network" "tf_test" {
+resource "google_compute_network" "network" {
   name                    = "${lower(var.prefix)}-terraform-network"
   auto_create_subnetworks = false
 }
 
-resource "google_compute_firewall" "tf-test" {
+resource "google_compute_firewall" "firewall" {
   name    = "${lower(var.prefix)}-terraform-firewall"
-  network = google_compute_network.tf_test.self_link
+  network = google_compute_network.network.self_link
 
   allow {
     protocol = "tcp"
@@ -38,38 +38,38 @@ resource "google_compute_firewall" "tf-test" {
   }
 }
 
-resource "google_compute_subnetwork" "tf_test" {
+resource "google_compute_subnetwork" "subnetwork" {
   name          = "${lower(var.prefix)}-terraform-subnetwork"
   ip_cidr_range = var.gcp_subnetwork_cidr
   region        = var.gcp_region
-  network       = google_compute_network.tf_test.self_link
+  network       = google_compute_network.network.self_link
 }
 
 // interconnect setup
-resource "google_compute_router" "tf_test" {
+resource "google_compute_router" "router" {
   name    = "${lower(var.prefix)}-terraform-router"
-  network = google_compute_network.tf_test.name
+  network = google_compute_network.network.name
 
   bgp {
     asn            = var.gcp_router_asn
     advertise_mode = "CUSTOM"
 
     advertised_ip_ranges {
-      range = google_compute_subnetwork.tf_test.ip_cidr_range
+      range = google_compute_subnetwork.subnetwork.ip_cidr_range
     }
   }
 }
 
-resource "google_compute_interconnect_attachment" "tf_test" {
+resource "google_compute_interconnect_attachment" "interconnect_attachment" {
   name                     = "${lower(var.prefix)}-terraform-interconnect"
   type                     = "PARTNER"
-  router                   = google_compute_router.tf_test.self_link
+  router                   = google_compute_router.router.self_link
   edge_availability_domain = "AVAILABILITY_DOMAIN_1"
 }
 
 
 // instance
-resource "google_compute_instance" "tf_test" {
+resource "google_compute_instance" "instance" {
   name                      = "${lower(var.prefix)}-terraform-instance"
   machine_type              = var.gcp_machine_type
   zone                      = data.google_compute_zones.available.names[0]
@@ -86,7 +86,7 @@ resource "google_compute_instance" "tf_test" {
   }
 
   network_interface {
-    subnetwork = google_compute_subnetwork.tf_test.self_link
+    subnetwork = google_compute_subnetwork.subnetwork.self_link
 
     access_config {
       // ephemeral ip

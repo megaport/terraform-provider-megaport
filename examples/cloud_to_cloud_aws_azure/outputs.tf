@@ -15,9 +15,9 @@
  */
 
 output "aws_instance_ip" {
-  value = aws_instance.tf_test.private_ip
+  value = aws_instance.instance.private_ip
 }
 
 output "ssh_command" {
-  value = format("ssh -i ~/.ssh/%s	ec2-user@%s", aws_instance.tf_test.key_name, aws_instance.tf_test.private_ip)
+  value = format("ssh -i ~/.ssh/%s	ec2-user@%s", aws_instance.instance.key_name, aws_instance.instance.private_ip)
 }
