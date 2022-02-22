@@ -27,13 +27,13 @@ data "megaport_azure_connection" "azure_vxc" {
 - `locked` - Indicates whether the resource has been locked by a user.
 - `admin_locked` - Indicates whether the resource has been locked by an administrator.
 - `vxc_internal_type` - An internal variable used by Terraform to orchestrate CSP VXCs.
-- `a_end`
+- `a_end`:
     - `port_id` - The resource id of the Port (A-End) for the Azure ExpressRoute connection.
     - `owner_uid` - The owner id of the A-End resource for the Azure ExpressRoute connection.
     - `name` - The name of the A-End resource.
     - `location` - The resource location name.
     - `assigned_vlan` - The VLAN assigned by Megaport to the A-End resource.
-- `b_end`
+- `b_end`:
     - `port_id` - The resource id of the Azure ExpressRoute connection (B-End).
     - `owner_uid` - The owner id of the B-End resource for the Azure ExpressRoute connection.
     - `name` - The name of the B-End resource.

@@ -47,7 +47,7 @@ The following arguments are supported:
 - `company_name` - The name of the company that owns the account for the MCR.
 - `locked` - Indicates whether the resource has been locked by a user.
 - `admin_locked` - Indicates whether the resource has been locked by an admin.
-- `router`
+- `router`:
     - `assigned_asn` - The ASN assigned by Megaport.
     - `requested_asn` - The ASN to assign to the MCR.
     - `port_speed` - The speed of the MCR in Mbps. The value can be between 1000 and 10000 Mbps.

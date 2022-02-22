@@ -24,6 +24,7 @@ data "megaport_partner_port" "aws_port" {
 resource "megaport_port" "port" {
   port_name   = "Terraform Example - Port"
   port_speed  = 1000
+  location_id = data.megaport_location.syd_gs.id
 }
 
 resource "megaport_aws_connection" "aws_vxc" {
@@ -31,11 +32,11 @@ resource "megaport_aws_connection" "aws_vxc" {
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_port.port.id
     requested_vlan = 191
   }
 
   csp_settings {
-    attached_to          = megaport_port.port.id
     requested_product_id = data.megaport_partner_port.aws_port.id
     requested_asn        = 64550
     amazon_asn           = 64551
@@ -50,7 +51,6 @@ resource "megaport_aws_connection" "aws_vxc" {
 - `a_end` - (Required) ** See VXC Documentation
 - `a_end_mcr_configuration` - (Optional) ** See VXC Documentation
 - `csp_settings`:
-    - `attached_to` - (Required) The identifier of the product (Port/MCR) to attach the connection to.
     - `requested_product_id` - (Required) The partner port on-ramp you want to connect to.
     - `visbility` - (Optional) The Direct Connect interface type.
     - `requested_asn` - (Required) The ASN for the AWS connection.
@@ -74,11 +74,13 @@ resource "megaport_aws_connection" "aws_vxc" {
 - `admin_locked` - Indicates whether the resource has been locked by an admin.
 - `vxc_internal_type` - An internal variable used by Terraform to orchestrate CSP VXCs.
 - `a_end`:
+    - `port_id` - The resource id of the Port (A-End) for the AWS connection.
     - `owner_uid` - The owner id of the A-End Port for this connection.
     - `name` - The name of the A-End Port.
     - `location` - The name of the location for the Port.
     - `assigned_vlan` - The VLAN assigned by Megaport to the A-End Port.
 - `b_end`:
+    - `port_id` - The resource id of the AWS connection (B-End).
     - `owner_uid` - The owner id of the B-End port.
     - `name` - The name of the B-End port.
     - `location` - The location name for the B-End Port.

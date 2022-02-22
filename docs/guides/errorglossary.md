@@ -183,10 +183,10 @@ Consider the following two examples for an AWS Hosted VIF Connection in Sydney:
 #### Proper Usage
 
 ```
-data "megaport_partner_port" "aws_test_sydney_1" {
+data "megaport_partner_port" "aws_port" {
   connect_type = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-  location_id = data.megaport_location.glb_switch_sydney.id
+  location_id = data.megaport_location.syd_gs.id
 }
 ```
 
@@ -196,7 +196,7 @@ AWS Hosted VIF Partner Port located in Global Switch Sydney West.
 #### Incorrect Usage
 
 ```
-data "megaport_partner_port" "aws_test_sydney_2" {
+data "megaport_partner_port" "aws_port" {
   company_name = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 }

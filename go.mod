@@ -4,6 +4,6 @@ go 1.13
 
 require (
 	github.com/hashicorp/terraform-plugin-sdk v1.9.1
-	github.com/megaport/megaportgo v0.1.6-beta
+	github.com/megaport/megaportgo v0.1.7-beta
 )
 

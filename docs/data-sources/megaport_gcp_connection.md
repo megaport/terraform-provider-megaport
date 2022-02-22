@@ -29,15 +29,15 @@ data "megaport_gcp_connection" "gcp_vxc" {
 - `locked` - Indicates whether the resource has been locked by a user.
 - `admin_locked` - Indicates whether the resource has been locked by an administrator.
 - `vxc_internal_type` - An internal variable used by terraform to orchestrate CSP VXCs.
-- `a_end`
-- `port_id` - The resource id of the Port (A-End) for the GCP connection.
-- `owner_uid` - The owner id of the A-End resource for the GCP connection.
-- `name` - The name of the A-End resource.
-- `location` - The resource location name.
-- `assigned_vlan` - The VLAN assigned by Megaport to the A-End resource.
-- `b_end`
-- `port_id` - The resource id of the GCP connection (B-End).
-- `owner_uid` - The owner id of the B-End resource for the GCP connection.
-- `name` - The name of the B-End resource.
-- `location` - The resource location name.
-- `assigned_vlan` - The VLAN assigned by Megaport to the B-End resource.
+- `a_end`:
+    - `port_id` - The resource id of the Port (A-End) for the GCP connection.
+    - `owner_uid` - The owner id of the A-End resource for the GCP connection.
+    - `name` - The name of the A-End resource.
+    - `location` - The resource location name.
+    - `assigned_vlan` - The VLAN assigned by Megaport to the A-End resource.
+- `b_end`:
+    - `port_id` - The resource id of the GCP connection (B-End).
+    - `owner_uid` - The owner id of the B-End resource for the GCP connection.
+    - `name` - The name of the B-End resource.
+    - `location` - The resource location name.
+    - `assigned_vlan` - The VLAN assigned by Megaport to the B-End resource.

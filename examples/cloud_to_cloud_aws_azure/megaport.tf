@@ -46,6 +46,7 @@ resource "megaport_mcr" "mcr" {
 resource "megaport_azure_connection" "azure_vxc" {
   vxc_name   = "${var.prefix} Terraform Example - Azure VXC"
   rate_limit = var.azure_expressroute_bandwidth
+  
   a_end {
     port_id        = megaport_mcr.mcr.id
     requested_vlan = 176
@@ -53,6 +54,7 @@ resource "megaport_azure_connection" "azure_vxc" {
 
   csp_settings {
     service_key = azurerm_express_route_circuit.express_route_circuit.service_key
+    
     peerings {
       private_peer   = true
       microsoft_peer = true

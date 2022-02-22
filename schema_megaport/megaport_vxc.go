@@ -122,6 +122,16 @@ func ResourceMcrConfigurationSettings() *schema.Schema {
 					Type:     schema.TypeList,
 					Optional: true,
 					Computed: true,
+					ForceNew: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"nat_ip_addresses": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+					ForceNew: true,
 					Elem: &schema.Schema{
 						Type: schema.TypeString,
 					},
@@ -138,13 +148,14 @@ func ResourceBfdConfigSettings() *schema.Schema {
 		Type:     schema.TypeSet,
 		Optional: true,
 		Computed: true,
+		ForceNew: true,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
-				"tx_internal": {
+				"tx_interval": {
 					Type:     schema.TypeInt,
 					Required: true,
 				},
-				"rx_internal": {
+				"rx_interval": {
 					Type:     schema.TypeInt,
 					Required: true,
 				},
@@ -162,6 +173,7 @@ func ResourceBgpConnectionSettings() *schema.Schema {
 		Type:     schema.TypeList,
 		Optional: true,
 		Computed: true,
+		ForceNew: true,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
 				"peer_asn": {
@@ -314,6 +326,13 @@ func DataMcrConfigurationSettings() *schema.Schema {
 						Type: schema.TypeString,
 					},
 				},
+				"nat_ip_addresses": {
+					Type:     schema.TypeList,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
 				"bfd_configuration": DataBfdConfigSettings(),
 				"bgp_connection":    DataBgpConnectionSettings(),
 			},
@@ -327,11 +346,11 @@ func DataBfdConfigSettings() *schema.Schema {
 		Computed: true,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
-				"tx_internal": {
+				"tx_interval": {
 					Type:     schema.TypeInt,
 					Computed: true,
 				},
-				"rx_internal": {
+				"rx_interval": {
 					Type:     schema.TypeInt,
 					Computed: true,
 				},

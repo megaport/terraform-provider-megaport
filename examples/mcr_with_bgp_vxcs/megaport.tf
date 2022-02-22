@@ -69,11 +69,14 @@ resource "megaport_aws_connection" "aws_vxc" {
 
   a_end_mcr_configuration {
     ip_addresses = ["10.0.0.1/30"]
+    nat_ip_addresses = ["10.0.0.1"]
+    
     bfd_configuration {
-      tx_internal = 500
-      rx_internal = 400
+      tx_interval = 500
+      rx_interval = 400
       multiplier  = 5
     }
+    
     bgp_connection {
       peer_asn         = 64512
       local_ip_address = "10.0.0.1"

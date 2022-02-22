@@ -24,13 +24,13 @@ data "megaport_vxc" "vxc" {
 - `locked` - Indicates whether the resource has been locked by a user.
 - `admin_locked` - Indicates whether the resource has been locked by an administrator.
 - `vxc_internal_type` - An internal variable used by Terraform to orchestrate CSP VXCs.
-- `a_end`
+- `a_end`:
     - `port_id` - The Port that the VXC A-End is attached to.
     - `owner_uid` - The identifier for the owner of the A-End Port.
     - `name` - The A-End Port name.
     - `location` - The name of the data center where the Port is located.
     - `assigned_vlan` - The VLAN that Megaport assigned to the A-End Port.
-- `b_end`
+- `b_end`:
     - `port_id` - The Port that the VXC B-End is attached to.
     - `owner_uid` - The identifier for the owner of the B-End Port.
     - `name` - The B-End Port name.

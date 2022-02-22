@@ -20,11 +20,11 @@ resource "megaport_gcp_connection" "gcp_vxc" {
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_port.port.id
     requested_vlan = 191
   }
 
   csp_settings {
-    attached_to = megaport_port.port.id
     pairing_key = "19f9d93e-05c8-4c18-81fc-095d679ff645/australia-southeast-1/1"
   }
 }
@@ -58,11 +58,11 @@ resource "megaport_gcp_connection" "gcp_vxc" {
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_port.port.id
     requested_vlan = 191
   }
 
   csp_settings {
-    attached_to          = megaport_port.port.id
     pairing_key          = "19f9d93e-05c8-4c18-81fc-095d679ff645/australia-southeast-1/1"
     requested_product_id = data.megaport_partner_port.gcp_port.id
   }
@@ -90,11 +90,13 @@ resource "megaport_gcp_connection" "gcp_vxc" {
 - `admin_locked` - Indicates whether the resource has been locked by an admin.
 - `vxc_internal_type` - An internal variable used by Terraform to orchestrate CSP VXCs.
 - `a_end`:
+    - `port_id` - The resource id of the Port (A-End) for the GCP connection.
     - `owner_uid` - The identifier of the owner of the A-End Port.
     - `name` - The name of the A-End Port.
     - `location` - The location name for the A-End Port.
     - `assigned_vlan` - The VLAN assigned by Megaport to the A-End Port.
 - `b_end`:
+    - `port_id` - The resource id of the GCP connection (B-End).
     - `owner_uid` - The identifier of the owner of the B-End port.
     - `name` - The name of the B-End port.
     - `location` - The location name for the B-End port.

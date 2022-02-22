@@ -1,3 +1,17 @@
+# 0.2.1-beta (February 22, 2022)
+
+## Changes
+  * Feature: NAT support for all VXC Connections with MCR A End
+    * Resource: `megaport_vxc_connection`
+      * Added optional `nat_ip_addresses` configuration
+    * Resource: `megaport_aws_connection`
+      * Added optional `nat_ip_addresses` configuration
+    * Resource: `megaport_azure_connection`
+      * Added optional `nat_ip_addresses` configuration
+    * Resource: `megaport_gcp_connection`
+      * Added optional `nat_ip_addresses` configuration
+    * Documentation and example updates
+
 # 0.2.0-beta (January 27, 2022)
 
 ## Changes

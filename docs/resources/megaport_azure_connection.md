@@ -19,16 +19,16 @@ resource "megaport_azure_connection" "azure_vxc" {
   rate_limit = 1000
 
   a_end {
+    port_id        = megaport_port.port.id
     requested_vlan = 191
   }
 
   csp_settings {
-    attached_to = megaport_port.port.id
     service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 
     peerings {
-      private   = true
-      microsoft = true
+      private_peer   = true
+      microsoft_peer = true
     }
   }
 }
@@ -42,9 +42,9 @@ resource "megaport_azure_connection" "azure_vxc" {
 - `csp_settings`:
     - `service_key` - (Required) The service key for the new ExpressRoute generated from your Azure subscription.
     - `peerings`:
-        - `private`: (Optional, default false) enable private peering between your Megaport Resources and internal Azure
+        - `private_peer` - (Optional, default false) enable private peering between your Megaport Resources and internal Azure
         network.
-        - `microsoft`: (Optional, default false) enable peering between Megaport Resources and the Microsoft Cloud
+        - `microsoft_peer` - (Optional, default false) enable peering between Megaport Resources and the Microsoft Cloud
         (Office 365, Dynamics, etc).
 
 ## Attribute Reference
@@ -59,11 +59,13 @@ resource "megaport_azure_connection" "azure_vxc" {
 - `admin_locked` - Indicates whether the resource has been locked by an admin.
 - `vxc_internal_type` - An internal variable used by Terraform to orchestrate CSP VXCs.
 - `a_end`:
+    - `port_id` - The resource id of the Port (A-End) for the Azure ExpressRoute connection.
     - `owner_uid` - The identifier for the owner of the A-End Port.
     - `name` - The name of the A-End Port.
     - `location` - The location name for the A-End Port.
     - `assigned_vlan` - The VLAN that was assigned by Megaport to the A-End Port.
 - `b_end`:
+    - `port_id` - The resource id of the Azure ExpressRoute connection (B-End).
     - `owner_uid` - The identifier for the owner of the B-End port.
     - `name` - The name of the B-End port.
     - `location` - The location name for the B-End port.
