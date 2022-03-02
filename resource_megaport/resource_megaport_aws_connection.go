@@ -62,6 +62,7 @@ func resourceMegaportAWSConnectionCreate(d *schema.ResourceData, m interface{}) 
 			ConnectType:       connectType,
 			Type:              cspSettings["visibility"].(string),
 			OwnerAccount:      cspSettings["amazon_account"].(string),
+			ConnectionName:    cspSettings["connection_name"].(string),
 		},
 	}
 

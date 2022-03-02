@@ -61,6 +61,7 @@ resource "megaport_aws_connection" "aws_vxc" {
     - `customer_ip` - (Optional) The internal tunnel IP for the Megaport end.
     - `amazon_ip` - (Optional) The internal tunnel IP for the Amazon end.
     - `hosted_connection` - (Optional) If set to true, an AWS Hosted Connection will be created with a dedicated Direct Connect. Otherwise, a Hosted VIF will be created.
+    - `connection_name` - (Optional) The label for the connection in AWS
 
 ## Attributes Reference
 - `uid` - The identifier of the Port.
