@@ -16,6 +16,7 @@ package resource_megaport
 
 import (
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -190,16 +191,22 @@ func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface
 	// MCR configuration
 	interfaces := []types.PartnerConfigInterface{}
 	mcrInterface, _ := vxc.MarshallMcrAEndConfig(d)
-	interfaces = append(interfaces, mcrInterface)
 
-	// assemble a end
-	aEndConfiguration := types.VXCOrderAEndConfiguration{
-		VLAN: aEndVlan,
-		PartnerConfig: types.VXCOrderAEndPartnerConfig{
-			Interfaces: interfaces,
-		},
+	// Add interface if not empty
+	if reflect.DeepEqual(mcrInterface, types.PartnerConfigInterface{}) {
+		aEndConfiguration := types.VXCOrderAEndConfiguration{
+			VLAN: aEndVlan,
+		}
+		return aEndConfiguration, aEndSchemaMap["port_id"].(string), nil
+	} else {
+		interfaces = append(interfaces, mcrInterface)
+		aEndConfiguration := types.VXCOrderAEndConfiguration{
+			VLAN: aEndVlan,
+			PartnerConfig: types.VXCOrderAEndPartnerConfig{
+				Interfaces: interfaces,
+			},
+		}
+		return aEndConfiguration, aEndSchemaMap["port_id"].(string), nil
 	}
 
-	//
-	return aEndConfiguration, aEndSchemaMap["port_id"].(string), nil
 }
