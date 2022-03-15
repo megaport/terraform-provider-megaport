@@ -31,6 +31,9 @@ func MegaportAWSConnection() *schema.Resource {
 		Update: resourceMegaportAWSConnectionUpdate,
 		Delete: resourceMegaportAWSConnectionUpdateDelete,
 		Schema: schema_megaport.ResourceAWSConnectionVXCSchema(),
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 	}
 }
 
@@ -62,6 +65,7 @@ func resourceMegaportAWSConnectionCreate(d *schema.ResourceData, m interface{}) 
 			ConnectType:       connectType,
 			Type:              cspSettings["visibility"].(string),
 			OwnerAccount:      cspSettings["amazon_account"].(string),
+			ConnectionName:    cspSettings["connection_name"].(string),
 		},
 	}
 
@@ -93,9 +97,69 @@ func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) er
 		return retrievalErr
 	}
 
+	d.Set("vxc_internal_type", "aws")
+
 	// Aws read
 	if vifId := vxc.ExtractAwsId(vxcDetails); vifId != "" {
 		d.Set("aws_id", vifId)
+	}
+
+	// AWS CSP read
+	PartnerConfig, err := vxc.ExtractAWSPartnerConfig(vxcDetails)
+	if err != nil {
+		return err
+	}
+	if PartnerConfig != nil {
+		// only read csp_settings into state if we don't have any already (ie. we're importing)
+		// otherwise erroneous options that API ignores may cause a ForceNew loop on each apply
+		if _, ok := d.GetOk("csp_settings"); ok == false {
+			cspSettings := make(map[string]interface{})
+			cspSettings["hosted_connection"] = PartnerConfig.ConnectType == types.CONNECT_TYPE_AWS_HOSTED_CONNECTION
+			cspSettings["visibility"] = "private"
+			if PartnerConfig.Type != "" {
+				cspSettings["visibility"] = PartnerConfig.Type
+			}
+			cspSettings["amazon_account"] = PartnerConfig.OwnerAccount
+			cspSettings["requested_asn"] = PartnerConfig.ASN
+			cspSettings["amazon_asn"] = PartnerConfig.AmazonASN
+			cspSettings["auth_key"] = PartnerConfig.AuthKey
+			cspSettings["prefixes"] = PartnerConfig.Prefixes
+			cspSettings["customer_ip"] = PartnerConfig.CustomerIPAddress
+			cspSettings["amazon_ip"] = PartnerConfig.AmazonIPAddress
+			cspSettings["connection_name"] = PartnerConfig.ConnectionName
+			// requested_product_id requires special handling bacause of a quirk in the API
+			// the b end id is not necessarily what we requested (can be fulfilled from a comparable product not set as vxcPermitted)
+			partner := m.(*terraform_utility.MegaportClient).Partner
+			partnerPorts, retrievalErr := partner.GetAllPartnerMegaports()
+			if retrievalErr != nil {
+				return retrievalErr
+			}
+			var bEndMegaport *types.PartnerMegaport
+			// iterate all ports instead of using FilterPartnerMegaport because that will skip anything not vxcPermitted
+			for i := range partnerPorts {
+				if partnerPorts[i].ProductUID == vxcDetails.BEndConfiguration.UID {
+					bEndMegaport = &partnerPorts[i]
+					break
+				}
+			}
+			if bEndMegaport == nil {
+				return errors.New(InvalidPartnerBEnd)
+			}
+			// now partially reimplement dataMegaportPartnerPortRead to get the current orderable port (will match the data lookup)
+			partner.FilterPartnerMegaportByProductName(&partnerPorts, bEndMegaport.ProductName, true)
+			partner.FilterPartnerMegaportByConnectType(&partnerPorts, bEndMegaport.ConnectType, true)
+			partner.FilterPartnerMegaportByLocationId(&partnerPorts, bEndMegaport.LocationId)
+			partner.FilterPartnerMegaportByCompanyName(&partnerPorts, bEndMegaport.CompanyName, true)
+			if len(partnerPorts) == 0 {
+				return errors.New(NoMatchingPartnerPortsAtLocationError)
+			} else if len(partnerPorts) > 1 {
+				return errors.New(TooManyPartnerPortsError)
+			}
+			cspSettings["requested_product_id"] = partnerPorts[0].ProductUID			
+			if err := d.Set("csp_settings", []map[string]interface{}{cspSettings}); err != nil {
+				return err
+			}
+		}
 	}
 
 	// base VXC read
