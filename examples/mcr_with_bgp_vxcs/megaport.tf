@@ -70,7 +70,11 @@ resource "megaport_aws_connection" "aws_vxc" {
   a_end_mcr_configuration {
     ip_addresses = ["10.0.0.1/30"]
     nat_ip_addresses = ["10.0.0.1"]
-    
+    ip_route {
+      prefix = "10.0.0.1/32"
+      description = "Static route 1"
+      next_hop = "10.0.0.2"
+    }
     bfd_configuration {
       tx_interval = 500
       rx_interval = 400

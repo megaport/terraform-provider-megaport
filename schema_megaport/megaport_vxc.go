@@ -127,6 +127,7 @@ func ResourceMcrConfigurationSettings() *schema.Schema {
 						Type: schema.TypeString,
 					},
 				},
+				"ip_route": ResourceIpRoute(),
 				"nat_ip_addresses": {
 					Type:     schema.TypeList,
 					Optional: true,
@@ -161,6 +162,32 @@ func ResourceBfdConfigSettings() *schema.Schema {
 				},
 				"multiplier": {
 					Type:     schema.TypeInt,
+					Required: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceIpRoute() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		Optional: true,
+		Computed: true,
+		ForceNew: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"prefix": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"description": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Default:  "",
+				},
+				"next_hop": {
+					Type:     schema.TypeString,
 					Required: true,
 				},
 			},
@@ -326,6 +353,7 @@ func DataMcrConfigurationSettings() *schema.Schema {
 						Type: schema.TypeString,
 					},
 				},
+				"ip_route": DataIpRoute(),
 				"nat_ip_addresses": {
 					Type:     schema.TypeList,
 					Computed: true,
@@ -335,6 +363,29 @@ func DataMcrConfigurationSettings() *schema.Schema {
 				},
 				"bfd_configuration": DataBfdConfigSettings(),
 				"bgp_connection":    DataBgpConnectionSettings(),
+			},
+		},
+	}
+}
+
+func DataIpRoute() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"prefix": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"decription": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"next_hop": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
 			},
 		},
 	}

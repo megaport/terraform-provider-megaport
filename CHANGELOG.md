@@ -1,4 +1,12 @@
-# 0.2.2-beta (March 2, 2022)
+# 0.2.3-beta (March 24, 2022)
+
+## Changes
+  * Feature: Static routes for all VXC Connections with MCR A End 
+    * `a_end_mcr_configuration` on all VXC resources can now accept `ip_route` configurations
+  * Bugfixes:
+    * Successfully handle and pass resource delete failures to terraform
+    
+## 0.2.2-beta (March 2, 2022)
 
 ## Changes
   * Bugfixes: 

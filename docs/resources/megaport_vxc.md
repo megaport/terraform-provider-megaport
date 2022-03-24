@@ -42,6 +42,12 @@ resource "megaport_vxc" "vxc" {
     ip_addresses = ["10.0.0.1/30"]
     nat_ip_addresses = ["10.0.0.1"]
 
+    ip_route {
+      prefix = "10.0.0.1/32"
+      next_hop = "10.0.0.2"
+      description = "Static route 1"
+    }
+
     bfd_configuration {
       tx_interval = 500
       rx_interval = 400
@@ -76,6 +82,10 @@ resource "megaport_vxc" "vxc" {
 - `a_end_mcr_configuration` - (Optional) Configuration block for an A-End MCR if you wish to define a BGP Connection.
     - `ip_addresses` - (Optional) List of IP address and associated subnet mask to be configured on this interface.
     - `nat_ip_addresses` - (Optional) List of NAT IP address to be configured on this interface.
+    - `ip_route` - (Optional) Static routes - Configure static routes to provide connectivity to a customer device that doesn’t support BGP or to a target device that requires manually configured addressing and routes - maximum of 50
+        - `prefix` - The IPv4 or IPv6 destination network address in CIDR notation.
+        - `description` - (Optional) A description for the route (will appear in the portal dashboard) 
+        - `next_hop` - The IPv4 or IPv6 address of the next-hop router. The address must be in the same subnet as the interface but it can’t match the interface IP address.
     - `bgp_connection` - (Optional) BGP peering relationships for this interface - maximum of five. Requires an Interface IP Address to be created.
         - `peer_asn` - (Required) The ASN of the remote BGP peer.
         - `local_ip_address` - (Required) The IPv4 or IPv6 address on this interface to use for communication with the BGP peer.

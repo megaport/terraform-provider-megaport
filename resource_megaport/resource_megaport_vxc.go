@@ -15,6 +15,8 @@
 package resource_megaport
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"reflect"
 	"time"
@@ -170,10 +172,17 @@ func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
 
 func ResourceMegaportVXCDelete(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
-	vxc.DeleteVXC(d.Id(), true)
-	log.Println("Wait for resource cleanup...")
-	time.Sleep(40 * time.Second)
-	return nil
+
+	deleteSuccess, deleteError := vxc.DeleteVXC(d.Id(), true)
+
+	if deleteSuccess {
+		log.Println("Wait for resource cleanup...")
+		time.Sleep(40 * time.Second)
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("Error deleting resource %s: %s", d.Id(), deleteError))
+	}
+
 }
 
 func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface{}) (types.VXCOrderAEndConfiguration, string, error) {

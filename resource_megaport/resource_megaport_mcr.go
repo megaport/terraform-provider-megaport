@@ -15,6 +15,9 @@
 package resource_megaport
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
@@ -114,6 +117,13 @@ func resourceMegaportMCRUpdate(d *schema.ResourceData, m interface{}) error {
 
 func resourceMegaportMCRDelete(d *schema.ResourceData, m interface{}) error {
 	mcr := m.(*terraform_utility.MegaportClient).Mcr
-	mcr.DeleteMCR(d.Id(), true)
-	return nil
+
+	deleteSuccess, deleteError := mcr.DeleteMCR(d.Id(), true)
+
+	if deleteSuccess {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("Error deleting resource %s: %s", d.Id(), deleteError))
+	}
+
 }

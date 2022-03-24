@@ -16,6 +16,7 @@ package resource_megaport
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
@@ -144,11 +145,23 @@ func resourceMegaportPortUpdate(d *schema.ResourceData, m interface{}) error {
 
 func resourceMegaportPortDelete(d *schema.ResourceData, m interface{}) error {
 	port := m.(*terraform_utility.MegaportClient).Port
+
 	// we don't want to automatically delete resources as this has physical ramifications and can't be undone.
 	if m.(*terraform_utility.MegaportClient).DeletePorts {
-		port.DeletePort(d.Id(), true)
+
+		deleteSuccess, deleteError := port.DeletePort(d.Id(), true)
+
+		if !deleteSuccess {
+			return errors.New(fmt.Sprintf("Error deleting resource %s: %s", d.Id(), deleteError))
+		}
+
 	} else {
-		port.DeletePort(d.Id(), false)
+
+		cancelSuccess, cancelError := port.DeletePort(d.Id(), false)
+
+		if !cancelSuccess {
+			return errors.New(fmt.Sprintf("Error cancelling resource %s: %s", d.Id(), cancelError))
+		}
 	}
 
 	return nil
