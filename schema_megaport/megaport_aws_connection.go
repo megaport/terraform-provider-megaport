@@ -95,7 +95,7 @@ func ResourceAwsConnectionCspSettings() *schema.Schema {
 				},
 				"requested_asn": {
 					Type:     schema.TypeInt,
-					Required: true,
+					Optional: true,
 					ForceNew: true,
 				},
 				"assigned_asn": {
@@ -104,7 +104,7 @@ func ResourceAwsConnectionCspSettings() *schema.Schema {
 				},
 				"amazon_asn": {
 					Type:     schema.TypeInt,
-					Required: true,
+					Optional: true,
 					ForceNew: true,
 				},
 				"amazon_account": {
