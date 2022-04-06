@@ -90,9 +90,9 @@ resource "megaport_aws_connection" "aws_vxc" {
     - `assigned_asn` - The ASN assigned by Megaport for this connection.
 
 ## Import
- AWS connections can be imported using the `uid`, for example:
- ```shell script
+AWS connections can be imported using the `uid`, for example:
+```shell script
 # terraform import megaport_aws_connection.aws_vxc 43aeaf75-d4e8-46e7-b312-95b931943f55
 ```
 
-Certain csp_settings attributes are invalid for certain A-/B-end combinations (eg. BGP for Hosted Connections not using MCR). If you import a connection, csp_settings will be populated with only the valid attributes. Check the plan after you import, and remove any invalid attributes from your Terraform configuration if it shows a forced new resource for one of these
+Certain csp_settings attributes are invalid for certain A-/B-end combinations (eg. BGP for Hosted Connections not using MCR). If you import a connection, csp_settings will be populated with only the valid attributes. Check the plan after you import, and remove any invalid attributes from your Terraform configuration if it shows a forced new resource for one of these.

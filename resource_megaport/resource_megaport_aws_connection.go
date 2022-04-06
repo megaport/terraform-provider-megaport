@@ -161,7 +161,7 @@ func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) er
 			}
 		}
 	}
-
+	
 	// base VXC read
 	return ResourceMegaportVXCRead(d, m)
 

@@ -1,17 +1,26 @@
+# 0.2.4-beta (April 6, 2022)
+
+## Changes
+  * Feature: Optional connection name attribute for AWS connections. Credit @ngarratt
+    * Added optional `connection_name` into `megaport_aws_connection` resource
+  * Feature: Import support for pre-existing AWS connections. Credit @ngarratt
+    * Documentation:
+      * Added import section for `megaport_aws_connection` resource
+
 # 0.2.3-beta (March 24, 2022)
 
 ## Changes
-  * Feature: Static routes for all VXC Connections with MCR A End 
+  * Feature: Static routes for all VXC Connections with MCR A End
     * `a_end_mcr_configuration` on all VXC resources can now accept `ip_route` configurations
   * Bugfixes:
     * Successfully handle and pass resource delete failures to terraform
-    
+
 ## 0.2.2-beta (March 2, 2022)
 
 ## Changes
-  * Bugfixes: 
+  * Bugfixes:
     * VXC to cloud resources will now properly autoconfigure BGP connection if no manual configuration is supplied.
-  
+
 ## 0.2.1-beta (February 22, 2022)
 
 ## Changes
@@ -31,13 +40,13 @@
 ## Changes
   * Feature: BGP Connection support for all VXC Connections with MCR A End
     * Resource: `megaport_vxc_connection`
-      * Added optional `a_end_mcr_configuration` configuration 
+      * Added optional `a_end_mcr_configuration` configuration
     * Resource: `megaport_aws_connection`
-      * Added optional `a_end_mcr_configuration` configuration 
+      * Added optional `a_end_mcr_configuration` configuration
     * Resource: `megaport_azure_connection`
-      * Added optional `a_end_mcr_configuration` configuration 
+      * Added optional `a_end_mcr_configuration` configuration
     * Resource: `megaport_gcp_connection`
-      * Added optional `a_end_mcr_configuration` configuration 
+      * Added optional `a_end_mcr_configuration` configuration
     * Documentation and example updates
 
 ## Breaking Changes
@@ -47,7 +56,7 @@
   * Resource: `megaport_azure_connection`
     * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other.
   * Resource: `megaport_gcp_connection`
-    * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other. 
+    * Moved `csp_settings.attached_to` to `a_end.port_id` to bring VXC resources in line with each other.
 
 ## 0.1.10-beta (November 5, 2021)
 
@@ -79,7 +88,7 @@ Notes
 * Fix: MCR import now works.
 * Documentation:
   * Removed import sections from `megaport_aws_connection`.
-  * Removed import sections from `megaport_azure_connection`.  
+  * Removed import sections from `megaport_azure_connection`.
   * Removed import sections from `megaport_gcp_connection`.
   * Removed import sections from `megaport_vxc_connection`.
 
@@ -119,7 +128,7 @@ DOCUMENTATION UPDATES:
 
 ## 0.1.0-beta (December 1, 2020)
 
-Notes:  
+Notes:
 
 * Initial Beta release
 
@@ -128,7 +137,7 @@ FEATURES:
 * **New Data-Source:** `megaport_partner_port` Lookup Partner Ports from the Megaport Marketplace
 * **New Data-Source:** `megaport_location` Lookup Megaport Location ID's
 * **New Data-Source:** `megaport_port` Lookup existing Port details
-* **New Data-Source:** `megaport_mcr` Lookup existing MCR (Megaport Cloud Router) details 
+* **New Data-Source:** `megaport_mcr` Lookup existing MCR (Megaport Cloud Router) details
 * **New Data-Source:** `megaport_vxc` Lookup existing VCX (Virtual Cross Connect) details
 * **New Data-Source:** `megaport_aws_connection` Lookup existing AWS CSP connection details
 * **New Data-Source:** `megaport_azure_connection` Lookup existing Azure CSP connection details
