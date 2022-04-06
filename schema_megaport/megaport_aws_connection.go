@@ -142,6 +142,12 @@ func ResourceAwsConnectionCspSettings() *schema.Schema {
 					Default:  false,
 					ForceNew: true,
 				},
+				"connection_name": {
+					Type:     schema.TypeString,
+					Optional: true,
+					ForceNew: true,
+					Default:  "",
+				},
 			},
 		},
 	}
