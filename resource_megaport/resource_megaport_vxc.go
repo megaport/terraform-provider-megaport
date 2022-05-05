@@ -186,8 +186,6 @@ func ResourceMegaportVXCDelete(d *schema.ResourceData, m interface{}) error {
 }
 
 func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface{}) (types.VXCOrderAEndConfiguration, string, error) {
-	vxc := m.(*terraform_utility.MegaportClient).Vxc
-
 	// convert schema to map for param access
 	aEndSchemaMap := d.Get("a_end").(*schema.Set).List()[0].(map[string]interface{})
 
@@ -199,7 +197,7 @@ func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface
 
 	// MCR configuration
 	interfaces := []types.PartnerConfigInterface{}
-	mcrInterface, _ := vxc.MarshallMcrAEndConfig(d)
+	mcrInterface, _ := MarshallMcrAEndConfig(d)
 
 	// Add interface if not empty
 	if reflect.DeepEqual(mcrInterface, types.PartnerConfigInterface{}) {
@@ -217,5 +215,109 @@ func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface
 		}
 		return aEndConfiguration, aEndSchemaMap["port_id"].(string), nil
 	}
+
+}
+
+func MarshallMcrAEndConfig(d *schema.ResourceData) (types.PartnerConfigInterface, error) {
+
+	mcrConfig := types.PartnerConfigInterface{}
+
+	// infer a_end configuration
+	if a_end_mcr_configuration, a_ok := d.GetOk("a_end_mcr_configuration"); a_ok && len(a_end_mcr_configuration.(*schema.Set).List()) > 0 {
+
+		// cast to a map
+		mcr_map := a_end_mcr_configuration.(*schema.Set).List()[0].(map[string]interface{})
+
+		// init config props
+		ip_addresses_list := []string{}
+		ip_routes_list := []types.IpRoute{}
+		nat_ip_addresses_list := []string{}
+		bfd_configuration := types.BfdConfig{}
+		bgp_connection_list := []types.BgpConnectionConfig{}
+
+		// extract ip addresses list
+		if ip_addresses, ip_ok := mcr_map["ip_addresses"].([]interface{}); ip_ok {
+
+			for _, ip_address := range ip_addresses {
+				i := ip_address.(string)
+				ip_addresses_list = append(ip_addresses_list, i)
+			}
+
+			mcrConfig.IpAddresses = ip_addresses_list
+		}
+
+		// extract static ip routes
+		if ip_routes, ipr_ok := mcr_map["ip_route"].([]interface{}); ipr_ok {
+
+			for _, ip_route := range ip_routes {
+
+				i := ip_route.(map[string]interface{})
+
+				new_ip_route := types.IpRoute{
+					Prefix:      i["prefix"].(string),
+					Description: i["description"].(string),
+					NextHop:     i["next_hop"].(string),
+				}
+
+				ip_routes_list = append(ip_routes_list, new_ip_route)
+
+			}
+
+			mcrConfig.IpRoutes = ip_routes_list
+		}
+
+		// extract nat ip addresses list
+		if nat_ip_addresses, nat_ok := mcr_map["nat_ip_addresses"].([]interface{}); nat_ok {
+
+			for _, nat_ip_address := range nat_ip_addresses {
+				i := nat_ip_address.(string)
+				nat_ip_addresses_list = append(nat_ip_addresses_list, i)
+			}
+
+			mcrConfig.NatIpAddresses = nat_ip_addresses_list
+		}
+
+		// extract BFD settings
+		if bfd_config, bfd_ok := mcr_map["bfd_configuration"].(*schema.Set); bfd_ok && len(bfd_config.List()) > 0 {
+
+			bfd_config_map := bfd_config.List()[0].(map[string]interface{})
+			bfd_configuration = types.BfdConfig{
+				TxInterval: bfd_config_map["tx_interval"].(int),
+				RxInterval: bfd_config_map["rx_interval"].(int),
+				Multiplier: bfd_config_map["multiplier"].(int),
+			}
+
+			mcrConfig.Bfd = bfd_configuration
+		}
+
+		// extract bgp connections
+		if bgp_connections, bgp_ok := mcr_map["bgp_connection"].([]interface{}); bgp_ok {
+
+			for _, bgp_connection := range bgp_connections {
+
+				i := bgp_connection.(map[string]interface{})
+
+				new_bgp_connection := types.BgpConnectionConfig{
+					PeerAsn:        i["peer_asn"].(int),
+					LocalIpAddress: i["local_ip_address"].(string),
+					PeerIpAddress:  i["peer_ip_address"].(string),
+					Password:       i["password"].(string),
+					Shutdown:       i["shutdown"].(bool),
+					Description:    i["description"].(string),
+					MedIn:          i["med_in"].(int),
+					MedOut:         i["med_out"].(int),
+					BfdEnabled:     i["bfd_enabled"].(bool),
+				}
+
+				bgp_connection_list = append(bgp_connection_list, new_bgp_connection)
+
+			}
+
+			mcrConfig.BgpConnections = bgp_connection_list
+		}
+
+	}
+
+	return mcrConfig, nil
 
 }
