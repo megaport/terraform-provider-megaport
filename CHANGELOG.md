@@ -1,3 +1,8 @@
+# 0.2.5-beta (May 5, 2022)
+
+## Changes
+  * Refactor: Import MarshallMcrAEndConfig from megaport/megaportgo. Credit @daniel-noland
+
 # 0.2.4-beta (April 6, 2022)
 
 ## Changes
