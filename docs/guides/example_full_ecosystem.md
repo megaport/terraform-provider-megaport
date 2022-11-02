@@ -139,4 +139,20 @@ resource "megaport_gcp_connection" "gcp_vxc" {
     requested_product_id = "90558833-e14f-49cf-84ba-bce1c2c40f2d"
   }
 }
+
+resource "megaport_azure_connection" "azure_vxc" {
+  vxc_name   = "Terraform Example - Azure VXC"
+  rate_limit = 200
+
+  a_end {
+    port_id        = megaport_mcr.mcr.id
+    requested_vlan = 0
+  }
+
+  csp_settings {
+    service_key                   = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+    auto_create_private_peering   = true
+    auto_create_microsoft_peering = true
+  }
+}
 ```

@@ -91,19 +91,16 @@ resource "megaport_gcp_connection" "gcp_vxc" {
 
 resource "megaport_azure_connection" "azure_vxc" {
   vxc_name   = "Terraform Example - Azure VXC"
-  rate_limit = 1000
+  rate_limit = 200
 
   a_end {
     port_id        = megaport_mcr.mcr.id
-    requested_vlan = 3191
+    requested_vlan = 0
   }
 
   csp_settings {
-    service_key = "12345678-b4d5-424b-976a-7b0de65a1b62"
-    
-    peerings {
-      private_peer   = true
-      microsoft_peer = true
-    }
+    service_key                   = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+    auto_create_private_peering   = true
+    auto_create_microsoft_peering = true
   }
 }

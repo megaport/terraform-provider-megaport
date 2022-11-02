@@ -83,35 +83,85 @@ func ResourceAzureConnectionCspSettings() *schema.Schema {
 					Required: true,
 					ForceNew: true,
 				},
-				"peerings": ResourceAzureConnectionCspSettingsPeerings(),
+				"auto_create_private_peering": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
+				},
+				"auto_create_microsoft_peering": {
+					Type:     schema.TypeBool,
+					Optional: true,
+					Default:  false,
+				},
+				"private_peering":   ResourceAzureConnectionCspSettingsPrivatePeering(),
+				"microsoft_peering": ResourceAzureConnectionCspSettingsMicrosoftPeering(),
 			},
 		},
 	}
 }
 
-func ResourceAzureConnectionCspSettingsPeerings() *schema.Schema {
+func ResourceAzureConnectionCspSettingsPrivatePeering() *schema.Schema {
 	return &schema.Schema{
 		Type:     schema.TypeSet,
-		Required: true,
+		Optional: true,
+		ForceNew: true,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
-				"private_peer": {
-					Type:     schema.TypeBool,
-					Optional: true,
-					Default:  false,
-					ForceNew: false,
+				"peer_asn": {
+					Type:     schema.TypeString,
+					Required: true,
 				},
-				"public_peer": {
-					Type:     schema.TypeBool,
-					Optional: true,
-					Default:  false,
-					ForceNew: false,
+				"primary_subnet": {
+					Type:     schema.TypeString,
+					Required: true,
 				},
-				"microsoft_peer": {
-					Type:     schema.TypeBool,
+				"secondary_subnet": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"shared_key": {
+					Type:     schema.TypeString,
 					Optional: true,
-					Default:  false,
-					ForceNew: false,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceAzureConnectionCspSettingsMicrosoftPeering() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		ForceNew: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"peer_asn": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"primary_subnet": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"secondary_subnet": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"public_prefixes": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+				"shared_key": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Required: true,
 				},
 			},
 		},

@@ -2,7 +2,7 @@
 Connects a Port or an MCR to an Azure ExpressRoute Circuit. Supported peering configurations include 
 Private and Microsoft peerings.
 
-## Example Usage
+## Example Usage (Port)
 ```
 data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
@@ -16,20 +16,65 @@ resource "megaport_port" "port" {
 
 resource "megaport_azure_connection" "azure_vxc" {
   vxc_name   = "Terraform Example - Azure VXC"
-  rate_limit = 1000
+  rate_limit = 200
 
   a_end {
     port_id        = megaport_port.port.id
-    requested_vlan = 191
+    requested_vlan = 0
   }
 
   csp_settings {
     service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 
-    peerings {
-      private_peer   = true
-      microsoft_peer = true
+    private_peering {
+      peer_asn         = "64555"
+      primary_subnet   = "10.0.0.0/30"
+      secondary_subnet = "10.0.0.4/30"
+      shared_key       = "SharedKey1"
+      requested_vlan   = 100
     }
+
+    microsoft_peering {
+      peer_asn         = "64555"
+      primary_subnet   = "192.88.99.0/30"
+      secondary_subnet = "192.88.99.4/30"
+      public_prefixes  = "192.88.99.64/26"
+      shared_key       = "SharedKey2"
+      requested_vlan   = 200
+    }
+  }
+}
+```
+
+## Example Usage (MCR)
+```
+data "megaport_location" "syd_gs" {
+  name = "Global Switch Sydney West"
+}
+
+resource "megaport_mcr" "mcr" {
+  mcr_name    = "Terraform Example - MCR"
+  location_id = data.megaport_location.syd_gs.id
+
+  router {
+    port_speed    = 5000
+    requested_asn = 64555
+  }
+}
+
+resource "megaport_azure_connection" "azure_vxc" {
+  vxc_name   = "Terraform Example - Azure VXC"
+  rate_limit = 200
+
+  a_end {
+    port_id        = megaport_mcr.mcr.id
+    requested_vlan = 0
+  }
+
+  csp_settings {
+    service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+    auto_create_private_peering   = true
+    auto_create_microsoft_peering = true
   }
 }
 ```
@@ -41,11 +86,21 @@ resource "megaport_azure_connection" "azure_vxc" {
 - `a_end_mcr_configuration` - (Optional) ** See VXC Documentation
 - `csp_settings`:
     - `service_key` - (Required) The service key for the new ExpressRoute generated from your Azure subscription.
-    - `peerings`:
-        - `private_peer` - (Optional, default false) enable private peering between your Megaport Resources and internal Azure
-        network.
-        - `microsoft_peer` - (Optional, default false) enable peering between Megaport Resources and the Microsoft Cloud
-        (Office 365, Dynamics, etc).
+    - `auto_create_private_peering` - (Optional, default false) Creates Private peering with auto-generated values. Only works for MCR's, for Ports peering values must be supplied (see below).
+    - `auto_create_microsoft_peering` - (Optional, default false) Creates Microsoft peering with auto-generated values. Only works for MCR's, for Ports peering values must be supplied (see below).
+    - `private_peering` - (Optional):
+        - `peer_asn` - (Required) The peer ASN for the peering.
+        - `primary_subnet` - (Required) The primary subnet for the peering.
+        - `secondary_subnet` - (Required) The secondary subnet for the peering.
+        - `shared_key` - (Optional) The shared key for the peering.
+        - `requested_vlan` - (Required) The VLAN for the peering.
+    - `microsoft_peering` - (Optional):
+        - `peer_asn` - (Required) The peer ASN for the peering.
+        - `primary_subnet` - (Required) The primary subnet for the peering.
+        - `secondary_subnet` - (Required) The secondary subnet for the peering.
+        - `public_prefixes` - (Optional) The public prefixes for the peering.
+        - `shared_key` - (Optional) The shared key for the peering.
+        - `requested_vlan` - (Required) The VLAN for the peering.
 
 ## Attribute Reference
 - `uid` - The Port identifier.

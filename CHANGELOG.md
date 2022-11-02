@@ -1,3 +1,16 @@
+# 0.2.6-beta (Nov 2, 2022)
+
+## Changes
+  * Feature: Support for manually supplying peering values for Azure VXC's.
+    * Resource: `megaport_azure_connection`
+      * Azure peering values can now be manually supplied via `private_peering` and `microsoft_peering` blocks.
+      * Added `auto_create_private_peering` and `auto_create_microsoft_peering` boolean options.
+    * Documentation and example updates.
+
+## Breaking Changes
+  * Resource: `megaport_azure_connection`
+    * Replaced `peerings` block within `csp_settings` with auto-create boolean options.
+
 # 0.2.5-beta (May 5, 2022)
 
 ## Changes

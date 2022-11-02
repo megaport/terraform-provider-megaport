@@ -44,7 +44,44 @@ func resourceMegaportAzureConnectionCreate(d *schema.ResourceData, m interface{}
 	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
 	rateLimit := d.Get("rate_limit").(int)
 	serviceKey := cspSettings["service_key"].(string)
-	peerings := cspSettings["peerings"].(*schema.Set).List()[0].(map[string]interface{})
+
+	// peerings
+	var peerings []types.PartnerOrderAzurePeeringConfig
+	if len(cspSettings["private_peering"].(*schema.Set).List()) > 0 {
+		private_peering := cspSettings["private_peering"].(*schema.Set).List()[0].(map[string]interface{})
+		new_private_peering := types.PartnerOrderAzurePeeringConfig{
+			Type:            "private",
+			PeerASN:         private_peering["peer_asn"].(string),
+			PrimarySubnet:   private_peering["primary_subnet"].(string),
+			SecondarySubnet: private_peering["secondary_subnet"].(string),
+			SharedKey:       private_peering["shared_key"].(string),
+			VLAN:            private_peering["requested_vlan"].(int),
+		}
+		peerings = append(peerings, new_private_peering)
+	} else if cspSettings["auto_create_private_peering"].(bool) {
+		new_private_peering := types.PartnerOrderAzurePeeringConfig{
+			Type: "private",
+		}
+		peerings = append(peerings, new_private_peering)
+	}
+	if len(cspSettings["microsoft_peering"].(*schema.Set).List()) > 0 {
+		microsoft_peering := cspSettings["microsoft_peering"].(*schema.Set).List()[0].(map[string]interface{})
+		new_microsoft_peering := types.PartnerOrderAzurePeeringConfig{
+			Type:            "microsoft",
+			PeerASN:         microsoft_peering["peer_asn"].(string),
+			PrimarySubnet:   microsoft_peering["primary_subnet"].(string),
+			SecondarySubnet: microsoft_peering["secondary_subnet"].(string),
+			Prefixes:        microsoft_peering["public_prefixes"].(string),
+			SharedKey:       microsoft_peering["shared_key"].(string),
+			VLAN:            microsoft_peering["requested_vlan"].(int),
+		}
+		peerings = append(peerings, new_microsoft_peering)
+	} else if cspSettings["auto_create_microsoft_peering"].(bool) {
+		new_microsoft_peering := types.PartnerOrderAzurePeeringConfig{
+			Type: "microsoft",
+		}
+		peerings = append(peerings, new_microsoft_peering)
+	}
 
 	// get partner port
 	partnerPortId, partnerLookupErr := vxc.LookupPartnerPorts(serviceKey, rateLimit, vxc_service.PARTNER_AZURE, "")
