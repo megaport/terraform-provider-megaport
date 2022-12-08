@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
@@ -52,6 +53,29 @@ func resourceMegaportMCRCreate(d *schema.ResourceData, m interface{}) error {
 
 	d.SetId(mcrId)
 	mcr.WaitForMcrProvisioning(mcrId)
+
+	for i := 0; i < len(d.Get("prefix_filter_list").(*schema.Set).List()); i++ {
+		prefixFilterList := d.Get("prefix_filter_list").(*schema.Set).List()[i].(map[string]interface{})
+		var prefixFilterEntries []types.MCRPrefixListEntry
+		for x := 0; x < len(prefixFilterList["entry"].(*schema.Set).List()); x++ {
+			entries := prefixFilterList["entry"].(*schema.Set).List()[x].(map[string]interface{})
+			prefixFilterEntry := types.MCRPrefixListEntry{
+				Action: entries["action"].(string),
+				Prefix: entries["prefix"].(string),
+				Ge:     entries["range_min"].(int),
+				Le:     entries["range_max"].(int),
+			}
+			prefixFilterEntries = append(prefixFilterEntries, prefixFilterEntry)
+		}
+
+		validatedPrefixFilterList := types.MCRPrefixFilterList{
+			Description:   prefixFilterList["name"].(string),
+			AddressFamily: prefixFilterList["address_family"].(string),
+			Entries:       prefixFilterEntries,
+		}
+
+		mcr.CreatePrefixFilterList(mcrId, validatedPrefixFilterList)
+	}
 	return resourceMegaportMCRRead(d, m)
 }
 

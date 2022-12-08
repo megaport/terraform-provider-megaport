@@ -136,8 +136,9 @@ func ResourceMegaportVXCRead(d *schema.ResourceData, m interface{}) error {
 }
 
 // TODO: See if we can do a .HasChange on the subitem for vlans.
-//       ** This is the expected behaviour of StackSet - the item is hashed and changes are across
-//       ** the whole StackSet. I need to think about the structure of data to pick up the modifications better.
+//
+//	** This is the expected behaviour of StackSet - the item is hashed and changes are across
+//	** the whole StackSet. I need to think about the structure of data to pick up the modifications better.
 func ResourceMegaportVXCUpdate(d *schema.ResourceData, m interface{}) error {
 	vxc := m.(*terraform_utility.MegaportClient).Vxc
 
@@ -197,7 +198,7 @@ func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface
 
 	// MCR configuration
 	interfaces := []types.PartnerConfigInterface{}
-	mcrInterface, _ := MarshallMcrAEndConfig(d)
+	mcrInterface, _ := MarshallMcrAEndConfig(d, m)
 
 	// Add interface if not empty
 	if reflect.DeepEqual(mcrInterface, types.PartnerConfigInterface{}) {
@@ -218,7 +219,8 @@ func ResourceMegaportVXCCreate_generate_AEnd(d *schema.ResourceData, m interface
 
 }
 
-func MarshallMcrAEndConfig(d *schema.ResourceData) (types.PartnerConfigInterface, error) {
+func MarshallMcrAEndConfig(d *schema.ResourceData, m interface{}) (types.PartnerConfigInterface, error) {
+	vxc := m.(*terraform_utility.MegaportClient).Vxc
 
 	mcrConfig := types.PartnerConfigInterface{}
 
@@ -234,6 +236,12 @@ func MarshallMcrAEndConfig(d *schema.ResourceData) (types.PartnerConfigInterface
 		nat_ip_addresses_list := []string{}
 		bfd_configuration := types.BfdConfig{}
 		bgp_connection_list := []types.BgpConnectionConfig{}
+		permit_exports_list := []string{}
+		deny_exports_list := []string{}
+		var import_permit_list_id int
+		var import_deny_list_id int
+		var export_permit_list_id int
+		var export_deny_list_id int
 
 		// extract ip addresses list
 		if ip_addresses, ip_ok := mcr_map["ip_addresses"].([]interface{}); ip_ok {
@@ -297,16 +305,92 @@ func MarshallMcrAEndConfig(d *schema.ResourceData) (types.PartnerConfigInterface
 
 				i := bgp_connection.(map[string]interface{})
 
+				mcrId := d.Get("a_end").(*schema.Set).List()[0].(map[string]interface{})["port_id"].(string)
+				prefix_filter_lists, _ := vxc.GetPrefixFilterLists(mcrId)
+
+				// extract permit exports list
+				if permit_exports, p_ok := i["permit_export_to"].([]interface{}); p_ok {
+
+					for _, permit_export := range permit_exports {
+						x := permit_export.(string)
+						permit_exports_list = append(permit_exports_list, x)
+					}
+				}
+
+				// extract deny exports list
+				if deny_exports, d_ok := i["deny_export_to"].([]interface{}); d_ok {
+
+					for _, deny_export := range deny_exports {
+						x := deny_export.(string)
+						deny_exports_list = append(deny_exports_list, x)
+					}
+				}
+
+				// extract import permit list
+				if len(i["import_permit_list"].(string)) > 0 {
+					import_permit_list := i["import_permit_list"]
+
+					for i := 0; i < len(prefix_filter_lists); i++ {
+						if prefix_filter_lists[i].Description == import_permit_list {
+							import_permit_list_id = prefix_filter_lists[i].Id
+							break
+						}
+					}
+				}
+
+				// extract import deny list
+				if len(i["import_deny_list"].(string)) > 0 {
+					import_deny_list := i["import_deny_list"]
+
+					for i := 0; i < len(prefix_filter_lists); i++ {
+						if prefix_filter_lists[i].Description == import_deny_list {
+							import_deny_list_id = prefix_filter_lists[i].Id
+							break
+						}
+					}
+				}
+
+				// extract export permit list
+				if len(i["export_permit_list"].(string)) > 0 {
+					export_permit_list := i["export_permit_list"]
+
+					for i := 0; i < len(prefix_filter_lists); i++ {
+						if prefix_filter_lists[i].Description == export_permit_list {
+							export_permit_list_id = prefix_filter_lists[i].Id
+							break
+						}
+					}
+				}
+
+				// extract export deny list
+				if len(i["export_deny_list"].(string)) > 0 {
+					export_deny_list := i["export_deny_list"]
+
+					for i := 0; i < len(prefix_filter_lists); i++ {
+						if prefix_filter_lists[i].Description == export_deny_list {
+							export_deny_list_id = prefix_filter_lists[i].Id
+							break
+						}
+					}
+				}
+
 				new_bgp_connection := types.BgpConnectionConfig{
-					PeerAsn:        i["peer_asn"].(int),
-					LocalIpAddress: i["local_ip_address"].(string),
-					PeerIpAddress:  i["peer_ip_address"].(string),
-					Password:       i["password"].(string),
-					Shutdown:       i["shutdown"].(bool),
-					Description:    i["description"].(string),
-					MedIn:          i["med_in"].(int),
-					MedOut:         i["med_out"].(int),
-					BfdEnabled:     i["bfd_enabled"].(bool),
+					PeerAsn:         i["peer_asn"].(int),
+					LocalIpAddress:  i["local_ip_address"].(string),
+					PeerIpAddress:   i["peer_ip_address"].(string),
+					Password:        i["password"].(string),
+					Shutdown:        i["shutdown"].(bool),
+					Description:     i["description"].(string),
+					MedIn:           i["med_in"].(int),
+					MedOut:          i["med_out"].(int),
+					BfdEnabled:      i["bfd_enabled"].(bool),
+					ExportPolicy:    i["export_policy"].(string),
+					PermitExportTo:  permit_exports_list,
+					DenyExportTo:    deny_exports_list,
+					ImportWhitelist: import_permit_list_id,
+					ImportBlacklist: import_deny_list_id,
+					ExportWhitelist: export_permit_list_id,
+					ExportBlacklist: export_deny_list_id,
 				}
 
 				bgp_connection_list = append(bgp_connection_list, new_bgp_connection)

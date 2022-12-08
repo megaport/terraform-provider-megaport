@@ -72,7 +72,8 @@ func ResourceMegaportMCRSchema() map[string]*schema.Schema {
 			Type:     schema.TypeBool,
 			Computed: true,
 		},
-		"router": ResourceMcrVirtualRouterConfiguration(),
+		"router":             ResourceMcrVirtualRouterConfiguration(),
+		"prefix_filter_list": ResourceMcrPrefixFilterList(),
 	}
 }
 
@@ -95,6 +96,59 @@ func ResourceMcrVirtualRouterConfiguration() *schema.Schema {
 				"port_speed": {
 					Type:     schema.TypeInt,
 					Required: true,
+					ForceNew: true,
+				},
+			},
+		},
+	}
+}
+
+func ResourceMcrPrefixFilterList() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Optional: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"name": {
+					Type:     schema.TypeString,
+					Required: true,
+					ForceNew: true,
+				},
+				"address_family": {
+					Type:     schema.TypeString,
+					Required: true,
+					ForceNew: true,
+				},
+				"entry": ResourceMcrPrefixListEntry(),
+			},
+		},
+	}
+}
+
+func ResourceMcrPrefixListEntry() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Required: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"action": {
+					Type:     schema.TypeString,
+					Required: true,
+					ForceNew: true,
+				},
+				"prefix": {
+					Type:     schema.TypeString,
+					Required: true,
+					ForceNew: true,
+				},
+				"range_min": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					ForceNew: true,
+				},
+				"range_max": {
+					Type:     schema.TypeInt,
+					Optional: true,
 					ForceNew: true,
 				},
 			},
@@ -160,7 +214,8 @@ func DataMegaportMCRSchema() map[string]*schema.Schema {
 			Type:     schema.TypeBool,
 			Computed: true,
 		},
-		"router": DataMcrVirtualRouterConfiguration(),
+		"router":             DataMcrVirtualRouterConfiguration(),
+		"prefix_filter_list": DataMcrPrefixFilterList(),
 	}
 }
 
@@ -175,6 +230,53 @@ func DataMcrVirtualRouterConfiguration() *schema.Schema {
 					Computed: true,
 				},
 				"port_speed": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+			},
+		},
+	}
+}
+
+func DataMcrPrefixFilterList() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"name": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"address_family": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"entry": DataMcrPrefixListEntry(),
+			},
+		},
+	}
+}
+
+func DataMcrPrefixListEntry() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeSet,
+		Computed: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"action": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"prefix": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"range_min": {
+					Type:     schema.TypeInt,
+					Computed: true,
+				},
+				"range_max": {
 					Type:     schema.TypeInt,
 					Computed: true,
 				},

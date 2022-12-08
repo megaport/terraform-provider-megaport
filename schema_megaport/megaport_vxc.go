@@ -244,6 +244,47 @@ func ResourceBgpConnectionSettings() *schema.Schema {
 					Optional: true,
 					Default:  false,
 				},
+				"export_policy": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"permit_export_to": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"deny_export_to": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"import_permit_list": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"import_deny_list": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"export_permit_list": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"export_deny_list": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
 			},
 		},
 	}
@@ -454,6 +495,40 @@ func DataBgpConnectionSettings() *schema.Schema {
 				},
 				"bfd_enabled": {
 					Type:     schema.TypeBool,
+					Computed: true,
+				},
+				"export_policy": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"permit_export_to": {
+					Type:     schema.TypeList,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"deny_export_to": {
+					Type:     schema.TypeList,
+					Computed: true,
+					Elem: &schema.Schema{
+						Type: schema.TypeString,
+					},
+				},
+				"import_permit_list": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"import_deny_list": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"export_permit_list": {
+					Type:     schema.TypeString,
+					Computed: true,
+				},
+				"export_deny_list": {
+					Type:     schema.TypeString,
 					Computed: true,
 				},
 			},

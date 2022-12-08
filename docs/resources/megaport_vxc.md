@@ -96,6 +96,13 @@ resource "megaport_vxc" "vxc" {
         - `med_in` - (Optional) The MED will be applied to all routes received on this BGP connection. Leave blank to use the value received from the BGP peer. The route with the lowest value will be preferred.
         - `med_out` - (Optional) The MED will be applied to all routes transmitted on this BGP connection. The neighbouring autonomous system may prefer the lowest value at their discretion.
         - `bfd_enabled` - (Optional) Must be true for BFD configuration to be honoured - default is false.
+        - `export_policy` - (Optional) You can advertise routes to all peers by default and filter routes to specific peers. Or, you can filter routes to all peers by default and advertise routes to specific peers. "permit" to Advertise by default, "deny" to Advertise by Exception.
+        - `permit_export_to` - (Optional) List of IP addresses matching BGP peer to allow export of routes.
+        - `deny_export_to` - (Optional) List of IP addresses matching BGP peer to deny export of routes.
+        - `import_permit_list` - (Optional) The name of the import prefix filter list to be used as a Permit list.
+        - `import_deny_list` - (Optional) The name of the import prefix filter list to be used as a Deny list.
+        - `export_permit_list` - (Optional) The name of the export prefix filter list to be used as a Permit list.
+        - `export_deny_list` - (Optional) The name of the export prefix filter list to be used as a Deny list.
     - `bfd_configuration` - (Optional) Bidirectional Forwarding Detection. These settings will be used for all BGP connections on this interface where BFD is enabled.
         - `tx_interval` - (Optional) The minimum time between sending BFD packets to the neighbour. The supported range is 300ms to 9000ms.
         - `rx_interval` - (Optional) The minimum time between BFD packets that a neighbour should send. The supported range is 300ms to 9000ms.

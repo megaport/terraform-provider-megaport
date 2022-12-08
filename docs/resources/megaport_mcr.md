@@ -21,6 +21,24 @@ resource "megaport_mcr" "mcr" {
     port_speed    = 5000
     requested_asn = 64555
   }
+
+  prefix_filter_list {
+    name           = "Prefix filter list 1"
+    address_family = "IPv4"
+
+    entry {
+      action    = "permit"
+      prefix    = "10.0.1.0/24"
+      range_min = 24
+      range_max = 24
+    }
+    entry {
+      action    = "deny"
+      prefix    = "10.0.2.0/24"
+      range_min = 24
+      range_max = 24
+    }
+  }
 }
 ```
 
@@ -28,9 +46,17 @@ resource "megaport_mcr" "mcr" {
 The following arguments are supported:
 - `mcr_name` - (Required) The name for the MCR.
 - `location_id` - (Required) The identifier of the preferred data center location for the MCR. This location must be MCR-enabled.
-- `router`
+- `router` - (Required)
     - `requested_asn` - (Optional) The Autonomous System Number (ASN) to assign to the MCR.
     - `port_speed` - (Required) The speed of the MCR in Mbps. The value can be between 1000 and 10000 Mbps.
+- `prefix_filter_list` - (Optional)
+    - `name` - (Required) The name of the prefix filter list.
+    - `address_family` - (Required) The IP address family. IPv4 or IPv6.
+    - `entry` - (Required) A single line prefix filter list rule.
+        - `action` - (Required) The entry action. Permit or Deny.
+        - `prefix` - (Required) IP address CIDR range for the entry.
+        - `range_min` - (Optional) Lower bound CIDR subnet mask value.
+        - `range_max` - (Optional) Upper bound CIDR subnet mask value.
     
 ## Attribute Reference
 

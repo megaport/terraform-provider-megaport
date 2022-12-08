@@ -54,6 +54,46 @@ resource "megaport_mcr" "mcr" {
     port_speed    = 2500
     requested_asn = 64555
   }
+
+  prefix_filter_list {
+    name           = "Prefix filter list 1"
+    address_family = "IPv4"
+
+    entry {
+      action    = "permit"
+      prefix    = "10.0.1.0/24"
+      range_min = 24
+      range_max = 24
+    }
+    entry {
+      action    = "deny"
+      prefix    = "10.0.2.0/24"
+      range_min = 24
+      range_max = 24
+    }
+  }
+}
+
+resource "megaport_azure_connection" "azure_vxc" {
+  vxc_name   = "Terraform Example - Azure VXC"
+  rate_limit = 200
+
+  a_end {
+    port_id        = megaport_mcr.mcr.id
+    requested_vlan = 0
+  }
+
+  csp_settings {
+    service_key = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
+
+    private_peering {
+      peer_asn         = "64555"
+      primary_subnet   = "10.0.1.0/30"
+      secondary_subnet = "10.0.2.0/30"
+      shared_key       = "SharedKey1"
+      requested_vlan   = 100
+    }
+  }
 }
 
 resource "megaport_aws_connection" "aws_vxc" {
@@ -66,24 +106,27 @@ resource "megaport_aws_connection" "aws_vxc" {
   }
 
   a_end_mcr_configuration {
-    ip_addresses = ["10.0.0.1/30"]
+    ip_addresses     = ["10.0.0.1/30"]
     nat_ip_addresses = ["10.0.0.1"]
-    
+
     bfd_configuration {
       tx_interval = 500
       rx_interval = 400
       multiplier  = 5
     }
-    
+
     bgp_connection {
-      peer_asn         = 64512
-      local_ip_address = "10.0.0.1"
-      peer_ip_address  = "10.0.0.2"
-      password         = "notARealPassword"
-      shutdown         = false
-      med_in           = 100
-      med_out          = 100
-      bfd_enabled      = true
+      peer_asn           = 64512
+      local_ip_address   = "10.0.0.1"
+      peer_ip_address    = "10.0.0.2"
+      password           = "notARealPassword"
+      shutdown           = false
+      med_in             = 100
+      med_out            = 100
+      bfd_enabled        = true
+      export_policy      = "deny"
+      permit_export_to   = ["10.0.1.2"]
+      import_permit_list = "Prefix filter list 1"
     }
   }
 

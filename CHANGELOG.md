@@ -1,3 +1,12 @@
+# 0.2.7-beta (Dec 8, 2022)
+
+## Changes
+  * Feature: Support for creating Prefix Filter Lists on MCR's.
+    * Prefix Filter Lists (multiple allowed) can now be created for MCR resources.
+  * Feature: Support for applying BGP Peer Filters and BGP Prefix Filters on VXC's.
+    * BGP Peer Filter and BGP Prefix Filter configuration can now be applied within the `a_end_mcr_configuration` `bgp_connection` block for VXC resources.
+  * Documentation and example updates.
+
 # 0.2.6-beta (Nov 2, 2022)
 
 ## Changes
