@@ -1,3 +1,11 @@
+# 0.2.8-beta (Feb 20, 2023)
+
+## Changes
+  * Feature: Support for filtering Partner Megaports by Diversity Zone.
+    * Data Source: `megaport_partner_port`
+      * Partner Megaports can now be filtered by `diversity_zone` attribute.
+    * Documentation and example updates.
+
 # 0.2.7-beta (Dec 8, 2022)
 
 ## Changes

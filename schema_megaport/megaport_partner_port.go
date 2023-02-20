@@ -48,5 +48,10 @@ func DataPartnerPortSchema() map[string]*schema.Schema {
 			Type:     schema.TypeInt,
 			Computed: true,
 		},
+		"diversity_zone": {
+			Type:     schema.TypeString,
+			Optional: true,
+			Default:  "",
+		},
 	}
 }

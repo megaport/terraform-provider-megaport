@@ -72,7 +72,7 @@ resource "megaport_azure_connection" "azure_vxc" {
   }
 
   csp_settings {
-    service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+    service_key                   = "1b2329a5-56dc-45d0-8a0d-87b706297777"
     auto_create_private_peering   = true
     auto_create_microsoft_peering = true
   }

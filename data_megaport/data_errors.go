@@ -7,3 +7,4 @@ const CompanyNameFilterTooStrictError = "no results have been returned as the co
 const TooManyPartnerPortsError = "too many results returned, please add more filter properties"
 const NoLocationsFoundError = "your location filters are too strict or a location doesn't exist that match your filters"
 const TooManyLocationsError = "more than result has been returned, add additional filters until 1 result is returned"
+const NoMatchingDiversityZoneAtLocationError = "no matching diversity zone found at that location"

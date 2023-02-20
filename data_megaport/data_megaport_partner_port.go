@@ -42,6 +42,7 @@ func dataMegaportPartnerPortRead(d *schema.ResourceData, m interface{}) error {
 	connectTypeLookupErr := partner.FilterPartnerMegaportByConnectType(&partnerPorts, d.Get("connect_type").(string), true)
 	locationLookupErr := partner.FilterPartnerMegaportByLocationId(&partnerPorts, d.Get("location_id").(int))
 	companyNameLookupErr := partner.FilterPartnerMegaportByCompanyName(&partnerPorts, d.Get("company_name").(string), true)
+	diversityZoneLookupErr := partner.FilterPartnerMegaportByDiversityZone(&partnerPorts, d.Get("diversity_zone").(string), true)
 
 	if productNameLookupErr != nil {
 		return errors.New(ProductNameFilterTooStrictError)
@@ -59,6 +60,10 @@ func dataMegaportPartnerPortRead(d *schema.ResourceData, m interface{}) error {
 		return errors.New(CompanyNameFilterTooStrictError)
 	}
 
+	if diversityZoneLookupErr != nil {
+		return errors.New(NoMatchingDiversityZoneAtLocationError)
+	}
+
 	if len(partnerPorts) != 1 {
 		return errors.New(TooManyPartnerPortsError)
 	}
@@ -72,6 +77,7 @@ func dataMegaportPartnerPortRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("location_id", chosenPort.LocationId)
 	d.Set("company_uid", chosenPort.CompanyUID)
 	d.Set("speed", chosenPort.Speed)
+	d.Set("diversity_zone", chosenPort.DiversityZone)
 
 	return nil
 }

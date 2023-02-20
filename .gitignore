@@ -1,4 +1,6 @@
-.idea/
-terraform-provider-megaport
-bin/
+.terraform.lock.hcl
+.terraform/
 go.sum
+main.tf
+terraform.tfstate
+terraform.tfstate.backup

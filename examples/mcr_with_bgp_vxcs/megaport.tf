@@ -42,10 +42,11 @@ data "megaport_location" "syd_sy3" {
 }
 
 data "megaport_partner_port" "aws_port" {
-  connect_type = "AWSHC"
-  company_name = "AWS"
-  product_name = "Asia Pacific (Sydney) (ap-southeast-2) [DZ-BLUE]"
-  location_id  = data.megaport_location.syd_sy3.id
+  connect_type   = "AWSHC"
+  company_name   = "AWS"
+  product_name   = "Asia Pacific (Sydney) (ap-southeast-2) [DZ-BLUE]"
+  diversity_zone = "blue"
+  location_id    = data.megaport_location.syd_sy3.id
 }
 
 resource "megaport_mcr" "mcr" {

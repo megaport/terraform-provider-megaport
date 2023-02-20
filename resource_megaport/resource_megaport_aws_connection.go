@@ -150,12 +150,13 @@ func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) er
 			partner.FilterPartnerMegaportByConnectType(&partnerPorts, bEndMegaport.ConnectType, true)
 			partner.FilterPartnerMegaportByLocationId(&partnerPorts, bEndMegaport.LocationId)
 			partner.FilterPartnerMegaportByCompanyName(&partnerPorts, bEndMegaport.CompanyName, true)
+			partner.FilterPartnerMegaportByDiversityZone(&partnerPorts, bEndMegaport.DiversityZone, true)
 			if len(partnerPorts) == 0 {
 				return errors.New(NoMatchingPartnerPortsAtLocationError)
 			} else if len(partnerPorts) > 1 {
 				return errors.New(TooManyPartnerPortsError)
 			}
-			cspSettings["requested_product_id"] = partnerPorts[0].ProductUID			
+			cspSettings["requested_product_id"] = partnerPorts[0].ProductUID
 			if err := d.Set("csp_settings", []map[string]interface{}{cspSettings}); err != nil {
 				return err
 			}

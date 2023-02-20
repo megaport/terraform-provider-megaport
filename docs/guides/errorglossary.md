@@ -22,6 +22,7 @@ Each error contains the exact text of the error, the cause, and a potential solu
 1. [TooManyPartnerPortsError](#toomanypartnerportserror)
 1. [NoLocationsFoundError](#nolocationsfounderror)
 1. [TooManyLocationsError](#toomanylocationserror)
+1. [NoMatchingDiversityZoneAtLocationError](#nomatchingdiversityzoneatlocationerror)
 1. [Error provisioning VXC service, VLAN XXX not available on service XXX](#error-provisioning-vxc-service-vlan-xxx-not-available-on-service-xxxxx)
 
 ## CannotSetVIFError
@@ -276,6 +277,45 @@ data "megaport_location" "my_loc" {
 data "megaport_location" "my_loc" {
   name        = "Equinix"
   market_code = "AU"
+}
+```
+
+## NoMatchingDiversityZoneAtLocationError
+
+### Error
+```
+"no matching diversity zone found at that location"
+```
+
+### Cause
+
+Each data lookup within the Megaport Terraform Provider has multiple filters that can be used to look up existing data. Each additional filter may subsequently reduce the number of results that are returned by the Megaport API, but if you have selected filters that contain incorrect information or mistakes, no results will be returned. If this occurs, an error will appear and execution will stop.
+
+A Partner Lookup can also fail if a Product with the given configuration is not available. In the case of this error, the Diversity Zone you are searching for does not exist in combination with your other filters. For example, this error can occur if the Diversity Zone specified is not available at your Partner Port location.
+
+### Solution
+
+In the [Megaport Marketplace](https://portal.megaport.com/marketplace/), verify whether the Diversity Zone you have specified actually exists for your Partner Port location. If it does, check your filter details for accuracy. An incorrect capitalization or typo in the Diversiy Zone name may also trigger this error.
+
+#### Proper Usage
+
+```
+data "megaport_partner_port" "aws_port" {
+  connect_type   = "AWSHC"
+  product_name   = "US East (N. Virginia) (us-east-1)"
+  diversity_zone = "red"
+  location_id    = data.megaport_location.nyc-eq2.id
+}
+```
+
+#### Incorrect Usage
+
+```
+data "megaport_partner_port" "aws_port" {
+  connect_type   = "AWSHC"
+  product_name   = "US East (N. Virginia) (us-east-1)"
+  diversity_zone = "Red"
+  location_id    = data.megaport_location.nyc-eq2.id
 }
 ```
 
