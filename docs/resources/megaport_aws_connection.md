@@ -48,6 +48,7 @@ resource "megaport_aws_connection" "aws_vxc" {
 ## Argument Reference
 - `vxc_name` - (Required) The name of your VXC.
 - `rate_limit` - (Required) The speed of your VXC in Mbps.
+- `destroy_connection` - (Optional, only for Hosted Connection) If set to true the AWS Connection (dxcon) will be deleted at destroy time. An external AWS session is required and the Connection cannot be deleted if it still has Virtual Interfaces attached.
 - `a_end` - (Required) ** See VXC Documentation
 - `a_end_mcr_configuration` - (Optional) ** See VXC Documentation
 - `csp_settings`:
@@ -61,7 +62,7 @@ resource "megaport_aws_connection" "aws_vxc" {
     - `customer_ip` - (Optional, only for VIF) The internal tunnel IP for the Megaport end.
     - `amazon_ip` - (Optional, only for VIF) The internal tunnel IP for the Amazon end.
     - `hosted_connection` - (Optional) If set to true, an AWS Hosted Connection will be created with a dedicated Direct Connect. Otherwise, a Hosted VIF will be created.
-    - `connection_name` - (Optional) The label for the connection in AWS
+    - `connection_name` - (Optional) The label for the connection in AWS.
 
 ## Attributes Reference
 - `uid` - The identifier of the Port.

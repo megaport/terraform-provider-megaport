@@ -1,3 +1,10 @@
+# 0.2.9-beta (Apr 5, 2023)
+
+## Changes
+  * Feature: Support for deleting AWS Hosted Connection (dxcon) at destroy time.
+    * Resource: `megaport_aws_connection`
+      * If `destroy_connection` is set to `true` the Connection will be deleted at destroy time. An external AWS session is required and the Connection cannot be deleted if it still has Virtual Interfaces attached.
+
 # 0.2.8-beta (Feb 20, 2023)
 
 ## Changes

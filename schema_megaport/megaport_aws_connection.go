@@ -73,6 +73,15 @@ func ResourceAWSConnectionVXCSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
+		"connection_id": {
+			Type:     schema.TypeString,
+			Computed: true,
+		},
+		"destroy_connection": {
+			Type:     schema.TypeBool,
+			Optional: true,
+			Default:  false,
+		},
 	}
 }
 
@@ -139,8 +148,8 @@ func ResourceAwsConnectionCspSettings() *schema.Schema {
 				"hosted_connection": {
 					Type:     schema.TypeBool,
 					Optional: true,
-					Default:  false,
 					ForceNew: true,
+					Default:  false,
 				},
 				"connection_name": {
 					Type:     schema.TypeString,

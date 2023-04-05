@@ -18,6 +18,9 @@ import (
 	"errors"
 	"log"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/directconnect"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
@@ -102,6 +105,10 @@ func resourceMegaportAWSConnectionRead(d *schema.ResourceData, m interface{}) er
 	// Aws read
 	if vifId := vxc.ExtractAwsId(vxcDetails); vifId != "" {
 		d.Set("aws_id", vifId)
+	}
+
+	if connectionId := vxc.ExtractConnectionId(vxcDetails); connectionId != "" {
+		d.Set("connection_id", connectionId)
 	}
 
 	// AWS CSP read
@@ -206,5 +213,25 @@ func resourceMegaportAWSConnectionUpdate(d *schema.ResourceData, m interface{}) 
 }
 
 func resourceMegaportAWSConnectionUpdateDelete(d *schema.ResourceData, m interface{}) error {
+	destroyConnection := d.Get("destroy_connection").(bool)
+	cspSettings := d.Get("csp_settings").(*schema.Set).List()[0].(map[string]interface{})
+	hostedConnection := cspSettings["hosted_connection"].(bool)
+
+	if destroyConnection && hostedConnection {
+		sess := session.Must(session.NewSessionWithOptions(session.Options{
+			SharedConfigState: session.SharedConfigEnable,
+		}))
+
+		svc := directconnect.New(sess)
+
+		_, err := svc.DeleteConnection(&directconnect.DeleteConnectionInput{
+			ConnectionId: aws.String(d.Get("connection_id").(string)),
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
 	return ResourceMegaportVXCDelete(d, m)
 }
