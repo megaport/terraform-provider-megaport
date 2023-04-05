@@ -1,7 +1,7 @@
 module github.com/megaport/terraform-provider-megaport
 
-# For local development
-#replace github.com/megaport/megaportgo => <megaportgo local directory>
+// For local development
+//replace github.com/megaport/megaportgo => <megaportgo local directory>
 
 go 1.13
 
