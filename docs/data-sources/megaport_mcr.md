@@ -16,6 +16,7 @@ The following arguments are supported:
 - `uid` - The UID of the MCR.
 - `mcr_name` - The name of the MCR.
 - `location_id` - The identifier of the MCR location.
+- `term` - The contract term for the MCR. "1" means month-to-month; otherwise, the number represents the number of months in the term.
 - `type` - The type of MCR (MCR or MCR 2.0).
 - `provisioning_status` - The current provisioning status of the MCR (this status does not refer to availability).
 - `create_date` - A Unix timestamp representing the time the MCR was created.

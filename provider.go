@@ -77,7 +77,7 @@ func Provider() *schema.Provider {
 			"megaport_aws_connection":   data_megaport.MegaportAWSConnection(),
 			"megaport_gcp_connection":   data_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": data_megaport.MegaportAzureConnection(),
-			"megaport_oci_connection": 	 data_megaport.MegaportOciConnection(),
+			"megaport_oci_connection":   data_megaport.MegaportOciConnection(),
 			"megaport_mcr":              data_megaport.MegaportMCR(),
 		},
 	}

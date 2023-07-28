@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	vxc_service "github.com/megaport/megaportgo/service/vxc" 
+	vxc_service "github.com/megaport/megaportgo/service/vxc"
 	"github.com/megaport/megaportgo/types"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"

@@ -2,10 +2,9 @@ HOSTNAME=registry.terraform.io
 NAMESPACE=megaport
 NAME=megaport
 BINARY=terraform-provider-${NAME}
-VERSION=0.2.9
+VERSION=0.2.10
 OS_ARCH=$$(go version | cut -d" " -f4 | sed 's/\//_/g')
 ZIP_FILE=terraform-provider-${NAME}_${VERSION}_${OS_ARCH}.zip
-provider_path = registry.terraform.io/local/${NAME}/$(VERSION)/${OS_ARCH}
 
 default: install
 
@@ -35,8 +34,3 @@ release:
 install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 	mv bin/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
-
-install_macos: build
-	
-	mkdir -p ~/Library/Application\ Support/io.terraform/plugins/$(provider_path)
-	cp ./bin/${BINARY} ~/Library/Application\ Support/io.terraform/plugins/$(provider_path)/${BINARY}_v${VERSION}

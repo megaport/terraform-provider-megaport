@@ -70,6 +70,7 @@ resource "megaport_port" "lag_port" {
 resource "megaport_mcr" "mcr" {
   mcr_name    = "Terraform Example - MCR"
   location_id = data.megaport_location.bne_nxt1.id
+  term        = 12
 
   router {
     port_speed    = 2500

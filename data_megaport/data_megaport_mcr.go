@@ -51,6 +51,7 @@ func DataMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("location_id", mcrDetails.LocationID)
 	d.Set("marketplace_visibility", mcrDetails.MarketplaceVisibility)
 	d.Set("company_name", mcrDetails.CompanyName)
+	d.Set("term", mcrDetails.ContractTermMonths)
 	d.Set("locked", mcrDetails.Locked)
 	d.Set("admin_locked", mcrDetails.AdminLocked)
 

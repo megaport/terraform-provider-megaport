@@ -1,3 +1,14 @@
+# 0.2.10-beta (July 28, 2023)
+
+## Changes
+  * Feature: Support for MCR contract term.
+    * Resource: `megaport_mcr`
+      * MCR contract `term` can optionally be set to 1, 12, 24, or 36 months when the MCR is created. Default is month-to-month (1).
+  * Feature: Oracle partner support and OCI VXC connectivity. Credit @aszynkow
+    * Resource: `megaport_oci_connection`
+      * Megaport MCR can now connect to OCI FastConnect via Megaport VXC. See Documentation for examples.
+  * Documentation and example updates.
+
 # 0.2.9-beta (Apr 5, 2023)
 
 ## Changes

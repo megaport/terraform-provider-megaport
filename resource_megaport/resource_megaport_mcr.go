@@ -43,9 +43,10 @@ func resourceMegaportMCRCreate(d *schema.ResourceData, m interface{}) error {
 	routerConfiguration := d.Get("router").(*schema.Set).List()[0].(map[string]interface{})
 	locationId := d.Get("location_id").(int)
 	mcrName := d.Get("mcr_name").(string)
+	term := d.Get("term").(int)
 	portSpeed := routerConfiguration["port_speed"].(int)
 	mcrAsn := routerConfiguration["requested_asn"].(int)
-	mcrId, buyErr := mcr.BuyMCR(locationId, mcrName, portSpeed, mcrAsn)
+	mcrId, buyErr := mcr.BuyMCR(locationId, mcrName, term, portSpeed, mcrAsn)
 
 	if buyErr != nil {
 		return buyErr
@@ -106,6 +107,7 @@ func resourceMegaportMCRRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("location_id", mcrDetails.LocationID)
 	d.Set("marketplace_visibility", mcrDetails.MarketplaceVisibility)
 	d.Set("company_name", mcrDetails.CompanyName)
+	d.Set("term", mcrDetails.ContractTermMonths)
 	d.Set("locked", mcrDetails.Locked)
 	d.Set("admin_locked", mcrDetails.AdminLocked)
 

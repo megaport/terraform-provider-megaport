@@ -78,7 +78,7 @@ resource "megaport_gcp_connection" "gcp_vxc" {
     - `pairing_key` - (Required) The pairing key for the new GCP connection.
     - `requested_product_id` - (Optional) The partner port location you want to connect to.
 
-## Attributes Reference
+## Attribute Reference
 - `uid` - The identifier of the Port.
 - `vxc_type` - The VXC type.
 - `provisioning_status` - The current provisioning status of the VXC (this status does not refer to availability).

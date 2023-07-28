@@ -16,6 +16,7 @@ data "megaport_location" "bne_nxt1" {
 resource "megaport_mcr" "mcr" {
   mcr_name    = "Terraform Example - MCR"
   location_id = data.megaport_location.bne_nxt1.id
+  term        = 12
 
   router {
     port_speed    = 5000
@@ -46,6 +47,7 @@ resource "megaport_mcr" "mcr" {
 The following arguments are supported:
 - `mcr_name` - (Required) The name for the MCR.
 - `location_id` - (Required) The identifier of the preferred data center location for the MCR. This location must be MCR-enabled.
+- `term` - (Optional) The contract term for your MCR. The default is month-to-month.
 - `router` - (Required)
     - `requested_asn` - (Optional) The Autonomous System Number (ASN) to assign to the MCR.
     - `port_speed` - (Required) The speed of the MCR in Mbps. The value can be between 1000 and 10000 Mbps.

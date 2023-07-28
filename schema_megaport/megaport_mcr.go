@@ -64,6 +64,12 @@ func ResourceMegaportMCRSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Computed: true,
 		},
+		"term": {
+			Type:     schema.TypeInt,
+			Optional: true,
+			ForceNew: true,
+			Default:  1,
+		},
 		"locked": {
 			Type:     schema.TypeBool,
 			Computed: true,
@@ -204,6 +210,10 @@ func DataMegaportMCRSchema() map[string]*schema.Schema {
 		},
 		"company_name": {
 			Type:     schema.TypeString,
+			Computed: true,
+		},
+		"term": {
+			Type:     schema.TypeInt,
 			Computed: true,
 		},
 		"locked": {
