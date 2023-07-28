@@ -3,7 +3,7 @@ page_title: "Megaport MCR to Oracle Cloud Infrastructure"
 subcategory: "Examples"
 ---
 
-# MultiCloud AWS to OCI
+# MCR to OCI
 This example provisions a demonstration environment including OCI FastConnect, Megaport MCR and a VXC between OCI FastConnect and MCR. It 
 requires account credentials for Megaport and Oracle Cloud Infrastructure.
 
