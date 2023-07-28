@@ -66,6 +66,7 @@ func Provider() *schema.Provider {
 			"megaport_mcr":              resource_megaport.MegaportAWS(),
 			"megaport_gcp_connection":   resource_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": resource_megaport.MegaportAzureConnection(),
+			"megaport_oci_connection":   resource_megaport.MegaportOciConnection(),
 		},
 		ConfigureFunc: providerConfigure,
 		DataSourcesMap: map[string]*schema.Resource{
@@ -76,6 +77,7 @@ func Provider() *schema.Provider {
 			"megaport_aws_connection":   data_megaport.MegaportAWSConnection(),
 			"megaport_gcp_connection":   data_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": data_megaport.MegaportAzureConnection(),
+			"megaport_oci_connection": 	 data_megaport.MegaportOciConnection(),
 			"megaport_mcr":              data_megaport.MegaportMCR(),
 		},
 	}
