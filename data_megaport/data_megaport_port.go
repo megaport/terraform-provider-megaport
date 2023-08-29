@@ -55,6 +55,7 @@ func dataMegaportPortRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("lag_id", portDetails.LAGID)
 	d.Set("locked", portDetails.Locked)
 	d.Set("admin_locked", portDetails.AdminLocked)
+	d.Set("diversity_zone", portDetails.DiversityZone)
 
 	return nil
 }

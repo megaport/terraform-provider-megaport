@@ -31,3 +31,4 @@ The following arguments are supported:
  - `lag_id` - The LAG identifier.
  - `locked` - Indicates whether the resource has been locked by a user.
  - `admin_locked` - Indicates whether the resource has been locked by an administrator.
+ - `diversity_zone` - The Diversity Zone in which the port is deployed (`red` or `blue` or undefined for sites where zones aren't available).

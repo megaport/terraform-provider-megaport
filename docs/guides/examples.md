@@ -22,6 +22,7 @@ provider "megaport" {
 
 Here's a description of each example:
 1. [single_port](example_single_port): Create a Single Megaport.
+1. [single_zoned_port](example_single_zoned_port): Create a Single Megaport in specified Zone.
 1. [two_ports_and_vxc](example_two_ports_and_vxc): Provision two Megaports in different locations linked by a VXC (Virtual Cross Connect)
 1. [lag_port](example_lag_port): Create a LAG Port.
 1. [multicloud_aws_azure](example_multicloud_aws_azure): Create a fully functional example network linking AWS & Azure 
