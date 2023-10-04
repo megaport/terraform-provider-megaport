@@ -11,9 +11,8 @@ To use each of these examples, you need to complete the [Getting Started Require
 Update the credentials in the `provider` block, which can be moved to its own file.
 ```
 provider "megaport" {
-  username              = "my.test.user@example.org"
-  password              = "n0t@re4lPassw0rd"
-  mfa_otp_key           = "ABCDEFGHIJK01234"
+  access_key            = "my-access-key"
+  secret_key            = "my-secret-key"
   accept_purchase_terms = true
   delete_ports          = true
   environment           = "staging"

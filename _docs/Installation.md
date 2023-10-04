@@ -12,7 +12,7 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport/megaport"
-      version = ">=0.1.4"
+      version = ">=0.3.0"
     }
   }
 }
@@ -40,7 +40,7 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport.com/megaport/megaport"
-      version = ">=0.1.4"
+      version = ">=0.3.0"
     }
   }
 }
@@ -84,7 +84,7 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport.com/megaport/megaport"
-      version = ">=0.1.4"
+      version = ">=0.1.11"
     }
   }
 }

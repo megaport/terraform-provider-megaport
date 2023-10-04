@@ -6,7 +6,7 @@ subcategory: "Examples"
 # MCR and CSP VXC's
 This will provision a MCR (Megaport Cloud Router) connected to AWS, Azure and GCP using Megaport VXC's (Virtual Cross Connects).  
 
-Replace the `username`, `password` and optional `mfa_otp_key` with your own credentials.  
+Replace the `access_key` and `secret_key` with your own credentials.  
 
 This configuration will deploy on the staging environment. To use this on production, valid CSP attributes are required:
 + `megaport_aws_connection.amazon_account`
@@ -18,15 +18,14 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport/megaport"
-      version = ">=0.1.4"
+      version = ">=0.3.0"
     }
   }
 }
 
 provider "megaport" {
-  username              = "my.test.user@example.org"
-  password              = "n0t@re4lPassw0rd"
-  mfa_otp_key           = "ABCDEFGHIJK01234"
+  access_key            = "my-access-key"
+  secret_key            = "my-secret-key"
   accept_purchase_terms = true
   delete_ports          = true
   environment           = "staging"

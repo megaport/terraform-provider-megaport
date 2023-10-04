@@ -1,5 +1,5 @@
 ---
-page_title: "Megaport MCR to Oracle Cloud Infrastructure"
+page_title: "MCR to OCI"
 subcategory: "Examples"
 ---
 

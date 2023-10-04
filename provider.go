@@ -38,20 +38,34 @@ func Provider() *schema.Provider {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
+			// username/password/mfa_otp_key are deprecated and will be removed in future release
 			"username": {
 				Type:        schema.TypeString,
-				Required:    true,
+				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USERNAME", nil),
+				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
 			},
 			"password": {
 				Type:        schema.TypeString,
-				Required:    true,
+				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_PASSWORD", nil),
+				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
 			},
 			"mfa_otp_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_MFA_OTP_KEY", nil),
+				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
+			},
+			"access_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_ACCESS_KEY", nil),
+			},
+			"secret_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_SECRET_KEY", nil),
 			},
 			"delete_ports": {
 				Type:     schema.TypeBool,
@@ -90,7 +104,11 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, errors.New(ERR_USER_NOT_ACCEPT_TOS)
 	}
 
-	username, password, otpKey := checkAuthVariables(d)
+	ab := terraform_utility.ParseAuthConfig(d)
+	if valid, err := ab.Valid(); !valid {
+		return nil, err
+	}
+
 	megaportUrl := getEnvironmentUrl(d)
 	deletePorts := shouldDeletePorts(d)
 
@@ -99,33 +117,13 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		Url:         megaportUrl,
 	}
 
-	err := megaportClient.ConfigureServices(username, password, otpKey)
+	err := megaportClient.ConfigureServices(ab)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &megaportClient, nil
-}
-
-func checkAuthVariables(d *schema.ResourceData) (string, string, string) {
-	username := ""
-	password := ""
-	oneTimePasswordKey := ""
-
-	if u, ok := d.GetOk("username"); ok {
-		username = u.(string)
-	}
-
-	if p, ok := d.GetOk("password"); ok {
-		password = p.(string)
-	}
-
-	if otp, ok := d.GetOk("mfa_otp_key"); ok {
-		oneTimePasswordKey = otp.(string)
-	}
-
-	return username, password, oneTimePasswordKey
 }
 
 func getEnvironmentUrl(d *schema.ResourceData) string {

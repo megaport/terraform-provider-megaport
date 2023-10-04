@@ -14,7 +14,7 @@ Megaport Cloud Routers (MCRs), and Partner VXCs
 ## Essentials
 To learn about Megaport essentials, read these guides:   
 * [Environments](guides/environments) - Testing your Terraform before committing to a purchase
-* [Getting Started](guides/gettingstarted) - Creating your account  
+* [Getting Started](guides/gettingstarted) - Creating your account and generating an API key
 * [Examples](guides/examples) - A suite of 
   tested examples are maintained in the guides
 
@@ -33,15 +33,14 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport/megaport"
-      version = ">=0.1.4"
+      version = ">=0.3.0"
     }
   }
 }
 
 provider "megaport" {
-  username              = "my.test.user@example.org"
-  password              = "n0t@re4lPassw0rd"
-  mfa_otp_key           = "ABCDEFGHIJK01234"
+  access_key            = "my-access-key"
+  secret_key            = "my-secret-key"
   accept_purchase_terms = true
   delete_ports          = true
   environment           = "staging"
@@ -49,9 +48,8 @@ provider "megaport" {
 ```
 ### Configuration Reference
 
- - `username` [**string**] - (Required) Your email address used to log in to the Megaport Portal. This can also be provided by the `MEGAPORT_USERNAME` environment variable.
- - `password` [**string**] - (Required) Your Megaport Portal password. This can also be provided by the `MEGAPORT_PASSWORD` environment variable.
- - `mfa_otp_key` [**string**] - (Optional) The multi-factor authentication (MFA) key displayed in the Megaport Portal when you set up MFA on your account. For details, see [Requirements](guides/gettingstarted)). This can also be provided by the `MEGAPORT_MFA_OTP_KEY` environment variable.
+ - `access_key` [**string**] - (Required) Your access key used to generate a token to authenticate API requests. This can also be provided by the `MEGAPORT_ACCESS_KEY` environment variable.
+ - `secret_key` [**string**] - (Required) Your secret key used to generate a token to authenticate API requests. This can also be provided by the `MEGAPORT_SECRET_KEY` environment variable.
  - `accept_purchase_terms` [**boolean**] - (Required) Indicates your acceptance of all terms for using Megaport's services.
  - `delete_ports` [**boolean**] - (Optional) Indicates whether to delete any Ports provisioned by Terraform.
  - `environment` [**string**] - (Optional) For details, see [Environments](guides/environments). This can also be provided by the `MEGAPORT_ENVIRONMENT` environment variable.
@@ -79,8 +77,7 @@ resource "megaport_port" "port" {
 
 ### Environment Variable Example
 ```
-export MEGAPORT_USERNAME="my.test.user@example.org"
-export MEGAPORT_PASSWORD="n0t@re4lPassw0rd"
-export MEGAPORT_MFA_OTP_KEY="ABCDEFGHIJK01234"
+export MEGAPORT_ACCESS_KEY="my-access-key"
+export MEGAPORT_SECRET_KEY="my-secret-key"
 export MEGAPORT_ENVIRONMENT="staging"
 ```

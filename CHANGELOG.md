@@ -1,3 +1,12 @@
+# 0.3.0-beta (Oct 4, 2023)
+
+## Breaking Changes
+  * Provider: `megaport`
+    * X-Auth tokens are being deprecated from October 2023, authentication has been updated to use API keys.
+    * `username`, `password` and `mfa_otp_key` attributes in provider configuration should be replaced with `access_key` and `secret_key` attributes.
+    * Go to Tools > API Key Generator in Megaport Portal to manage Active API Keys.
+    * See documentation and example updates for further information.
+
 # 0.2.10-beta (July 28, 2023)
 
 ## Changes
