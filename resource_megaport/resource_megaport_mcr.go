@@ -24,7 +24,7 @@ import (
 	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
-func MegaportAWS() *schema.Resource {
+func MegaportMCR() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceMegaportMCRCreate,
 		Read:   resourceMegaportMCRRead,

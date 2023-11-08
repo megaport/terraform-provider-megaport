@@ -79,7 +79,27 @@ func ResourceVxcEndConfiguration() *schema.Schema {
 			Schema: map[string]*schema.Schema{
 				"port_id": {
 					Type:     schema.TypeString,
-					Required: true,
+					Optional: true,
+					Computed: true,
+				},
+				"mve_id": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"vnic_index": {
+					Type:     schema.TypeInt,
+					Optional: true,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
+				},
+				"inner_vlan": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
 				},
 				"owner_uid": {
 					Type:     schema.TypeString,
@@ -92,11 +112,6 @@ func ResourceVxcEndConfiguration() *schema.Schema {
 				"location": {
 					Type:     schema.TypeString,
 					Computed: true,
-				},
-				"requested_vlan": {
-					Type:     schema.TypeInt,
-					Optional: true,
-					Default:  0,
 				},
 				"assigned_vlan": {
 					Type:     schema.TypeInt,
@@ -350,7 +365,24 @@ func DataVxcEndConfiguration() *schema.Schema {
 			Schema: map[string]*schema.Schema{
 				"port_id": {
 					Type:     schema.TypeString,
-					Computed: true,
+					Optional: true,
+				},
+				"mve_id": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+				"vnic_index": {
+					Type:     schema.TypeInt,
+					Optional: true,
+				},
+				"requested_vlan": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"inner_vlan": {
+					Type:     schema.TypeInt,
+					Optional: true,
+					Default:  0,
 				},
 				"owner_uid": {
 					Type:     schema.TypeString,
@@ -363,10 +395,6 @@ func DataVxcEndConfiguration() *schema.Schema {
 				"location": {
 					Type:     schema.TypeString,
 					Computed: true,
-				},
-				"requested_vlan": {
-					Type:     schema.TypeInt,
-					Required: true,
 				},
 				"assigned_vlan": {
 					Type:     schema.TypeInt,

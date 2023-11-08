@@ -2,7 +2,7 @@ HOSTNAME=registry.terraform.io
 NAMESPACE=megaport
 NAME=megaport
 BINARY=terraform-provider-${NAME}
-VERSION=0.3.0
+VERSION=0.4.0
 OS_ARCH=$$(go version | cut -d" " -f4 | sed 's/\//_/g')
 ZIP_FILE=terraform-provider-${NAME}_${VERSION}_${OS_ARCH}.zip
 
@@ -32,5 +32,5 @@ release:
 	GOOS=windows GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_windows_amd64
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
-	mv bin/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
+	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}-local/${VERSION}/${OS_ARCH}
+	mv bin/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}-local/${VERSION}/${OS_ARCH}/${BINARY}-local

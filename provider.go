@@ -16,6 +16,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/megaport/terraform-provider-megaport/data_megaport"
@@ -38,25 +39,6 @@ func Provider() *schema.Provider {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
-			// username/password/mfa_otp_key are deprecated and will be removed in future release
-			"username": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_USERNAME", nil),
-				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
-			},
-			"password": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_PASSWORD", nil),
-				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
-			},
-			"mfa_otp_key": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("MEGAPORT_MFA_OTP_KEY", nil),
-				Deprecated:  "Starting October 2023, use access_key and secret_key instead",
-			},
 			"access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -75,24 +57,27 @@ func Provider() *schema.Provider {
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"megaport_port":             resource_megaport.MegaportPort(),
+			"megaport_mcr":              resource_megaport.MegaportMCR(),
+			"megaport_mve":              resource_megaport.MegaportMVE(),
 			"megaport_vxc":              resource_megaport.MegaportVXC(),
 			"megaport_aws_connection":   resource_megaport.MegaportAWSConnection(),
-			"megaport_mcr":              resource_megaport.MegaportAWS(),
 			"megaport_gcp_connection":   resource_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": resource_megaport.MegaportAzureConnection(),
 			"megaport_oci_connection":   resource_megaport.MegaportOciConnection(),
 		},
 		ConfigureFunc: providerConfigure,
 		DataSourcesMap: map[string]*schema.Resource{
-			"megaport_port":             data_megaport.MegaportPort(),
 			"megaport_location":         data_megaport.MegaportLocation(),
+			"megaport_internet":         data_megaport.MegaportInternet(),
+			"megaport_port":             data_megaport.MegaportPort(),
+			"megaport_mcr":              data_megaport.MegaportMCR(),
+			"megaport_mve":              data_megaport.MegaportMVE(),
 			"megaport_vxc":              data_megaport.MegaportVXC(),
 			"megaport_partner_port":     data_megaport.MegaportPartnerPort(),
 			"megaport_aws_connection":   data_megaport.MegaportAWSConnection(),
 			"megaport_gcp_connection":   data_megaport.MegaportGcpConnection(),
 			"megaport_azure_connection": data_megaport.MegaportAzureConnection(),
 			"megaport_oci_connection":   data_megaport.MegaportOciConnection(),
-			"megaport_mcr":              data_megaport.MegaportMCR(),
 		},
 	}
 }
@@ -104,9 +89,14 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, errors.New(ERR_USER_NOT_ACCEPT_TOS)
 	}
 
-	ab := terraform_utility.ParseAuthConfig(d)
-	if valid, err := ab.Valid(); !valid {
-		return nil, err
+	// Grab credentials from config.
+	accessKey, ok := d.Get("access_key").(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing 'access_key'")
+	}
+	secretKey, ok := d.Get("secret_key").(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing 'secret_key'")
 	}
 
 	megaportUrl := getEnvironmentUrl(d)
@@ -117,9 +107,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		Url:         megaportUrl,
 	}
 
-	err := megaportClient.ConfigureServices(ab)
-
-	if err != nil {
+	if err := megaportClient.ConfigureServices(accessKey, secretKey); err != nil {
 		return nil, err
 	}
 
@@ -127,16 +115,16 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 }
 
 func getEnvironmentUrl(d *schema.ResourceData) string {
-	if environment, ok := d.GetOk("environment"); ok {
-		myEnvironment := environment.(string)
+	env, ok := d.GetOk("environment")
+	if !ok {
+		return "https://api-staging.megaport.com/"
+	}
 
-		if myEnvironment == "production" {
-			return "https://api.megaport.com/"
-		} else if myEnvironment != "" {
-			return "https://api-" + myEnvironment + ".megaport.com/"
-		} else {
-			return "https://api-staging.megaport.com/"
-		}
+	environment := env.(string)
+	if environment == "production" {
+		return "https://api.megaport.com/"
+	} else if environment != "" {
+		return "https://api-" + environment + ".megaport.com/"
 	} else {
 		return "https://api-staging.megaport.com/"
 	}
