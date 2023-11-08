@@ -5,8 +5,6 @@ module github.com/megaport/terraform-provider-megaport
 
 go 1.21
 
-toolchain go1.21.0
-
 require (
 	github.com/aws/aws-sdk-go v1.25.3
 	github.com/hashicorp/terraform-plugin-sdk v1.9.1
