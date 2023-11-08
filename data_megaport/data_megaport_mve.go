@@ -16,18 +16,30 @@ package data_megaport
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/megaport/terraform-provider-megaport/resource_megaport"
 	"github.com/megaport/terraform-provider-megaport/schema_megaport"
+	"github.com/megaport/terraform-provider-megaport/terraform_utility"
 )
 
 func MegaportMVE() *schema.Resource {
 	return &schema.Resource{
-		Read:   DataMegaportMVERead,
+		Read:   dataMegaportMVERead,
 		Schema: schema_megaport.DataMegaportMVESchema(),
 	}
 }
 
-func DataMegaportMVERead(d *schema.ResourceData, m interface{}) error {
-	// TODO
+func dataMegaportMVERead(d *schema.ResourceData, m interface{}) error {
+	mve := m.(*terraform_utility.MegaportClient).Mve
+
+	mveUid := d.Get("mve_id").(string)
+	d.SetId(mveUid)
+
+	details, err := resource_megaport.FetchMVEDetails(mve, d)
+	if err != nil {
+		return err
+	}
+
+	resource_megaport.MVEPopulateBaseResourceData(details, d)
 
 	return nil
 }

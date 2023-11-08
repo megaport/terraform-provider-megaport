@@ -15,6 +15,7 @@
 package terraform_utility
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/megaport/megaportgo/config"
@@ -27,6 +28,13 @@ import (
 	"github.com/megaport/megaportgo/service/product"
 	"github.com/megaport/megaportgo/service/vxc"
 )
+
+// Set via goreleaser.
+var buildVersion = "devel"
+
+func SetBuildVersion(v string) {
+	buildVersion = v
+}
 
 type MegaportClient struct {
 	*MegaportServices
@@ -51,8 +59,7 @@ type terraformRoundTripper struct {
 }
 
 func (t *terraformRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("User-Agent", "Go-Megaport-Library/0.1 terraform-provider-megaport/0.3.0")
-
+	req.Header.Add("User-Agent", fmt.Sprintf("Go-Megaport-Library/0.1 terraform-provider-megaport/%s", buildVersion))
 	return t.T.RoundTrip(req)
 }
 

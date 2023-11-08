@@ -82,11 +82,11 @@ func resourceMegaportMVECreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
-	details, err := fetchMVEDetails(mve, d)
+	details, err := FetchMVEDetails(mve, d)
 	if err != nil {
 		return err
 	}
-	populateBaseResourceData(details, d)
+	MVEPopulateBaseResourceData(details, d)
 
 	// Set original vendor config back to avoid Terraform trying to modify it later.
 	d.Set("vendor_config", origVendorConfig)
@@ -94,7 +94,7 @@ func resourceMegaportMVECreate(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func fetchMVEDetails(mve *mve.MVE, d *schema.ResourceData) (*types.MVE, error) {
+func FetchMVEDetails(mve *mve.MVE, d *schema.ResourceData) (*types.MVE, error) {
 	details, err := mve.GetMVEDetails(d.Id())
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func fetchMVEDetails(mve *mve.MVE, d *schema.ResourceData) (*types.MVE, error) {
 	return details, nil
 }
 
-func populateBaseResourceData(details *types.MVE, d *schema.ResourceData) {
+func MVEPopulateBaseResourceData(details *types.MVE, d *schema.ResourceData) {
 	d.Set("uid", details.UID)
 	d.Set("mve_name", details.Name)
 	d.Set("type", details.Type)
@@ -148,11 +148,11 @@ func populateBaseResourceData(details *types.MVE, d *schema.ResourceData) {
 func resourceMegaportMVERead(d *schema.ResourceData, m interface{}) error {
 	mve := m.(*terraform_utility.MegaportClient).Mve
 
-	details, err := fetchMVEDetails(mve, d)
+	details, err := FetchMVEDetails(mve, d)
 	if err != nil {
 		return err
 	}
-	populateBaseResourceData(details, d)
+	MVEPopulateBaseResourceData(details, d)
 
 	return nil
 }
@@ -174,11 +174,11 @@ func resourceMegaportMVEUpdate(d *schema.ResourceData, m interface{}) error {
 		}
 	}
 
-	details, err := fetchMVEDetails(mve, d)
+	details, err := FetchMVEDetails(mve, d)
 	if err != nil {
 		return err
 	}
-	populateBaseResourceData(details, d)
+	MVEPopulateBaseResourceData(details, d)
 
 	return nil
 }
