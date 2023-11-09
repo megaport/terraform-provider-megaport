@@ -27,6 +27,25 @@ resource "megaport_port" "port" {
 This example results in the creation of a single Port located at NextDC Brisbane 1, under a 12 month term with a Port
 speed of 10 Gbps.
 
+## Example Usage (Single with Zone)
+```
+data "megaport_location" "bne_nxt1" {
+  name    = "NextDC B1"
+  has_mcr = false
+}
+
+resource "megaport_port" "port" {
+  port_name   = "Terraform Example - Port"
+  port_speed  = 10000
+  location_id = data.megaport_location.bne_nxt1.id
+  term        = 12
+  diversity_zone = "red"
+}
+```
+
+This example results in the creation of a single Port located at NextDC Brisbane 1, under a 12 month term with a Port
+speed of 10 Gbps, in the Red Diversity Zone.
+
 ## Example Usage (Link Aggregation Group)
 ```
 data "megaport_location" "bne_nxt1" {
@@ -46,6 +65,26 @@ resource "megaport_port" "lag_port" {
 This example results in the creation of a LAG Port with 3 Ports located at NextDC Brisbane 1, under a 1 month term with 
 an aggregate speed of 30 Gbps.
 
+## Example Usage (Link Aggregation Group with Zone)
+```
+data "megaport_location" "bne_nxt1" {
+  name    = "NextDC B1"
+}
+
+resource "megaport_port" "lag_port" {
+  port_name      = "Terraform Example - LAG Port"
+  port_speed     = 10000
+  location_id    = data.megaport_location.bne_nxt1.id
+  term           = 1
+  lag            = true
+  lag_port_count = 3
+  diversity_zone = "blue"
+}
+```
+
+This example results in the creation of a LAG Port with 3 Ports located at NextDC Brisbane 1, under a 1 month term with 
+an aggregate speed of 30 Gbps, in the Blue Diversity Zone.
+
 ## Argument Reference
 
 The following arguments are supported:
@@ -57,6 +96,7 @@ The following arguments are supported:
  - `lag` - (Optional) Indicates that you want the Port to be a member of a Link Aggregation Port (LAG). A LAG is a set of physical Ports that are grouped into a single logical connection.
  - `lag_port_count` - (Optional) The number of Ports you would like in your LAG. This argument should only be used if
  `lag` is true. Note, the LAG Port speed will be this number multiplied by `port_speed`.
+ - `diversity_zone` - (Optional) Diversity Zone in which the Port will be created, `red` or `blue`.
  - `marketplace_visibility` - (Optional) Whether to make this Port public on the 
  [Megaport Marketplace](https://docs.megaport.com/marketplace/).
  

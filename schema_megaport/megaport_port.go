@@ -14,7 +14,9 @@
 
 package schema_megaport
 
-import "github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+import (
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+)
 
 func ResourcePortSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
@@ -98,6 +100,12 @@ func ResourcePortSchema() map[string]*schema.Schema {
 			Type:     schema.TypeInt,
 			Optional: true,
 			Default:  0,
+			ForceNew: true,
+		},
+		"diversity_zone": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
 			ForceNew: true,
 		},
 	}
@@ -185,6 +193,12 @@ func DataPortSchema() map[string]*schema.Schema {
 			Type:     schema.TypeInt,
 			Optional: true,
 			Default:  0,
+			ForceNew: true,
+		},
+		"diversity_zone": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
 			ForceNew: true,
 		},
 	}

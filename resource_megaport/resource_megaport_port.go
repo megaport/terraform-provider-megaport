@@ -51,6 +51,7 @@ func resourceMegaportPortCreate(d *schema.ResourceData, m interface{}) error {
 	isLag := d.Get("lag").(bool)
 	numberOfPorts := d.Get("lag_port_count").(int)
 	loc, locationErr := location.GetLocationByID(locationId)
+	diversityZone := d.Get("diversity_zone").(string)
 
 	if locationErr != nil {
 		return locationErr
@@ -59,9 +60,17 @@ func resourceMegaportPortCreate(d *schema.ResourceData, m interface{}) error {
 	marketCode := loc.Market
 
 	if isLag {
-		portId, portErr = port.BuyLAGPort(portName, term, portSpeed, locationId, marketCode, numberOfPorts, !marketplaceVisibility)
+		if len(diversityZone) > 0 {
+			portId, portErr = port.BuyZonedLAGPort(portName, term, portSpeed, locationId, marketCode, numberOfPorts, !marketplaceVisibility, diversityZone)
+		} else {
+			portId, portErr = port.BuyLAGPort(portName, term, portSpeed, locationId, marketCode, numberOfPorts, !marketplaceVisibility)
+		}
 	} else {
-		portId, portErr = port.BuySinglePort(portName, term, portSpeed, locationId, marketCode, !marketplaceVisibility)
+		if len(diversityZone) > 0 {
+			portId, portErr = port.BuyZonedSinglePort(portName, term, portSpeed, locationId, marketCode, !marketplaceVisibility, diversityZone)
+		} else {
+			portId, portErr = port.BuySinglePort(portName, term, portSpeed, locationId, marketCode, !marketplaceVisibility)
+		}
 	}
 
 	if portErr != nil {
@@ -98,6 +107,7 @@ func resourceMegaportPortRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("lag_id", portDetails.LAGID)
 	d.Set("locked", portDetails.Locked)
 	d.Set("admin_locked", portDetails.AdminLocked)
+	d.Set("diversity_zone", portDetails.DiversityZone)
 
 	return nil
 }
