@@ -109,15 +109,15 @@ func ResourceAzureConnectionCspSettingsPrivatePeering() *schema.Schema {
 			Schema: map[string]*schema.Schema{
 				"peer_asn": {
 					Type:     schema.TypeString,
-					Required: true,
+					Optional: true,
 				},
 				"primary_subnet": {
 					Type:     schema.TypeString,
-					Required: true,
+					Optional: true,
 				},
 				"secondary_subnet": {
 					Type:     schema.TypeString,
-					Required: true,
+					Optional: true,
 				},
 				"shared_key": {
 					Type:     schema.TypeString,
@@ -125,7 +125,7 @@ func ResourceAzureConnectionCspSettingsPrivatePeering() *schema.Schema {
 				},
 				"requested_vlan": {
 					Type:     schema.TypeInt,
-					Required: true,
+					Optional: true,
 				},
 			},
 		},
