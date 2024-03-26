@@ -28,37 +28,37 @@ var (
 type mcrResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
-	ID                    types.Int64               `tfsdk:"productId"`
-	UID                   types.String            `tfsdk:"productUid"`
-	Name                  types.String            `tfsdk:"productName"`
-	Type                  types.String            `tfsdk:"productType"`
-	ProvisioningStatus    types.String            `tfsdk:"provisioningStatus"`
-	CreateDate            types.String             `tfsdk:"createDate"`
-	CreatedBy             types.String            `tfsdk:"createdBy"`
-	CostCentre            types.String            `tfsdk:"costCentre"`
-	PortSpeed             types.Int64               `tfsdk:"portSpeed"`
-	TerminateDate         types.String             `tfsdk:"terminateDate"`
-	LiveDate              types.String             `tfsdk:"liveDate"`
+	ID                    types.Int64               `tfsdk:"product_id"`
+	UID                   types.String            `tfsdk:"product_uid"`
+	Name                  types.String            `tfsdk:"product_name"`
+	Type                  types.String            `tfsdk:"product_type"`
+	ProvisioningStatus    types.String            `tfsdk:"provisioning_status"`
+	CreateDate            types.String             `tfsdk:"create_date"`
+	CreatedBy             types.String            `tfsdk:"created_by"`
+	CostCentre            types.String            `tfsdk:"cost_centre"`
+	PortSpeed             types.Int64               `tfsdk:"port_speed"`
+	TerminateDate         types.String             `tfsdk:"terminate_date"`
+	LiveDate              types.String             `tfsdk:"live_date"`
 	Market                types.String            `tfsdk:"market"`
-	LocationID            types.Int64               `tfsdk:"locationId"`
-	UsageAlgorithm        types.String            `tfsdk:"usageAlgorithm"`
-	MarketplaceVisibility types.Bool              `tfsdk:"marketplaceVisibility"`
+	LocationID            types.Int64               `tfsdk:"location_id"`
+	UsageAlgorithm        types.String            `tfsdk:"usage_algorithm"`
+	MarketplaceVisibility types.Bool              `tfsdk:"marketplace_visibility"`
 	VXCPermitted          types.Bool              `tfsdk:"vxcpermitted"`
-	VXCAutoApproval       types.Bool              `tfsdk:"vxcAutoApproval"`
-	SecondaryName         types.String            `tfsdk:"secondaryName"`
-	LAGPrimary            types.Bool              `tfsdk:"lagPrimary"`
-	LAGID                 types.Int64               `tfsdk:"lagId"`
-	AggregationID         types.Int64               `tfsdk:"aggregationId"`
-	CompanyUID            types.String            `tfsdk:"companyUid"`
-	CompanyName           types.String            `tfsdk:"companyName"`
-	ContractStartDate     types.String             `tfsdk:"contractStartDate"`
-	ContractEndDate       types.String             `tfsdk:"contractEndDate"`
-	ContractTermMonths    types.Int64               `tfsdk:"contractTermMonths"`
+	VXCAutoApproval       types.Bool              `tfsdk:"vxc_auto_approval"`
+	SecondaryName         types.String            `tfsdk:"secondary_name"`
+	LAGPrimary            types.Bool              `tfsdk:"lag_primary"`
+	LAGID                 types.Int64               `tfsdk:"lag_id"`
+	AggregationID         types.Int64               `tfsdk:"aggregation_id"`
+	CompanyUID            types.String            `tfsdk:"company_uid"`
+	CompanyName           types.String            `tfsdk:"company_name"`
+	ContractStartDate     types.String             `tfsdk:"contract_start_date"`
+	ContractEndDate       types.String             `tfsdk:"contract_end_date"`
+	ContractTermMonths    types.Int64               `tfsdk:"contract_term_months"`
 	
 	Virtual               types.Bool              `tfsdk:"virtual"`
-	BuyoutPort            types.Bool              `tfsdk:"buyoutPort"`
+	BuyoutPort            types.Bool              `tfsdk:"buyout_port"`
 	Locked                types.Bool              `tfsdk:"locked"`
-	AdminLocked           types.Bool              `tfsdk:"adminLocked"`
+	AdminLocked           types.Bool              `tfsdk:"admin_locked"`
 	Cancelable            types.Bool              `tfsdk:"cancelable"`
 	// AttributeTags         map[string]string `tfsdk:"attributeTags"`
 	// Resources             MCRResources      `tfsdk:"resources"`
