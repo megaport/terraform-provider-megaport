@@ -118,114 +118,140 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
+				Description: "Last updated by the Terraform provider.",
 				Computed: true,
 			},
 			"uid": schema.StringAttribute{
+				Description: "UID identifier of the product.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"product_id": schema.Int64Attribute{
+				Description: "Numeric ID of the product.",
 				Computed: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"product_name": schema.StringAttribute{
+				Description: "Name of the product.",
 				Required: true,
 			},
 			"provisioning_status": schema.StringAttribute{
+				Description: "Provisioning status of the product.",
 				Computed: true,
 			},
 			"create_date": schema.StringAttribute{
+				Description: "Date the product was created.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_by": schema.StringAttribute{
+				Description: "User who created the product.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"port_speed": schema.Int64Attribute{
+				Description: "Bandwidth speed of the product.",
 				Required: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
+				Description: "Date the product will be terminated.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"live_date": schema.StringAttribute{
+				Description: "Date the product went live.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"market": schema.StringAttribute{
+				Description: "Market the product is in.",
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
+				Description: "Location ID of the product.",
 				Required: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
+				Description: "Contract term in months.",
 				Required: true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
+				Description: "Usage algorithm of the product.",
 				Computed: true,
 			},
 			"company_uid": schema.StringAttribute{
+				Description: "Megaport Company UID of the product.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cost_centre": schema.StringAttribute{
+				Description: "Cost centre of the product.",
 				Required: true,
 			},
 			"contract_start_date": schema.BoolAttribute{
+				Description: "Contract start date of the product.",
 				Computed: true,
 			},
 			"contract_end_date": schema.BoolAttribute{
+				Description: "Contract end date of the product.",
 				Computed: true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
+				Description: "Whether the product is visible in the Marketplace.",
 				Required: true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
+				Description: "Whether VXC is permitted.",
 				Computed: true,
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
+				Description: "Whether VXC is auto approved.",
 				Computed: true,
 			},
 			"virtual": schema.BoolAttribute{
+				Description: "Whether the product is virtual.",
 				Computed: true,
 			},
 			"buyout_port": schema.BoolAttribute{
+				Description: "Whether the product is bought out.",
 				Optional: true,
 			},
 			"locked": schema.BoolAttribute{
+				Description: "Whether the product is locked.",
 				Optional: true,
 			},
 			"admin_locked": schema.BoolAttribute{
+				Description: "Whether the product is admin locked.",
 				Optional: true,
 			},
 			"cancelable": schema.BoolAttribute{
+				Description: "Whether the product is cancelable.",
 				Computed: true,
 			}, 
 		},
