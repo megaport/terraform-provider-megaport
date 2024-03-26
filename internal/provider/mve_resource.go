@@ -53,7 +53,7 @@ type mveResourceModel struct {
 	Virtual               types.Bool                   `tfsdk:"virtual"`
 	BuyoutPort            types.Bool                   `tfsdk:"buyout_port"`
 	Locked                types.Bool                   `tfsdk:"locked"`
-	AdminLocked           types.Bool                   `tfsdk:"adminLocked"`
+	AdminLocked           types.Bool                   `tfsdk:"admin_locked"`
 	Cancelable            types.Bool                   `tfsdk:"cancelable"`
 	
 	Vendor                types.String                 `tfsdk:"vendor"`
@@ -242,7 +242,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			Description: "Whether the MVE is locked.",
 			Computed: true,
 		},
-		"adminLocked": schema.BoolAttribute{
+		"admin_locked": schema.BoolAttribute{
 			Description: "Whether the MVE is admin locked.",
 			Computed: true,
 		},
