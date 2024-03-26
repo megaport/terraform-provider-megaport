@@ -216,7 +216,13 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"virtual": schema.BoolAttribute{
 				Computed: true,
 			},
+			"buyout_port": schema.BoolAttribute{
+				Optional: true,
+			},
 			"locked": schema.BoolAttribute{
+				Optional: true,
+			},
+			"admin_locked": schema.BoolAttribute{
 				Optional: true,
 			},
 			"cancelable": schema.BoolAttribute{
