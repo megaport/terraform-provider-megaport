@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -52,7 +57,7 @@ type mveResourceModel struct {
 	Cancelable            types.Bool                   `tfsdk:"cancelable"`
 	
 	Vendor                types.String                 `tfsdk:"vendor"`
-	Size                  types.String                 `tfsdk:"mveSize"`
+	Size                  types.String                 `tfsdk:"mve_size"`
 	
 	// TODO - MODELS FOR RESOURCES AND VENDOR CONFIGS
 	// NetworkInterfaces     []*MVENetworkInterface `tfsdk:"vnics"`
@@ -108,11 +113,153 @@ func (r *mveResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 // Schema defines the schema for the resource.
 func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	
-	// TODO - MVE SCHEMA
-	resp.Schema = schema.Schema{
-	}
 
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+		"last_updated": schema.StringAttribute{
+				Description: "The last time the MVE was updated by the Terraform Provider.",
+				Computed: true,
+		},
+		"uid": schema.StringAttribute{
+			Description: "The unique identifier of the MVE.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"product_id": schema.Int64Attribute{
+			Description: "The Numeric ID of the MVE.",
+			Computed: true,
+			PlanModifiers: []planmodifier.Int64{
+				int64planmodifier.UseStateForUnknown(),
+			},
+		},
+		"product_name": schema.StringAttribute{
+			Description: "The name of the MVE.",
+			Required: true,
+		},
+		"provisioning_status": schema.StringAttribute{
+			Description: "The provisioning status of the MVE.",
+			Computed: true,
+		},
+		"create_date": schema.StringAttribute{
+			Description: "The date the MVE was created.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"created_by": schema.StringAttribute{
+			Description: "The user who created the MVE.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"terminate_date": schema.StringAttribute{
+			Description: "The date the MVE will be terminated.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"live_date": schema.StringAttribute{
+			Description: "The date the MVE went live.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"market": schema.StringAttribute{
+			Description: "The market the MVE is in.",
+			Required: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
+		},
+		"location_id": schema.Int64Attribute{
+			Description: "The location ID of the MVE.",
+			Required: true,
+			PlanModifiers: []planmodifier.Int64{
+				int64planmodifier.RequiresReplace(),
+			},
+		},
+		"contract_term_months": schema.Int64Attribute{
+			Description: "The contract term in months.",
+			Required: true,
+			Validators: []validator.Int64{
+				int64validator.OneOf(1, 12, 24, 36),
+			},
+		},
+		"usage_algorithm": schema.StringAttribute{
+			Description: "The usage algorithm of the MVE.",
+			Computed: true,
+		},
+		"company_uid": schema.StringAttribute{
+			Description: "The company UID of the MVE.",
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
+		"contract_start_date": schema.BoolAttribute{
+			Description: "The contract start date of the MVE.",
+			Computed: true,
+		},
+		"contract_end_date": schema.BoolAttribute{
+			Description: "The contract end date of the MVE.",
+			Computed: true,
+		},
+		"marketplace_visibility": schema.BoolAttribute{
+			Description: "Whether the MVE is visible in the marketplace.",
+			Required: true,
+		},
+		"vxc_permitted": schema.BoolAttribute{
+			Description: "Whether VXC is permitted.",
+			Computed: true,
+		},
+		"vxc_auto_approval": schema.BoolAttribute{
+			Description: "Whether VXC is auto approved.",
+			Computed: true,
+		},
+		"secondary_name": schema.StringAttribute{
+			Description: "The secondary name of the MVE.",
+			Computed: true,
+		},
+		"company_name": schema.StringAttribute{
+			Description: "The company name of the MVE.",
+			Computed: true,
+		},
+		"virtual": schema.BoolAttribute{
+			Description: "Whether the MVE is virtual.",
+			Computed: true,
+		},
+		"buyout_port": schema.BoolAttribute{
+			Description: "Whether the port is buyout.",
+			Computed: true,
+		},
+		"locked": schema.BoolAttribute{
+			Description: "Whether the MVE is locked.",
+			Computed: true,
+		},
+		"adminLocked": schema.BoolAttribute{
+			Description: "Whether the MVE is admin locked.",
+			Computed: true,
+		},
+		"cancelable": schema.BoolAttribute{
+			Description: "Whether the MVE is cancelable.",
+			Computed: true,
+		},
+		"vendor": schema.StringAttribute{
+			Description: "The vendor of the MVE.",
+			Computed: true,
+		},
+		"mve_size": schema.StringAttribute{
+			Description: "The size of the MVE.",
+			Computed: true,
+		},
+	},
+	}
 }
 
 // Create a new resource.
