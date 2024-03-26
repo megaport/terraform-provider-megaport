@@ -222,12 +222,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"cancelable": schema.BoolAttribute{
 				Computed: true,
 			},
-			"diversity_zone": schema.StringAttribute{
-				Optional: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 		},
 	}
 }
