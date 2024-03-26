@@ -221,7 +221,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"cancelable": schema.BoolAttribute{
 				Computed: true,
-			},
+			}, 
 		},
 	}
 }
@@ -236,12 +236,11 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createdMCR, err := r.client.MCRService.BuyPort(ctx, &megaport.BuyMCRRequest{
+	createdMCR, err := r.client.MCRService.BuyMCR(ctx, &megaport.BuyMCRRequest{
 		Name:                  plan.Name.ValueString(),
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
-		LocationId:            int(plan.LocationID.ValueInt64()),
-		Market:                plan.Market.ValueString(),
+		LocationID:            int(plan.LocationID.ValueInt64()),
 		WaitForProvision:      true,
 		WaitForTime:           5 * time.Minute,
 	})
@@ -253,7 +252,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createdID := createdMCR.TechnicalServiceUIDs[0]
+	createdID := createdMCR.TechnicalServiceUID
 
 	// get the created MCR
 	mcr, err := r.client.MCRService.GetMCR(ctx, createdID)
@@ -376,7 +375,7 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Delete existing order
 	_, err := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
-		PortID:    state.UID.String(),
+		MCRID:    state.UID.String(),
 		DeleteNow: true,
 	})
 	if err != nil {
