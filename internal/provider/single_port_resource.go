@@ -59,16 +59,16 @@ type singlePortResourceModel struct {
 
 // portInterfaceModel represents a port interface
 type portInterfaceModel struct {
-	Demarcation  types.String 	`tfsdk:"demarcation"`
-	Description  types.String 	`tfsdk:"description"`
-	ID           types.Int64    `tfsdk:"id"`
-	LOATemplate  types.String 	`tfsdk:"loa_template"`
-	Media        types.String 	`tfsdk:"media"`
-	Name         types.String 	`tfsdk:"name"`
-	PortSpeed    types.Int64    `tfsdk:"port_speed"`
-	ResourceName types.String 	`tfsdk:"resource_name"`
-	ResourceType types.String 	`tfsdk:"resource_type"`
-	Up           types.Int64    `tfsdk:"up"`
+	Demarcation  types.String `tfsdk:"demarcation"`
+	Description  types.String `tfsdk:"description"`
+	ID           types.Int64  `tfsdk:"id"`
+	LOATemplate  types.String `tfsdk:"loa_template"`
+	Media        types.String `tfsdk:"media"`
+	Name         types.String `tfsdk:"name"`
+	PortSpeed    types.Int64  `tfsdk:"port_speed"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	Up           types.Int64  `tfsdk:"up"`
 }
 
 func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
@@ -119,136 +119,136 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the resource was updated.",
-				Computed: true,
+				Computed:    true,
 			},
 			"uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"product_id": schema.Int64Attribute{
 				Description: "The numeric ID of the product.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"product_name": schema.StringAttribute{
 				Description: "The name of the product.",
-				Required: true,
+				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the product.",
-				Computed: true,
+				Computed:    true,
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"port_speed": schema.Int64Attribute{
 				Description: "The speed of the port in Mbps.",
-				Required: true,
+				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
 				Description: "The date the product will be terminated.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
-				Required: true,
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the product.",
-				Required: true,
+				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
-				Required: true,
+				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
 				Description: "The usage algorithm for the product.",
-				Computed: true,
+				Computed:    true,
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The unique identifier of the company.",
-				Computed: true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre for the product.",
-				Required: true,
+				Required:    true,
 			},
 			"contract_start_date": schema.BoolAttribute{
 				Description: "The date the contract started.",
-				Computed: true,
+				Computed:    true,
 			},
 			"contract_end_date": schema.BoolAttribute{
 				Description: "The date the contract ends.",
-				Computed: true,
+				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace.",
-				Required: true,
+				Required:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted on this product.",
-				Computed: true,
+				Computed:    true,
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
 				Description: "Whether VXC is auto-approved on this product.",
-				Computed: true,
+				Computed:    true,
 			},
 			"virtual": schema.BoolAttribute{
 				Description: "Whether the product is virtual.",
-				Computed: true,
+				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
-				Optional: true,
+				Optional:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
-				Computed: true,
+				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the product.",
-				Optional: true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
