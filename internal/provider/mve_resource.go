@@ -26,44 +26,44 @@ var (
 
 // mveResourceModel maps the resource schema data.
 type mveResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
+	LastUpdated 		  types.String 						`tfsdk:"last_updated"`
 
-	ID                    types.Int64                    `tfsdk:"product_id"`
-	UID                   types.String                 `tfsdk:"product_uid"`
-	Name                  types.String                 `tfsdk:"product_name"`
-	Type                  types.String                 `tfsdk:"product_type"`
-	ProvisioningStatus    types.String                 `tfsdk:"provisioning_status"`
-	CreateDate            types.String                  `tfsdk:"create_date"`
-	CreatedBy             types.String                 `tfsdk:"created_by"`
-	TerminateDate         types.String                  `tfsdk:"terminate_date"`
-	LiveDate              types.Int64                    `tfsdk:"live_date"`
-	Market                types.String                 `tfsdk:"market"`
-	LocationID            types.Int64                    `tfsdk:"location_id"`
-	UsageAlgorithm        types.String                 `tfsdk:"usage_algorithm"`
-	MarketplaceVisibility types.Bool                   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool                   `tfsdk:"vxcpermitted"`
-	VXCAutoApproval       types.Bool                   `tfsdk:"vxc_auto_approval"`
-	SecondaryName         types.String                 `tfsdk:"secondary_name"`
-	CompanyUID            types.String                 `tfsdk:"company_uid"`
-	CompanyName           types.String                 `tfsdk:"company_name"`
-	ContractStartDate     types.String                  `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String                  `tfsdk:"contract_end_date"`
-	ContractTermMonths    types.Int64                    `tfsdk:"contract_term_months"`
+	ID                    types.Int64                    	`tfsdk:"product_id"`
+	UID                   types.String                 		`tfsdk:"product_uid"`
+	Name                  types.String                 		`tfsdk:"product_name"`
+	Type                  types.String                 		`tfsdk:"product_type"`
+	ProvisioningStatus    types.String                 		`tfsdk:"provisioning_status"`
+	CreateDate            types.String                  	`tfsdk:"create_date"`
+	CreatedBy             types.String                 		`tfsdk:"created_by"`
+	TerminateDate         types.String                  	`tfsdk:"terminate_date"`
+	LiveDate              types.Int64                    	`tfsdk:"live_date"`
+	Market                types.String                 		`tfsdk:"market"`
+	LocationID            types.Int64                    	`tfsdk:"location_id"`
+	UsageAlgorithm        types.String                 		`tfsdk:"usage_algorithm"`
+	MarketplaceVisibility types.Bool                   		`tfsdk:"marketplace_visibility"`
+	VXCPermitted          types.Bool                   		`tfsdk:"vxcpermitted"`
+	VXCAutoApproval       types.Bool                   		`tfsdk:"vxc_auto_approval"`
+	SecondaryName         types.String                 		`tfsdk:"secondary_name"`
+	CompanyUID            types.String                 		`tfsdk:"company_uid"`
+	CompanyName           types.String                 		`tfsdk:"company_name"`
+	ContractStartDate     types.String                  	`tfsdk:"contract_start_date"`
+	ContractEndDate       types.String                  	`tfsdk:"contract_end_date"`
+	ContractTermMonths    types.Int64                    	`tfsdk:"contract_term_months"`
 	
-	Virtual               types.Bool                   `tfsdk:"virtual"`
-	BuyoutPort            types.Bool                   `tfsdk:"buyout_port"`
-	Locked                types.Bool                   `tfsdk:"locked"`
-	AdminLocked           types.Bool                   `tfsdk:"admin_locked"`
-	Cancelable            types.Bool                   `tfsdk:"cancelable"`
+	Virtual               types.Bool                   		`tfsdk:"virtual"`
+	BuyoutPort            types.Bool                   		`tfsdk:"buyout_port"`
+	Locked                types.Bool                   		`tfsdk:"locked"`
+	AdminLocked           types.Bool                   		`tfsdk:"admin_locked"`
+	Cancelable            types.Bool                   		`tfsdk:"cancelable"`
 	
-	Vendor                types.String                 `tfsdk:"vendor"`
-	Size                  types.String                 `tfsdk:"mve_size"`
+	Vendor                types.String                 		`tfsdk:"vendor"`
+	Size                  types.String                 		`tfsdk:"mve_size"`
 
-	VendorConfig          vendorConfigModel		   	  `tfsdk:"vendor_config"`
+	VendorConfig          vendorConfigModel		   	  		`tfsdk:"vendor_config"`
 	
-	NetworkInterfaces     []*mveNetworkInterfaceModel `tfsdk:"vnics"`
-	AttributeTags         map[string]types.String     `tfsdk:"attribute_tags"`
-	Resources             *mveResourcesModel          `tfsdk:"resources"`
+	NetworkInterfaces     []*mveNetworkInterfaceModel 		`tfsdk:"vnics"`
+	AttributeTags         map[types.String]types.String     `tfsdk:"attribute_tags"`
+	Resources             *mveResourcesModel          		`tfsdk:"resources"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -81,18 +81,18 @@ func (orm *mveNetworkInterfaceModel) toAPINetworkInterface() megaport.MVENetwork
 
 // mveResourcesModel represents the resources associated with an MVE.
 type mveResourcesModel struct {
-	Interface       *portInterfaceModel       `tfsdk:"interface"`
-	VirtualMachines []*mveVirtualMachineModel `tfsdk:"virtual_machine"`
+	Interface       *portInterfaceModel       		`tfsdk:"interface"`
+	VirtualMachines []*mveVirtualMachineModel 		`tfsdk:"virtual_machine"`
 }
 
 // mveVirtualMachineModel represents a virtual machine associated with an MVE.
 type mveVirtualMachineModel struct {
-	ID           types.Int64                          `tfsdk:"id"`
-	CpuCount     types.Int64                     	  `tfsdk:"cpu_count"`
-	Image        *mveVirtualMachineImageModel `tfsdk:"image"`
+	ID           types.Int64                        `tfsdk:"id"`
+	CpuCount     types.Int64                     	`tfsdk:"cpu_count"`
+	Image        *mveVirtualMachineImageModel 		`tfsdk:"image"`
 	ResourceType types.String                       `tfsdk:"resource_type"`
 	Up           types.Bool                         `tfsdk:"up"`
-	Vnics        []*mveNetworkInterfaceModel  `tfsdk:"vnics"`
+	Vnics        []*mveNetworkInterfaceModel  		`tfsdk:"vnics"`
 }
 
 // MVVEVirtualMachineImage represents the image associated with an MVE virtual machine.
@@ -206,7 +206,7 @@ func (orm *mveResourceModel) fromAPIMVE(p *megaport.MVE) {
 	orm.Size = types.StringValue(p.Size)
 
 	for k,v := range p.AttributeTags {
-		orm.AttributeTags[k] = types.StringValue(v)
+		orm.AttributeTags[types.StringValue(k)] = types.StringValue(v)
 	}
 
 	for _, vnic := range p.NetworkInterfaces {
@@ -464,10 +464,198 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			Description: "The size of the MVE.",
 			Computed: true,
 		},
+		"attribute_tags": schema.MapAttribute{
+			Description: "The attribute tags of the MVE.",
+			Computed: true,
+			ElementType: types.StringType,
+		},
+		"network_interfaces": schema.ListNestedAttribute{
+			Description: "The network interfaces of the MVE.",
+			Computed: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: map[string]schema.Attribute{
+					"description": schema.StringAttribute{
+						Description: "The description of the network interface.",
+						Computed: true,
+					},
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the network interface.",
+						Computed: true,
+					},
+				},
+			},
+		},
+		"vendor_config": schema.SingleNestedAttribute{
+			Description: "The vendor configuration of the MVE.",
+			Computed: true,
+			Attributes: map[string]schema.Attribute{
+				"vendor": schema.StringAttribute{
+					Description: "The vendor of the MVE.",
+					Computed: true,
+				},
+				"image_id": schema.Int64Attribute{
+					Description: "The image ID of the MVE.",
+					Computed: true,
+				},
+				"product_size": schema.StringAttribute{
+					Description: "The product size for the vendor config.",
+					Computed: true,
+				},
+				"account_name": schema.StringAttribute{
+					Description: "The account name for the vendor config.",
+					Computed: true,
+				},
+				"account_key": schema.StringAttribute{
+					Description: "The account key for the vendor config.",
+					Computed: true,
+				},
+				"admin_ssh_public_key": schema.StringAttribute{
+					Description: "The admin SSH public key for the vendor config.",
+					Computed: true,
+				},
+				"cloud_init": schema.StringAttribute{
+					Description: "The cloud init for the vendor config.",
+					Computed: true,
+				},
+				"license_data": schema.StringAttribute{
+					Description: "The license data for the vendor config.",
+					Computed: true,
+				},
+				"admin_password_hash": schema.StringAttribute{
+					Description: "The admin password hash for the vendor config.",
+					Computed: true,
+				},
+				"director_address": schema.StringAttribute{
+					Description: "The director address for the vendor config.",
+					Computed: true,
+				},
+				"controller_address": schema.StringAttribute{
+					Description: "The controller address for the vendor config.",
+					Computed: true,
+				},
+				"local_auth": schema.StringAttribute{
+					Description: "The local auth for the vendor config.",
+					Computed: true,
+				},
+				"remote_auth": schema.StringAttribute{
+					Description: "The remote auth for the vendor config.",
+					Computed: true,
+				},
+				"serial_number": schema.StringAttribute{
+					Description: "The serial number for the vendor config.",
+					Computed: true,
+				},
+				"vco_address": schema.StringAttribute{
+					Description: "The VCO address for the vendor config.",
+					Computed: true,
+				},
+				"vco_activation_code": schema.StringAttribute{
+					Description: "The VCO activation code for the vendor config.",
+					Computed: true,
+				},
+			},
+		},
+		"resources": schema.SingleNestedAttribute{
+			Description: "The resources associated with the MVE.",
+			Computed: true,
+			Attributes: map[string]schema.Attribute{
+				"interface": schema.SingleNestedAttribute{
+					Description: "The port interface of the MVE.",
+					Computed: true,
+					Attributes: map[string]schema.Attribute{
+						"demarcation": schema.StringAttribute{
+							Description: "The demarcation of the port interface.",
+							Computed: true,
+						},
+						"description": schema.StringAttribute{
+							Description: "The description of the port interface.",
+							Computed: true,
+						},
+						"id": schema.Int64Attribute{
+							Description: "The ID of the port interface.",
+							Computed: true,
+						},
+						"loa_template": schema.StringAttribute{
+							Description: "The LOA template of the port interface.",
+							Computed: true,
+						},
+						"media": schema.StringAttribute{
+							Description: "The media of the port interface.",
+							Computed: true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the port interface.",
+							Computed: true,
+						},
+						"port_speed": schema.Int64Attribute{
+							Description: "The port speed of the port interface.",
+							Computed: true,
+						},
+						"resource_name": schema.StringAttribute{
+							Description: "The resource name of the port interface.",
+							Computed: true,
+						},
+						"resource_type": schema.StringAttribute{
+							Description: "The resource type of the port interface.",
+							Computed: true,
+						},
+						"up": schema.BoolAttribute{
+							Description: "Whether the port interface is up.",
+							Computed: true,
+						},
+					},
+				},
+				"virtual_machine": schema.ListNestedAttribute{
+					Description: "The virtual machines associated with the MVE.",
+					Computed: true,
+					NestedObject: schema.NestedAttributeObject{
+						Attributes: map[string]schema.Attribute{
+							"id": schema.Int64Attribute{
+								Description: "The ID of the virtual machine.",
+								Computed: true,
+							},
+							"cpu_count": schema.Int64Attribute{
+								Description: "The CPU count of the virtual machine.",
+								Computed: true,
+							},
+							"image": schema.SingleNestedAttribute{
+								Description: "The image of the virtual machine.",
+								Computed: true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "The resource type of the virtual machine.",
+								Computed: true,
+							},
+							"up": schema.BoolAttribute{
+								Description: "Whether the virtual machine is up.",
+								Computed: true,
+							},
+							"vnics": schema.ListNestedAttribute{
+								Description: "The network interfaces of the virtual machine.",
+								Computed: true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"description": schema.StringAttribute{
+											Description: "The description of the network interface.",
+											Computed: true,
+									},
+									"vlan": schema.Int64Attribute{
+										Description: "The VLAN of the network interface.",
+										Computed: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			},
+		},
 		// TODO - OTHER STRUCTS AND VENDOR CONFIGS
-	},
+		},
 	}
 }
+
 
 // Create a new resource.
 func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
