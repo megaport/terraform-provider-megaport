@@ -57,6 +57,19 @@ type singlePortResourceModel struct {
 	// VXCResources          PortResources     `tfsdk:"resources"`
 }
 
+type portInterfaceModel struct {
+	Demarcation  types.String 	`json:"demarcation"`
+	Description  types.String 	`json:"description"`
+	ID           types.Int64    `json:"id"`
+	LOATemplate  types.String 	`json:"loa_template"`
+	Media        types.String 	`json:"media"`
+	Name         types.String 	`json:"name"`
+	PortSpeed    types.Int64    `json:"port_speed"`
+	ResourceName types.String 	`json:"resource_name"`
+	ResourceType types.String 	`json:"resource_type"`
+	Up           types.Int64    `json:"up"`
+}
+
 func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))

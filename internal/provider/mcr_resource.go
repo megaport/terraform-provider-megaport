@@ -24,46 +24,64 @@ var (
 	_ resource.ResourceWithImportState = &mcrResource{}
 )
 
-// singlePortResourceModel maps the resource schema data.
+// mcrResourceModel maps the resource schema data.
 type mcrResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
-	ID                    types.Int64               `tfsdk:"product_id"`
-	UID                   types.String            `tfsdk:"product_uid"`
-	Name                  types.String            `tfsdk:"product_name"`
-	Type                  types.String            `tfsdk:"product_type"`
-	ProvisioningStatus    types.String            `tfsdk:"provisioning_status"`
-	CreateDate            types.String             `tfsdk:"create_date"`
-	CreatedBy             types.String            `tfsdk:"created_by"`
-	CostCentre            types.String            `tfsdk:"cost_centre"`
-	PortSpeed             types.Int64               `tfsdk:"port_speed"`
-	TerminateDate         types.String             `tfsdk:"terminate_date"`
-	LiveDate              types.String             `tfsdk:"live_date"`
-	Market                types.String            `tfsdk:"market"`
-	LocationID            types.Int64               `tfsdk:"location_id"`
-	UsageAlgorithm        types.String            `tfsdk:"usage_algorithm"`
-	MarketplaceVisibility types.Bool              `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool              `tfsdk:"vxcpermitted"`
-	VXCAutoApproval       types.Bool              `tfsdk:"vxc_auto_approval"`
-	SecondaryName         types.String            `tfsdk:"secondary_name"`
-	LAGPrimary            types.Bool              `tfsdk:"lag_primary"`
-	LAGID                 types.Int64               `tfsdk:"lag_id"`
-	AggregationID         types.Int64               `tfsdk:"aggregation_id"`
-	CompanyUID            types.String            `tfsdk:"company_uid"`
-	CompanyName           types.String            `tfsdk:"company_name"`
-	ContractStartDate     types.String             `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String             `tfsdk:"contract_end_date"`
-	ContractTermMonths    types.Int64               `tfsdk:"contract_term_months"`
+	ID                    types.Int64             		`tfsdk:"product_id"`
+	UID                   types.String            		`tfsdk:"product_uid"`
+	Name                  types.String            		`tfsdk:"product_name"`
+	Type                  types.String            		`tfsdk:"product_type"`
+	ProvisioningStatus    types.String            		`tfsdk:"provisioning_status"`
+	CreateDate            types.String            		`tfsdk:"create_date"`
+	CreatedBy             types.String            		`tfsdk:"created_by"`
+	CostCentre            types.String            		`tfsdk:"cost_centre"`
+	PortSpeed             types.Int64             		`tfsdk:"port_speed"`
+	TerminateDate         types.String            		`tfsdk:"terminate_date"`
+	LiveDate              types.String            		`tfsdk:"live_date"`
+	Market                types.String            		`tfsdk:"market"`
+	LocationID            types.Int64             		`tfsdk:"location_id"`
+	UsageAlgorithm        types.String            		`tfsdk:"usage_algorithm"`
+	MarketplaceVisibility types.Bool              		`tfsdk:"marketplace_visibility"`
+	VXCPermitted          types.Bool              		`tfsdk:"vxcpermitted"`
+	VXCAutoApproval       types.Bool              		`tfsdk:"vxc_auto_approval"`
+	SecondaryName         types.String            		`tfsdk:"secondary_name"`
+	LAGPrimary            types.Bool              		`tfsdk:"lag_primary"`
+	LAGID                 types.Int64             		`tfsdk:"lag_id"`
+	AggregationID         types.Int64             		`tfsdk:"aggregation_id"`
+	CompanyUID            types.String            		`tfsdk:"company_uid"`
+	CompanyName           types.String            		`tfsdk:"company_name"`
+	ContractStartDate     types.String            		`tfsdk:"contract_start_date"`
+	ContractEndDate       types.String            		`tfsdk:"contract_end_date"`
+	ContractTermMonths    types.Int64             		`tfsdk:"contract_term_months"`
+	ASN				   	  types.Int64             		`tfsdk:"asn"`
 	
-	Virtual               types.Bool              `tfsdk:"virtual"`
-	BuyoutPort            types.Bool              `tfsdk:"buyout_port"`
-	Locked                types.Bool              `tfsdk:"locked"`
-	AdminLocked           types.Bool              `tfsdk:"admin_locked"`
-	Cancelable            types.Bool              `tfsdk:"cancelable"`
-	// AttributeTags         map[string]string `tfsdk:"attributeTags"`
-	// Resources             MCRResources      `tfsdk:"resources"`
+	Virtual               types.Bool              		`tfsdk:"virtual"`
+	BuyoutPort            types.Bool              		`tfsdk:"buyout_port"`
+	Locked                types.Bool              		`tfsdk:"locked"`
+	AdminLocked           types.Bool              		`tfsdk:"admin_locked"`
+	Cancelable            types.Bool              	    `tfsdk:"cancelable"`
+	AttributeTags 		  map[types.String]types.String `tfsdk:"attributeTags"`
+	Resources          	  *mcrResourcesModel      		`tfsdk:"resources"`
 }
 
+// mcrResourcesModel represents the associated interface and virtual router
+type mcrResourcesModel struct {
+	Interface 	  *portInterfaceModel 		`tfsdk:"interface"`
+	VirtualRouter *mcrVirtualRouterModel 	`tfsdk:"virtual_router"`
+}
+
+// mcrVirtualRouterModel represents the virtual router associated with the MCR
+type mcrVirtualRouterModel struct {
+	ID types.Int64			  `tfsdk:"id"`
+	ASN types.Int64 		  `tfsdk:"mcr_asn"`
+	Name types.String 		  `tfsdk:"name"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	Speed types.Int64 	 	  `tfsdk:"speed"`
+}
+
+// fromAPIMCR maps the API MCR response to the resource schema.
 func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
@@ -96,6 +114,35 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.Locked = types.BoolValue(m.Locked)
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
+
+	if m.AttributeTags != nil {
+		orm.AttributeTags = make(map[types.String]types.String)
+		for k, v := range m.AttributeTags {
+			orm.AttributeTags[types.StringValue(k)] = types.StringValue(v)
+		}
+	}
+
+	orm.Resources = &mcrResourcesModel{
+		Interface: &portInterfaceModel{
+			Demarcation: types.StringValue(m.Resources.Interface.Demarcation),
+			Description: types.StringValue(m.Resources.Interface.Description),
+			ID: types.Int64Value(int64(m.Resources.Interface.ID)),
+			LOATemplate: types.StringValue(m.Resources.Interface.LOATemplate),
+			Media: types.StringValue(m.Resources.Interface.Media),
+			Name: types.StringValue(m.Resources.Interface.Name),
+			PortSpeed: types.Int64Value(int64(m.Resources.Interface.PortSpeed)),
+			ResourceName: types.StringValue(m.Resources.Interface.ResourceName),
+			ResourceType: types.StringValue(m.Resources.Interface.ResourceType),
+		},
+		VirtualRouter: &mcrVirtualRouterModel{
+			ID: types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
+			ASN: types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
+			Name: types.StringValue(m.Resources.VirtualRouter.Name),
+			ResourceName: types.StringValue(m.Resources.VirtualRouter.ResourceName),
+			ResourceType: types.StringValue(m.Resources.VirtualRouter.ResourceType),
+			Speed: types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
+		},
+	}
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -226,6 +273,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Whether the product is visible in the Marketplace.",
 				Required: true,
 			},
+			"asn": schema.Int64Attribute{
+				Description: "ASN in the MCR order configuration.",
+				Computed: true,
+			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted.",
 				Computed: true,
@@ -253,7 +304,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
 				Computed: true,
-			}, 
+			},
+			// TODO - Resources and AttributeTags 
 		},
 	}
 }
@@ -268,14 +320,20 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createdMCR, err := r.client.MCRService.BuyMCR(ctx, &megaport.BuyMCRRequest{
+	buyReq := &megaport.BuyMCRRequest{
 		Name:                  plan.Name.ValueString(),
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
 		LocationID:            int(plan.LocationID.ValueInt64()),
 		WaitForProvision:      true,
 		WaitForTime:           5 * time.Minute,
-	})
+	}
+
+	if !plan.ASN.IsNull() {
+		buyReq.MCRAsn = int(plan.ASN.ValueInt64())
+	}
+
+	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating mcr",
