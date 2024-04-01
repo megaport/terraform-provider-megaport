@@ -61,7 +61,7 @@ type mcrResourceModel struct {
 	Locked                types.Bool              		`tfsdk:"locked"`
 	AdminLocked           types.Bool              		`tfsdk:"admin_locked"`
 	Cancelable            types.Bool              	    `tfsdk:"cancelable"`
-	AttributeTags 		  map[types.String]types.String `tfsdk:"attributeTags"`
+	AttributeTags 		  map[types.String]types.String `tfsdk:"attribute_tags"`
 	Resources          	  *mcrResourcesModel      		`tfsdk:"resources"`
 }
 
@@ -305,7 +305,93 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Whether the product is cancelable.",
 				Computed: true,
 			},
-			// TODO - Resources and AttributeTags 
+			"attribute_tags": schema.MapAttribute{
+				ElementType: types.StringType,
+				Description: "Attribute tags of the product.",
+				Computed: true,
+			},
+			"resources": schema.SingleNestedAttribute{
+				Computed: true,
+				Description: "Resources associated with the product.",
+				Attributes: map[string]schema.Attribute{
+					"interface": schema.SingleNestedAttribute{
+						Computed: true,
+						Description: "Port interface associated with the product.",
+						Attributes: map[string]schema.Attribute{
+							"demarcation": schema.StringAttribute{
+								Description: "Demarcation of the interface.",
+								Computed: true,
+							},
+							"description": schema.StringAttribute{
+								Description: "Description of the interface.",
+								Computed: true,
+							},
+							"id": schema.Int64Attribute{
+								Description: "Numeric ID of the interface.",
+								Computed: true,
+							},
+							"loa_template": schema.StringAttribute{
+								Description: "LOA template of the interface.",
+								Computed: true,
+							},
+							"media": schema.StringAttribute{
+								Description: "Media of the interface.",
+								Computed: true,
+							},
+							"name": schema.StringAttribute{
+								Description: "Name of the interface.",
+								Computed: true,
+							},
+							"port_speed": schema.Int64Attribute{
+								Description: "Bandwidth speed of the interface.",
+								Computed: true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "Resource name of the interface.",
+								Computed: true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "Resource type of the interface.",
+								Computed: true,
+							},
+							"up": schema.BoolAttribute{
+								Description: "Whether the interface is up.",
+								Computed: true,
+							},
+						},
+					},
+					"virtual_router": schema.SingleNestedAttribute{
+						Computed: true,
+						Description: "Virtual router associated with the product.",
+						Attributes: map[string]schema.Attribute{
+							"id": schema.Int64Attribute{
+								Description: "Numeric ID of the virtual router.",
+								Computed: true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "ASN of the virtual router.",
+								Computed: true,
+							},
+							"name": schema.StringAttribute{
+								Description: "Name of the virtual router.",
+								Computed: true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "Resource name of the virtual router.",
+								Computed: true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "Resource type of the virtual router.",
+								Computed: true,
+							},
+							"speed": schema.Int64Attribute{
+								Description: "Speed of the virtual router.",
+								Computed: true,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
