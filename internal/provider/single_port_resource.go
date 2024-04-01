@@ -57,6 +57,20 @@ type singlePortResourceModel struct {
 	// VXCResources          PortResources     `tfsdk:"resources"`
 }
 
+// portInterfaceModel represents the interface associated with a Megaport Port.
+type portInterfaceModel struct {
+	Demarcation  types.String `tfsdk:"demarcation"`
+	Description  types.String `tfsdk:"description"`
+	ID           types.Int64    `tfsdk:"id"`
+	LOATemplate  types.String `tfsdk:"loa_template"`
+	Media        types.String `tfsdk:"media"`
+	Name         types.String `tfsdk:"name"`
+	PortSpeed    types.Int64    `tfsdk:"port_speed"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	Up           types.Int64    `tfsdk:"up"`
+}
+
 func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))

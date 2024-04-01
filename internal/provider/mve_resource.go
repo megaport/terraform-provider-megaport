@@ -58,12 +58,122 @@ type mveResourceModel struct {
 	
 	Vendor                types.String                 `tfsdk:"vendor"`
 	Size                  types.String                 `tfsdk:"mve_size"`
+
+	VendorConfig          vendorConfigModel		   	  `tfsdk:"vendor_config"`
 	
-	// TODO - MODELS FOR RESOURCES AND VENDOR CONFIGS
-	// NetworkInterfaces     []*MVENetworkInterface `tfsdk:"vnics"`
-	// AttributeTags         map[string]string      `tfsdk:"attribute_tags"`
-	// Resources             *MVEResources          `tfsdk:"resources"`
+	NetworkInterfaces     []*mveNetworkInterfaceModel `tfsdk:"vnics"`
+	AttributeTags         map[string]types.String     `tfsdk:"attribute_tags"`
+	Resources             *mveResourcesModel          `tfsdk:"resources"`
 }
+
+// mveNetworkInterfaceModel represents a vNIC.
+type mveNetworkInterfaceModel struct {
+	Description types.String   `tfsdk:"description"`
+	VLAN        types.Int64    `tfsdk:"vlan"`
+}
+
+func (orm *mveNetworkInterfaceModel) toAPINetworkInterface() megaport.MVENetworkInterface {
+	return megaport.MVENetworkInterface{
+		Description: orm.Description.ValueString(),
+		VLAN:        int(orm.VLAN.ValueInt64()),
+	}
+}
+
+// mveResourcesModel represents the resources associated with an MVE.
+type mveResourcesModel struct {
+	Interface       *portInterfaceModel       `tfsdk:"interface"`
+	VirtualMachines []*mveVirtualMachineModel `tfsdk:"virtual_machine"`
+}
+
+// mveVirtualMachineModel represents a virtual machine associated with an MVE.
+type mveVirtualMachineModel struct {
+	ID           types.Int64                          `tfsdk:"id"`
+	CpuCount     types.Int64                     	  `tfsdk:"cpu_count"`
+	Image        *mveVirtualMachineImageModel `tfsdk:"image"`
+	ResourceType types.String                       `tfsdk:"resource_type"`
+	Up           types.Bool                         `tfsdk:"up"`
+	Vnics        []*mveNetworkInterfaceModel  `tfsdk:"vnics"`
+}
+
+// MVVEVirtualMachineImage represents the image associated with an MVE virtual machine.
+type mveVirtualMachineImageModel struct {
+	ID      types.Int64    `tfsdk:"id"`
+	Vendor  types.String `tfsdk:"vendor"`
+	Product types.String `tfsdk:"product"`
+	Version types.String `tfsdk:"version"`
+}
+
+
+// vendorConfigModel is an interface for MVE vendor configuration.
+type vendorConfigModel interface {
+	IsVendorConfig()
+}
+
+// arubaConfigModel represents the configuration for an Aruba MVE.
+type arubaConfigModel struct {
+	vendorConfigModel
+	Vendor      types.String `tfsdk:"vendor"`
+	ImageID     types.Int64  `tfsdk:"image_id"`
+	ProductSize types.String `tfsdk:"product_size"`
+	AccountName types.String `tfsdk:"account_name"`
+	AccountKey  types.String `tfsdk:"account_key"`
+}
+
+// ciscoConfigModel represents the configuration for a Cisco MVE.
+type ciscoConfigModel struct {
+	vendorConfigModel
+	Vendor            types.String `tfsdk:"vendor"`
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	CloudInit         types.String `tfsdk:"cloud_init"`
+}
+
+// fortinetConfigModel represents the configuration for a Fortinet MVE.
+type fortinetConfigModel struct {
+	vendorConfigModel
+	Vendor            types.String `tfsdk:"vendor"`
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	LicenseData       types.String `tfsdk:"license_data"`
+}
+
+// paloAltoConfigModel represents the configuration for a Palo Alto MVE.
+type paloAltoConfigModel struct {
+	vendorConfigModel
+	Vendor            types.String `tfsdk:"vendor"`
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	AdminPasswordHash types.String `tfsdk:"admin_password_hash"`
+	LicenseData       types.String `tfsdk:"license_data"`
+}
+
+// versaConfigModel represents the configuration for a Versa MVE.
+type versaConfigModel struct {
+	vendorConfigModel
+	Vendor            types.String `tfsdk:"vendor"`
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	DirectorAddress   types.String `tfsdk:"director_address"`
+	ControllerAddress types.String `tfsdk:"controller_address"`
+	LocalAuth         types.String `tfsdk:"local_auth"`
+	RemoteAuth        types.String `tfsdk:"remote_auth"`
+	SerialNumber      types.String `tfsdk:"serial_number"`
+}
+
+// vmwareConfigModel represents the configuration for a VMware MVE.
+type vmwareConfig struct {
+	vendorConfigModel
+	Vendor            types.String `tfsdk:"vendor"`
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	VcoAddress        types.String `tfsdk:"vco_address"`
+	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
+}
+
 
 func (orm *mveResourceModel) fromAPIMVE(p *megaport.MVE) {
 	orm.ID = types.Int64Value(int64(p.ID))
@@ -94,6 +204,102 @@ func (orm *mveResourceModel) fromAPIMVE(p *megaport.MVE) {
 	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.Vendor = types.StringValue(p.Vendor)
 	orm.Size = types.StringValue(p.Size)
+
+	for k,v := range p.AttributeTags {
+		orm.AttributeTags[k] = types.StringValue(v)
+	}
+
+	for _, vnic := range p.NetworkInterfaces {
+		orm.NetworkInterfaces = append(orm.NetworkInterfaces, &mveNetworkInterfaceModel{
+			Description: types.StringValue(vnic.Description),
+			VLAN:        types.Int64Value(int64(vnic.VLAN)),
+		})
+	}
+	
+	if p.Resources != nil {
+	 r := &mveResourcesModel{}
+	 if p.Resources.Interface != nil {
+		r.Interface = &portInterfaceModel{
+			Demarcation: types.StringValue(p.Resources.Interface.Demarcation),
+			Description: types.StringValue(p.Resources.Interface.Description),
+			ID: 		types.Int64Value(int64(p.Resources.Interface.ID)),
+			LOATemplate: types.StringValue(p.Resources.Interface.LOATemplate),
+			Media: types.StringValue(p.Resources.Interface.Media),
+			Name: types.StringValue(p.Resources.Interface.Name),
+			PortSpeed: types.Int64Value(int64(p.Resources.Interface.PortSpeed)),
+			ResourceName: types.StringValue(p.Resources.Interface.ResourceName),
+			ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
+		}
+	 }
+	 for _, vm := range p.Resources.VirtualMachines {
+		r.VirtualMachines = append(r.VirtualMachines, &mveVirtualMachineModel{
+			ID:           types.Int64Value(int64(vm.ID)),
+			CpuCount:     types.Int64Value(int64(vm.CpuCount)),
+			ResourceType: types.StringValue(vm.ResourceType),
+			Up:           types.BoolValue(vm.Up),
+		})
+	 }
+	 orm.Resources = r
+	}
+}
+
+func toAPIVendorConfig(v vendorConfigModel) megaport.VendorConfig {
+	switch c := v.(type) {
+		case *arubaConfigModel:
+			return &megaport.ArubaConfig{
+				Vendor:      c.Vendor.ValueString(),
+				ImageID:     int(c.ImageID.ValueInt64()),
+				ProductSize: c.ProductSize.ValueString(),
+				AccountName: c.AccountName.ValueString(),
+				AccountKey:  c.AccountKey.ValueString(),
+			}
+		case *ciscoConfigModel:
+			return &megaport.CiscoConfig{
+				Vendor:            c.Vendor.ValueString(),
+				ImageID:           int(c.ImageID.ValueInt64()),
+				ProductSize:       c.ProductSize.ValueString(),
+				AdminSSHPublicKey: c.AdminSSHPublicKey.ValueString(),
+				CloudInit:         c.CloudInit.ValueString(),
+			}
+		case *fortinetConfigModel:
+			return &megaport.FortinetConfig{
+				Vendor:            c.Vendor.ValueString(),
+				ImageID:           int(c.ImageID.ValueInt64()),
+				ProductSize:       c.ProductSize.ValueString(),
+				AdminSSHPublicKey: c.AdminSSHPublicKey.ValueString(),
+				LicenseData:       c.LicenseData.ValueString(),
+			}
+		case *paloAltoConfigModel:
+			return &megaport.PaloAltoConfig{
+				Vendor:            c.Vendor.ValueString(),
+				ImageID:           int(c.ImageID.ValueInt64()),
+				ProductSize:       c.ProductSize.ValueString(),
+				AdminSSHPublicKey: c.AdminSSHPublicKey.ValueString(),
+				AdminPasswordHash: c.AdminPasswordHash.ValueString(),
+				LicenseData:       c.LicenseData.ValueString(),
+			}
+		case *versaConfigModel:
+			return &megaport.VersaConfig{
+				Vendor:            c.Vendor.ValueString(),
+				ImageID:           int(c.ImageID.ValueInt64()),
+				ProductSize:       c.ProductSize.ValueString(),
+				DirectorAddress:   c.DirectorAddress.ValueString(),
+				ControllerAddress: c.ControllerAddress.ValueString(),
+				LocalAuth:         c.LocalAuth.ValueString(),
+				RemoteAuth:        c.RemoteAuth.ValueString(),
+				SerialNumber:      c.SerialNumber.ValueString(),
+			}
+		case *vmwareConfig:
+			return &megaport.VmwareConfig{
+				Vendor:            c.Vendor.ValueString(),
+				ImageID:           int(c.ImageID.ValueInt64()),
+				ProductSize:       c.ProductSize.ValueString(),
+				AdminSSHPublicKey: c.AdminSSHPublicKey.ValueString(),
+				VcoAddress:        c.VcoAddress.ValueString(),
+				VcoActivationCode: c.VcoActivationCode.ValueString(),
+			}
+	}
+	return nil
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -258,6 +464,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			Description: "The size of the MVE.",
 			Computed: true,
 		},
+		// TODO - OTHER STRUCTS AND VENDOR CONFIGS
 	},
 	}
 }
@@ -272,17 +479,27 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createdMVE, err := r.client.MVEService.BuyMVE(ctx, &megaport.BuyMVERequest{
+	
+
+	mveReq := &megaport.BuyMVERequest{
 		LocationID: 		 int(plan.LocationID.ValueInt64()),
 		Name:                 plan.Name.ValueString(),
 		Term: 			   int(plan.ContractTermMonths.ValueInt64()),
 
-		// TODO - VNICS
-		// TODO - Vendor Config
-
 		WaitForProvision:      true,
-		WaitForTime:           5 * time.Minute,
-	})
+		WaitForTime:           10 * time.Minute,
+	}
+
+	if plan.VendorConfig != nil {
+		mveReq.VendorConfig = toAPIVendorConfig(plan.VendorConfig)
+	}
+
+	for _, vnic := range plan.NetworkInterfaces {
+		mveReq.Vnics = append(mveReq.Vnics, vnic.toAPINetworkInterface())
+	
+	}
+
+	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
