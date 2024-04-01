@@ -102,6 +102,13 @@ Read-Only:
 <a id="nestedatt--resources--virtual_machine--image"></a>
 ### Nested Schema for `resources.virtual_machine.image`
 
+Read-Only:
+
+- `id` (Number) The ID of the image.
+- `product` (String) The product of the image.
+- `vendor` (String) The vendor of the image.
+- `version` (String) The version of the image.
+
 
 <a id="nestedatt--resources--virtual_machine--vnics"></a>
 ### Nested Schema for `resources.virtual_machine.vnics`

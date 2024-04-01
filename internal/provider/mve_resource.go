@@ -97,7 +97,7 @@ type mveVirtualMachineModel struct {
 
 // MVVEVirtualMachineImage represents the image associated with an MVE virtual machine.
 type mveVirtualMachineImageModel struct {
-	ID      types.Int64    `tfsdk:"id"`
+	ID      types.Int64  `tfsdk:"id"`
 	Vendor  types.String `tfsdk:"vendor"`
 	Product types.String `tfsdk:"product"`
 	Version types.String `tfsdk:"version"`
@@ -621,6 +621,24 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"image": schema.SingleNestedAttribute{
 								Description: "The image of the virtual machine.",
 								Computed: true,
+								Attributes: map[string]schema.Attribute{
+									"id": schema.Int64Attribute{
+										Description: "The ID of the image.",
+										Computed: true,
+									},
+									"vendor": schema.StringAttribute{
+										Description: "The vendor of the image.",
+										Computed: true,
+									},
+									"product": schema.StringAttribute{
+										Description: "The product of the image.",
+										Computed: true,
+									},
+									"version": schema.StringAttribute{
+										Description: "The version of the image.",
+										Computed: true,
+									},
+								},
 							},
 							"resource_type": schema.StringAttribute{
 								Description: "The resource type of the virtual machine.",
