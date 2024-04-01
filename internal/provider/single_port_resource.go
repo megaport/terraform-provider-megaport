@@ -57,17 +57,18 @@ type singlePortResourceModel struct {
 	// VXCResources          PortResources     `tfsdk:"resources"`
 }
 
+// portInterfaceModel represents a port interface
 type portInterfaceModel struct {
-	Demarcation  types.String 	`json:"demarcation"`
-	Description  types.String 	`json:"description"`
-	ID           types.Int64    `json:"id"`
-	LOATemplate  types.String 	`json:"loa_template"`
-	Media        types.String 	`json:"media"`
-	Name         types.String 	`json:"name"`
-	PortSpeed    types.Int64    `json:"port_speed"`
-	ResourceName types.String 	`json:"resource_name"`
-	ResourceType types.String 	`json:"resource_type"`
-	Up           types.Int64    `json:"up"`
+	Demarcation  types.String 	`tfsdk:"demarcation"`
+	Description  types.String 	`tfsdk:"description"`
+	ID           types.Int64    `tfsdk:"id"`
+	LOATemplate  types.String 	`tfsdk:"loa_template"`
+	Media        types.String 	`tfsdk:"media"`
+	Name         types.String 	`tfsdk:"name"`
+	PortSpeed    types.Int64    `tfsdk:"port_speed"`
+	ResourceName types.String 	`tfsdk:"resource_name"`
+	ResourceType types.String 	`tfsdk:"resource_type"`
+	Up           types.Int64    `tfsdk:"up"`
 }
 
 func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
