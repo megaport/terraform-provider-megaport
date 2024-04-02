@@ -19,9 +19,12 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 
 - `contract_term_months` (Number) The contract term in months.
 - `location_id` (Number) The location ID of the MVE.
-- `network_interfaces` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--network_interfaces))
 - `product_name` (String) The name of the MVE.
 - `vendor_config` (Attributes) The vendor configuration of the MVE. (see [below for nested schema](#nestedatt--vendor_config))
+
+### Optional
+
+- `network_interfaces` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--network_interfaces))
 
 ### Read-Only
 
@@ -53,36 +56,39 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
 
-<a id="nestedatt--network_interfaces"></a>
-### Nested Schema for `network_interfaces`
-
-Read-Only:
-
-- `description` (String) The description of the network interface.
-- `vlan` (Number) The VLAN of the network interface.
-
-
 <a id="nestedatt--vendor_config"></a>
 ### Nested Schema for `vendor_config`
 
-Read-Only:
+Required:
 
-- `account_key` (String) The account key for the vendor config.
-- `account_name` (String) The account name for the vendor config.
-- `admin_password_hash` (String) The admin password hash for the vendor config.
-- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
-- `cloud_init` (String) The cloud init for the vendor config.
-- `controller_address` (String) The controller address for the vendor config.
-- `director_address` (String) The director address for the vendor config.
 - `image_id` (Number) The image ID of the MVE.
-- `license_data` (String) The license data for the vendor config.
-- `local_auth` (String) The local auth for the vendor config.
-- `product_size` (String) The product size for the vendor config.
-- `remote_auth` (String) The remote auth for the vendor config.
-- `serial_number` (String) The serial number for the vendor config.
-- `vco_activation_code` (String) The VCO activation code for the vendor config.
-- `vco_address` (String) The VCO address for the vendor config.
 - `vendor` (String) The vendor of the MVE.
+
+Optional:
+
+- `account_key` (String) The account key for the vendor config. Required for Aruba MVE.
+- `account_name` (String) The account name for the vendor config. Required for Aruba MVE.
+- `admin_password_hash` (String) The admin password hash for the vendor config. Required for Palo Alto MVE.
+- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, Palo Alto, and Vmware MVEs.
+- `cloud_init` (String) The cloud init for the vendor config. Required for Cisco MVE.
+- `controller_address` (String) The controller address for the vendor config. Required for Versa MVE.
+- `director_address` (String) The director address for the vendor config. Required for Versa MVE.
+- `license_data` (String) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
+- `local_auth` (String) The local auth for the vendor config. Required for Versa MVE.
+- `product_size` (String) The product size for the vendor config. Required for Aruba, Cisco, and Fortinet MVEs.
+- `remote_auth` (String) The remote auth for the vendor config. Required for Versa MVE.
+- `serial_number` (String) The serial number for the vendor config. Required for Versa MVE.
+- `vco_activation_code` (String) The VCO activation code for the vendor config. Required for VMware MVE.
+- `vco_address` (String) The VCO address for the vendor config. Required for VMware MVE.
+
+
+<a id="nestedatt--network_interfaces"></a>
+### Nested Schema for `network_interfaces`
+
+Required:
+
+- `description` (String) The description of the network interface.
+- `vlan` (Number) The VLAN of the network interface.
 
 
 <a id="nestedatt--resources"></a>

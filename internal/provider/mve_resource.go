@@ -324,7 +324,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The last time the MVE was updated by the Terraform Provider.",
 				Computed:    true,
 			},
-			"uid": schema.StringAttribute{
+			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -469,16 +469,16 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Description: "The network interfaces of the MVE.",
-				Required:    true,
+				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"description": schema.StringAttribute{
 							Description: "The description of the network interface.",
-							Computed:    true,
+							Required:    true,
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the network interface.",
-							Computed:    true,
+							Required:    true,
 						},
 					},
 				},
@@ -489,67 +489,67 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
 						Description: "The vendor of the MVE.",
-						Computed:    true,
+						Required:    true,
 					},
 					"image_id": schema.Int64Attribute{
 						Description: "The image ID of the MVE.",
-						Computed:    true,
+						Required:    true,
 					},
 					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config.",
-						Computed:    true,
+						Description: "The product size for the vendor config. Required for Aruba, Cisco, and Fortinet MVEs.",
+						Optional:    true,
 					},
 					"account_name": schema.StringAttribute{
-						Description: "The account name for the vendor config.",
-						Computed:    true,
+						Description: "The account name for the vendor config. Required for Aruba MVE.",
+						Optional:    true,
 					},
 					"account_key": schema.StringAttribute{
-						Description: "The account key for the vendor config.",
-						Computed:    true,
+						Description: "The account key for the vendor config. Required for Aruba MVE.",
+						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
-						Description: "The admin SSH public key for the vendor config.",
-						Computed:    true,
+						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, Palo Alto, and Vmware MVEs.",
+						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config.",
-						Computed:    true,
+						Description: "The cloud init for the vendor config. Required for Cisco MVE.",
+						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
-						Description: "The license data for the vendor config.",
-						Computed:    true,
+						Description: "The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.",
+						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
-						Description: "The admin password hash for the vendor config.",
-						Computed:    true,
+						Description: "The admin password hash for the vendor config. Required for Palo Alto MVE.",
+						Optional:    true,
 					},
 					"director_address": schema.StringAttribute{
-						Description: "The director address for the vendor config.",
-						Computed:    true,
+						Description: "The director address for the vendor config. Required for Versa MVE.",
+						Optional:    true,
 					},
 					"controller_address": schema.StringAttribute{
-						Description: "The controller address for the vendor config.",
-						Computed:    true,
+						Description: "The controller address for the vendor config. Required for Versa MVE.",
+						Optional:    true,
 					},
 					"local_auth": schema.StringAttribute{
-						Description: "The local auth for the vendor config.",
-						Computed:    true,
+						Description: "The local auth for the vendor config. Required for Versa MVE.",
+						Optional:    true,
 					},
 					"remote_auth": schema.StringAttribute{
-						Description: "The remote auth for the vendor config.",
-						Computed:    true,
+						Description: "The remote auth for the vendor config. Required for Versa MVE.",
+						Optional:    true,
 					},
 					"serial_number": schema.StringAttribute{
-						Description: "The serial number for the vendor config.",
-						Computed:    true,
+						Description: "The serial number for the vendor config. Required for Versa MVE.",
+						Optional:    true,
 					},
 					"vco_address": schema.StringAttribute{
-						Description: "The VCO address for the vendor config.",
-						Computed:    true,
+						Description: "The VCO address for the vendor config. Required for VMware MVE.",
+						Optional:    true,
 					},
 					"vco_activation_code": schema.StringAttribute{
-						Description: "The VCO activation code for the vendor config.",
-						Computed:    true,
+						Description: "The VCO activation code for the vendor config. Required for VMware MVE.",
+						Optional:    true,
 					},
 				},
 			},
