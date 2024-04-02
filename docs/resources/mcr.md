@@ -3,12 +3,12 @@
 page_title: "megaport_mcr Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  MCR Service for Megaport Terraform Provider.
+  Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 ---
 
 # megaport_mcr (Resource)
 
-MCR Service for Megaport Terraform Provider.
+Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 
 
 
