@@ -28,12 +28,12 @@ description: |-
 ### Optional
 
 - `admin_locked` (Boolean) Whether the product is admin locked.
+- `asn` (Number) ASN in the MCR order configuration.
 - `buyout_port` (Boolean) Whether the product is bought out.
 - `locked` (Boolean) Whether the product is locked.
 
 ### Read-Only
 
-- `asn` (Number) ASN in the MCR order configuration.
 - `attribute_tags` (Map of String) Attribute tags of the product.
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) Megaport Company UID of the product.
