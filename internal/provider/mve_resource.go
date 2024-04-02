@@ -376,7 +376,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the MVE is in.",
-				Required:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -416,7 +416,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
-				Required:    true,
+				Computed:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted.",
@@ -469,7 +469,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Description: "The network interfaces of the MVE.",
-				Computed:    true,
+				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"description": schema.StringAttribute{
@@ -485,7 +485,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"vendor_config": schema.SingleNestedAttribute{
 				Description: "The vendor configuration of the MVE.",
-				Computed:    true,
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
 						Description: "The vendor of the MVE.",
@@ -691,13 +691,15 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      10 * time.Minute,
 	}
 
-	if plan.VendorConfig != nil {
-		mveReq.VendorConfig = toAPIVendorConfig(plan.VendorConfig)
+	if plan.VendorConfig == nil {
+		resp.Diagnostics.AddError(
+			"vendor config required", "vendor config required",
+		)
 	}
+	mveReq.VendorConfig = toAPIVendorConfig(plan.VendorConfig)
 
 	for _, vnic := range plan.NetworkInterfaces {
 		mveReq.Vnics = append(mveReq.Vnics, vnic.toAPINetworkInterface())
-
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
@@ -780,66 +782,38 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		name = plan.Name
 	}
 
-	r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
+	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
 		MVEID:         state.UID.ValueString(),
 		Name:          name.String(),
 		WaitForUpdate: true,
 	})
 
-	// // Generate API request body from plan
-	// var hashicupsItems []hashicups.OrderItem
-	// for _, item := range plan.Items {
-	// 	hashicupsItems = append(hashicupsItems, hashicups.OrderItem{
-	// 		Coffee: hashicups.Coffee{
-	// 			ID: types.Int64(item.Coffee.ID.ValueInt64()),
-	// 		},
-	// 		Quantity: types.Int64(item.Quantity.ValueInt64()),
-	// 	})
-	// }
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating MVE",
+			"Could not update MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
 
-	// // Update existing order
-	// _, err := r.client.UpdateOrder(plan.ID.ValueString(), hashicupsItems)
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Error Updating HashiCups Order",
-	// 		"Could not update order, unexpected error: "+err.Error(),
-	// 	)
-	// 	return
-	// }
+	updatedMVE, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading updated MVE",
+			"Could not read updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
 
-	// // Fetch updated items from GetOrder as UpdateOrder items are not
-	// // populated.
-	// order, err := r.client.GetOrder(plan.ID.ValueString())
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Error Reading HashiCups Order",
-	// 		"Could not read HashiCups order ID "+plan.ID.ValueString()+": "+err.Error(),
-	// 	)
-	// 	return
-	// }
+	state.fromAPIMVE(updatedMVE)
 
-	// // Update resource state with updated items and timestamp
-	// plan.Items = []orderItemModel{}
-	// for _, item := range order.Items {
-	// 	plan.Items = append(plan.Items, orderItemModel{
-	// 		Coffee: orderItemCoffeeModel{
-	// 			ID:          types.Int64Value(int64(item.Coffee.ID)),
-	// 			Name:        types.StringValue(item.Coffee.Name),
-	// 			Teaser:      types.StringValue(item.Coffee.Teaser),
-	// 			Description: types.StringValue(item.Coffee.Description),
-	// 			Price:       types.Float64Value(item.Coffee.Price),
-	// 			Image:       types.StringValue(item.Coffee.Image),
-	// 		},
-	// 		Quantity: types.Int64Value(int64(item.Quantity)),
-	// 	})
-	// }
-	// plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	// diags = resp.State.Set(ctx, plan)
-	// resp.Diagnostics.Append(diags...)
-	// if resp.Diagnostics.HasError() {
-	// 	return
-	// }
+	diags := resp.State.Set(ctx, state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

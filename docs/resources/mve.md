@@ -19,9 +19,9 @@ description: |-
 
 - `contract_term_months` (Number) The contract term in months.
 - `location_id` (Number) The location ID of the MVE.
-- `market` (String) The market the MVE is in.
-- `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
+- `network_interfaces` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--network_interfaces))
 - `product_name` (String) The name of the MVE.
+- `vendor_config` (Attributes) The vendor configuration of the MVE. (see [below for nested schema](#nestedatt--vendor_config))
 
 ### Read-Only
 
@@ -38,8 +38,9 @@ description: |-
 - `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
 - `live_date` (String) The date the MVE went live.
 - `locked` (Boolean) Whether the MVE is locked.
+- `market` (String) The market the MVE is in.
+- `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
 - `mve_size` (String) The size of the MVE.
-- `network_interfaces` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--network_interfaces))
 - `product_id` (Number) The Numeric ID of the MVE.
 - `provisioning_status` (String) The provisioning status of the MVE.
 - `resources` (Attributes) The resources associated with the MVE. (see [below for nested schema](#nestedatt--resources))
@@ -48,7 +49,6 @@ description: |-
 - `uid` (String) The unique identifier of the MVE.
 - `usage_algorithm` (String) The usage algorithm of the MVE.
 - `vendor` (String) The vendor of the MVE.
-- `vendor_config` (Attributes) The vendor configuration of the MVE. (see [below for nested schema](#nestedatt--vendor_config))
 - `virtual` (Boolean) Whether the MVE is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
@@ -60,6 +60,29 @@ Read-Only:
 
 - `description` (String) The description of the network interface.
 - `vlan` (Number) The VLAN of the network interface.
+
+
+<a id="nestedatt--vendor_config"></a>
+### Nested Schema for `vendor_config`
+
+Read-Only:
+
+- `account_key` (String) The account key for the vendor config.
+- `account_name` (String) The account name for the vendor config.
+- `admin_password_hash` (String) The admin password hash for the vendor config.
+- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
+- `cloud_init` (String) The cloud init for the vendor config.
+- `controller_address` (String) The controller address for the vendor config.
+- `director_address` (String) The director address for the vendor config.
+- `image_id` (Number) The image ID of the MVE.
+- `license_data` (String) The license data for the vendor config.
+- `local_auth` (String) The local auth for the vendor config.
+- `product_size` (String) The product size for the vendor config.
+- `remote_auth` (String) The remote auth for the vendor config.
+- `serial_number` (String) The serial number for the vendor config.
+- `vco_activation_code` (String) The VCO activation code for the vendor config.
+- `vco_address` (String) The VCO address for the vendor config.
+- `vendor` (String) The vendor of the MVE.
 
 
 <a id="nestedatt--resources"></a>
@@ -117,28 +140,3 @@ Read-Only:
 
 - `description` (String) The description of the network interface.
 - `vlan` (Number) The VLAN of the network interface.
-
-
-
-
-<a id="nestedatt--vendor_config"></a>
-### Nested Schema for `vendor_config`
-
-Read-Only:
-
-- `account_key` (String) The account key for the vendor config.
-- `account_name` (String) The account name for the vendor config.
-- `admin_password_hash` (String) The admin password hash for the vendor config.
-- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
-- `cloud_init` (String) The cloud init for the vendor config.
-- `controller_address` (String) The controller address for the vendor config.
-- `director_address` (String) The director address for the vendor config.
-- `image_id` (Number) The image ID of the MVE.
-- `license_data` (String) The license data for the vendor config.
-- `local_auth` (String) The local auth for the vendor config.
-- `product_size` (String) The product size for the vendor config.
-- `remote_auth` (String) The remote auth for the vendor config.
-- `serial_number` (String) The serial number for the vendor config.
-- `vco_activation_code` (String) The VCO activation code for the vendor config.
-- `vco_address` (String) The VCO address for the vendor config.
-- `vendor` (String) The vendor of the MVE.
