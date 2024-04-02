@@ -44,10 +44,10 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `last_updated` (String) Last updated by the Terraform provider.
 - `live_date` (String) Date the product went live.
 - `product_id` (Number) Numeric ID of the product.
+- `product_uid` (String) UID identifier of the product.
 - `provisioning_status` (String) Provisioning status of the product.
 - `resources` (Attributes) Resources associated with the product. (see [below for nested schema](#nestedatt--resources))
 - `terminate_date` (String) Date the product will be terminated.
-- `uid` (String) UID identifier of the product.
 - `usage_algorithm` (String) Usage algorithm of the product.
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.

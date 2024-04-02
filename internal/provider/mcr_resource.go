@@ -169,7 +169,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Last updated by the Terraform provider.",
 				Computed:    true,
 			},
-			"uid": schema.StringAttribute{
+			"product_uid": schema.StringAttribute{
 				Description: "UID identifier of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
