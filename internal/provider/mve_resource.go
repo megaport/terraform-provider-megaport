@@ -317,8 +317,8 @@ func (r *mveResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 // Schema defines the schema for the resource.
 func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-
 	resp.Schema = schema.Schema{
+		Description: "Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the MVE was updated by the Terraform Provider.",

@@ -3,12 +3,12 @@
 page_title: "megaport_mve Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  
+  Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 ---
 
 # megaport_mve (Resource)
 
-
+Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 
 
 
