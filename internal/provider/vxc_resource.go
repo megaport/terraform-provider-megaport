@@ -66,10 +66,137 @@ type vxcResourceModel struct {
 
 // vxcResourcesModel represents the resources associated with a VXC.
 type vxcResourcesModel struct {
-	Interface     []*portInterfaceModel `tfsdk:"interface"`
-	VirtualRouter *virtualRouterModel   `tfsdk:"virtual_router"`
-	VLL           *vllConfigModel       `tfsdk:"vll"`
-	// TODO - CSPConnection struct
+	Interface     []*portInterfaceModel  `tfsdk:"interface"`
+	VirtualRouter *virtualRouterModel    `tfsdk:"virtual_router"`
+	VLL           *vllConfigModel        `tfsdk:"vll"`
+	CSPConnection *vxcCSPConnectionModel `tfsdk:"csp_connection"`
+}
+
+// vxcCSPConnectionModel represents the CSP connection schema data.
+type vxcCSPConnectionModel struct {
+	CSPConnections []cspConnection
+}
+
+// cspConnection is an interface to ensure the CSP connection is implemented.
+type cspConnection interface {
+	isCSPConnection()
+}
+
+// cspConnectionAWSModel represents the configuration of a CSP connection for AWS Virtual Interface.
+type cspConnectionAWSModel struct {
+	cspConnection
+	ConnectType       types.String `tfsdk:"connect_type"`
+	ResourceName      types.String `tfsdk:"resource_name"`
+	ResourceType      types.String `tfsdk:"resource_type"`
+	VLAN              types.Int64  `tfsdk:"vlan"`
+	Account           types.String `tfsdk:"account"`
+	AmazonAddress     types.String `tfsdk:"amazon_address"`
+	ASN               types.Int64  `tfsdk:"asn"`
+	AuthKey           types.String `tfsdk:"auth_key"`
+	CustomerAddress   types.String `tfsdk:"customer_address"`
+	CustomerIPAddress types.String `tfsdk:"customer_ip_address"`
+	ID                types.Int64  `tfsdk:"id"`
+	Name              types.String `tfsdk:"name"`
+	OwnerAccount      types.String `tfsdk:"owner_account"`
+	PeerASN           types.Int64  `tfsdk:"peer_asn"`
+	Type              types.String `tfsdk:"type"`
+	VIFID             types.String `tfsdk:"vif_id"`
+}
+
+// cspConnectionAWSHCModel represents the configuration of a CSP connection for AWS Hosted Connection.
+type cspConnectionAWSHCModel struct {
+	cspConnection
+	ConnectType  types.String  `tfsdk:"connect_type"`
+	ResourceName types.String  `tfsdk:"resource_name"`
+	ResourceType types.String  `tfsdk:"resource_type"`
+	Bandwidth    types.Int64   `tfsdk:"bandwidth"`
+	Name         types.String  `tfsdk:"name"`
+	OwnerAccount types.String  `tfsdk:"owner_account"`
+	Bandwidths   []types.Int64 `tfsdk:"bandwidths"`
+	ConnectionID types.String  `tfsdk:"connection_id"`
+}
+
+// cspConnectionAzureModel represents the configuration of a CSP connection for Azure ExpressRoute.
+type cspConnectionAzureModel struct {
+	cspConnection
+	ConnectType  types.String                       `tfsdk:"connect_type"`
+	ResourceName types.String                       `tfsdk:"resource_name"`
+	ResourceType types.String                       `tfsdk:"resource_type"`
+	Bandwidth    types.Int64                        `tfsdk:"bandwidth"`
+	Managed      types.Bool                         `tfsdk:"managed"`
+	Megaports    []*cspConnectionAzureMegaportModel `tfsdk:"megaports"`
+	Ports        []*cspConnectionAzurePortModel     `tfsdk:"ports"`
+	ServiceKey   types.String                       `tfsdk:"service_key"`
+	VLAN         types.Int64                        `tfsdk:"vlan"`
+}
+
+// CSPConnectionAzureMegaport represents the configuration of a CSP connection for Azure ExpressRoute megaport.
+type cspConnectionAzureMegaportModel struct {
+	Port types.Int64  `tfsdk:"port"`
+	Type types.String `tfsdk:"type"`
+	VXC  types.Int64  `tfsdk:"vxc,omitempty"`
+}
+
+// cspConnectionAzurePortModel represents the configuration of a CSP connection for Azure ExpressRoute port.
+type cspConnectionAzurePortModel struct {
+	ServiceID     types.Int64   `tfsdk:"service_id"`
+	Type          types.String  `tfsdk:"type"`
+	VXCServiceIDs []types.Int64 `tfsdk:"vxc_service_ids"`
+}
+
+// cspConnectionGoogleModel represents the configuration of a CSP connection for Google Cloud Interconnect.
+type cspConnectionGoogleModel struct {
+	cspConnection
+	Bandwidth    types.Int64                         `tfsdk:"bandwidth"`
+	ConnectType  types.String                        `tfsdk:"connect_type"`
+	ResourceName types.String                        `tfsdk:"resource_name"`
+	ResourceType types.String                        `tfsdk:"resource_type"`
+	Bandwidths   []types.Int64                       `tfsdk:"bandwidths"`
+	Megaports    []*cspConnectionGoogleMegaportModel `tfsdk:"megaports"`
+	Ports        []*cspConnectionGooglePortModel     `tfsdk:"ports"`
+	CSPName      types.String                        `tfsdk:"csp_name"`
+	PairingKey   types.String                        `tfsdk:"pairing_key"`
+}
+
+// cspConnectionGoogleMegaportModel represents the configuration of a CSP connection for Google Cloud Interconnect megaport.
+type cspConnectionGoogleMegaportModel struct {
+	Port types.Int64 `tfsdk:"port"`
+	VXC  types.Int64 `tfsdk:"vxc"`
+}
+
+// cspConnectionGooglePortModel represents the configuration of a CSP connection for Google Cloud Interconnect port.
+type cspConnectionGooglePortModel struct {
+	ServiceID     types.Int64   `tfsdk:"service_id"`
+	VXCServiceIDs []types.Int64 `tfsdk:"vxc_service_ids"`
+}
+
+// cspConnectionVirtualRouterModel represents the configuration of a CSP connection for Virtual Router.
+type cspConnectionVirtualRouterModel struct {
+	cspConnection
+	ConnectType       types.String                                `tfsdk:"connect_type"`
+	ResourceName      types.String                                `tfsdk:"resource_name"`
+	ResourceType      types.String                                `tfsdk:"resource_type"`
+	VLAN              types.Int64                                 `tfsdk:"vlan"`
+	Interfaces        []*cspConnectionVirtualRouterInterfaceModel `tfsdk:"interfaces"`
+	IPAddresses       []types.String                              `tfsdk:"ip_addresses"`
+	VirtualRouterName types.String                                `tfsdk:"virtual_router_name"`
+}
+
+// cspConnectionVirtualRouterInterfaceModel represents the configuration of a CSP connection for Virtual Router interface.
+type cspConnectionVirtualRouterInterfaceModel struct {
+	IPAddresses []types.String `tfsdk:"ip_addresses"`
+}
+
+// cspConnectionTransit represents the configuration of a CSP connection for a Transit VXC.
+type cspConnectionTransit struct {
+	cspConnection
+	ConnectType        types.String `tfsdk:"connect_type"`
+	ResourceName       types.String `tfsdk:"resource_name"`
+	ResourceType       types.String `tfsdk:"resource_type"`
+	CustomerIP4Address types.String `tfsdk:"customer_ip4_address"`
+	CustomerIP6Network types.String `tfsdk:"customer_ip6_network"`
+	IPv4GatewayAddress types.String `tfsdk:"ipv4_gateway_address"`
+	IPv6GatewayAddress types.String `tfsdk:"ipv6_gateway_address"`
 }
 
 // virtualRouterModel maps the virtual router schema data.
@@ -258,7 +385,11 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 			Up:           types.Int64Value(int64(i.Up)),
 		})
 	}
-	// TODO - Struct Model Fields
+	cspConnection := &vxcCSPConnectionModel{}
+	for _, c := range v.Resources.CSPConnection.CSPConnection {
+		cspConnection.CSPConnections = append(cspConnection.CSPConnections, fromAPICSPConnection(c))
+	}
+	orm.Resources.CSPConnection = cspConnection
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -550,6 +681,130 @@ func toAPIPartnerConfig(c vxcPartnerConfiguration) megaport.VXCPartnerConfigurat
 		return &megaport.VXCPartnerConfigOracle{
 			ConnectType:      p.ConnectType.ValueString(),
 			VirtualCircuitId: p.VirtualCircuitId.ValueString(),
+		}
+	}
+	return nil
+}
+
+func fromAPICSPConnection(c megaport.CSPConnectionConfig) cspConnection {
+	switch provider := c.(type) {
+	case *megaport.CSPConnectionAWS:
+		return &cspConnectionAWSModel{
+			ConnectType:       types.StringValue(provider.ConnectType),
+			ResourceName:      types.StringValue(provider.ResourceName),
+			ResourceType:      types.StringValue(provider.ResourceType),
+			VLAN:              types.Int64Value(int64(provider.VLAN)),
+			Account:           types.StringValue(provider.Account),
+			AmazonAddress:     types.StringValue(provider.AmazonAddress),
+			ASN:               types.Int64Value(int64(provider.ASN)),
+			AuthKey:           types.StringValue(provider.AuthKey),
+			CustomerAddress:   types.StringValue(provider.CustomerAddress),
+			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
+			ID:                types.Int64Value(int64(provider.ID)),
+			Name:              types.StringValue(provider.Name),
+			OwnerAccount:      types.StringValue(provider.OwnerAccount),
+			PeerASN:           types.Int64Value(int64(provider.PeerASN)),
+			Type:              types.StringValue(provider.Type),
+			VIFID:             types.StringValue(provider.VIFID),
+		}
+	case *megaport.CSPConnectionAWSHC:
+		toReturn := &cspConnectionAWSHCModel{
+			ConnectType:  types.StringValue(provider.ConnectType),
+			ResourceName: types.StringValue(provider.ResourceName),
+			ResourceType: types.StringValue(provider.ResourceType),
+			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
+			Name:         types.StringValue(provider.Name),
+			OwnerAccount: types.StringValue(provider.OwnerAccount),
+			ConnectionID: types.StringValue(provider.ConnectionID),
+		}
+		for _, b := range provider.Bandwidths {
+			toReturn.Bandwidths = append(toReturn.Bandwidths, types.Int64Value(int64(b)))
+		}
+		return toReturn
+	case *megaport.CSPConnectionAzure:
+		toReturn := &cspConnectionAzureModel{
+			ConnectType:  types.StringValue(provider.ConnectType),
+			ResourceName: types.StringValue(provider.ResourceName),
+			ResourceType: types.StringValue(provider.ResourceType),
+			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
+			Managed:      types.BoolValue(provider.Managed),
+			ServiceKey:   types.StringValue(provider.ServiceKey),
+			VLAN:         types.Int64Value(int64(provider.VLAN)),
+		}
+		for _, m := range provider.Megaports {
+			toReturn.Megaports = append(toReturn.Megaports, &cspConnectionAzureMegaportModel{
+				Port: types.Int64Value(int64(m.Port)),
+				Type: types.StringValue(m.Type),
+				VXC:  types.Int64Value(int64(m.VXC)),
+			})
+		}
+		for _, p := range provider.Ports {
+			port := &cspConnectionAzurePortModel{
+				ServiceID: types.Int64Value(int64(p.ServiceID)),
+				Type:      types.StringValue(p.Type),
+			}
+			for _, v := range p.VXCServiceIDs {
+				port.VXCServiceIDs = append(port.VXCServiceIDs, types.Int64Value(int64(v)))
+			}
+			toReturn.Ports = append(toReturn.Ports, port)
+		}
+		return toReturn
+	case *megaport.CSPConnectionGoogle:
+		toReturn := &cspConnectionGoogleModel{
+			ConnectType:  types.StringValue(provider.ConnectType),
+			ResourceName: types.StringValue(provider.ResourceName),
+			ResourceType: types.StringValue(provider.ResourceType),
+			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
+			CSPName:      types.StringValue(provider.CSPName),
+			PairingKey:   types.StringValue(provider.PairingKey),
+		}
+		for _, b := range provider.Bandwidths {
+			toReturn.Bandwidths = append(toReturn.Bandwidths, types.Int64Value(int64(b)))
+		}
+		for _, m := range provider.Megaports {
+			toReturn.Megaports = append(toReturn.Megaports, &cspConnectionGoogleMegaportModel{
+				Port: types.Int64Value(int64(m.Port)),
+				VXC:  types.Int64Value(int64(m.VXC)),
+			})
+		}
+		for _, p := range provider.Ports {
+			port := &cspConnectionGooglePortModel{
+				ServiceID: types.Int64Value(int64(p.ServiceID)),
+			}
+			for _, v := range p.VXCServiceIDs {
+				port.VXCServiceIDs = append(port.VXCServiceIDs, types.Int64Value(int64(v)))
+			}
+			toReturn.Ports = append(toReturn.Ports, port)
+		}
+		return toReturn
+	case *megaport.CSPConnectionVirtualRouter:
+		toReturn := &cspConnectionVirtualRouterModel{
+			ConnectType:       types.StringValue(provider.ConnectType),
+			ResourceName:      types.StringValue(provider.ResourceName),
+			ResourceType:      types.StringValue(provider.ResourceType),
+			VLAN:              types.Int64Value(int64(provider.VLAN)),
+			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
+		}
+		for _, i := range provider.Interfaces {
+			interfaceModel := &cspConnectionVirtualRouterInterfaceModel{}
+			for _, ip := range i.IPAddresses {
+				interfaceModel.IPAddresses = append(interfaceModel.IPAddresses, types.StringValue(ip))
+			}
+			toReturn.Interfaces = append(toReturn.Interfaces, interfaceModel)
+		}
+		for _, ip := range provider.IPAddresses {
+			toReturn.IPAddresses = append(toReturn.IPAddresses, types.StringValue(ip))
+		}
+		return toReturn
+	case *megaport.CSPConnectionTransit:
+		return &cspConnectionTransit{
+			ConnectType:        types.StringValue(provider.ConnectType),
+			ResourceName:       types.StringValue(provider.ResourceName),
+			ResourceType:       types.StringValue(provider.ResourceType),
+			CustomerIP4Address: types.StringValue(provider.CustomerIP4Address),
+			CustomerIP6Network: types.StringValue(provider.CustomerIP6Network),
+			IPv4GatewayAddress: types.StringValue(provider.IPv4GatewayAddress),
+			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
 		}
 	}
 	return nil
