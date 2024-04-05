@@ -1236,8 +1236,27 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// TODO - Update Logic for Req
-	updateReq := &megaport.UpdateVXCRequest{}
+	var name string
+	var aEndVlan, bEndVlan, rateLimit int
+	if !plan.Name.Equal(state.Name) {
+		name = plan.Name.ValueString()
+	}
+	if !plan.AEndOrderConfiguration.VLAN.Equal(state.AEndOrderConfiguration.VLAN) {
+		aEndVlan = int(plan.AEndOrderConfiguration.VLAN.ValueInt64())
+	}
+	if !plan.BEndOrderConfiguration.VLAN.Equal(state.BEndOrderConfiguration.VLAN) {
+		bEndVlan = int(plan.BEndOrderConfiguration.VLAN.ValueInt64())
+	}
+	if !plan.RateLimit.Equal(state.RateLimit) {
+		rateLimit = int(plan.RateLimit.ValueInt64())
+	}
+
+	updateReq := &megaport.UpdateVXCRequest{
+		Name:      &name,
+		AEndVLAN:  &aEndVlan,
+		BEndVlan:  &bEndVlan,
+		RateLimit: &rateLimit,
+	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.ID.String(), updateReq)
 
