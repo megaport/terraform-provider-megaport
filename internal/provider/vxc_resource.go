@@ -52,8 +52,7 @@ type vxcResourceModel struct {
 	ContractStartDate types.String `tfsdk:"contract_start_date"`
 	ContractEndDate   types.String `tfsdk:"contract_end_date"`
 
-	PortUID types.String `tfsdk:"port_uid"`
-
+	PortUID           types.String              `tfsdk:"port_uid"`
 	AEndConfiguration *vxcEndConfigurationModel `tfsdk:"a_end"`
 	BEndConfiguration *vxcEndConfigurationModel `tfsdk:"b_end"`
 
@@ -433,10 +432,215 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The name of the product.",
 				Required:    true,
 			},
-
+			"rate_limit": schema.Int64Attribute{
+				Description: "The rate limit of the product.",
+				Required:    true,
+			},
+			"port_uid": schema.StringAttribute{
+				Description: "The UID of the port the VXC is connected to.",
+				Required:    true,
+			},
+			"a_end_order_configuration": schema.SingleNestedAttribute{
+				Description: "The A-End order configuration of the VXC.",
+				Required:    true,
+				Attributes: map[string]schema.Attribute{
+					"product_uid": schema.StringAttribute{
+						Description: "The product UID of the A-End order configuration.",
+						Required:    true,
+					},
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the A-End order configuration.",
+						Required:    true,
+					},
+					"inner_vlan": schema.Int64Attribute{
+						Description: "The inner VLAN of the A-End order configuration if there is an MVE configuration.",
+						Optional:    true,
+					},
+					"network_interface_index": schema.Int64Attribute{
+						Description: "The network interface index of the A-End order configuration if there is an MVE configuration.",
+						Optional:    true,
+					},
+					"partner_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the A-End order configuration.",
+						Required:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							// AWS PARTNER CONFIG FIELDS
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Optional:    true,
+							},
+							// Azure Partner Config Fields
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Optional:    true,
+							},
+							// Google Partner Config Fields
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Optional:    true,
+							},
+							// Oracle Partner Config Fields
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Optional:    true,
+							},
+						},
+					},
+				},
+			},
+			"b_end_order_configuration": schema.SingleNestedAttribute{
+				Description: "The B-End order configuration of the VXC.",
+				Required:    true,
+				Attributes: map[string]schema.Attribute{
+					"product_uid": schema.StringAttribute{
+						Description: "The product UID of the B-End order configuration.",
+						Required:    true,
+					},
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the B-End order configuration.",
+						Required:    true,
+					},
+					"inner_vlan": schema.Int64Attribute{
+						Description: "The inner VLAN of the B-End order configuration if there is an MVE configuration.",
+						Optional:    true,
+					},
+					"network_interface_index": schema.Int64Attribute{
+						Description: "The network interface index of the B-End order configuration if there is an MVE configuration.",
+						Optional:    true,
+					},
+					"partner_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the B-End order configuration.",
+						Required:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							// AWS PARTNER CONFIG FIELDS
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Optional:    true,
+							},
+							// Azure Partner Config Fields
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Optional:    true,
+							},
+							// Google Partner Config Fields
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Optional:    true,
+							},
+							// Oracle Partner Config Fields
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Optional:    true,
+							},
+						},
+					},
+				},
+			},
+			"type": schema.StringAttribute{
+				Description: "The type of the product.",
+				Computed:    true,
+			},
+			"distance_band": schema.StringAttribute{
+				Description: "The distance band of the product.",
+				Computed:    true,
+			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the product.",
 				Computed:    true,
+			},
+			"secondary_name": schema.StringAttribute{
+				Description: "The secondary name of the product.",
+				Computed:    true,
+			},
+			"usage_algorithm": schema.StringAttribute{
+				Description: "The usage algorithm of the product.",
+				Computed:    true,
+			},
+			"created_by": schema.StringAttribute{
+				Description: "The user who created the product.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"live_date": schema.StringAttribute{
+				Description: "The date the product went live.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
@@ -445,11 +649,464 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
+			"resources": schema.SingleNestedAttribute{
+				Description: "The resources associated with the VXC.",
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"interface": schema.ListNestedAttribute{
+						Description: "The interfaces associated with the VXC.",
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"demarcation": schema.StringAttribute{
+									Description: "The demarcation of the interface.",
+									Computed:    true,
+								},
+								"description": schema.StringAttribute{
+									Description: "The description of the interface.",
+									Computed:    true,
+								},
+								"id": schema.Int64Attribute{
+									Description: "The ID of the interface.",
+									Computed:    true,
+								},
+								"loa_template": schema.StringAttribute{
+									Description: "The LOA template of the interface.",
+									Computed:    true,
+								},
+								"media": schema.StringAttribute{
+									Description: "The media of the interface.",
+									Computed:    true,
+								},
+								"name": schema.StringAttribute{
+									Description: "The name of the interface.",
+									Computed:    true,
+								},
+								"port_speed": schema.Int64Attribute{
+									Description: "The port speed of the interface.",
+									Computed:    true,
+								},
+								"resource_name": schema.StringAttribute{
+									Description: "The resource name of the interface.",
+									Computed:    true,
+								},
+								"resource_type": schema.StringAttribute{
+									Description: "The resource type of the interface.",
+									Computed:    true,
+								},
+								"up": schema.Int64Attribute{
+									Description: "The up status of the interface.",
+									Computed:    true,
+								},
+							},
+						},
+					},
+					"virtual_router": schema.SingleNestedAttribute{
+						Description: "The virtual router associated with the VXC.",
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"mcr_asn": schema.Int64Attribute{
+								Description: "The MCR ASN of the virtual router.",
+								Computed:    true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "The resource name of the virtual router.",
+								Computed:    true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "The resource type of the virtual router.",
+								Computed:    true,
+							},
+							"speed": schema.Int64Attribute{
+								Description: "The speed of the virtual router.",
+								Computed:    true,
+							},
+							"bgp_shutdown_default": schema.BoolAttribute{
+								Description: "Whether BGP Shutdown is enabled by default on the virtual router.",
+							},
+						},
+					},
+					"vll": schema.SingleNestedAttribute{
+						Description: "The VLL associated with the VXC.",
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"a_vlan": schema.Int64Attribute{
+								Description: "The A-End VLAN of the VLL.",
+								Computed:    true,
+							},
+							"b_vlan": schema.Int64Attribute{
+								Description: "The B-End VLAN of the VLL.",
+								Computed:    true,
+							},
+							"description": schema.StringAttribute{
+								Description: "The description of the VLL.",
+								Computed:    true,
+							},
+							"id": schema.Int64Attribute{
+								Description: "The ID of the VLL.",
+								Computed:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the VLL.",
+								Computed:    true,
+							},
+							"rate_limit_mbps": schema.Int64Attribute{
+								Description: "The rate limit in Mbps of the VLL.",
+								Computed:    true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "The resource name of the VLL.",
+								Computed:    true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "The resource type of the VLL.",
+								Computed:    true,
+							},
+						},
+					},
+					"csp_connection": schema.SingleNestedAttribute{
+						Description: "The CSP connection associated with the VXC.",
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"csp_connections": schema.ListNestedAttribute{
+								Description: "The CSP connections associated with the VXC.",
+								Computed:    true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										// Fields for all CSP Connections
+										"connect_type": schema.StringAttribute{
+											Description: "The connection type of the CSP connection.",
+										},
+										"resource_name": schema.StringAttribute{
+											Description: "The resource name of the CSP connection.",
+											Computed:    true,
+										},
+										"resource_type": schema.StringAttribute{
+											Description: "The resource type of the CSP connection.",
+											Computed:    true,
+										},
+										// Fields for AWS, Azure, and Virtual Router
+										"vlan": schema.Int64Attribute{
+											Description: "The VLAN of the CSP connection.",
+											Computed:    true,
+										},
+										// AWS CSP Connection Fields
+										"name": schema.StringAttribute{
+											Description: "The name of the CSP connection.",
+										},
+										"owner_account": schema.StringAttribute{
+											Description: "The owner's AWS account of the CSP connection.",
+										},
+										// Fields for AWS, Azure, and Google Cloud
+										"bandwidth": schema.Int64Attribute{
+											Description: "The bandwidth of the CSP connection.",
+											Computed:    true,
+										},
+										// Field for AWS and Google Cloud
+										"bandwidths": schema.ListAttribute{
+											Description: "The bandwidths of the CSP connection.",
+											Computed:    true,
+											ElementType: types.Int64Type,
+										},
+										// Fields for AWS VIF and Transit VXC
+										"customer_ip_address": schema.StringAttribute{
+											Description: "The customer IP address of the CSP connection.",
+											Computed:    true,
+										},
+										// AWS VIF CSP Connection Fields
+										"account": schema.StringAttribute{
+											Description: "The account of the CSP connection.",
+											Computed:    true,
+										},
+										"amazon_address": schema.StringAttribute{
+											Description: "The Amazon address of the CSP connection.",
+											Computed:    true,
+										},
+										"asn": schema.Int64Attribute{
+											Description: "The ASN of the CSP connection.",
+											Computed:    true,
+										},
+										"auth_key": schema.StringAttribute{
+											Description: "The authentication key of the CSP connection.",
+											Computed:    true,
+										},
+										"customer_address": schema.StringAttribute{
+											Description: "The customer address of the CSP connection.",
+											Computed:    true,
+										},
+
+										"id": schema.Int64Attribute{
+											Description: "The ID of the CSP connection.",
+											Computed:    true,
+										},
+										"peer_asn": schema.Int64Attribute{
+											Description: "The peer ASN of the CSP connection.",
+											Computed:    true,
+										},
+										"type": schema.StringAttribute{
+											Description: "The type of the AWS Virtual Interface.",
+										},
+										"vif_id": schema.StringAttribute{
+											Description: "The ID of the AWS Virtual Interface.",
+											Computed:    true,
+										},
+										// AWS Hosted Connection Fields
+										"connection_id": schema.StringAttribute{
+											Description: "The hosted connection ID of the CSP connection.",
+										},
+										// Azure and Google Cloud CSP Connection Fields
+										"ports": schema.ListNestedAttribute{
+											Description: "The ports of the CSP connection.",
+											Computed:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"service_id": schema.Int64Attribute{
+														Description: "The service ID of the port.",
+														Computed:    true,
+													},
+													"vxc_service_ids": schema.ListAttribute{
+														Description: "The VXC service IDs of the port.",
+														Computed:    true,
+														ElementType: types.Int64Type,
+													},
+													"type": schema.StringAttribute{
+														Description: "The type of the port.",
+														Computed:    true,
+													},
+												},
+											},
+										},
+										"megaports": schema.ListNestedAttribute{
+											Description: "The Megaports of the CSP connection.",
+											Computed:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"port": schema.Int64Attribute{
+														Description: "The numeric identifier for the port.",
+														Computed:    true,
+													},
+													"type": schema.StringAttribute{
+														Description: "The type of the Megaport.",
+														Computed:    true,
+													},
+													"vxc": schema.Int64Attribute{
+														Description: "The numeric identifier for the VXC (Google).",
+														Computed:    true,
+													},
+												},
+											},
+										},
+										// Azure Fields
+										"managed": schema.BoolAttribute{
+											Description: "Whether the CSP connection is managed.",
+											Computed:    true,
+										},
+										"service_key": schema.StringAttribute{
+											Description: "The service key of the CSP connection.",
+											Computed:    true,
+										},
+										// Google Cloud Fields
+										"csp_name": schema.StringAttribute{
+											Description: "The name of the CSP connection.",
+											Computed:    true,
+										},
+										"pairing_key": schema.StringAttribute{
+											Description: "The pairing key of the Google Cloud connection.",
+											Computed:    true,
+										},
+										// Virtual Router Fields
+										"interfaces": schema.ListNestedAttribute{
+											Description: "The interfaces of the Virtual Router connection.",
+											Computed:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"ip_addresses": schema.ListAttribute{
+														Description: "The IP addresses of the interface.",
+														Computed:    true,
+														ElementType: types.StringType,
+													},
+												},
+											},
+										},
+										"ip_addresses": schema.ListAttribute{
+											Description: "The IP addresses of the Virtual Router.",
+											Computed:    true,
+										},
+										"virtual_router_name": schema.StringAttribute{
+											Description: "The name of the Virtual Router.",
+											Computed:    true,
+										},
+										// Transit VXC Fields
+										"customer_ip6_network": schema.StringAttribute{
+											Description: "The customer IPv6 network of the Transit VXC connection.",
+											Computed:    true,
+										},
+										"ipv4_gateway_address": schema.StringAttribute{
+											Description: "The IPv4 gateway address of the Transit VXC connection.",
+											Computed:    true,
+										},
+										"ipv6_gateway_address": schema.StringAttribute{
+											Description: "The IPv6 gateway address of the Transit VXC connection.",
+											Computed:    true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"vxc_approval": schema.SingleNestedAttribute{
+				Description: "The VXC approval details.",
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"status": schema.StringAttribute{
+						Description: "The status of the VXC approval.",
+						Computed:    true,
+					},
+					"message": schema.StringAttribute{
+						Description: "The message of the VXC approval.",
+						Computed:    true,
+					},
+					"uid": schema.StringAttribute{
+						Description: "The UID of the VXC approval.",
+						Computed:    true,
+					},
+					"type": schema.StringAttribute{
+						Description: "The type of the VXC approval.",
+						Computed:    true,
+					},
+					"new_speed": schema.Int64Attribute{
+						Description: "The new speed of the VXC approval.",
+						Computed:    true,
+					},
+				},
+			},
+			"contract_start_date": schema.StringAttribute{
+				Description: "The date the contract starts.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"contract_end_date": schema.StringAttribute{
+				Description: "The date the contract ends.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"contract_term_months": schema.Int64Attribute{
+				Description: "The number of months the contract is for.",
+				Computed:    true,
+			},
+			"company_uid": schema.StringAttribute{
+				Description: "The UID of the company the product is associated with.",
+				Computed:    true,
+			},
+			"company_name": schema.StringAttribute{
+				Description: "The name of the company the product is associated with.",
+				Computed:    true,
+			},
+			"locked": schema.BoolAttribute{
+				Description: "Whether the product is locked.",
+				Computed:    true,
+			},
+			"admin_locked": schema.BoolAttribute{
+				Description: "Whether the product is admin locked.",
+				Computed:    true,
+			},
+			"attribute_tags": schema.MapAttribute{
+				Description: "The attribute tags associated with the product.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"cancelable": schema.BoolAttribute{
+				Description: "Whether the product is cancelable.",
+				Computed:    true,
+			},
+			"a_end": schema.SingleNestedAttribute{
+				Description: "The current A-End configuration of the VXC.",
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"owner_uid": schema.StringAttribute{
+						Description: "The owner UID of the A-End configuration.",
+						Computed:    true,
+					},
+					"product_uid": schema.StringAttribute{
+						Description: "The product UID of the A-End configuration.",
+						Computed:    true,
+					},
+					"product_name": schema.StringAttribute{
+						Description: "The product name of the A-End configuration.",
+						Computed:    true,
+					},
+					"location_id": schema.Int64Attribute{
+						Description: "The location ID of the A-End configuration.",
+						Computed:    true,
+					},
+					"location": schema.StringAttribute{
+						Description: "The location of the A-End configuration.",
+						Computed:    true,
+					},
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the A-End configuration.",
+						Computed:    true,
+					},
+					"inner_vlan": schema.Int64Attribute{
+						Description: "The inner VLAN of the A-End configuration.",
+						Computed:    true,
+					},
+					"vnic_index": schema.Int64Attribute{
+						Description: "The network interface index of the A-End configuration.",
+						Computed:    true,
+					},
+					"secondary_name": schema.StringAttribute{
+						Description: "The secondary name of the A-End configuration.",
+						Computed:    true,
+					},
+				},
+			},
+			"b_end": schema.SingleNestedAttribute{
+				Description: "The current B-End configuration of the VXC.",
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"owner_uid": schema.StringAttribute{
+						Description: "The owner UID of the B-End configuration.",
+						Computed:    true,
+					},
+					"product_uid": schema.StringAttribute{
+						Description: "The product UID of the B-End configuration.",
+						Computed:    true,
+					},
+					"product_name": schema.StringAttribute{
+						Description: "The product name of the B-End configuration.",
+						Computed:    true,
+					},
+					"location_id": schema.Int64Attribute{
+						Description: "The location ID of the B-End configuration.",
+						Computed:    true,
+					},
+					"location": schema.StringAttribute{
+						Description: "The location of the B-End configuration.",
+						Computed:    true,
+					},
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the B-End configuration.",
+						Computed:    true,
+					},
+					"inner_vlan": schema.Int64Attribute{
+						Description: "The inner VLAN of the B-End configuration.",
+						Computed:    true,
+					},
+					"vnic_index": schema.Int64Attribute{
+						Description: "The network interface index of the B-End configuration.",
+						Computed:    true,
+					},
+					"secondary_name": schema.StringAttribute{
+						Description: "The secondary name of the B-End configuration.",
+						Computed:    true,
+					},
 				},
 			},
 		},
