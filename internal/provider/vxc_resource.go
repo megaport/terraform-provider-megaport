@@ -392,7 +392,7 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
-func NewVxcResource() resource.Resource {
+func NewVXCResource() resource.Resource {
 	return &vxcResource{}
 }
 
@@ -723,6 +723,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 							"bgp_shutdown_default": schema.BoolAttribute{
 								Description: "Whether BGP Shutdown is enabled by default on the virtual router.",
+								Computed:    true,
 							},
 						},
 					},
@@ -776,6 +777,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										// Fields for all CSP Connections
 										"connect_type": schema.StringAttribute{
 											Description: "The connection type of the CSP connection.",
+											Computed:    true,
 										},
 										"resource_name": schema.StringAttribute{
 											Description: "The resource name of the CSP connection.",
@@ -793,9 +795,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										// AWS CSP Connection Fields
 										"name": schema.StringAttribute{
 											Description: "The name of the CSP connection.",
+											Computed:    true,
 										},
 										"owner_account": schema.StringAttribute{
 											Description: "The owner's AWS account of the CSP connection.",
+											Computed:    true,
 										},
 										// Fields for AWS, Azure, and Google Cloud
 										"bandwidth": schema.Int64Attribute{
@@ -845,6 +849,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										},
 										"type": schema.StringAttribute{
 											Description: "The type of the AWS Virtual Interface.",
+											Computed:    true,
 										},
 										"vif_id": schema.StringAttribute{
 											Description: "The ID of the AWS Virtual Interface.",
@@ -853,6 +858,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										// AWS Hosted Connection Fields
 										"connection_id": schema.StringAttribute{
 											Description: "The hosted connection ID of the CSP connection.",
+											Computed:    true,
 										},
 										// Azure and Google Cloud CSP Connection Fields
 										"ports": schema.ListNestedAttribute{
@@ -931,6 +937,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"ip_addresses": schema.ListAttribute{
 											Description: "The IP addresses of the Virtual Router.",
 											Computed:    true,
+											ElementType: types.StringType,
 										},
 										"virtual_router_name": schema.StringAttribute{
 											Description: "The name of the Virtual Router.",
