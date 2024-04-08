@@ -28,7 +28,7 @@ var (
 type singlePortResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
-	UID                   types.String `tfsdk:"uid"`
+	UID                   types.String `tfsdk:"product_uid"`
 	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
 	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
@@ -121,7 +121,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: "The last time the resource was updated.",
 				Computed:    true,
 			},
-			"uid": schema.StringAttribute{
+			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
