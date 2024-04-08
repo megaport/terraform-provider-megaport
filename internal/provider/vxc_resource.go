@@ -1254,7 +1254,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	updateReq := &megaport.UpdateVXCRequest{
 		Name:      &name,
 		AEndVLAN:  &aEndVlan,
-		BEndVlan:  &bEndVlan,
+		BEndVLAN:  &bEndVlan,
 		RateLimit: &rateLimit,
 	}
 
