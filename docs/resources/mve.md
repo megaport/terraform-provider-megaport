@@ -45,11 +45,11 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
 - `mve_size` (String) The size of the MVE.
 - `product_id` (Number) The Numeric ID of the MVE.
+- `product_uid` (String) The unique identifier of the MVE.
 - `provisioning_status` (String) The provisioning status of the MVE.
 - `resources` (Attributes) The resources associated with the MVE. (see [below for nested schema](#nestedatt--resources))
 - `secondary_name` (String) The secondary name of the MVE.
 - `terminate_date` (String) The date the MVE will be terminated.
-- `uid` (String) The unique identifier of the MVE.
 - `usage_algorithm` (String) The usage algorithm of the MVE.
 - `vendor` (String) The vendor of the MVE.
 - `virtual` (Boolean) Whether the MVE is virtual.

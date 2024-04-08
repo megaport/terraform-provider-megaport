@@ -36,7 +36,7 @@ type mveResourceModel struct {
 	CreateDate            types.String `tfsdk:"create_date"`
 	CreatedBy             types.String `tfsdk:"created_by"`
 	TerminateDate         types.String `tfsdk:"terminate_date"`
-	LiveDate              types.Int64  `tfsdk:"live_date"`
+	LiveDate              types.String `tfsdk:"live_date"`
 	Market                types.String `tfsdk:"market"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
@@ -182,7 +182,7 @@ func (orm *mveResourceModel) fromAPIMVE(p *megaport.MVE) {
 	orm.CreateDate = types.StringValue(p.CreateDate.String())
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.TerminateDate = types.StringValue(p.TerminateDate.String())
-	orm.LiveDate = types.Int64Value(int64(p.LiveDate))
+	orm.LiveDate = types.StringValue(p.LiveDate.String())
 	orm.Market = types.StringValue(p.Market)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
