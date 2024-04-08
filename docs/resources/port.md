@@ -41,9 +41,9 @@ description: |-
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
 - `product_id` (Number) The numeric ID of the product.
+- `product_uid` (String) The unique identifier for the resource.
 - `provisioning_status` (String) The provisioning status of the product.
 - `terminate_date` (String) The date the product will be terminated.
-- `uid` (String) The unique identifier for the resource.
 - `usage_algorithm` (String) The usage algorithm for the product.
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto-approved on this product.
