@@ -262,6 +262,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 // Resources defines the resources implemented in the provider.
 func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewMCRResource,
 		NewPortResource,
 		NewMVEResource,
 	}
