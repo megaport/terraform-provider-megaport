@@ -211,6 +211,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
+				Validators: []validator.Int64{
+					int64validator.OneOf(1000, 2500, 5000, 10000),
+				},
 			},
 			"terminate_date": schema.StringAttribute{
 				Description: "Date the product will be terminated.",
@@ -260,15 +263,21 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "Cost centre of the product.",
-				Required:    true,
+				Optional:    true,
 			},
-			"contract_start_date": schema.BoolAttribute{
+			"contract_start_date": schema.StringAttribute{
 				Description: "Contract start date of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"contract_end_date": schema.BoolAttribute{
+			"contract_end_date": schema.StringAttribute{
 				Description: "Contract end date of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
@@ -368,6 +377,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"id": schema.Int64Attribute{
 								Description: "Numeric ID of the virtual router.",
 								Computed:    true,
+								PlanModifiers: []planmodifier.Int64{
+									int64planmodifier.UseStateForUnknown(),
+								},
 							},
 							"asn": schema.Int64Attribute{
 								Description: "ASN of the virtual router.",

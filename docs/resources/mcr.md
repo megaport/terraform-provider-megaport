@@ -18,7 +18,6 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 ### Required
 
 - `contract_term_months` (Number) Contract term in months.
-- `cost_centre` (String) Cost centre of the product.
 - `location_id` (Number) Location ID of the product.
 - `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
@@ -30,6 +29,7 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `admin_locked` (Boolean) Whether the product is admin locked.
 - `asn` (Number) ASN in the MCR order configuration.
 - `buyout_port` (Boolean) Whether the product is bought out.
+- `cost_centre` (String) Cost centre of the product.
 - `locked` (Boolean) Whether the product is locked.
 
 ### Read-Only
@@ -37,8 +37,8 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `attribute_tags` (Map of String) Attribute tags of the product.
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) Megaport Company UID of the product.
-- `contract_end_date` (Boolean) Contract end date of the product.
-- `contract_start_date` (Boolean) Contract start date of the product.
+- `contract_end_date` (String) Contract end date of the product.
+- `contract_start_date` (String) Contract start date of the product.
 - `create_date` (String) Date the product was created.
 - `created_by` (String) User who created the product.
 - `last_updated` (String) Last updated by the Terraform provider.
