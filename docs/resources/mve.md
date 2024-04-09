@@ -34,8 +34,8 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 - `cancelable` (Boolean) Whether the MVE is cancelable.
 - `company_name` (String) The company name of the MVE.
 - `company_uid` (String) The company UID of the MVE.
-- `contract_end_date` (Boolean) The contract end date of the MVE.
-- `contract_start_date` (Boolean) The contract start date of the MVE.
+- `contract_end_date` (String) The contract end date of the MVE.
+- `contract_start_date` (String) The contract start date of the MVE.
 - `create_date` (String) The date the MVE was created.
 - `created_by` (String) The user who created the MVE.
 - `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
@@ -62,6 +62,7 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 Required:
 
 - `image_id` (Number) The image ID of the MVE.
+- `product_size` (String) The product size for the vendor config.
 - `vendor` (String) The vendor of the MVE.
 
 Optional:
@@ -75,7 +76,6 @@ Optional:
 - `director_address` (String) The director address for the vendor config. Required for Versa MVE.
 - `license_data` (String) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
 - `local_auth` (String) The local auth for the vendor config. Required for Versa MVE.
-- `product_size` (String) The product size for the vendor config. Required for Aruba, Cisco, and Fortinet MVEs.
 - `remote_auth` (String) The remote auth for the vendor config. Required for Versa MVE.
 - `serial_number` (String) The serial number for the vendor config. Required for Versa MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. Required for VMware MVE.

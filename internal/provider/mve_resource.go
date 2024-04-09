@@ -406,13 +406,19 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"contract_start_date": schema.BoolAttribute{
+			"contract_start_date": schema.StringAttribute{
 				Description: "The contract start date of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"contract_end_date": schema.BoolAttribute{
+			"contract_end_date": schema.StringAttribute{
 				Description: "The contract end date of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
@@ -433,6 +439,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"company_name": schema.StringAttribute{
 				Description: "The company name of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"virtual": schema.BoolAttribute{
 				Description: "Whether the MVE is virtual.",
@@ -461,6 +470,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"mve_size": schema.StringAttribute{
 				Description: "The size of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"attribute_tags": schema.MapAttribute{
 				Description: "The attribute tags of the MVE.",
@@ -490,14 +502,23 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"vendor": schema.StringAttribute{
 						Description: "The vendor of the MVE.",
 						Required:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"image_id": schema.Int64Attribute{
 						Description: "The image ID of the MVE.",
 						Required:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.RequiresReplace(),
+						},
 					},
 					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config. Required for Aruba, Cisco, and Fortinet MVEs.",
-						Optional:    true,
+						Description: "The product size for the vendor config.",
+						Required:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"account_name": schema.StringAttribute{
 						Description: "The account name for the vendor config. Required for Aruba MVE.",
@@ -572,6 +593,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"id": schema.Int64Attribute{
 								Description: "The ID of the port interface.",
 								Computed:    true,
+								PlanModifiers: []planmodifier.Int64{
+									int64planmodifier.UseStateForUnknown(),
+								},
 							},
 							"loa_template": schema.StringAttribute{
 								Description: "The LOA template of the port interface.",
@@ -611,6 +635,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								"id": schema.Int64Attribute{
 									Description: "The ID of the virtual machine.",
 									Computed:    true,
+									PlanModifiers: []planmodifier.Int64{
+										int64planmodifier.UseStateForUnknown(),
+									},
 								},
 								"cpu_count": schema.Int64Attribute{
 									Description: "The CPU count of the virtual machine.",
@@ -623,6 +650,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"id": schema.Int64Attribute{
 											Description: "The ID of the image.",
 											Computed:    true,
+											PlanModifiers: []planmodifier.Int64{
+												int64planmodifier.UseStateForUnknown(),
+											},
 										},
 										"vendor": schema.StringAttribute{
 											Description: "The vendor of the image.",
@@ -667,7 +697,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 				},
 			},
-			// TODO - OTHER STRUCTS AND VENDOR CONFIGS
 		},
 	}
 }
