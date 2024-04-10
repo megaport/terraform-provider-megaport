@@ -264,5 +264,6 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewMCRResource,
 		NewPortResource,
+		NewMVEResource,
 	}
 }
