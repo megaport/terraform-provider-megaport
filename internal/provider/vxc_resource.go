@@ -50,6 +50,7 @@ type vxcResourceModel struct {
 	AdminLocked        types.Bool                    `tfsdk:"admin_locked"`
 	AttributeTags      map[types.String]types.String `tfsdk:"attribute_tags"`
 	Cancelable         types.Bool                    `tfsdk:"cancelable"`
+	CostCentre         types.String                  `tfsdk:"cost_centre"`
 
 	LiveDate          types.String `tfsdk:"live_date"`
 	CreateDate        types.String `tfsdk:"create_date"`
@@ -307,6 +308,7 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
 	orm.CompanyName = types.StringValue(v.CompanyName)
+	orm.CostCentre = types.StringValue(v.CostCentre)
 	orm.Locked = types.BoolValue(v.Locked)
 	orm.AdminLocked = types.BoolValue(v.AdminLocked)
 	orm.Cancelable = types.BoolValue(v.Cancelable)
@@ -487,6 +489,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
 				},
+			},
+			"cost_centre": schema.StringAttribute{
+				Description: "A customer reference number to be included in billing information and invoices.",
+				Optional:    true,
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "The resources associated with the VXC.",
@@ -1345,7 +1351,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var name string
+	var name, costCentre string
 	var aEndVlan, bEndVlan, rateLimit int
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
@@ -1359,12 +1365,16 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
 	}
+	if !plan.CostCentre.Equal(state.CostCentre) {
+		costCentre = plan.CostCentre.ValueString()
+	}
 
 	updateReq := &megaport.UpdateVXCRequest{
-		Name:      &name,
-		AEndVLAN:  &aEndVlan,
-		BEndVLAN:  &bEndVlan,
-		RateLimit: &rateLimit,
+		Name:       &name,
+		AEndVLAN:   &aEndVlan,
+		CostCentre: &costCentre,
+		BEndVLAN:   &bEndVlan,
+		RateLimit:  &rateLimit,
 	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.ID.String(), updateReq)
