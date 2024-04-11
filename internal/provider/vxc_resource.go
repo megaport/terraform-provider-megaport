@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -481,8 +482,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The contract term in months.",
-				Computed:    true,
+				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.OneOf(1, 12, 24, 36),
+				},
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "The resources associated with the VXC.",
@@ -1209,6 +1213,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	buyReq := &megaport.BuyVXCRequest{
 		PortUID:   plan.PortUID.ValueString(),
 		VXCName:   plan.Name.ValueString(),
+		Term:      int(plan.ContractTermMonths.ValueInt64()),
 		RateLimit: int(plan.RateLimit.ValueInt64()),
 
 		WaitForProvision: true,
