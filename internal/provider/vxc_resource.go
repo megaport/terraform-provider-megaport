@@ -56,6 +56,7 @@ type vxcResourceModel struct {
 	CreateDate        types.String `tfsdk:"create_date"`
 	ContractStartDate types.String `tfsdk:"contract_start_date"`
 	ContractEndDate   types.String `tfsdk:"contract_end_date"`
+	Shutdown          types.Bool   `tfsdk:"shutdown"`
 
 	PortUID           types.String              `tfsdk:"port_uid"`
 	AEndConfiguration *vxcEndConfigurationModel `tfsdk:"a_end"`
@@ -308,6 +309,7 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
 	orm.CompanyName = types.StringValue(v.CompanyName)
+	orm.Shutdown = types.BoolValue(v.Shutdown)
 	orm.CostCentre = types.StringValue(v.CostCentre)
 	orm.Locked = types.BoolValue(v.Locked)
 	orm.AdminLocked = types.BoolValue(v.AdminLocked)
@@ -489,6 +491,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
 				},
+			},
+			"shutdown": schema.BoolAttribute{
+				Description: "Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).",
+				Optional:    true,
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "A customer reference number to be included in billing information and invoices.",
@@ -1226,6 +1232,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      10 * time.Minute,
 	}
 
+	if !plan.Shutdown.IsNull() {
+		buyReq.Shutdown = plan.Shutdown.ValueBool()
+	}
+
 	a := plan.AEndConfiguration
 	b := plan.BEndConfiguration
 
@@ -1353,6 +1363,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	var name, costCentre string
 	var aEndVlan, bEndVlan, rateLimit int
+	var shutdown bool
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	}
@@ -1368,11 +1379,15 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !plan.CostCentre.Equal(state.CostCentre) {
 		costCentre = plan.CostCentre.ValueString()
 	}
+	if !plan.Shutdown.Equal(state.Shutdown) {
+		shutdown = plan.Shutdown.ValueBool()
+	}
 
 	updateReq := &megaport.UpdateVXCRequest{
 		Name:       &name,
 		AEndVLAN:   &aEndVlan,
 		CostCentre: &costCentre,
+		Shutdown:   &shutdown,
 		BEndVLAN:   &bEndVlan,
 		RateLimit:  &rateLimit,
 	}
