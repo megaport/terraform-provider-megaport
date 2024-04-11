@@ -17,8 +17,6 @@ description: |-
 
 ### Required
 
-- `a_end_order_configuration` (Attributes) The A-End order configuration of the VXC. (see [below for nested schema](#nestedatt--a_end_order_configuration))
-- `b_end_order_configuration` (Attributes) The B-End order configuration of the VXC. (see [below for nested schema](#nestedatt--b_end_order_configuration))
 - `port_uid` (String) The UID of the port the VXC is connected to.
 - `product_name` (String) The name of the product.
 - `rate_limit` (Number) The rate limit of the product.
@@ -34,7 +32,7 @@ description: |-
 - `company_uid` (String) The UID of the company the product is associated with.
 - `contract_end_date` (String) The date the contract ends.
 - `contract_start_date` (String) The date the contract starts.
-- `contract_term_months` (Number) The number of months the contract is for.
+- `contract_term_months` (Number) The contract term in months.
 - `create_date` (String) The date the product was created.
 - `created_by` (String) The user who created the product.
 - `distance_band` (String) The distance band of the product.
@@ -45,117 +43,96 @@ description: |-
 - `provisioning_status` (String) The provisioning status of the product.
 - `resources` (Attributes) The resources associated with the VXC. (see [below for nested schema](#nestedatt--resources))
 - `secondary_name` (String) The secondary name of the product.
+- `service_id` (Number) The service ID of the VXC.
 - `type` (String) The type of the product.
 - `uid` (String) The unique identifier for the resource.
 - `usage_algorithm` (String) The usage algorithm of the product.
 - `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
-<a id="nestedatt--a_end_order_configuration"></a>
-### Nested Schema for `a_end_order_configuration`
-
-Required:
-
-- `partner_config` (Attributes) The partner configuration of the A-End order configuration. (see [below for nested schema](#nestedatt--a_end_order_configuration--partner_config))
-- `product_uid` (String) The product UID of the A-End order configuration.
-- `vlan` (Number) The VLAN of the A-End order configuration.
-
-Optional:
-
-- `inner_vlan` (Number) The inner VLAN of the A-End order configuration if there is an MVE configuration.
-- `network_interface_index` (Number) The network interface index of the A-End order configuration if there is an MVE configuration.
-
-<a id="nestedatt--a_end_order_configuration--partner_config"></a>
-### Nested Schema for `a_end_order_configuration.partner_config`
-
-Required:
-
-- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
-
-Optional:
-
-- `amazon_asn` (Number) The Amazon ASN of the partner configuration.
-- `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
-- `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
-- `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `name` (String) The name of the partner configuration.
-- `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
-- `prefixes` (String) The prefixes of the partner configuration.
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
-- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
-- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
-
-
-
-<a id="nestedatt--b_end_order_configuration"></a>
-### Nested Schema for `b_end_order_configuration`
-
-Required:
-
-- `partner_config` (Attributes) The partner configuration of the B-End order configuration. (see [below for nested schema](#nestedatt--b_end_order_configuration--partner_config))
-- `product_uid` (String) The product UID of the B-End order configuration.
-- `vlan` (Number) The VLAN of the B-End order configuration.
-
-Optional:
-
-- `inner_vlan` (Number) The inner VLAN of the B-End order configuration if there is an MVE configuration.
-- `network_interface_index` (Number) The network interface index of the B-End order configuration if there is an MVE configuration.
-
-<a id="nestedatt--b_end_order_configuration--partner_config"></a>
-### Nested Schema for `b_end_order_configuration.partner_config`
-
-Required:
-
-- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
-
-Optional:
-
-- `amazon_asn` (Number) The Amazon ASN of the partner configuration.
-- `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
-- `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
-- `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `name` (String) The name of the partner configuration.
-- `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
-- `prefixes` (String) The prefixes of the partner configuration.
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
-- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
-- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
-
-
-
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
 
-Read-Only:
+Optional:
 
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
+- `partner_config` (Attributes) The partner configuration of the A-End order configuration. (see [below for nested schema](#nestedatt--a_end--partner_config))
+- `product_uid` (String) The product UID of the A-End configuration.
+- `vlan` (Number) The VLAN of the A-End configuration.
+- `vnic_index` (Number) The network interface index of the A-End configuration.
+
+Read-Only:
+
 - `location` (String) The location of the A-End configuration.
 - `location_id` (Number) The location ID of the A-End configuration.
 - `owner_uid` (String) The owner UID of the A-End configuration.
 - `product_name` (String) The product name of the A-End configuration.
-- `product_uid` (String) The product UID of the A-End configuration.
 - `secondary_name` (String) The secondary name of the A-End configuration.
-- `vlan` (Number) The VLAN of the A-End configuration.
-- `vnic_index` (Number) The network interface index of the A-End configuration.
+
+<a id="nestedatt--a_end--partner_config"></a>
+### Nested Schema for `a_end.partner_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+
+Optional:
+
+- `amazon_asn` (Number) The Amazon ASN of the partner configuration.
+- `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
+- `asn` (Number) The ASN of the partner configuration.
+- `auth_key` (String) The authentication key of the partner configuration.
+- `customer_ip_address` (String) The customer IP address of the partner configuration.
+- `name` (String) The name of the partner configuration.
+- `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
+- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+- `prefixes` (String) The prefixes of the partner configuration.
+- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
+- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+
 
 
 <a id="nestedatt--b_end"></a>
 ### Nested Schema for `b_end`
 
-Read-Only:
+Optional:
 
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration.
+- `partner_config` (Attributes) The partner configuration of the B-End order configuration. (see [below for nested schema](#nestedatt--b_end--partner_config))
+- `vlan` (Number) The VLAN of the B-End configuration.
+- `vnic_index` (Number) The network interface index of the B-End configuration.
+
+Read-Only:
+
 - `location` (String) The location of the B-End configuration.
 - `location_id` (Number) The location ID of the B-End configuration.
 - `owner_uid` (String) The owner UID of the B-End configuration.
 - `product_name` (String) The product name of the B-End configuration.
 - `product_uid` (String) The product UID of the B-End configuration.
 - `secondary_name` (String) The secondary name of the B-End configuration.
-- `vlan` (Number) The VLAN of the B-End configuration.
-- `vnic_index` (Number) The network interface index of the B-End configuration.
+
+<a id="nestedatt--b_end--partner_config"></a>
+### Nested Schema for `b_end.partner_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+
+Optional:
+
+- `amazon_asn` (Number) The Amazon ASN of the partner configuration.
+- `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
+- `asn` (Number) The ASN of the partner configuration.
+- `auth_key` (String) The authentication key of the partner configuration.
+- `customer_ip_address` (String) The customer IP address of the partner configuration.
+- `name` (String) The name of the partner configuration.
+- `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
+- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+- `prefixes` (String) The prefixes of the partner configuration.
+- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
+- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+
 
 
 <a id="nestedatt--resources"></a>
