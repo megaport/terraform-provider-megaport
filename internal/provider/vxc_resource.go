@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -240,14 +243,21 @@ type vxcEndConfigurationModel struct {
 	PartnerConfig         *vxcPartnerConfiguration `tfsdk:"partner_config,omitempty"`
 }
 
-// vxcPartnerConfiguration is an interface to ensure the partner configuration is implemented.
-type vxcPartnerConfiguration interface {
-	IsParnerConfiguration()
+type vxcPartnerConfiguration struct {
+	Partner             types.String                 `tfsdk:"partner"`
+	AWSPartnerConfig    *vxcPartnerConfigAWSModel    `tfsdk:"aws_config,omitempty"`
+	AzurePartnerConfig  *vxcPartnerConfigAzureModel  `tfsdk:"azure_config,omitempty"`
+	GooglePartnerConfig *vxcPartnerConfigGoogleModel `tfsdk:"google_config,omitempty"`
+	OraclePartnerConfig *vxcPartnerConfigOracleModel `tfsdk:"oracle_config,omitempty"`
+}
+
+type vxcPartnerConfig interface {
+	isPartnerConfig()
 }
 
 // vxcPartnerConfigAWSModel maps the partner configuration schema data for AWS.
 type vxcPartnerConfigAWSModel struct {
-	vxcPartnerConfiguration
+	vxcPartnerConfig
 	ConnectType       types.String `tfsdk:"connect_type"`
 	Type              types.String `tfsdk:"type"`
 	OwnerAccount      types.String `tfsdk:"owner_account"`
@@ -262,21 +272,21 @@ type vxcPartnerConfigAWSModel struct {
 
 // vxcPartnerConfigAzureModel maps the partner configuration schema data for Azure.
 type vxcPartnerConfigAzureModel struct {
-	vxcPartnerConfiguration
+	vxcPartnerConfig
 	ConnectType types.String `tfsdk:"connect_type"`
 	ServiceKey  types.String `tfsdk:"service_key"`
 }
 
 // vxcPartnerConfigGoogleModel maps the partner configuration schema data for Google.
 type vxcPartnerConfigGoogleModel struct {
-	vxcPartnerConfiguration
+	vxcPartnerConfig
 	ConnectType types.String `tfsdk:"connect_type"`
 	PairingKey  types.String `tfsdk:"pairing_key"`
 }
 
 // vxcPartnerConfigOracleModel maps the partner configuration schema data for Oracle.
 type vxcPartnerConfigOracleModel struct {
-	vxcPartnerConfiguration
+	vxcPartnerConfig
 	ConnectType      types.String `tfsdk:"connect_type"`
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
 }
@@ -900,61 +910,120 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner configuration of the A-End order configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+							"partner": schema.StringAttribute{
+								Description: "The partner of the partner configuration.",
 								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+								},
 							},
-							// AWS PARTNER CONFIG FIELDS
-							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+							"aws_config": schema.SingleNestedAttribute{
+								Description: "The AWS partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"type": schema.StringAttribute{
+										Description: "The type of the partner configuration. Required for AWS partner configurations.",
+										Required:    true,
+									},
+									"owner_account": schema.StringAttribute{
+										Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+										Required:    true,
+									},
+									"asn": schema.Int64Attribute{
+										Description: "The ASN of the partner configuration.",
+										Required:    true,
+									},
+									"amazon_asn": schema.Int64Attribute{
+										Description: "The Amazon ASN of the partner configuration.",
+										Required:    true,
+									},
+									"auth_key": schema.StringAttribute{
+										Description: "The authentication key of the partner configuration.",
+										Required:    true,
+									},
+									"prefixes": schema.StringAttribute{
+										Description: "The prefixes of the partner configuration.",
+										Required:    true,
+									},
+									"customer_ip_address": schema.StringAttribute{
+										Description: "The customer IP address of the partner configuration.",
+										Required:    true,
+									},
+									"amazon_ip_address": schema.StringAttribute{
+										Description: "The Amazon IP address of the partner configuration.",
+										Required:    true,
+									},
+									"name": schema.StringAttribute{
+										Description: "The name of the partner configuration.",
+										Optional:    true,
+									},
+								},
 							},
-							"owner_account": schema.StringAttribute{
-								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+							"azure_config": schema.SingleNestedAttribute{
+								Description: "The Azure partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"service_key": schema.StringAttribute{
+										Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+										Required:    true,
+									},
+								},
 							},
-							"asn": schema.Int64Attribute{
-								Description: "The ASN of the partner configuration.",
+							"google_config": schema.SingleNestedAttribute{
+								Description: "The Google partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"pairing_key": schema.StringAttribute{
+										Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+										Required:    true,
+									},
+								},
 							},
-							"amazon_asn": schema.Int64Attribute{
-								Description: "The Amazon ASN of the partner configuration.",
+							"oracle_config": schema.SingleNestedAttribute{
+								Description: "The Oracle partner configuration.",
 								Optional:    true,
-							},
-							"auth_key": schema.StringAttribute{
-								Description: "The authentication key of the partner configuration.",
-								Optional:    true,
-							},
-							"prefixes": schema.StringAttribute{
-								Description: "The prefixes of the partner configuration.",
-								Optional:    true,
-							},
-							"customer_ip_address": schema.StringAttribute{
-								Description: "The customer IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_ip_address": schema.StringAttribute{
-								Description: "The Amazon IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the partner configuration.",
-								Optional:    true,
-							},
-							// Azure Partner Config Fields
-							"service_key": schema.StringAttribute{
-								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-								Optional:    true,
-							},
-							// Google Partner Config Fields
-							"pairing_key": schema.StringAttribute{
-								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-								Optional:    true,
-							},
-							// Oracle Partner Config Fields
-							"virtual_circuit_id": schema.StringAttribute{
-								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"virtual_circuit_id": schema.StringAttribute{
+										Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+										Required:    true,
+									},
+								},
 							},
 						},
 					},
@@ -1004,61 +1073,120 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner configuration of the B-End order configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+							"partner": schema.StringAttribute{
+								Description: "The partner of the partner configuration.",
 								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+								},
 							},
-							// AWS PARTNER CONFIG FIELDS
-							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+							"aws_config": schema.SingleNestedAttribute{
+								Description: "The AWS partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"type": schema.StringAttribute{
+										Description: "The type of the partner configuration. Required for AWS partner configurations.",
+										Required:    true,
+									},
+									"owner_account": schema.StringAttribute{
+										Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+										Required:    true,
+									},
+									"asn": schema.Int64Attribute{
+										Description: "The ASN of the partner configuration.",
+										Required:    true,
+									},
+									"amazon_asn": schema.Int64Attribute{
+										Description: "The Amazon ASN of the partner configuration.",
+										Required:    true,
+									},
+									"auth_key": schema.StringAttribute{
+										Description: "The authentication key of the partner configuration.",
+										Required:    true,
+									},
+									"prefixes": schema.StringAttribute{
+										Description: "The prefixes of the partner configuration.",
+										Required:    true,
+									},
+									"customer_ip_address": schema.StringAttribute{
+										Description: "The customer IP address of the partner configuration.",
+										Required:    true,
+									},
+									"amazon_ip_address": schema.StringAttribute{
+										Description: "The Amazon IP address of the partner configuration.",
+										Required:    true,
+									},
+									"name": schema.StringAttribute{
+										Description: "The name of the partner configuration.",
+										Optional:    true,
+									},
+								},
 							},
-							"owner_account": schema.StringAttribute{
-								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+							"azure_config": schema.SingleNestedAttribute{
+								Description: "The Azure partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"service_key": schema.StringAttribute{
+										Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+										Required:    true,
+									},
+								},
 							},
-							"asn": schema.Int64Attribute{
-								Description: "The ASN of the partner configuration.",
+							"google_config": schema.SingleNestedAttribute{
+								Description: "The Google partner configuration.",
 								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"pairing_key": schema.StringAttribute{
+										Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+										Required:    true,
+									},
+								},
 							},
-							"amazon_asn": schema.Int64Attribute{
-								Description: "The Amazon ASN of the partner configuration.",
+							"oracle_config": schema.SingleNestedAttribute{
+								Description: "The Oracle partner configuration.",
 								Optional:    true,
-							},
-							"auth_key": schema.StringAttribute{
-								Description: "The authentication key of the partner configuration.",
-								Optional:    true,
-							},
-							"prefixes": schema.StringAttribute{
-								Description: "The prefixes of the partner configuration.",
-								Optional:    true,
-							},
-							"customer_ip_address": schema.StringAttribute{
-								Description: "The customer IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_ip_address": schema.StringAttribute{
-								Description: "The Amazon IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the partner configuration.",
-								Optional:    true,
-							},
-							// Azure Partner Config Fields
-							"service_key": schema.StringAttribute{
-								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-								Optional:    true,
-							},
-							// Google Partner Config Fields
-							"pairing_key": schema.StringAttribute{
-								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-								Optional:    true,
-							},
-							// Oracle Partner Config Fields
-							"virtual_circuit_id": schema.StringAttribute{
-								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-								Optional:    true,
+								Validators: []validator.Object{
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
+									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
+								},
+								Attributes: map[string]schema.Attribute{
+									"connect_type": schema.StringAttribute{
+										Description: "The connection type of the partner configuration. Required for all partner configurations.",
+										Required:    true,
+									},
+									"virtual_circuit_id": schema.StringAttribute{
+										Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+										Required:    true,
+									},
+								},
 							},
 						},
 					},
@@ -1101,7 +1229,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEnd.NetworkInterfaceIndex = int(a.NetworkInterfaceIndex.ValueInt64())
 	}
 	if a.PartnerConfig != nil {
-		aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig)
+		switch a.PartnerConfig.Partner {
+		case types.StringValue("aws"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig.AWSPartnerConfig)
+		case types.StringValue("azure"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig.AzurePartnerConfig)
+		case types.StringValue("google"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig.GooglePartnerConfig)
+		case types.StringValue("oracle"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig.OraclePartnerConfig)
+		}
 	}
 
 	var bEnd megaport.VXCOrderEndpointConfiguration
@@ -1115,7 +1252,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		bEnd.NetworkInterfaceIndex = int(b.NetworkInterfaceIndex.ValueInt64())
 	}
 	if b.PartnerConfig != nil {
-		bEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig)
+		switch b.PartnerConfig.Partner {
+		case types.StringValue("aws"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig.AWSPartnerConfig)
+		case types.StringValue("azure"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig.AzurePartnerConfig)
+		case types.StringValue("google"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig.GooglePartnerConfig)
+		case types.StringValue("oracle"):
+			aEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig.OraclePartnerConfig)
+		}
 	}
 
 	buyReq.AEndConfiguration = aEnd
@@ -1293,7 +1439,7 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resource.ImportStatePassthroughID(ctx, path.Root("uid"), req, resp)
 }
 
-func toAPIPartnerConfig(c vxcPartnerConfiguration) megaport.VXCPartnerConfiguration {
+func toAPIPartnerConfig(c vxcPartnerConfig) megaport.VXCPartnerConfiguration {
 	switch p := c.(type) {
 	case *vxcPartnerConfigAWSModel:
 		return &megaport.VXCPartnerConfigAWS{

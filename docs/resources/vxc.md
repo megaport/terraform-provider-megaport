@@ -73,22 +73,61 @@ Read-Only:
 
 Required:
 
-- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `partner` (String) The partner of the partner configuration.
 
 Optional:
+
+- `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--a_end--partner_config--aws_config))
+- `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end--partner_config--azure_config))
+- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end--partner_config--google_config))
+- `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end--partner_config--oracle_config))
+
+<a id="nestedatt--a_end--partner_config--aws_config"></a>
+### Nested Schema for `a_end.partner_config.aws_config`
+
+Required:
 
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
 - `auth_key` (String) The authentication key of the partner configuration.
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `name` (String) The name of the partner configuration.
 - `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
 - `prefixes` (String) The prefixes of the partner configuration.
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
 - `type` (String) The type of the partner configuration. Required for AWS partner configurations.
+
+Optional:
+
+- `name` (String) The name of the partner configuration.
+
+
+<a id="nestedatt--a_end--partner_config--azure_config"></a>
+### Nested Schema for `a_end.partner_config.azure_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+
+
+<a id="nestedatt--a_end--partner_config--google_config"></a>
+### Nested Schema for `a_end.partner_config.google_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+
+
+<a id="nestedatt--a_end--partner_config--oracle_config"></a>
+### Nested Schema for `a_end.partner_config.oracle_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
 - `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+
 
 
 
@@ -116,22 +155,61 @@ Read-Only:
 
 Required:
 
-- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `partner` (String) The partner of the partner configuration.
 
 Optional:
+
+- `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end--partner_config--aws_config))
+- `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end--partner_config--azure_config))
+- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end--partner_config--google_config))
+- `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end--partner_config--oracle_config))
+
+<a id="nestedatt--b_end--partner_config--aws_config"></a>
+### Nested Schema for `b_end.partner_config.aws_config`
+
+Required:
 
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
 - `auth_key` (String) The authentication key of the partner configuration.
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `name` (String) The name of the partner configuration.
 - `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
 - `prefixes` (String) The prefixes of the partner configuration.
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
 - `type` (String) The type of the partner configuration. Required for AWS partner configurations.
+
+Optional:
+
+- `name` (String) The name of the partner configuration.
+
+
+<a id="nestedatt--b_end--partner_config--azure_config"></a>
+### Nested Schema for `b_end.partner_config.azure_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+
+
+<a id="nestedatt--b_end--partner_config--google_config"></a>
+### Nested Schema for `b_end.partner_config.google_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
+- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+
+
+<a id="nestedatt--b_end--partner_config--oracle_config"></a>
+### Nested Schema for `b_end.partner_config.oracle_config`
+
+Required:
+
+- `connect_type` (String) The connection type of the partner configuration. Required for all partner configurations.
 - `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+
 
 
 
