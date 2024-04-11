@@ -1039,7 +1039,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the B-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"product_name": schema.StringAttribute{
 						Description: "The product name of the B-End configuration.",
