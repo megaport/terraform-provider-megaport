@@ -56,9 +56,6 @@ type vxcResourceModel struct {
 	AEndConfiguration *vxcEndConfigurationModel `tfsdk:"a_end"`
 	BEndConfiguration *vxcEndConfigurationModel `tfsdk:"b_end"`
 
-	AEndOrderConfiguration *vxcOrderEndPointConfigurationModel `tfsdk:"a_end_order_configuration"`
-	BEndOrderConfiguration *vxcOrderEndPointConfigurationModel `tfsdk:"b_end_order_configuration"`
-
 	Resources   *vxcResourcesModel `tfsdk:"resources"`
 	VXCApproval *vxcApprovalModel  `tfsdk:"vxc_approval"`
 }
@@ -228,18 +225,19 @@ type vxcApprovalModel struct {
 	NewSpeed types.Int64  `tfsdk:"new_speed"`
 }
 
-// vxcOrderEndPointConfigurationModel maps the end point configuration schema data.
-type vxcOrderEndPointConfigurationModel struct {
-	ProductUID              types.String             `tfsdk:"product_uid,omitempty"`
-	VLAN                    types.Int64              `tfsdk:"vlan,omitempty"`
-	PartnerConfig           *vxcPartnerConfiguration `tfsdk:"partner_config,omitempty"`
-	*vxcOrderMVEConfigModel `tfsdk:"mve_config,omitempty"`
-}
-
-// vxcOrderMVEConfigModel maps the MVE configuration schema data.
-type vxcOrderMVEConfigModel struct {
-	InnerVLAN             types.Int64 `tfsdk:"inner_vlan,omitempty"`
-	NetworkInterfaceIndex types.Int64 `tfsdk:"vnic_index"`
+// vxcEndConfigurationModel maps the end configuration schema data.
+type vxcEndConfigurationModel struct {
+	OwnerUID              types.String             `tfsdk:"owner_uid"`
+	UID                   types.String             `tfsdk:"product_uid,omitempty"`
+	Name                  types.String             `tfsdk:"product_name"`
+	LocationID            types.Int64              `tfsdk:"location_id"`
+	Location              types.String             `tfsdk:"location"`
+	VLAN                  types.Int64              `tfsdk:"vlan,omitempty"`
+	InnerVLAN             types.Int64              `tfsdk:"inner_vlan,omitempty"`
+	ProductUID            types.String             `tfsdk:"product_uid,omitempty"`
+	NetworkInterfaceIndex types.Int64              `tfsdk:"vnic_index,omitempty"`
+	SecondaryName         types.String             `tfsdk:"secondary_name"`
+	PartnerConfig         *vxcPartnerConfiguration `tfsdk:"partner_config,omitempty"`
 }
 
 // vxcPartnerConfiguration is an interface to ensure the partner configuration is implemented.
@@ -283,19 +281,6 @@ type vxcPartnerConfigOracleModel struct {
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
 }
 
-// vxcEndConfigurationModel maps the end configuration schema data.
-type vxcEndConfigurationModel struct {
-	OwnerUID              types.String `tfsdk:"owner_uid"`
-	UID                   types.String `tfsdk:"product_uid"`
-	Name                  types.String `tfsdk:"product_name"`
-	LocationID            types.Int64  `tfsdk:"location_id"`
-	Location              types.String `tfsdk:"location"`
-	VLAN                  int          `tfsdk:"vlan"`
-	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
-	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
-	SecondaryName         types.String `tfsdk:"secondary_name"`
-}
-
 func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 	orm.UID = types.StringValue(v.UID)
 	orm.ID = types.Int64Value(int64(v.ID))
@@ -325,7 +310,7 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.AEndConfiguration.Location),
-		VLAN:                  v.AEndConfiguration.VLAN,
+		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.AEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
@@ -337,7 +322,7 @@ func (orm *vxcResourceModel) fromAPIVXC(v *megaport.VXC) {
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.BEndConfiguration.Location),
-		VLAN:                  v.BEndConfiguration.VLAN,
+		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.BEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
@@ -432,6 +417,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The name of the product.",
 				Required:    true,
 			},
+			"service_id": schema.Int64Attribute{
+				Description: "The service ID of the VXC.",
+				Computed:    true,
+			},
 			"rate_limit": schema.Int64Attribute{
 				Description: "The rate limit of the product.",
 				Required:    true,
@@ -439,174 +428,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"port_uid": schema.StringAttribute{
 				Description: "The UID of the port the VXC is connected to.",
 				Required:    true,
-			},
-			"a_end_order_configuration": schema.SingleNestedAttribute{
-				Description: "The A-End order configuration of the VXC.",
-				Required:    true,
-				Attributes: map[string]schema.Attribute{
-					"product_uid": schema.StringAttribute{
-						Description: "The product UID of the A-End order configuration.",
-						Required:    true,
-					},
-					"vlan": schema.Int64Attribute{
-						Description: "The VLAN of the A-End order configuration.",
-						Required:    true,
-					},
-					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the A-End order configuration if there is an MVE configuration.",
-						Optional:    true,
-					},
-					"network_interface_index": schema.Int64Attribute{
-						Description: "The network interface index of the A-End order configuration if there is an MVE configuration.",
-						Optional:    true,
-					},
-					"partner_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the A-End order configuration.",
-						Required:    true,
-						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
-							// AWS PARTNER CONFIG FIELDS
-							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
-								Optional:    true,
-							},
-							"owner_account": schema.StringAttribute{
-								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
-								Optional:    true,
-							},
-							"asn": schema.Int64Attribute{
-								Description: "The ASN of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_asn": schema.Int64Attribute{
-								Description: "The Amazon ASN of the partner configuration.",
-								Optional:    true,
-							},
-							"auth_key": schema.StringAttribute{
-								Description: "The authentication key of the partner configuration.",
-								Optional:    true,
-							},
-							"prefixes": schema.StringAttribute{
-								Description: "The prefixes of the partner configuration.",
-								Optional:    true,
-							},
-							"customer_ip_address": schema.StringAttribute{
-								Description: "The customer IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_ip_address": schema.StringAttribute{
-								Description: "The Amazon IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the partner configuration.",
-								Optional:    true,
-							},
-							// Azure Partner Config Fields
-							"service_key": schema.StringAttribute{
-								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-								Optional:    true,
-							},
-							// Google Partner Config Fields
-							"pairing_key": schema.StringAttribute{
-								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-								Optional:    true,
-							},
-							// Oracle Partner Config Fields
-							"virtual_circuit_id": schema.StringAttribute{
-								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-								Optional:    true,
-							},
-						},
-					},
-				},
-			},
-			"b_end_order_configuration": schema.SingleNestedAttribute{
-				Description: "The B-End order configuration of the VXC.",
-				Required:    true,
-				Attributes: map[string]schema.Attribute{
-					"product_uid": schema.StringAttribute{
-						Description: "The product UID of the B-End order configuration.",
-						Required:    true,
-					},
-					"vlan": schema.Int64Attribute{
-						Description: "The VLAN of the B-End order configuration.",
-						Required:    true,
-					},
-					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End order configuration if there is an MVE configuration.",
-						Optional:    true,
-					},
-					"network_interface_index": schema.Int64Attribute{
-						Description: "The network interface index of the B-End order configuration if there is an MVE configuration.",
-						Optional:    true,
-					},
-					"partner_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the B-End order configuration.",
-						Required:    true,
-						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
-							// AWS PARTNER CONFIG FIELDS
-							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
-								Optional:    true,
-							},
-							"owner_account": schema.StringAttribute{
-								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
-								Optional:    true,
-							},
-							"asn": schema.Int64Attribute{
-								Description: "The ASN of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_asn": schema.Int64Attribute{
-								Description: "The Amazon ASN of the partner configuration.",
-								Optional:    true,
-							},
-							"auth_key": schema.StringAttribute{
-								Description: "The authentication key of the partner configuration.",
-								Optional:    true,
-							},
-							"prefixes": schema.StringAttribute{
-								Description: "The prefixes of the partner configuration.",
-								Optional:    true,
-							},
-							"customer_ip_address": schema.StringAttribute{
-								Description: "The customer IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"amazon_ip_address": schema.StringAttribute{
-								Description: "The Amazon IP address of the partner configuration.",
-								Optional:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the partner configuration.",
-								Optional:    true,
-							},
-							// Azure Partner Config Fields
-							"service_key": schema.StringAttribute{
-								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-								Optional:    true,
-							},
-							// Google Partner Config Fields
-							"pairing_key": schema.StringAttribute{
-								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-								Optional:    true,
-							},
-							// Oracle Partner Config Fields
-							"virtual_circuit_id": schema.StringAttribute{
-								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-								Optional:    true,
-							},
-						},
-					},
-				},
 			},
 			"type": schema.StringAttribute{
 				Description: "The type of the product.",
@@ -648,6 +469,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"contract_term_months": schema.Int64Attribute{
+				Description: "The contract term in months.",
+				Computed:    true,
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "The resources associated with the VXC.",
@@ -1003,13 +828,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"contract_term_months": schema.Int64Attribute{
-				Description: "The number of months the contract is for.",
-				Computed:    true,
-			},
 			"company_uid": schema.StringAttribute{
 				Description: "The UID of the company the product is associated with.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"company_name": schema.StringAttribute{
 				Description: "The name of the company the product is associated with.",
@@ -1042,7 +866,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the A-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"product_name": schema.StringAttribute{
 						Description: "The product name of the A-End configuration.",
@@ -1058,19 +882,81 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the A-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the A-End configuration.",
 						Computed:    true,
+					},
+					"partner_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the A-End order configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							// AWS PARTNER CONFIG FIELDS
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Optional:    true,
+							},
+							// Azure Partner Config Fields
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Optional:    true,
+							},
+							// Google Partner Config Fields
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Optional:    true,
+							},
+							// Oracle Partner Config Fields
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Optional:    true,
+							},
+						},
 					},
 				},
 			},
@@ -1100,19 +986,81 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the B-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the B-End configuration.",
-						Computed:    true,
+						Optional:    true,
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the B-End configuration.",
 						Computed:    true,
+					},
+					"partner_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the B-End order configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							// AWS PARTNER CONFIG FIELDS
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Optional:    true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Optional:    true,
+							},
+							// Azure Partner Config Fields
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Optional:    true,
+							},
+							// Google Partner Config Fields
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Optional:    true,
+							},
+							// Oracle Partner Config Fields
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Optional:    true,
+							},
+						},
 					},
 				},
 			},
@@ -1139,29 +1087,39 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      10 * time.Minute,
 	}
 
-	aEnd := megaport.VXCOrderEndpointConfiguration{
-		ProductUID: plan.AEndOrderConfiguration.ProductUID.ValueString(),
-		VLAN:       int(plan.AEndOrderConfiguration.VLAN.ValueInt64()),
-	}
-	if plan.AEndOrderConfiguration.vxcOrderMVEConfigModel != nil {
-		aEnd.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(plan.AEndOrderConfiguration.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(plan.AEndOrderConfiguration.NetworkInterfaceIndex.ValueInt64()),
-		}
-	}
-	aEnd.PartnerConfig = toAPIPartnerConfig(*plan.AEndOrderConfiguration.PartnerConfig)
+	a := plan.AEndConfiguration
+	b := plan.BEndConfiguration
 
-	bEnd := megaport.VXCOrderEndpointConfiguration{
-		ProductUID: plan.BEndOrderConfiguration.ProductUID.ValueString(),
-		VLAN:       int(plan.BEndOrderConfiguration.VLAN.ValueInt64()),
+	var aEnd megaport.VXCOrderEndpointConfiguration
+	if !a.InnerVLAN.IsNull() {
+		aEnd.InnerVLAN = int(a.InnerVLAN.ValueInt64())
 	}
-	if plan.BEndOrderConfiguration.vxcOrderMVEConfigModel != nil {
-		bEnd.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(plan.BEndOrderConfiguration.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(plan.BEndOrderConfiguration.NetworkInterfaceIndex.ValueInt64()),
-		}
+	if !a.VLAN.IsNull() {
+		aEnd.VLAN = int(a.VLAN.ValueInt64())
 	}
-	bEnd.PartnerConfig = toAPIPartnerConfig(*plan.BEndOrderConfiguration.PartnerConfig)
+	if !a.NetworkInterfaceIndex.IsNull() {
+		aEnd.NetworkInterfaceIndex = int(a.NetworkInterfaceIndex.ValueInt64())
+	}
+	if a.PartnerConfig != nil {
+		aEnd.PartnerConfig = toAPIPartnerConfig(*a.PartnerConfig)
+	}
+
+	var bEnd megaport.VXCOrderEndpointConfiguration
+	if !b.InnerVLAN.IsNull() {
+		bEnd.InnerVLAN = int(b.InnerVLAN.ValueInt64())
+	}
+	if !b.VLAN.IsNull() {
+		bEnd.VLAN = int(b.VLAN.ValueInt64())
+	}
+	if !b.NetworkInterfaceIndex.IsNull() {
+		bEnd.NetworkInterfaceIndex = int(b.NetworkInterfaceIndex.ValueInt64())
+	}
+	if b.PartnerConfig != nil {
+		bEnd.PartnerConfig = toAPIPartnerConfig(*b.PartnerConfig)
+	}
+
+	buyReq.AEndConfiguration = aEnd
+	buyReq.BEndConfiguration = bEnd
 
 	createdVXC, err := r.client.VXCService.BuyVXC(ctx, buyReq)
 	if err != nil {
@@ -1241,11 +1199,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	}
-	if !plan.AEndOrderConfiguration.VLAN.Equal(state.AEndOrderConfiguration.VLAN) {
-		aEndVlan = int(plan.AEndOrderConfiguration.VLAN.ValueInt64())
+	if !plan.AEndConfiguration.VLAN.Equal(state.AEndConfiguration.VLAN) {
+		aEndVlan = int(plan.AEndConfiguration.VLAN.ValueInt64())
 	}
-	if !plan.BEndOrderConfiguration.VLAN.Equal(state.BEndOrderConfiguration.VLAN) {
-		bEndVlan = int(plan.BEndOrderConfiguration.VLAN.ValueInt64())
+	if !plan.BEndConfiguration.VLAN.Equal(state.BEndConfiguration.VLAN) {
+		bEndVlan = int(plan.BEndConfiguration.VLAN.ValueInt64())
 	}
 	if !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
