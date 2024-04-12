@@ -1362,7 +1362,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	var name, costCentre string
-	var aEndVlan, bEndVlan, rateLimit int
+	var aEndVlan, bEndVlan, rateLimit, term int
 	var shutdown bool
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
@@ -1382,6 +1382,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown = plan.Shutdown.ValueBool()
 	}
+	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		term = int(plan.ContractTermMonths.ValueInt64())
+	}
 
 	updateReq := &megaport.UpdateVXCRequest{
 		Name:       &name,
@@ -1390,6 +1393,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		Shutdown:   &shutdown,
 		BEndVLAN:   &bEndVlan,
 		RateLimit:  &rateLimit,
+		Term:       &term,
 	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.ID.String(), updateReq)
