@@ -1361,7 +1361,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var name, costCentre string
+	var name, costCentre, aEndProductUID, bEndProductUID string
 	var aEndVlan, bEndVlan, rateLimit, term int
 	var shutdown bool
 	if !plan.Name.Equal(state.Name) {
@@ -1372,6 +1372,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	if !plan.BEndConfiguration.VLAN.Equal(state.BEndConfiguration.VLAN) {
 		bEndVlan = int(plan.BEndConfiguration.VLAN.ValueInt64())
+	}
+	if !plan.AEndConfiguration.ProductUID.Equal(state.AEndConfiguration.ProductUID) {
+		aEndProductUID = plan.AEndConfiguration.ProductUID.ValueString()
+	}
+	if !plan.BEndConfiguration.ProductUID.Equal(state.BEndConfiguration.ProductUID) {
+		bEndProductUID = plan.BEndConfiguration.ProductUID.ValueString()
 	}
 	if !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
@@ -1387,13 +1393,15 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	updateReq := &megaport.UpdateVXCRequest{
-		Name:       &name,
-		AEndVLAN:   &aEndVlan,
-		CostCentre: &costCentre,
-		Shutdown:   &shutdown,
-		BEndVLAN:   &bEndVlan,
-		RateLimit:  &rateLimit,
-		Term:       &term,
+		Name:           &name,
+		AEndVLAN:       &aEndVlan,
+		BEndVLAN:       &bEndVlan,
+		AEndProductUID: &aEndProductUID,
+		BEndProductUID: &bEndProductUID,
+		CostCentre:     &costCentre,
+		Shutdown:       &shutdown,
+		RateLimit:      &rateLimit,
+		Term:           &term,
 	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.ID.String(), updateReq)
