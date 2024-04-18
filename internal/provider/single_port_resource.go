@@ -76,14 +76,30 @@ func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
-	orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
+	if p.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
+	if p.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
+	if p.CreateDate != nil {
+		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
-	orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
+	if p.LiveDate != nil {
+		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.Locked = types.BoolValue(p.Locked)
 	orm.Market = types.StringValue(p.Market)
@@ -91,7 +107,11 @@ func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
 	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
+	if p.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
+	} else {
+		orm.TerminateDate = types.StringNull()
+	}
 	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
 	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
 	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
@@ -212,13 +232,14 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre for the product.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
-			"contract_start_date": schema.BoolAttribute{
+			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract started.",
 				Computed:    true,
 			},
-			"contract_end_date": schema.BoolAttribute{
+			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
 			},
@@ -241,6 +262,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
 				Optional:    true,
+				Computed:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
@@ -249,6 +271,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the product.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -264,6 +287,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		fmt.Println("oh no you don't!")
 		return
 	}
 
@@ -433,6 +457,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+
 	// Retrieve values from state
 	var state singlePortResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -443,7 +468,7 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	// Delete existing order
 	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:    state.UID.String(),
+		PortID:    state.UID.ValueString(),
 		DeleteNow: true,
 	})
 	if err != nil {

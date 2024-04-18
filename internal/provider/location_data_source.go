@@ -28,21 +28,21 @@ type locationDataSourceModel struct {
 
 // locationDataSourceModel maps the data source schema data.
 type locationModel struct {
-	Name             types.String                  `tfsdk:"name"`
-	Country          types.String                  `tfsdk:"country"`
-	LiveDate         types.String                  `tfsdk:"live_date"`
-	SiteCode         types.String                  `tfsdk:"site_code"`
-	NetworkRegion    types.String                  `tfsdk:"network_region"`
-	Address          map[types.String]types.String `tfsdk:"address"`
-	Campus           types.String                  `tfsdk:"campus"`
-	Latitude         types.Float64                 `tfsdk:"latitude"`
-	Longitude        types.Float64                 `tfsdk:"longitude"`
-	Products         *locationProductsModel        `tfsdk:"products"`
-	Market           types.String                  `tfsdk:"market"`
-	Metro            types.String                  `tfsdk:"metro"`
-	VRouterAvailable types.Bool                    `tfsdk:"v_router_available"`
-	ID               types.Int64                   `tfsdk:"id"`
-	Status           types.String                  `tfsdk:"status"`
+	Name             types.String            `tfsdk:"name"`
+	Country          types.String            `tfsdk:"country"`
+	LiveDate         types.String            `tfsdk:"live_date"`
+	SiteCode         types.String            `tfsdk:"site_code"`
+	NetworkRegion    types.String            `tfsdk:"network_region"`
+	Address          map[string]types.String `tfsdk:"address"`
+	Campus           types.String            `tfsdk:"campus"`
+	Latitude         types.Float64           `tfsdk:"latitude"`
+	Longitude        types.Float64           `tfsdk:"longitude"`
+	Products         *locationProductsModel  `tfsdk:"products"`
+	Market           types.String            `tfsdk:"market"`
+	Metro            types.String            `tfsdk:"metro"`
+	VRouterAvailable types.Bool              `tfsdk:"v_router_available"`
+	ID               types.Int64             `tfsdk:"id"`
+	Status           types.String            `tfsdk:"status"`
 }
 
 // locationProductsModel maps the data source schema data.
@@ -149,6 +149,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 								"megaport": &schema.ListAttribute{
 									Description: "The Megaport availability of the location.",
 									Computed:    true,
+									ElementType: types.Int64Type,
 								},
 								"mve": &schema.ListNestedAttribute{
 									Description: "The MVE availability of the location.",
@@ -222,10 +223,12 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 								"mcr1": &schema.ListAttribute{
 									Description: "The MCR1 bandwidth availability of the location.",
 									Computed:    true,
+									ElementType: types.Int64Type,
 								},
 								"mcr2": &schema.ListAttribute{
 									Description: "The MCR2 bandwidth availability of the location.",
 									Computed:    true,
+									ElementType: types.Int64Type,
 								},
 							},
 						},
@@ -259,7 +262,9 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 	orm.Name = types.StringValue(l.Name)
 	orm.Country = types.StringValue(l.Country)
-	orm.LiveDate = types.StringValue(l.LiveDate.Format(time.RFC850))
+	if l.LiveDate != nil {
+		orm.LiveDate = types.StringValue(l.LiveDate.Format(time.RFC850))
+	}
 	orm.SiteCode = types.StringValue(l.SiteCode)
 	orm.NetworkRegion = types.StringValue(l.NetworkRegion)
 	orm.Campus = types.StringValue(l.Campus)
@@ -270,9 +275,10 @@ func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 	orm.VRouterAvailable = types.BoolValue(l.VRouterAvailable)
 	orm.ID = types.Int64Value(int64(l.ID))
 	orm.Status = types.StringValue(l.Status)
+	orm.Address = make(map[string]types.String)
 
 	for k, v := range l.Address {
-		orm.Address[types.StringValue(k)] = types.StringValue(v)
+		orm.Address[k] = types.StringValue(v)
 	}
 
 	products := &locationProductsModel{
@@ -322,7 +328,7 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	for _, location := range locations {
-		var locationState *locationModel
+		locationState := &locationModel{}
 		locationState.fromAPILocation(location)
 		state.Locations = append(state.Locations, locationState)
 	}
