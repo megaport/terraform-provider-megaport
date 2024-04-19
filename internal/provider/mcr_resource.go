@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,11 +18,21 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// Ensure the implementation satisfies the expected interfaces.
 var (
+	// Ensure the implementation satisfies the expected interfaces.
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+
+	// Object Schema Attributes
+	virtualRouterAttributes = map[string]attr.Type{
+		"id":            types.Int64Type,
+		"asn":           types.Int64Type,
+		"name":          types.StringType,
+		"resource_name": types.StringType,
+		"resource_type": types.StringType,
+		"speed":         types.Int64Type,
+	}
 )
 
 // mcrResourceModel maps the resource schema data.
@@ -43,7 +54,7 @@ type mcrResourceModel struct {
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxcpermitted"`
+	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	LAGPrimary            types.Bool   `tfsdk:"lag_primary"`
@@ -56,25 +67,19 @@ type mcrResourceModel struct {
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	ASN                   types.Int64  `tfsdk:"asn"`
 
-	Virtual       types.Bool                    `tfsdk:"virtual"`
-	BuyoutPort    types.Bool                    `tfsdk:"buyout_port"`
-	Locked        types.Bool                    `tfsdk:"locked"`
-	AdminLocked   types.Bool                    `tfsdk:"admin_locked"`
-	Cancelable    types.Bool                    `tfsdk:"cancelable"`
-	AttributeTags map[types.String]types.String `tfsdk:"attribute_tags"`
-	Resources     *mcrResourcesModel            `tfsdk:"resources"`
-}
-
-// mcrResourcesModel represents the associated interface and virtual router
-type mcrResourcesModel struct {
-	Interface     *portInterfaceModel    `tfsdk:"interface"`
-	VirtualRouter *mcrVirtualRouterModel `tfsdk:"virtual_router"`
+	Virtual       types.Bool   `tfsdk:"virtual"`
+	BuyoutPort    types.Bool   `tfsdk:"buyout_port"`
+	Locked        types.Bool   `tfsdk:"locked"`
+	AdminLocked   types.Bool   `tfsdk:"admin_locked"`
+	Cancelable    types.Bool   `tfsdk:"cancelable"`
+	AttributeTags types.Map    `tfsdk:"attribute_tags"`
+	VirtualRouter types.Object `tfsdk:"virtual_router"`
 }
 
 // mcrVirtualRouterModel represents the virtual router associated with the MCR
 type mcrVirtualRouterModel struct {
 	ID           types.Int64  `tfsdk:"id"`
-	ASN          types.Int64  `tfsdk:"mcr_asn"`
+	ASN          types.Int64  `tfsdk:"asn"`
 	Name         types.String `tfsdk:"name"`
 	ResourceName types.String `tfsdk:"resource_name"`
 	ResourceType types.String `tfsdk:"resource_type"`
@@ -88,12 +93,25 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.Name = types.StringValue(m.Name)
 	orm.Type = types.StringValue(m.Type)
 	orm.ProvisioningStatus = types.StringValue(m.ProvisioningStatus)
-	orm.CreateDate = types.StringValue(m.CreateDate.String())
+	if m.CreateDate != nil {
+		orm.CreateDate = types.StringValue(m.CreateDate.String())
+	} else {
+		orm.CreateDate = types.StringValue("")
+	}
 	orm.CreatedBy = types.StringValue(m.CreatedBy)
 	orm.CostCentre = types.StringValue(m.CostCentre)
 	orm.PortSpeed = types.Int64Value(int64(m.PortSpeed))
-	orm.TerminateDate = types.StringValue(m.TerminateDate.String())
-	orm.LiveDate = types.StringValue(m.LiveDate.String())
+	if m.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(m.TerminateDate.String())
+	} else {
+		orm.TerminateDate = types.StringValue("")
+	}
+	if m.LiveDate != nil {
+		orm.LiveDate = types.StringValue(m.LiveDate.String())
+	} else {
+		orm.LiveDate = types.StringValue("")
+	}
+
 	orm.Market = types.StringValue(m.Market)
 	orm.LocationID = types.Int64Value(int64(m.LocationID))
 	orm.UsageAlgorithm = types.StringValue(m.UsageAlgorithm)
@@ -106,8 +124,17 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.AggregationID = types.Int64Value(int64(m.AggregationID))
 	orm.CompanyUID = types.StringValue(m.CompanyUID)
 	orm.CompanyName = types.StringValue(m.CompanyName)
-	orm.ContractStartDate = types.StringValue(m.ContractStartDate.String())
-	orm.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+	if m.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(m.ContractStartDate.String())
+	} else {
+		orm.ContractStartDate = types.StringValue("")
+	}
+	if m.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+	} else {
+		orm.ContractEndDate = types.StringValue("")
+
+	}
 	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
 	orm.Virtual = types.BoolValue(m.Virtual)
 	orm.BuyoutPort = types.BoolValue(m.BuyoutPort)
@@ -116,36 +143,26 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.Cancelable = types.BoolValue(m.Cancelable)
 
 	if m.AttributeTags != nil {
-		orm.AttributeTags = make(map[types.String]types.String)
+		attributeTags := make(map[string]attr.Value)
 		for k, v := range m.AttributeTags {
-			orm.AttributeTags[types.StringValue(k)] = types.StringValue(v)
+			attributeTags[k] = types.StringValue(v)
 		}
+		orm.AttributeTags = types.MapValueMust(types.StringType, attributeTags)
 	}
 
-	orm.Resources = &mcrResourcesModel{
-		Interface: &portInterfaceModel{
-			Demarcation:  types.StringValue(m.Resources.Interface.Demarcation),
-			Description:  types.StringValue(m.Resources.Interface.Description),
-			ID:           types.Int64Value(int64(m.Resources.Interface.ID)),
-			LOATemplate:  types.StringValue(m.Resources.Interface.LOATemplate),
-			Media:        types.StringValue(m.Resources.Interface.Media),
-			Name:         types.StringValue(m.Resources.Interface.Name),
-			PortSpeed:    types.Int64Value(int64(m.Resources.Interface.PortSpeed)),
-			ResourceName: types.StringValue(m.Resources.Interface.ResourceName),
-			ResourceType: types.StringValue(m.Resources.Interface.ResourceType),
-		},
-		VirtualRouter: &mcrVirtualRouterModel{
-			ID:           types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
-			ASN:          types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
-			Name:         types.StringValue(m.Resources.VirtualRouter.Name),
-			ResourceName: types.StringValue(m.Resources.VirtualRouter.ResourceName),
-			ResourceType: types.StringValue(m.Resources.VirtualRouter.ResourceType),
-			Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
-		},
+	virtualRouter := mcrVirtualRouterModel{
+		ID:           types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
+		ASN:          types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
+		Name:         types.StringValue(m.Resources.VirtualRouter.Name),
+		ResourceName: types.StringValue(m.Resources.VirtualRouter.ResourceName),
+		ResourceType: types.StringValue(m.Resources.VirtualRouter.ResourceType),
+		Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
 	}
+
+	orm.VirtualRouter, _ = types.ObjectValueFrom(context.Background(), virtualRouterAttributes, virtualRouter)
 }
 
-// NewPortResource is a helper function to simplify the provider implementation.
+// NewPortResource is a helper function to simplify the provider implemeantation.
 func NewMCRResource() resource.Resource {
 	return &mcrResource{}
 }
@@ -186,6 +203,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"product_name": schema.StringAttribute{
 				Description: "Name of the product.",
 				Required:    true,
+			},
+			"product_type": schema.StringAttribute{
+				Description: "Type of the product.",
+				Computed:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "Provisioning status of the product.",
@@ -263,6 +284,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "Cost centre of the product.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"contract_start_date": schema.StringAttribute{
@@ -278,6 +300,28 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"secondary_name": schema.StringAttribute{
+				Description: "Secondary name of the product.",
+				Computed:    true,
+			},
+			"lag_primary": schema.BoolAttribute{
+				Description: "Whether the product is a LAG primary.",
+				Computed:    true,
+			},
+			"lag_id": schema.Int64Attribute{
+				Description: "Numeric ID of the LAG.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"aggregation_id": schema.Int64Attribute{
+				Description: "Numeric ID of the aggregation.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"company_name": schema.StringAttribute{
+				Description: "Name of the company.",
+				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
@@ -302,17 +346,21 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"buyout_port": schema.BoolAttribute{
 				Description: "Whether the product is bought out.",
 				Optional:    true,
+				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the product is admin locked.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"attribute_tags": schema.MapAttribute{
@@ -320,88 +368,42 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Attribute tags of the product.",
 				Computed:    true,
 			},
-			"resources": schema.SingleNestedAttribute{
+			"virtual_router": schema.SingleNestedAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Resources associated with the product.",
+				Description: "Virtual router associated with the product.",
 				Attributes: map[string]schema.Attribute{
-					"interface": schema.SingleNestedAttribute{
+					"id": schema.Int64Attribute{
+						Description: "Numeric ID of the virtual router.",
 						Computed:    true,
-						Description: "Port interface associated with the product.",
-						Attributes: map[string]schema.Attribute{
-							"demarcation": schema.StringAttribute{
-								Description: "Demarcation of the interface.",
-								Computed:    true,
-							},
-							"description": schema.StringAttribute{
-								Description: "Description of the interface.",
-								Computed:    true,
-							},
-							"id": schema.Int64Attribute{
-								Description: "Numeric ID of the interface.",
-								Computed:    true,
-							},
-							"loa_template": schema.StringAttribute{
-								Description: "LOA template of the interface.",
-								Computed:    true,
-							},
-							"media": schema.StringAttribute{
-								Description: "Media of the interface.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "Name of the interface.",
-								Computed:    true,
-							},
-							"port_speed": schema.Int64Attribute{
-								Description: "Bandwidth speed of the interface.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "Resource name of the interface.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "Resource type of the interface.",
-								Computed:    true,
-							},
-							"up": schema.BoolAttribute{
-								Description: "Whether the interface is up.",
-								Computed:    true,
-							},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
 						},
 					},
-					"virtual_router": schema.SingleNestedAttribute{
+					"asn": schema.Int64Attribute{
+						Description: "ASN of the virtual router.",
+						Optional:    true,
 						Computed:    true,
-						Description: "Virtual router associated with the product.",
-						Attributes: map[string]schema.Attribute{
-							"id": schema.Int64Attribute{
-								Description: "Numeric ID of the virtual router.",
-								Computed:    true,
-								PlanModifiers: []planmodifier.Int64{
-									int64planmodifier.UseStateForUnknown(),
-								},
-							},
-							"asn": schema.Int64Attribute{
-								Description: "ASN of the virtual router.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "Name of the virtual router.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "Resource name of the virtual router.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "Resource type of the virtual router.",
-								Computed:    true,
-							},
-							"speed": schema.Int64Attribute{
-								Description: "Speed of the virtual router.",
-								Computed:    true,
-							},
-						},
+					},
+					"name": schema.StringAttribute{
+						Description: "Name of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"resource_name": schema.StringAttribute{
+						Description: "Resource name of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"resource_type": schema.StringAttribute{
+						Description: "Resource type of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"speed": schema.Int64Attribute{
+						Description: "Speed of the virtual router.",
+						Optional:    true,
+						Computed:    true,
 					},
 				},
 			},
@@ -564,7 +566,7 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Delete existing order
 	_, err := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
-		MCRID:     state.UID.String(),
+		MCRID:     state.UID.ValueString(),
 		DeleteNow: true,
 	})
 	if err != nil {
