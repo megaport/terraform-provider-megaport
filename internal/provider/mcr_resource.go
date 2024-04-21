@@ -87,7 +87,7 @@ type mcrVirtualRouterModel struct {
 }
 
 // fromAPIMCR maps the API MCR response to the resource schema.
-func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
+func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) {
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
 	orm.Name = types.StringValue(m.Name)
@@ -159,7 +159,7 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 		Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
 	}
 
-	orm.VirtualRouter, _ = types.ObjectValueFrom(context.Background(), virtualRouterAttributes, virtualRouter)
+	orm.VirtualRouter, _ = types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouter)
 }
 
 // NewPortResource is a helper function to simplify the provider implemeantation.
@@ -456,7 +456,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the MCR info
-	plan.fromAPIMCR(mcr)
+	plan.fromAPIMCR(ctx, mcr)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -487,7 +487,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	state.fromAPIMCR(mcr)
+	state.fromAPIMCR(ctx, mcr)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -542,7 +542,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	state.fromAPIMCR(mcr)
+	state.fromAPIMCR(ctx, mcr)
 
 	// Update the state with the new values
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
