@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,7 +88,7 @@ type mcrVirtualRouterModel struct {
 }
 
 // fromAPIMCR maps the API MCR response to the resource schema.
-func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) {
+func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) error {
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
 	orm.Name = types.StringValue(m.Name)
@@ -133,7 +134,6 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) {
 		orm.ContractEndDate = types.StringValue(m.ContractEndDate.String())
 	} else {
 		orm.ContractEndDate = types.StringValue("")
-
 	}
 	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
 	orm.Virtual = types.BoolValue(m.Virtual)
@@ -147,10 +147,14 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) {
 		for k, v := range m.AttributeTags {
 			attributeTags[k] = types.StringValue(v)
 		}
-		orm.AttributeTags = types.MapValueMust(types.StringType, attributeTags)
+		tags, diags := types.MapValue(types.StringType, attributeTags)
+		if diags.HasError() {
+			return errors.New("error converting attribute tags")
+		}
+		orm.AttributeTags = tags
 	}
 
-	virtualRouter := mcrVirtualRouterModel{
+	virtualRouterModel := mcrVirtualRouterModel{
 		ID:           types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
 		ASN:          types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
 		Name:         types.StringValue(m.Resources.VirtualRouter.Name),
@@ -159,7 +163,12 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) {
 		Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
 	}
 
-	orm.VirtualRouter, _ = types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouter)
+	virtualRouter, diags := types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouterModel)
+	if diags.HasError() {
+		return errors.New("error converting virtual router")
+	}
+	orm.VirtualRouter = virtualRouter
+	return nil
 }
 
 // NewPortResource is a helper function to simplify the provider implemeantation.
@@ -456,7 +465,14 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the MCR info
-	plan.fromAPIMCR(ctx, mcr)
+	err = plan.fromAPIMCR(ctx, mcr)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading newly created mcr",
+			"Could not read newly created mcr with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -487,7 +503,14 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	state.fromAPIMCR(ctx, mcr)
+	err = state.fromAPIMCR(ctx, mcr)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading MCR",
+			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -542,7 +565,14 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	state.fromAPIMCR(ctx, mcr)
+	err = state.fromAPIMCR(ctx, mcr)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading MCR",
+			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
 
 	// Update the state with the new values
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
