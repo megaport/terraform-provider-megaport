@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -211,7 +212,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	orm.Size = types.StringValue(p.Size)
 
 	if p.AttributeTags != nil {
-		tags, _ := types.MapValueFrom(context.Background(), types.StringType, p.AttributeTags)
+		tags, _ := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
 		orm.AttributeTags = tags
 	}
 
@@ -281,86 +282,91 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	}
 }
 
-func toAPIVendorConfig(o types.Object) (megaport.VendorConfig, error) {
-	attrs := o.Attributes()
+func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConfig, error) {
 	vendor := o.Attributes()["vendor"].String()
 	switch vendor {
 	case "aruba":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg arubaConfigModel
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.ArubaConfig{
 			Vendor:      vendor,
-			ImageID:     imgId,
-			ProductSize: attrs["product_size"].String(),
-			AccountName: attrs["account_name"].String(),
-			AccountKey:  attrs["account_key"].String(),
+			ImageID:     int(cfg.ImageID.ValueInt64()),
+			ProductSize: cfg.ProductSize.ValueString(),
+			AccountName: cfg.AccountName.ValueString(),
+			AccountKey:  cfg.AccountName.ValueString(),
 		}, nil
 	case "cisco":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg ciscoConfigModel
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.CiscoConfig{
 			Vendor:            vendor,
-			ImageID:           imgId,
-			ProductSize:       attrs["product_size"].String(),
-			AdminSSHPublicKey: attrs["admin_ssh_public_key"].String(),
-			CloudInit:         attrs["cloud_init"].String(),
+			ImageID:           int(cfg.ImageID.ValueInt64()),
+			ProductSize:       cfg.ProductSize.ValueString(),
+			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+			CloudInit:         cfg.CloudInit.ValueString(),
 		}, nil
 	case "fortinet":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg fortinetConfigModel
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.FortinetConfig{
 			Vendor:            vendor,
-			ImageID:           imgId,
-			ProductSize:       attrs["product_size"].String(),
-			AdminSSHPublicKey: attrs["admin_ssh_public_key"].String(),
-			LicenseData:       attrs["license_data"].String(),
+			ImageID:           int(cfg.ImageID.ValueInt64()),
+			ProductSize:       cfg.ProductSize.ValueString(),
+			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+			LicenseData:       cfg.LicenseData.ValueString(),
 		}, nil
 	case "palo_alto":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg paloAltoConfigModel
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.PaloAltoConfig{
 			Vendor:            vendor,
-			ImageID:           imgId,
-			ProductSize:       attrs["product_size"].String(),
-			AdminSSHPublicKey: attrs["admin_ssh_public_key"].String(),
-			AdminPasswordHash: attrs["admin_password_hash"].String(),
-			LicenseData:       attrs["license_data"].String(),
+			ImageID:           int(cfg.ImageID.ValueInt64()),
+			ProductSize:       cfg.ProductSize.ValueString(),
+			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+			AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
+			LicenseData:       cfg.LicenseData.ValueString(),
 		}, nil
 	case "versa":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg versaConfigModel
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.VersaConfig{
 			Vendor:            vendor,
-			ImageID:           imgId,
-			ProductSize:       attrs["product_size"].String(),
-			DirectorAddress:   attrs["director_address"].String(),
-			ControllerAddress: attrs["controller_address"].String(),
-			LocalAuth:         attrs["local_auth"].String(),
-			RemoteAuth:        attrs["remote_auth"].String(),
-			SerialNumber:      attrs["serial_number"].String(),
+			ImageID:           int(cfg.ImageID.ValueInt64()),
+			ProductSize:       cfg.ProductSize.ValueString(),
+			DirectorAddress:   cfg.DirectorAddress.ValueString(),
+			ControllerAddress: cfg.ControllerAddress.ValueString(),
+			LocalAuth:         cfg.LocalAuth.ValueString(),
+			RemoteAuth:        cfg.RemoteAuth.ValueString(),
+			SerialNumber:      cfg.SerialNumber.ValueString(),
 		}, nil
 	case "vmware":
-		imgId, err := strconv.Atoi(attrs["image_id"].String())
-		if err != nil {
-			return nil, err
+		var cfg vmwareConfig
+		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		if diag.HasError() {
+			return nil, errors.New("invalid vendor config")
 		}
 		return &megaport.VmwareConfig{
 			Vendor:            vendor,
-			ImageID:           imgId,
-			ProductSize:       attrs["product_size"].String(),
-			AdminSSHPublicKey: attrs["admin_ssh_public_key"].String(),
-			VcoAddress:        attrs["vco_address"].String(),
-			VcoActivationCode: attrs["vco_activation_code"].String(),
+			ImageID:           int(cfg.ImageID.ValueInt64()),
+			ProductSize:       cfg.ProductSize.ValueString(),
+			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+			VcoAddress:        cfg.VcoAddress.ValueString(),
+			VcoActivationCode: cfg.VcoActivationCode.ValueString(),
 		}, nil
 	}
 	return nil, errors.New("unknown vendor")
@@ -791,7 +797,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 			"vendor config required", "vendor config required",
 		)
 	}
-	vendorConfig, err := toAPIVendorConfig(plan.VendorConfig)
+	vendorConfig, err := toAPIVendorConfig(ctx, plan.VendorConfig)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Vendor Config",
