@@ -300,7 +300,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           5 * time.Minute,
+		WaitForTime:           10 * time.Minute,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(

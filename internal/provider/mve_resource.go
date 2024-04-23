@@ -187,10 +187,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	orm.Name = types.StringValue(p.Name)
 	orm.Type = types.StringValue(p.Type)
 	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.CreateDate = types.StringValue(p.CreateDate.String())
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
-	orm.TerminateDate = types.StringValue(p.TerminateDate.String())
-	orm.LiveDate = types.StringValue(p.LiveDate.String())
 	orm.Market = types.StringValue(p.Market)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
@@ -200,8 +197,24 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	orm.SecondaryName = types.StringValue(p.SecondaryName)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.CompanyName = types.StringValue(p.CompanyName)
-	orm.ContractStartDate = types.StringValue(p.ContractStartDate.String())
-	orm.ContractEndDate = types.StringValue(p.ContractEndDate.String())
+	if p.CreateDate != nil {
+		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+	orm.CreateDate = types.StringValue(p.CreateDate.String())
+	orm.TerminateDate = types.StringValue(p.TerminateDate.String())
+	orm.LiveDate = types.StringValue(p.LiveDate.String())
+	if p.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
+	if p.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.Virtual = types.BoolValue(p.Virtual)
 	orm.BuyoutPort = types.BoolValue(p.BuyoutPort)
@@ -287,7 +300,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 	switch vendor {
 	case "aruba":
 		var cfg arubaConfigModel
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}
@@ -300,7 +313,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "cisco":
 		var cfg ciscoConfigModel
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}
@@ -313,7 +326,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "fortinet":
 		var cfg fortinetConfigModel
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}
@@ -326,7 +339,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "palo_alto":
 		var cfg paloAltoConfigModel
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}
@@ -340,7 +353,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "versa":
 		var cfg versaConfigModel
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}
@@ -356,7 +369,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "vmware":
 		var cfg vmwareConfig
-		diag := o.As(ctx, cfg, basetypes.ObjectAsOptions{})
+		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
 		if diag.HasError() {
 			return nil, errors.New("invalid vendor config")
 		}

@@ -290,7 +290,7 @@ type cspConnectionAzureModel struct {
 type cspConnectionAzureMegaportModel struct {
 	Port types.Int64  `tfsdk:"port"`
 	Type types.String `tfsdk:"type"`
-	VXC  types.Int64  `tfsdk:"vxc,omitempty"`
+	VXC  types.Int64  `tfsdk:"vxc"`
 }
 
 // cspConnectionAzurePortModel represents the configuration of a CSP connection for Azure ExpressRoute port.
@@ -388,24 +388,23 @@ type vxcApprovalModel struct {
 // vxcEndConfigurationModel maps the end configuration schema data.
 type vxcEndConfigurationModel struct {
 	OwnerUID              types.String `tfsdk:"owner_uid"`
-	UID                   types.String `tfsdk:"product_uid,omitempty"`
+	UID                   types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	Location              types.String `tfsdk:"location"`
-	VLAN                  types.Int64  `tfsdk:"vlan,omitempty"`
-	InnerVLAN             types.Int64  `tfsdk:"inner_vlan,omitempty"`
-	ProductUID            types.String `tfsdk:"product_uid,omitempty"`
-	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index,omitempty"`
+	VLAN                  types.Int64  `tfsdk:"vlan"`
+	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
+	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
-	PartnerConfig         types.Object `tfsdk:"partner_config,omitempty"`
+	PartnerConfig         types.Object `tfsdk:"partner_config"`
 }
 
 type vxcPartnerConfigurationModel struct {
 	Partner             types.String `tfsdk:"partner"`
-	AWSPartnerConfig    types.Object `tfsdk:"aws_config,omitempty"`
-	AzurePartnerConfig  types.Object `tfsdk:"azure_config,omitempty"`
-	GooglePartnerConfig types.Object `tfsdk:"google_config,omitempty"`
-	OraclePartnerConfig types.Object `tfsdk:"oracle_config,omitempty"`
+	AWSPartnerConfig    types.Object `tfsdk:"aws_config"`
+	AzurePartnerConfig  types.Object `tfsdk:"azure_config"`
+	GooglePartnerConfig types.Object `tfsdk:"google_config"`
+	OraclePartnerConfig types.Object `tfsdk:"oracle_config"`
 }
 
 type vxcPartnerConfig interface {
@@ -418,13 +417,13 @@ type vxcPartnerConfigAWSModel struct {
 	ConnectType       types.String `tfsdk:"connect_type"`
 	Type              types.String `tfsdk:"type"`
 	OwnerAccount      types.String `tfsdk:"owner_account"`
-	ASN               types.Int64  `tfsdk:"asn,omitempty"`
-	AmazonASN         types.Int64  `tfsdk:"amazon_asn,omitempty"`
-	AuthKey           types.String `tfsdk:"auth_key,omitempty"`
-	Prefixes          types.String `tfsdk:"prefixes,omitempty"`
-	CustomerIPAddress types.String `tfsdk:"customer_ip_address,omitempty"`
-	AmazonIPAddress   types.String `tfsdk:"amazon_ip_address,omitempty"`
-	ConnectionName    types.String `tfsdk:"name,omitempty"`
+	ASN               types.Int64  `tfsdk:"asn"`
+	AmazonASN         types.Int64  `tfsdk:"amazon_asn"`
+	AuthKey           types.String `tfsdk:"auth_key"`
+	Prefixes          types.String `tfsdk:"prefixes"`
+	CustomerIPAddress types.String `tfsdk:"customer_ip_address"`
+	AmazonIPAddress   types.String `tfsdk:"amazon_ip_address"`
+	ConnectionName    types.String `tfsdk:"name"`
 }
 
 // vxcPartnerConfigAzureModel maps the partner configuration schema data for Azure.
@@ -468,10 +467,28 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) er
 	orm.Locked = types.BoolValue(v.Locked)
 	orm.AdminLocked = types.BoolValue(v.AdminLocked)
 	orm.Cancelable = types.BoolValue(v.Cancelable)
-	orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
-	orm.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
-	orm.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
-	orm.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
+
+	if v.CreateDate != nil {
+		orm.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+
+	if v.LiveDate != nil {
+		orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
+	if v.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
+	if v.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
 
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
@@ -520,7 +537,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) er
 	}
 	orm.VXCApproval = vxcApproval
 
-	var resourcesModel vxcResourcesModel
+	resourcesModel := &vxcResourcesModel{}
 	if v.Resources.Interface != nil {
 		interfaces := []types.Object{}
 		for _, i := range v.Resources.Interface {
@@ -596,11 +613,20 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) er
 		return errors.New("failed to convert CSP connection object")
 	}
 	resourcesModel.CSPConnection = cspConnectionObj
+
 	resourcesObj, diag := types.ObjectValueFrom(ctx, vxcResourcesAttrs, resourcesModel)
 	if diag.HasError() {
 		return errors.New("failed to convert resources object")
 	}
 	orm.Resources = resourcesObj
+
+	if v.AttributeTags != nil {
+		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
+		if attributeDiags.HasError() {
+			return errors.New("failed to convert attribute tags")
+		}
+		orm.AttributeTags = attributeTags
+	}
 	return nil
 }
 
@@ -627,7 +653,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The last time the resource was updated.",
 				Computed:    true,
 			},
-			"uid": schema.StringAttribute{
+			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -657,7 +683,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The UID of the port the VXC is connected to.",
 				Required:    true,
 			},
-			"type": schema.StringAttribute{
+			"product_type": schema.StringAttribute{
 				Description: "The type of the product.",
 				Computed:    true,
 			},
@@ -1097,7 +1123,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"a_end": schema.SingleNestedAttribute{
 				Description: "The current A-End configuration of the VXC.",
-				Computed:    true,
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the A-End configuration.",
@@ -1105,7 +1131,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the A-End configuration.",
-						Optional:    true,
+						Computed:    true,
 					},
 					"product_name": schema.StringAttribute{
 						Description: "The product name of the A-End configuration.",
@@ -1260,7 +1286,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"b_end": schema.SingleNestedAttribute{
 				Description: "The current B-End configuration of the VXC.",
-				Computed:    true,
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the B-End configuration.",
@@ -1453,98 +1479,103 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	bEndOBj := plan.BEndConfiguration
 
 	var a vxcEndConfigurationModel
-	aEndDiags := aEndObj.As(ctx, a, basetypes.ObjectAsOptions{})
+	aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
 	if aEndDiags.HasError() {
 		resp.Diagnostics.Append(aEndDiags...)
 		return
 	}
-	var aPartnerConfig vxcPartnerConfigurationModel
-	aPartnerDiags := a.PartnerConfig.As(ctx, aPartnerConfig, basetypes.ObjectAsOptions{})
-	if aPartnerDiags.HasError() {
-		resp.Diagnostics.Append(aPartnerDiags...)
-		return
-	}
 	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.ProductUID.ValueString(),
+		ProductUID: a.UID.ValueString(),
 		VLAN:       int(a.VLAN.ValueInt64()),
 	}
-	if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
-		aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+	if !a.PartnerConfig.IsNull() {
+		var aPartnerConfig vxcPartnerConfigurationModel
+		aPartnerDiags := a.PartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{})
+		if aPartnerDiags.HasError() {
+			resp.Diagnostics.Append(aPartnerDiags...)
+			return
 		}
+
+		if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
+			aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
+				InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
+				NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+			}
+		}
+		switch aPartnerConfig.Partner.ValueString() {
+		case "aws":
+			var awsConfig vxcPartnerConfigAWSModel
+			awsDiags := aPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
+			if awsDiags.HasError() {
+				resp.Diagnostics.Append(awsDiags...)
+				return
+			}
+			aEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
+				ConnectType:  awsConfig.ConnectType.ValueString(),
+				Type:         awsConfig.Type.ValueString(),
+				OwnerAccount: awsConfig.OwnerAccount.ValueString(),
+				ASN:          int(awsConfig.ASN.ValueInt64()),
+				AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
+				AuthKey:      awsConfig.AuthKey.ValueString(),
+				Prefixes:     awsConfig.Prefixes.ValueString(),
+			}
+			aEndConfig.PartnerConfig = aEndPartnerConfig
+		case "azure":
+			var azureConfig vxcPartnerConfigAzureModel
+			azureDiags := aPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
+			if azureDiags.HasError() {
+				resp.Diagnostics.Append(azureDiags...)
+				return
+			}
+			aEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
+				ConnectType: azureConfig.ConnectType.ValueString(),
+				ServiceKey:  azureConfig.ServiceKey.ValueString(),
+			}
+			aEndConfig.PartnerConfig = aEndPartnerConfig
+		case "google":
+			var googleConfig vxcPartnerConfigGoogleModel
+			googleDiags := aPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
+			if googleDiags.HasError() {
+				resp.Diagnostics.Append(googleDiags...)
+				return
+			}
+			aEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
+				ConnectType: googleConfig.ConnectType.ValueString(),
+				PairingKey:  googleConfig.PairingKey.ValueString(),
+			}
+			aEndConfig.PartnerConfig = aEndPartnerConfig
+		case "oracle":
+			var oracleConfig vxcPartnerConfigOracleModel
+			oracleDiags := aPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
+			if oracleDiags.HasError() {
+				resp.Diagnostics.Append(oracleDiags...)
+				return
+			}
+			aEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
+				ConnectType:      oracleConfig.ConnectType.ValueString(),
+				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
+			}
+			aEndConfig.PartnerConfig = aEndPartnerConfig
+		default:
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
+			)
+			return
+		}
+
 	}
-	switch aPartnerConfig.Partner.ValueString() {
-	case "aws":
-		var awsConfig vxcPartnerConfigAWSModel
-		awsDiags := aPartnerConfig.AWSPartnerConfig.As(ctx, awsConfig, basetypes.ObjectAsOptions{})
-		if awsDiags.HasError() {
-			resp.Diagnostics.Append(awsDiags...)
-			return
-		}
-		aEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
-			ConnectType:  awsConfig.ConnectType.ValueString(),
-			Type:         awsConfig.Type.ValueString(),
-			OwnerAccount: awsConfig.OwnerAccount.ValueString(),
-			ASN:          int(awsConfig.ASN.ValueInt64()),
-			AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
-			AuthKey:      awsConfig.AuthKey.ValueString(),
-			Prefixes:     awsConfig.Prefixes.ValueString(),
-		}
-		aEndConfig.PartnerConfig = aEndPartnerConfig
-	case "azure":
-		var azureConfig vxcPartnerConfigAzureModel
-		azureDiags := aPartnerConfig.AzurePartnerConfig.As(ctx, azureConfig, basetypes.ObjectAsOptions{})
-		if azureDiags.HasError() {
-			resp.Diagnostics.Append(azureDiags...)
-			return
-		}
-		aEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
-			ConnectType: azureConfig.ConnectType.ValueString(),
-			ServiceKey:  azureConfig.ServiceKey.ValueString(),
-		}
-		aEndConfig.PartnerConfig = aEndPartnerConfig
-	case "google":
-		var googleConfig vxcPartnerConfigGoogleModel
-		googleDiags := aPartnerConfig.GooglePartnerConfig.As(ctx, googleConfig, basetypes.ObjectAsOptions{})
-		if googleDiags.HasError() {
-			resp.Diagnostics.Append(googleDiags...)
-			return
-		}
-		aEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
-			ConnectType: googleConfig.ConnectType.ValueString(),
-			PairingKey:  googleConfig.PairingKey.ValueString(),
-		}
-		aEndConfig.PartnerConfig = aEndPartnerConfig
-	case "oracle":
-		var oracleConfig vxcPartnerConfigOracleModel
-		oracleDiags := aPartnerConfig.OraclePartnerConfig.As(ctx, oracleConfig, basetypes.ObjectAsOptions{})
-		if oracleDiags.HasError() {
-			resp.Diagnostics.Append(oracleDiags...)
-			return
-		}
-		aEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
-			ConnectType:      oracleConfig.ConnectType.ValueString(),
-			VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
-		}
-		aEndConfig.PartnerConfig = aEndPartnerConfig
-	default:
-		resp.Diagnostics.AddError(
-			"Error creating VXC",
-			"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
-		)
-		return
-	}
+	buyReq.AEndConfiguration = *aEndConfig
 
 	var b vxcEndConfigurationModel
-	bEndDiags := bEndOBj.As(ctx, b, basetypes.ObjectAsOptions{})
+	bEndDiags := bEndOBj.As(ctx, &b, basetypes.ObjectAsOptions{})
 	if bEndDiags.HasError() {
 		resp.Diagnostics.Append(bEndDiags...)
 		return
 	}
 	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.ProductUID.ValueString(),
-		VLAN:       int(a.VLAN.ValueInt64()),
+		ProductUID: b.UID.ValueString(),
+		VLAN:       int(b.VLAN.ValueInt64()),
 	}
 	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
 		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
@@ -1552,76 +1583,76 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
 		}
 	}
-	var bPartnerConfig vxcPartnerConfigurationModel
-	bPartnerDiags := b.PartnerConfig.As(ctx, bPartnerConfig, basetypes.ObjectAsOptions{})
-	if bPartnerDiags.HasError() {
-		resp.Diagnostics.Append(aPartnerDiags...)
-		return
-	}
+	if !b.PartnerConfig.IsNull() {
+		var bPartnerConfig vxcPartnerConfigurationModel
+		bPartnerDiags := b.PartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
+		if bPartnerDiags.HasError() {
+			resp.Diagnostics.Append(bPartnerDiags...)
+			return
+		}
 
-	switch bPartnerConfig.Partner.ValueString() {
-	case "aws":
-		var awsConfig vxcPartnerConfigAWSModel
-		awsDiags := aPartnerConfig.AWSPartnerConfig.As(ctx, awsConfig, basetypes.ObjectAsOptions{})
-		if awsDiags.HasError() {
-			resp.Diagnostics.Append(awsDiags...)
+		switch bPartnerConfig.Partner.ValueString() {
+		case "aws":
+			var awsConfig vxcPartnerConfigAWSModel
+			awsDiags := bPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
+			if awsDiags.HasError() {
+				resp.Diagnostics.Append(awsDiags...)
+				return
+			}
+			bEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
+				ConnectType:  awsConfig.ConnectType.ValueString(),
+				Type:         awsConfig.Type.ValueString(),
+				OwnerAccount: awsConfig.OwnerAccount.ValueString(),
+				ASN:          int(awsConfig.ASN.ValueInt64()),
+				AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
+				AuthKey:      awsConfig.AuthKey.ValueString(),
+				Prefixes:     awsConfig.Prefixes.ValueString(),
+			}
+			bEndConfig.PartnerConfig = bEndPartnerConfig
+		case "azure":
+			var azureConfig vxcPartnerConfigAzureModel
+			azureDiags := bPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
+			if azureDiags.HasError() {
+				resp.Diagnostics.Append(azureDiags...)
+				return
+			}
+			bEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
+				ConnectType: azureConfig.ConnectType.ValueString(),
+				ServiceKey:  azureConfig.ServiceKey.ValueString(),
+			}
+			bEndConfig.PartnerConfig = bEndPartnerConfig
+		case "google":
+			var googleConfig vxcPartnerConfigGoogleModel
+			googleDiags := bPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
+			if googleDiags.HasError() {
+				resp.Diagnostics.Append(googleDiags...)
+				return
+			}
+			bEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
+				ConnectType: googleConfig.ConnectType.ValueString(),
+				PairingKey:  googleConfig.PairingKey.ValueString(),
+			}
+			bEndConfig.PartnerConfig = bEndPartnerConfig
+		case "oracle":
+			var oracleConfig vxcPartnerConfigOracleModel
+			oracleDiags := bPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
+			if oracleDiags.HasError() {
+				resp.Diagnostics.Append(oracleDiags...)
+				return
+			}
+			bEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
+				ConnectType:      oracleConfig.ConnectType.ValueString(),
+				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
+			}
+			bEndConfig.PartnerConfig = bEndPartnerConfig
+		default:
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
+			)
 			return
 		}
-		bEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
-			ConnectType:  awsConfig.ConnectType.ValueString(),
-			Type:         awsConfig.Type.ValueString(),
-			OwnerAccount: awsConfig.OwnerAccount.ValueString(),
-			ASN:          int(awsConfig.ASN.ValueInt64()),
-			AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
-			AuthKey:      awsConfig.AuthKey.ValueString(),
-			Prefixes:     awsConfig.Prefixes.ValueString(),
-		}
-		bEndConfig.PartnerConfig = bEndPartnerConfig
-	case "azure":
-		var azureConfig vxcPartnerConfigAzureModel
-		azureDiags := aPartnerConfig.AzurePartnerConfig.As(ctx, azureConfig, basetypes.ObjectAsOptions{})
-		if azureDiags.HasError() {
-			resp.Diagnostics.Append(azureDiags...)
-			return
-		}
-		bEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
-			ConnectType: azureConfig.ConnectType.ValueString(),
-			ServiceKey:  azureConfig.ServiceKey.ValueString(),
-		}
-		bEndConfig.PartnerConfig = bEndPartnerConfig
-	case "google":
-		var googleConfig vxcPartnerConfigGoogleModel
-		googleDiags := aPartnerConfig.GooglePartnerConfig.As(ctx, googleConfig, basetypes.ObjectAsOptions{})
-		if googleDiags.HasError() {
-			resp.Diagnostics.Append(googleDiags...)
-			return
-		}
-		bEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
-			ConnectType: googleConfig.ConnectType.ValueString(),
-			PairingKey:  googleConfig.PairingKey.ValueString(),
-		}
-		bEndConfig.PartnerConfig = bEndPartnerConfig
-	case "oracle":
-		var oracleConfig vxcPartnerConfigOracleModel
-		oracleDiags := aPartnerConfig.OraclePartnerConfig.As(ctx, oracleConfig, basetypes.ObjectAsOptions{})
-		if oracleDiags.HasError() {
-			resp.Diagnostics.Append(oracleDiags...)
-			return
-		}
-		bEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
-			ConnectType:      oracleConfig.ConnectType.ValueString(),
-			VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
-		}
-		bEndConfig.PartnerConfig = bEndPartnerConfig
-	default:
-		resp.Diagnostics.AddError(
-			"Error creating VXC",
-			"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
-		)
-		return
 	}
-
-	buyReq.AEndConfiguration = *aEndConfig
 	buyReq.BEndConfiguration = *bEndConfig
 
 	createdVXC, err := r.client.VXCService.BuyVXC(ctx, buyReq)
@@ -1721,23 +1752,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	var aEndPlan, bEndPlan, aEndState, bEndState vxcEndConfigurationModel
 
-	aEndPlanDiags := plan.AEndConfiguration.As(ctx, aEndPlan, basetypes.ObjectAsOptions{})
+	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
 	if aEndPlanDiags.HasError() {
 		resp.Diagnostics.Append(aEndPlanDiags...)
 		return
 	}
-	bEndPlanDiags := plan.BEndConfiguration.As(ctx, bEndPlan, basetypes.ObjectAsOptions{})
+	bEndPlanDiags := plan.BEndConfiguration.As(ctx, &bEndPlan, basetypes.ObjectAsOptions{})
 	if bEndPlanDiags.HasError() {
 		resp.Diagnostics.Append(bEndPlanDiags...)
 		return
 	}
 
-	aEndStateDiags := state.AEndConfiguration.As(ctx, aEndState, basetypes.ObjectAsOptions{})
+	aEndStateDiags := state.AEndConfiguration.As(ctx, &aEndState, basetypes.ObjectAsOptions{})
 	if aEndStateDiags.HasError() {
 		resp.Diagnostics.Append(aEndStateDiags...)
 		return
 	}
-	bEndStateDiags := state.BEndConfiguration.As(ctx, bEndState, basetypes.ObjectAsOptions{})
+	bEndStateDiags := state.BEndConfiguration.As(ctx, &bEndState, basetypes.ObjectAsOptions{})
 	if bEndStateDiags.HasError() {
 		resp.Diagnostics.Append(bEndStateDiags...)
 		return
@@ -1749,11 +1780,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
 	}
-	if !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
-		aEndProductUID = aEndPlan.ProductUID.ValueString()
+	if !aEndPlan.UID.Equal(aEndState.UID) {
+		aEndProductUID = aEndPlan.UID.ValueString()
 	}
-	if !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
-		bEndProductUID = bEndPlan.ProductUID.ValueString()
+	if !bEndPlan.UID.Equal(bEndState.UID) {
+		bEndProductUID = bEndPlan.UID.ValueString()
 	}
 	if !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
