@@ -22,11 +22,7 @@ type locationDataSource struct {
 	client *megaport.Client
 }
 
-type locationDataSourceModel struct {
-	Locations []*locationModel `tfsdk:"locations"`
-}
-
-// locationDataSourceModel maps the data source schema data.
+// locationModel maps the data source schema data.
 type locationModel struct {
 	Name             types.String            `tfsdk:"name"`
 	Country          types.String            `tfsdk:"country"`
@@ -90,170 +86,163 @@ func (d *locationDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Locations Data Source",
+		Description: "Location",
 		Attributes: map[string]schema.Attribute{
-			"locations": &schema.ListNestedAttribute{
-				Description: "List of locations.",
+			"name": &schema.StringAttribute{
+				Description: "The name of the location.",
+				Optional:    true,
 				Computed:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": &schema.StringAttribute{
-							Description: "The name of the location.",
-							Computed:    true,
-						},
-						"country": &schema.StringAttribute{
-							Description: "The country of the location.",
-							Computed:    true,
-						},
-						"live_date": &schema.StringAttribute{
-							Description: "The live date of the location.",
-							Computed:    true,
-						},
-						"site_code": &schema.StringAttribute{
-							Description: "The site code of the location.",
-							Computed:    true,
-						},
-						"network_region": &schema.StringAttribute{
-							Description: "The network region of the location.",
-							Computed:    true,
-						},
-						"address": &schema.MapAttribute{
-							Description: "The address of the location.",
-							Computed:    true,
-							ElementType: types.StringType,
-						},
-						"campus": &schema.StringAttribute{
-							Description: "The campus of the location.",
-							Computed:    true,
-						},
-						"latitude": &schema.Float64Attribute{
-							Description: "The latitude of the location.",
-							Computed:    true,
-						},
-						"longitude": &schema.Float64Attribute{
-							Description: "The longitude of the location.",
-							Computed:    true,
-						},
-						"products": &schema.SingleNestedAttribute{
-							Description: "The products available in the location.",
-							Computed:    true,
+			},
+			"country": &schema.StringAttribute{
+				Description: "The country of the location.",
+				Computed:    true,
+			},
+			"live_date": &schema.StringAttribute{
+				Description: "The live date of the location.",
+				Computed:    true,
+			},
+			"site_code": &schema.StringAttribute{
+				Description: "The site code of the location.",
+				Computed:    true,
+			},
+			"network_region": &schema.StringAttribute{
+				Description: "The network region of the location.",
+				Computed:    true,
+			},
+			"address": &schema.MapAttribute{
+				Description: "The address of the location.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"campus": &schema.StringAttribute{
+				Description: "The campus of the location.",
+				Computed:    true,
+			},
+			"latitude": &schema.Float64Attribute{
+				Description: "The latitude of the location.",
+				Computed:    true,
+			},
+			"longitude": &schema.Float64Attribute{
+				Description: "The longitude of the location.",
+				Computed:    true,
+			},
+			"products": &schema.SingleNestedAttribute{
+				Description: "The products available in the location.",
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"mcr": &schema.BoolAttribute{
+						Description: "The MCR availability of the location.",
+						Computed:    true,
+					},
+					"mcr_version": &schema.Int64Attribute{
+						Description: "The MCR version available at the location.",
+						Computed:    true,
+					},
+					"megaport": &schema.ListAttribute{
+						Description: "The Megaport availability of the location.",
+						Computed:    true,
+						ElementType: types.Int64Type,
+					},
+					"mve": &schema.ListNestedAttribute{
+						Description: "The MVE availability of the location.",
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"mcr": &schema.BoolAttribute{
-									Description: "The MCR availability of the location.",
+								"sizes": &schema.ListAttribute{
+									Description: "The sizes available in the location.",
 									Computed:    true,
+									ElementType: types.StringType,
 								},
-								"mcr_version": &schema.Int64Attribute{
-									Description: "The MCR version available at the location.",
-									Computed:    true,
-								},
-								"megaport": &schema.ListAttribute{
-									Description: "The Megaport availability of the location.",
-									Computed:    true,
-									ElementType: types.Int64Type,
-								},
-								"mve": &schema.ListNestedAttribute{
-									Description: "The MVE availability of the location.",
+								"details": &schema.ListNestedAttribute{
+									Description: "The details of the MVE available in the location.",
 									Computed:    true,
 									NestedObject: schema.NestedAttributeObject{
 										Attributes: map[string]schema.Attribute{
-											"sizes": &schema.ListAttribute{
-												Description: "The sizes available in the location.",
-												Computed:    true,
-												ElementType: types.StringType,
-											},
-											"details": &schema.ListNestedAttribute{
-												Description: "The details of the MVE available in the location.",
-												Computed:    true,
-												NestedObject: schema.NestedAttributeObject{
-													Attributes: map[string]schema.Attribute{
-														"size": &schema.StringAttribute{
-															Description: "The size of the MVE available in the location.",
-															Computed:    true,
-														},
-														"label": &schema.StringAttribute{
-															Description: "The label of the MVE available in the location.",
-															Computed:    true,
-														},
-														"cpu_core_count": &schema.Int64Attribute{
-															Description: "The CPU core count of the MVE available in the location.",
-															Computed:    true,
-														},
-														"ram_gb": &schema.Int64Attribute{
-															Description: "The RAM GB of the MVE available in the location.",
-															Computed:    true,
-														},
-														"bandwidth_mbps": &schema.Int64Attribute{
-															Description: "The bandwidth Mbps of the MVE available in the location.",
-															Computed:    true,
-														},
-													},
-												},
-											},
-											"max_cpu_count": &schema.Int64Attribute{
-												Description: "The maximum CPU count of the MVE available in the location.",
+											"size": &schema.StringAttribute{
+												Description: "The size of the MVE available in the location.",
 												Computed:    true,
 											},
-											"version": &schema.StringAttribute{
-												Description: "The version of the MVE available in the location.",
+											"label": &schema.StringAttribute{
+												Description: "The label of the MVE available in the location.",
 												Computed:    true,
 											},
-											"product": &schema.StringAttribute{
-												Description: "The product of the MVE available in the location.",
+											"cpu_core_count": &schema.Int64Attribute{
+												Description: "The CPU core count of the MVE available in the location.",
 												Computed:    true,
 											},
-											"vendor": &schema.StringAttribute{
-												Description: "The vendor of the MVE available in the location.",
+											"ram_gb": &schema.Int64Attribute{
+												Description: "The RAM GB of the MVE available in the location.",
 												Computed:    true,
 											},
-											"vendor_description": &schema.StringAttribute{
-												Description: "The vendor description of the MVE available in the location.",
-												Computed:    true,
-											},
-											"id": &schema.Int64Attribute{
-												Description: "The ID of the MVE available in the location.",
-												Computed:    true,
-											},
-											"release_image": &schema.BoolAttribute{
-												Description: "Whether there is a release image or not.",
+											"bandwidth_mbps": &schema.Int64Attribute{
+												Description: "The bandwidth Mbps of the MVE available in the location.",
 												Computed:    true,
 											},
 										},
 									},
 								},
-								"mcr1": &schema.ListAttribute{
-									Description: "The MCR1 bandwidth availability of the location.",
+								"max_cpu_count": &schema.Int64Attribute{
+									Description: "The maximum CPU count of the MVE available in the location.",
 									Computed:    true,
-									ElementType: types.Int64Type,
 								},
-								"mcr2": &schema.ListAttribute{
-									Description: "The MCR2 bandwidth availability of the location.",
+								"version": &schema.StringAttribute{
+									Description: "The version of the MVE available in the location.",
 									Computed:    true,
-									ElementType: types.Int64Type,
+								},
+								"product": &schema.StringAttribute{
+									Description: "The product of the MVE available in the location.",
+									Computed:    true,
+								},
+								"vendor": &schema.StringAttribute{
+									Description: "The vendor of the MVE available in the location.",
+									Computed:    true,
+								},
+								"vendor_description": &schema.StringAttribute{
+									Description: "The vendor description of the MVE available in the location.",
+									Computed:    true,
+								},
+								"id": &schema.Int64Attribute{
+									Description: "The ID of the MVE available in the location.",
+									Computed:    true,
+								},
+								"release_image": &schema.BoolAttribute{
+									Description: "Whether there is a release image or not.",
+									Computed:    true,
 								},
 							},
 						},
-						"market": &schema.StringAttribute{
-							Description: "The market of the location.",
-							Computed:    true,
-						},
-						"metro": &schema.StringAttribute{
-							Description: "The metro of the location.",
-							Computed:    true,
-						},
-						"v_router_available": &schema.BoolAttribute{
-							Description: "The vRouter availability of the location.",
-							Computed:    true,
-						},
-						"id": &schema.Int64Attribute{
-							Description: "The ID of the location.",
-							Computed:    true,
-						},
-						"status": &schema.StringAttribute{
-							Description: "The status of the location.",
-							Computed:    true,
-						},
+					},
+					"mcr1": &schema.ListAttribute{
+						Description: "The MCR1 bandwidth availability of the location.",
+						Computed:    true,
+						ElementType: types.Int64Type,
+					},
+					"mcr2": &schema.ListAttribute{
+						Description: "The MCR2 bandwidth availability of the location.",
+						Computed:    true,
+						ElementType: types.Int64Type,
 					},
 				},
+			},
+			"market": &schema.StringAttribute{
+				Description: "The market of the location.",
+				Computed:    true,
+			},
+			"metro": &schema.StringAttribute{
+				Description: "The metro of the location.",
+				Computed:    true,
+			},
+			"v_router_available": &schema.BoolAttribute{
+				Description: "The vRouter availability of the location.",
+				Computed:    true,
+			},
+			"id": &schema.Int64Attribute{
+				Description: "The ID of the location.",
+				Computed:    true,
+			},
+			"status": &schema.StringAttribute{
+				Description: "The status of the location.",
+				Computed:    true,
 			},
 		},
 	}
@@ -315,9 +304,15 @@ func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 
 // Read refreshes the Terraform state with the latest data.
 func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var state locationDataSourceModel
+	var state locationModel
 
-	locations, err := d.client.LocationService.ListLocations(ctx)
+	diags := req.Config.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	location, err := d.client.LocationService.GetLocationByName(ctx, state.Name.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -327,14 +322,10 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	for _, location := range locations {
-		locationState := &locationModel{}
-		locationState.fromAPILocation(location)
-		state.Locations = append(state.Locations, locationState)
-	}
+	state.fromAPILocation(location)
 
 	// Set state
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
