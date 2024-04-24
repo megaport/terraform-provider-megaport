@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccMegaportMCR_Basic(t *testing.T) {
@@ -33,6 +34,26 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mcr.mcr",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mcr.mcr"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})

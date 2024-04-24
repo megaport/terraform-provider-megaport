@@ -629,5 +629,5 @@ func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest
 
 func (r *mcrResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
-	resource.ImportStatePassthroughID(ctx, path.Root("uid"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }

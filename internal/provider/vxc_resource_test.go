@@ -42,11 +42,11 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
                     rate_limit = 1000
                     contract_term_months = 1
                     port_uid = megaport_port.port_1.product_uid
-                  
+
                     a_end = {
                         vlan = 0
                     }
-                  
+
                     b_end = {
                         product_uid = megaport_port.port_2.product_uid
                         vlan = 0

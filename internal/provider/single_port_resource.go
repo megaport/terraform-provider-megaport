@@ -287,7 +287,6 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		fmt.Println("oh no you don't!")
 		return
 	}
 
@@ -500,6 +499,10 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Retrieve import ID and save to id attribute
-	resource.ImportStatePassthroughID(ctx, path.Root("uid"), req, resp)
+
+	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
