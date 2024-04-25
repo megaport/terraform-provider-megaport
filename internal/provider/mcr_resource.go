@@ -94,25 +94,9 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) er
 	orm.Name = types.StringValue(m.Name)
 	orm.Type = types.StringValue(m.Type)
 	orm.ProvisioningStatus = types.StringValue(m.ProvisioningStatus)
-	if m.CreateDate != nil {
-		orm.CreateDate = types.StringValue(m.CreateDate.String())
-	} else {
-		orm.CreateDate = types.StringValue("")
-	}
 	orm.CreatedBy = types.StringValue(m.CreatedBy)
 	orm.CostCentre = types.StringValue(m.CostCentre)
 	orm.PortSpeed = types.Int64Value(int64(m.PortSpeed))
-	if m.TerminateDate != nil {
-		orm.TerminateDate = types.StringValue(m.TerminateDate.String())
-	} else {
-		orm.TerminateDate = types.StringValue("")
-	}
-	if m.LiveDate != nil {
-		orm.LiveDate = types.StringValue(m.LiveDate.String())
-	} else {
-		orm.LiveDate = types.StringValue("")
-	}
-
 	orm.Market = types.StringValue(m.Market)
 	orm.LocationID = types.Int64Value(int64(m.LocationID))
 	orm.UsageAlgorithm = types.StringValue(m.UsageAlgorithm)
@@ -125,6 +109,28 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) er
 	orm.AggregationID = types.Int64Value(int64(m.AggregationID))
 	orm.CompanyUID = types.StringValue(m.CompanyUID)
 	orm.CompanyName = types.StringValue(m.CompanyName)
+	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
+	orm.Virtual = types.BoolValue(m.Virtual)
+	orm.BuyoutPort = types.BoolValue(m.BuyoutPort)
+	orm.Locked = types.BoolValue(m.Locked)
+	orm.AdminLocked = types.BoolValue(m.AdminLocked)
+	orm.Cancelable = types.BoolValue(m.Cancelable)
+
+	if m.CreateDate != nil {
+		orm.CreateDate = types.StringValue(m.CreateDate.String())
+	} else {
+		orm.CreateDate = types.StringValue("")
+	}
+	if m.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(m.TerminateDate.String())
+	} else {
+		orm.TerminateDate = types.StringValue("")
+	}
+	if m.LiveDate != nil {
+		orm.LiveDate = types.StringValue(m.LiveDate.String())
+	} else {
+		orm.LiveDate = types.StringValue("")
+	}
 	if m.ContractStartDate != nil {
 		orm.ContractStartDate = types.StringValue(m.ContractStartDate.String())
 	} else {
@@ -135,12 +141,6 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) er
 	} else {
 		orm.ContractEndDate = types.StringValue("")
 	}
-	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
-	orm.Virtual = types.BoolValue(m.Virtual)
-	orm.BuyoutPort = types.BoolValue(m.BuyoutPort)
-	orm.Locked = types.BoolValue(m.Locked)
-	orm.AdminLocked = types.BoolValue(m.AdminLocked)
-	orm.Cancelable = types.BoolValue(m.Cancelable)
 
 	if m.AttributeTags != nil {
 		attributeTags := make(map[string]attr.Value)
