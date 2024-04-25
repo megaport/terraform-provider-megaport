@@ -2,12 +2,12 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -88,7 +88,9 @@ type mcrVirtualRouterModel struct {
 }
 
 // fromAPIMCR maps the API MCR response to the resource schema.
-func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) error {
+func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) diag.Diagnostics {
+	diags := diag.Diagnostics{}
+
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
 	orm.Name = types.StringValue(m.Name)
@@ -147,9 +149,10 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) er
 		for k, v := range m.AttributeTags {
 			attributeTags[k] = types.StringValue(v)
 		}
-		tags, diags := types.MapValue(types.StringType, attributeTags)
-		if diags.HasError() {
-			return errors.New("error converting attribute tags")
+		tags, tagDiags := types.MapValue(types.StringType, attributeTags)
+		if tagDiags.HasError() {
+			diags = append(diags, tagDiags...)
+			return diags
 		}
 		orm.AttributeTags = tags
 	}
@@ -163,12 +166,13 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) er
 		Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
 	}
 
-	virtualRouter, diags := types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouterModel)
-	if diags.HasError() {
-		return errors.New("error converting virtual router")
+	virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouterModel)
+	if virtualRouterDiags.HasError() {
+		diags = append(diags, virtualRouterDiags...)
+		return diags
 	}
 	orm.VirtualRouter = virtualRouter
-	return nil
+	return diags
 }
 
 // NewPortResource is a helper function to simplify the provider implemeantation.
@@ -465,14 +469,13 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the MCR info
-	err = plan.fromAPIMCR(ctx, mcr)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading newly created mcr",
-			"Could not read newly created mcr with ID "+createdID+": "+err.Error(),
-		)
+	apiDiags := plan.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
+
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -503,12 +506,9 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	err = state.fromAPIMCR(ctx, mcr)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading MCR",
-			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+	apiDiags := state.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -565,12 +565,9 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	err = state.fromAPIMCR(ctx, mcr)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading MCR",
-			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+	apiDiags := state.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
