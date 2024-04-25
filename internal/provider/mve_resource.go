@@ -2,13 +2,13 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -181,7 +181,8 @@ type vmwareConfig struct {
 	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
 }
 
-func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
+func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
+	diags := diag.Diagnostics{}
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
 	orm.Name = types.StringValue(p.Name)
@@ -197,14 +198,30 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	orm.SecondaryName = types.StringValue(p.SecondaryName)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.CompanyName = types.StringValue(p.CompanyName)
+	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
+	orm.Virtual = types.BoolValue(p.Virtual)
+	orm.BuyoutPort = types.BoolValue(p.BuyoutPort)
+	orm.Locked = types.BoolValue(p.Locked)
+	orm.AdminLocked = types.BoolValue(p.AdminLocked)
+	orm.Cancelable = types.BoolValue(p.Cancelable)
+	orm.Vendor = types.StringValue(p.Vendor)
+	orm.Size = types.StringValue(p.Size)
+
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	} else {
 		orm.CreateDate = types.StringNull()
 	}
-	orm.CreateDate = types.StringValue(p.CreateDate.String())
-	orm.TerminateDate = types.StringValue(p.TerminateDate.String())
-	orm.LiveDate = types.StringValue(p.LiveDate.String())
+	if p.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
+	} else {
+		orm.TerminateDate = types.StringNull()
+	}
+	if p.LiveDate != nil {
+		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
 	if p.ContractStartDate != nil {
 		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
 	} else {
@@ -215,17 +232,13 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 	} else {
 		orm.ContractEndDate = types.StringNull()
 	}
-	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
-	orm.Virtual = types.BoolValue(p.Virtual)
-	orm.BuyoutPort = types.BoolValue(p.BuyoutPort)
-	orm.Locked = types.BoolValue(p.Locked)
-	orm.AdminLocked = types.BoolValue(p.AdminLocked)
-	orm.Cancelable = types.BoolValue(p.Cancelable)
-	orm.Vendor = types.StringValue(p.Vendor)
-	orm.Size = types.StringValue(p.Size)
 
 	if p.AttributeTags != nil {
-		tags, _ := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
+		tags, tagDiags := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
+		if tagDiags.HasError() {
+			diags = append(diags, tagDiags...)
+			return diags
+		}
 		orm.AttributeTags = tags
 	}
 
@@ -235,10 +248,19 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 			Description: types.StringValue(n.Description),
 			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
-		vnic, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+		vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+		if vnicDiags.HasError() {
+			diags = append(diags, vnicDiags...)
+			return diags
+		}
 		vnics = append(vnics, vnic)
 	}
-	orm.NetworkInterfaces, _ = types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
+	networkInterfaceList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
+	if listDiags.HasError() {
+		diags = append(diags, listDiags...)
+		return diags
+	}
+	orm.NetworkInterfaces = networkInterfaceList
 
 	if p.Resources != nil {
 		resourcesModel := &mveResourcesModel{}
@@ -254,7 +276,11 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 				ResourceName: types.StringValue(p.Resources.Interface.ResourceName),
 				ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
 			}
-			interfaceObject, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, interfaceModel)
+			interfaceObject, interfaceDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, interfaceModel)
+			if interfaceDiags.HasError() {
+				diags = append(diags, interfaceDiags...)
+				return diags
+			}
 			resourcesModel.Interface = interfaceObject
 		}
 		virtualMachineObjects := []types.Object{}
@@ -272,7 +298,11 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 					Product: types.StringValue(vm.Image.Product),
 					Version: types.StringValue(vm.Image.Version),
 				}
-				image, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, imageModel)
+				image, imageDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, imageModel)
+				if imageDiags.HasError() {
+					diags = append(diags, imageDiags...)
+					return diags
+				}
 				vmModel.Image = image
 			}
 			vnics := []types.Object{}
@@ -281,28 +311,52 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) {
 					Description: types.StringValue(vnic.Description),
 					VLAN:        types.Int64Value(int64(vnic.VLAN)),
 				}
-				vnic, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+				vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+				if vnicDiags.HasError() {
+					diags = append(diags, vnicDiags...)
+					return diags
+				}
 				vnics = append(vnics, vnic)
 			}
-			vmModel.Vnics, _ = types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
-			vmObject, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, vmModel)
+			vnicList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
+			if listDiags.HasError() {
+				diags = append(diags, listDiags...)
+				return diags
+			}
+			vmModel.Vnics = vnicList
+			vmObject, vmDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, vmModel)
+			if vmDiags.HasError() {
+				diags = append(diags, vmDiags...)
+				return diags
+			}
 			virtualMachineObjects = append(virtualMachineObjects, vmObject)
 		}
-		virtualMachines, _ := types.ListValueFrom(context.Background(), types.ObjectType{}, virtualMachineObjects)
-		resourcesModel.VirtualMachines = virtualMachines
-		resources, _ := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, resourcesModel)
-		orm.Resources = resources
+		virtualMachinesList, vmListDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, virtualMachineObjects)
+		if vmListDiags.HasError() {
+			diags = append(diags, vmListDiags...)
+			return diags
+		}
+		resourcesModel.VirtualMachines = virtualMachinesList
+		resourcesObj, resourcesDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, resourcesModel)
+		if resourcesDiags.HasError() {
+			diags = append(diags, resourcesDiags...)
+			return diags
+		}
+		orm.Resources = resourcesObj
 	}
+	return diags
 }
 
-func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConfig, error) {
+func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConfig, diag.Diagnostics) {
+	diags := diag.Diagnostics{}
 	vendor := o.Attributes()["vendor"].String()
 	switch vendor {
 	case "aruba":
 		var cfg arubaConfigModel
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.ArubaConfig{
 			Vendor:      vendor,
@@ -310,12 +364,13 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 			ProductSize: cfg.ProductSize.ValueString(),
 			AccountName: cfg.AccountName.ValueString(),
 			AccountKey:  cfg.AccountName.ValueString(),
-		}, nil
+		}, diags
 	case "cisco":
 		var cfg ciscoConfigModel
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.CiscoConfig{
 			Vendor:            vendor,
@@ -326,9 +381,10 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "fortinet":
 		var cfg fortinetConfigModel
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.FortinetConfig{
 			Vendor:            vendor,
@@ -339,9 +395,10 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "palo_alto":
 		var cfg paloAltoConfigModel
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.PaloAltoConfig{
 			Vendor:            vendor,
@@ -353,9 +410,10 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "versa":
 		var cfg versaConfigModel
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.VersaConfig{
 			Vendor:            vendor,
@@ -369,9 +427,10 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 		}, nil
 	case "vmware":
 		var cfg vmwareConfig
-		diag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if diag.HasError() {
-			return nil, errors.New("invalid vendor config")
+		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+		if cfgDiag.HasError() {
+			diags = append(diags, cfgDiag...)
+			return nil, diags
 		}
 		return &megaport.VmwareConfig{
 			Vendor:            vendor,
@@ -382,7 +441,7 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 			VcoActivationCode: cfg.VcoActivationCode.ValueString(),
 		}, nil
 	}
-	return nil, errors.New("unknown vendor")
+	return nil, diags
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -810,12 +869,9 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 			"vendor config required", "vendor config required",
 		)
 	}
-	vendorConfig, err := toAPIVendorConfig(ctx, plan.VendorConfig)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Invalid Vendor Config",
-			"Invalid Vendor Config: "+err.Error(),
-		)
+	vendorConfig, vendorDiags := toAPIVendorConfig(ctx, plan.VendorConfig)
+	if vendorDiags.HasError() {
+		resp.Diagnostics.Append(vendorDiags...)
 		return
 	}
 	mveReq.VendorConfig = vendorConfig
@@ -863,7 +919,11 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the MVE info
-	plan.fromAPIMVE(ctx, mve)
+	apiDiags := plan.fromAPIMVE(ctx, mve)
+	if apiDiags.HasError() {
+		resp.Diagnostics.Append(apiDiags...)
+		return
+	}
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -894,7 +954,11 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	state.fromAPIMVE(ctx, mve)
+	apiDiags := state.fromAPIMVE(ctx, mve)
+	if apiDiags.HasError() {
+		resp.Diagnostics.Append(apiDiags...)
+		return
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -943,7 +1007,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	state.fromAPIMVE(ctx, updatedMVE)
+	apiDiags := state.fromAPIMVE(ctx, updatedMVE)
+	if apiDiags.HasError() {
+		resp.Diagnostics.Append(apiDiags...)
+		return
+	}
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
