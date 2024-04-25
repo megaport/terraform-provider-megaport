@@ -448,7 +448,7 @@ type vxcPartnerConfigOracleModel struct {
 }
 
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
-	diags := diag.Diagnostics{}
+	apiDiags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(v.UID)
 	orm.ID = types.Int64Value(int64(v.ID))
@@ -504,10 +504,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
 	}
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
-	if aEndDiags.HasError() {
-		diags = append(diags, aEndDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
 	bEndModel := &vxcEndConfigurationModel{
@@ -522,10 +519,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
 	}
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
-	if bEndDiags.HasError() {
-		diags = append(diags, bEndDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, bEndDiags...)
 	orm.BEndConfiguration = bEnd
 
 	vxcApprovalModel := &vxcApprovalModel{
@@ -536,10 +530,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		NewSpeed: types.Int64Value(int64(v.VXCApproval.NewSpeed)),
 	}
 	vxcApproval, vxcApprovalDiags := types.ObjectValueFrom(ctx, vxcApprovalAttrs, vxcApprovalModel)
-	if vxcApprovalDiags.HasError() {
-		diags = append(diags, vxcApprovalDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, vxcApprovalDiags...)
 	orm.VXCApproval = vxcApproval
 
 	resourcesModel := &vxcResourcesModel{}
@@ -559,17 +550,11 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 				Up:           types.Int64Value(int64(i.Up)),
 			}
 			interfaceObj, interfaceObjDiags := types.ObjectValueFrom(ctx, vxcResourcesAttrs, interfaceModel)
-			if interfaceObjDiags.HasError() {
-				diags = append(diags, interfaceObjDiags...)
-				return diags
-			}
+			apiDiags = append(apiDiags, interfaceObjDiags...)
 			interfaces = append(interfaces, interfaceObj)
 		}
 		portInterface, portInterfaceDiags := types.ListValueFrom(ctx, types.ObjectType{}, interfaces)
-		if portInterfaceDiags.HasError() {
-			diags = append(diags, portInterfaceDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, portInterfaceDiags...)
 		resourcesModel.Interface = portInterface
 	}
 	vllModel := &vllConfigModel{
@@ -583,10 +568,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		ResourceType:  types.StringValue(v.Resources.VLL.ResourceType),
 	}
 	vll, vllDiags := types.ObjectValueFrom(ctx, vllConfigAttrs, vllModel)
-	if vllDiags.HasError() {
-		diags = append(diags, vllDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, vllDiags...)
 	resourcesModel.VLL = vll
 
 	virtualRouterModel := &virtualRouterModel{
@@ -597,51 +579,33 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		BGPShutdownDefault: types.BoolValue(v.Resources.VirtualRouter.BGPShutdownDefault),
 	}
 	virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttrs, virtualRouterModel)
-	if virtualRouterDiags.HasError() {
-		diags = append(diags, virtualRouterDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, virtualRouterDiags...)
 	resourcesModel.VirtualRouter = virtualRouter
 
 	cspConnectionModel := &vxcCSPConnectionModel{}
 	cspConnections := []types.Object{}
 	for _, c := range v.Resources.CSPConnection.CSPConnection {
 		cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
-		if cspDiags.HasError() {
-			diags = append(diags, cspDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, cspDiags...)
 		cspConnections = append(cspConnections, *cspConnection)
 	}
 	cspConnection, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}, cspConnections)
-	if cspConnectionDiags.HasError() {
-		diags = append(diags, cspConnectionDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, cspConnectionDiags...)
 	cspConnectionModel.CSPConnections = cspConnection
 	cspConnectionObj, cspConnectionObjDiags := types.ObjectValueFrom(ctx, vxcCSPConnectionAttrs, cspConnectionModel)
-	if cspConnectionObjDiags.HasError() {
-		diags = append(diags, cspConnectionObjDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, cspConnectionObjDiags...)
 	resourcesModel.CSPConnection = cspConnectionObj
 
 	resourcesObj, resourcesObjDiags := types.ObjectValueFrom(ctx, vxcResourcesAttrs, resourcesModel)
-	if resourcesObjDiags.HasError() {
-		diags = append(diags, resourcesObjDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, resourcesObjDiags...)
 	orm.Resources = resourcesObj
 
 	if v.AttributeTags != nil {
 		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
-		if attributeDiags.HasError() {
-			diags = append(diags, attributeDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, attributeDiags...)
 		orm.AttributeTags = attributeTags
 	}
-	return diags
+	return apiDiags
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -1693,9 +1657,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// update the plan with the VXC info
 	apiDiags := plan.fromAPIVXC(ctx, vxc)
 	resp.Diagnostics.Append(apiDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -1729,9 +1690,6 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 	apiDiags := state.fromAPIVXC(ctx, vxc)
 	resp.Diagnostics.Append(apiDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -1841,9 +1799,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	apiDiags := state.fromAPIVXC(ctx, vxc)
 	resp.Diagnostics.Append(apiDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
 	// Set refreshed state
 	diags := resp.State.Set(ctx, &state)
@@ -1901,7 +1856,7 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (*types.Object, diag.Diagnostics) {
-	diags := diag.Diagnostics{}
+	apiDiags := diag.Diagnostics{}
 	switch provider := c.(type) {
 	case *megaport.CSPConnectionAWS:
 		awsModel := &cspConnectionAWSModel{
@@ -1923,11 +1878,8 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			VIFID:             types.StringValue(provider.VIFID),
 		}
 		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionAWSAttrs, awsModel)
-		if awsDiags.HasError() {
-			diags = append(diags, awsDiags...)
-			return nil, diags
-		}
-		return &awsObject, diags
+		apiDiags = append(apiDiags, awsDiags...)
+		return &awsObject, apiDiags
 	case *megaport.CSPConnectionAWSHC:
 		awsHCModel := &cspConnectionAWSHCModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -1943,17 +1895,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			bandwidths = append(bandwidths, int64(b))
 		}
 		bandwidthList, bandwidthDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
-		if bandwidthDiags.HasError() {
-			diags = append(diags, bandwidthDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, bandwidthDiags...)
 		awsHCModel.Bandwidths = bandwidthList
 		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionAWSHCAttrs, awsHCModel)
-		if awsHCDiags.HasError() {
-			diags = append(diags, awsHCDiags...)
-			return nil, diags
-		}
-		return &awsHCObject, diags
+		apiDiags = append(apiDiags, awsHCDiags...)
+		return &awsHCObject, apiDiags
 	case *megaport.CSPConnectionAzure:
 		azureModel := &cspConnectionAzureModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -1972,17 +1918,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 				VXC:  types.Int64Value(int64(m.VXC)),
 			}
 			megaportObject, mpDiags := types.ObjectValueFrom(ctx, cspConnectionAzureMegaportAttrs, megaportModel)
-			if mpDiags.HasError() {
-				diags = append(diags, mpDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, mpDiags...)
 			megaports = append(megaports, megaportObject)
 		}
 		megaportsList, mpListDiags := types.ListValueFrom(ctx, types.ObjectType{}, megaports)
-		if mpListDiags.HasError() {
-			diags = append(diags, mpListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, mpListDiags...)
 		azureModel.Megaports = megaportsList
 		ports := []types.Object{}
 		for _, p := range provider.Ports {
@@ -1996,29 +1936,18 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 				vxcServiceIDs = append(vxcServiceIDs, int64(v))
 			}
 			vxcServiceIDList, serviceIdListDiags := types.ListValueFrom(ctx, types.Int64Type, vxcServiceIDs)
-			if serviceIdListDiags.HasError() {
-				diags = append(diags, serviceIdListDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, serviceIdListDiags...)
 			portModel.VXCServiceIDs = vxcServiceIDList
 			portObject, portObjDiags := types.ObjectValueFrom(ctx, cspConnectionAzurePortAttrs, portModel)
-			if portObjDiags.HasError() {
-				diags = append(diags, portObjDiags...)
-			}
+			apiDiags = append(apiDiags, portObjDiags...)
 			ports = append(ports, portObject)
 		}
 		portsList, portsListDiags := types.ListValueFrom(ctx, types.ObjectType{}, ports)
-		if diags.HasError() {
-			diags = append(diags, portsListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, portsListDiags...)
 		azureModel.Ports = portsList
 		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionAzureAttrs, azureModel)
-		if azureObjDiags.HasError() {
-			diags = append(diags, azureObjDiags...)
-			return nil, diags
-		}
-		return &azureObject, diags
+		apiDiags = append(apiDiags, azureObjDiags...)
+		return &azureObject, apiDiags
 	case *megaport.CSPConnectionGoogle:
 		googleModel := &cspConnectionGoogleModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -2034,10 +1963,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			bandwidths = append(bandwidths, int64(b))
 		}
 		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
-		if bwListDiags.HasError() {
-			diags = append(diags, bwListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, bwListDiags...)
 		googleModel.Bandwidths = bandwidthList
 		megaports := []types.Object{}
 		for _, m := range provider.Megaports {
@@ -2046,17 +1972,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 				VXC:  types.Int64Value(int64(m.VXC)),
 			}
 			megaportObject, mpObjDiags := types.ObjectValueFrom(ctx, cspConnectionGoogleMegaportAttrs, megaportModel)
-			if mpObjDiags.HasError() {
-				diags = append(diags, mpObjDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, mpObjDiags...)
 			megaports = append(megaports, megaportObject)
 		}
 		megaportsList, mpListDiags := types.ListValueFrom(ctx, types.ObjectType{}, megaports)
-		if mpListDiags.HasError() {
-			diags = append(diags, mpListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, mpListDiags...)
 		googleModel.Megaports = megaportsList
 		ports := []types.Object{}
 		for _, p := range provider.Ports {
@@ -2068,30 +1988,18 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 				vxcServiceIDs = append(vxcServiceIDs, int64(v))
 			}
 			vxcServiceIDList, vxcServiceIdListDiags := types.ListValueFrom(ctx, types.Int64Type, vxcServiceIDs)
-			if vxcServiceIdListDiags.HasError() {
-				diags = append(diags, vxcServiceIdListDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, vxcServiceIdListDiags...)
 			portModel.VXCServiceIDs = vxcServiceIDList
 			portObject, portObjDiags := types.ObjectValueFrom(ctx, cspConnectionGooglePortAttrs, portModel)
-			if portObjDiags.HasError() {
-				diags = append(diags, portObjDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, portObjDiags...)
 			ports = append(ports, portObject)
 		}
 		portsList, portsListDiags := types.ListValueFrom(ctx, types.ObjectType{}, ports)
-		if portsListDiags.HasError() {
-			diags = append(diags, portsListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, portsListDiags...)
 		googleModel.Ports = portsList
 		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionGoogleAttrs, googleModel)
-		if googleObjDiags.HasError() {
-			diags = append(diags, googleObjDiags...)
-			return nil, diags
-		}
-		return &googleObject, diags
+		apiDiags = append(apiDiags, googleObjDiags...)
+		return &googleObject, apiDiags
 	case *megaport.CSPConnectionVirtualRouter:
 		virtualRouterModel := &cspConnectionVirtualRouterModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
@@ -2106,30 +2014,18 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			ipAddresses := []string{}
 			ipAddresses = append(ipAddresses, i.IPAddresses...)
 			ipAddressesList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
-			if ipListDiags.HasError() {
-				diags = append(diags, ipListDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, ipListDiags...)
 			interfaceModel.IPAddresses = ipAddressesList
 			interfaceObject, interfaceObjDiags := types.ObjectValueFrom(ctx, cspConnectionVirtualRouterInterfaceAttrs, interfaceModel)
-			if interfaceObjDiags.HasError() {
-				diags = append(diags, interfaceObjDiags...)
-				return nil, diags
-			}
+			apiDiags = append(apiDiags, interfaceObjDiags...)
 			interfaces = append(interfaces, interfaceObject)
 		}
 		interfacesList, interfaceListDiags := types.ListValueFrom(ctx, types.ObjectType{}, interfaces)
-		if interfaceListDiags.HasError() {
-			diags = append(diags, interfaceListDiags...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, interfaceListDiags...)
 		virtualRouterModel.Interfaces = interfacesList
 		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionVirtualRouterAttrs, virtualRouterModel)
-		if vrObjDiags.HasError() {
-			diags = append(diags, vrObjDiags...)
-			return nil, diags
-		}
-		return &virtualRouterObject, diags
+		apiDiags = append(apiDiags, vrObjDiags...)
+		return &virtualRouterObject, apiDiags
 	case *megaport.CSPConnectionTransit:
 		transitModel := &cspConnectionTransit{
 			ConnectType:        types.StringValue(provider.ConnectType),
@@ -2141,12 +2037,9 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
 		}
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionTransitAttrs, transitModel)
-		if transitObjectDiags.HasError() {
-			diags = append(diags, transitObjectDiags...)
-			return nil, diags
-		}
-		return &transitObject, diags
+		apiDiags = append(apiDiags, transitObjectDiags...)
+		return &transitObject, apiDiags
 	}
-	diags.AddError("Error creating CSP Connection", "Could not create CSP Connection")
-	return nil, diags
+	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
+	return nil, apiDiags
 }

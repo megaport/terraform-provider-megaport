@@ -182,7 +182,7 @@ type vmwareConfig struct {
 }
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
-	diags := diag.Diagnostics{}
+	apiDiags := diag.Diagnostics{}
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
 	orm.Name = types.StringValue(p.Name)
@@ -235,10 +235,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 
 	if p.AttributeTags != nil {
 		tags, tagDiags := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
-		if tagDiags.HasError() {
-			diags = append(diags, tagDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, tagDiags...)
 		orm.AttributeTags = tags
 	}
 
@@ -249,17 +246,11 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
 		vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
-		if vnicDiags.HasError() {
-			diags = append(diags, vnicDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, vnicDiags...)
 		vnics = append(vnics, vnic)
 	}
 	networkInterfaceList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
-	if listDiags.HasError() {
-		diags = append(diags, listDiags...)
-		return diags
-	}
+	apiDiags = append(apiDiags, listDiags...)
 	orm.NetworkInterfaces = networkInterfaceList
 
 	if p.Resources != nil {
@@ -277,10 +268,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 				ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
 			}
 			interfaceObject, interfaceDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, interfaceModel)
-			if interfaceDiags.HasError() {
-				diags = append(diags, interfaceDiags...)
-				return diags
-			}
+			apiDiags = append(apiDiags, interfaceDiags...)
 			resourcesModel.Interface = interfaceObject
 		}
 		virtualMachineObjects := []types.Object{}
@@ -299,10 +287,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 					Version: types.StringValue(vm.Image.Version),
 				}
 				image, imageDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, imageModel)
-				if imageDiags.HasError() {
-					diags = append(diags, imageDiags...)
-					return diags
-				}
+				apiDiags = append(apiDiags, imageDiags...)
 				vmModel.Image = image
 			}
 			vnics := []types.Object{}
@@ -312,94 +297,67 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 					VLAN:        types.Int64Value(int64(vnic.VLAN)),
 				}
 				vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
-				if vnicDiags.HasError() {
-					diags = append(diags, vnicDiags...)
-					return diags
-				}
+				apiDiags = append(apiDiags, vnicDiags...)
 				vnics = append(vnics, vnic)
 			}
 			vnicList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
-			if listDiags.HasError() {
-				diags = append(diags, listDiags...)
-				return diags
-			}
+			apiDiags = append(apiDiags, listDiags...)
 			vmModel.Vnics = vnicList
 			vmObject, vmDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, vmModel)
-			if vmDiags.HasError() {
-				diags = append(diags, vmDiags...)
-				return diags
-			}
+			apiDiags = append(apiDiags, vmDiags...)
 			virtualMachineObjects = append(virtualMachineObjects, vmObject)
 		}
 		virtualMachinesList, vmListDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, virtualMachineObjects)
-		if vmListDiags.HasError() {
-			diags = append(diags, vmListDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, vmListDiags...)
 		resourcesModel.VirtualMachines = virtualMachinesList
 		resourcesObj, resourcesDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, resourcesModel)
-		if resourcesDiags.HasError() {
-			diags = append(diags, resourcesDiags...)
-			return diags
-		}
+		apiDiags = append(apiDiags, resourcesDiags...)
 		orm.Resources = resourcesObj
 	}
-	return diags
+	return apiDiags
 }
 
 func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConfig, diag.Diagnostics) {
-	diags := diag.Diagnostics{}
+	apiDiags := diag.Diagnostics{}
 	vendor := o.Attributes()["vendor"].String()
 	switch vendor {
 	case "aruba":
 		var cfg arubaConfigModel
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.ArubaConfig{
 			Vendor:      vendor,
 			ImageID:     int(cfg.ImageID.ValueInt64()),
 			ProductSize: cfg.ProductSize.ValueString(),
 			AccountName: cfg.AccountName.ValueString(),
 			AccountKey:  cfg.AccountName.ValueString(),
-		}, diags
+		}, apiDiags
 	case "cisco":
 		var cfg ciscoConfigModel
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.CiscoConfig{
 			Vendor:            vendor,
 			ImageID:           int(cfg.ImageID.ValueInt64()),
 			ProductSize:       cfg.ProductSize.ValueString(),
 			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
 			CloudInit:         cfg.CloudInit.ValueString(),
-		}, nil
+		}, apiDiags
 	case "fortinet":
 		var cfg fortinetConfigModel
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.FortinetConfig{
 			Vendor:            vendor,
 			ImageID:           int(cfg.ImageID.ValueInt64()),
 			ProductSize:       cfg.ProductSize.ValueString(),
 			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
 			LicenseData:       cfg.LicenseData.ValueString(),
-		}, nil
+		}, apiDiags
 	case "palo_alto":
 		var cfg paloAltoConfigModel
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.PaloAltoConfig{
 			Vendor:            vendor,
 			ImageID:           int(cfg.ImageID.ValueInt64()),
@@ -407,14 +365,11 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
 			AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
 			LicenseData:       cfg.LicenseData.ValueString(),
-		}, nil
+		}, apiDiags
 	case "versa":
 		var cfg versaConfigModel
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.VersaConfig{
 			Vendor:            vendor,
 			ImageID:           int(cfg.ImageID.ValueInt64()),
@@ -424,14 +379,11 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 			LocalAuth:         cfg.LocalAuth.ValueString(),
 			RemoteAuth:        cfg.RemoteAuth.ValueString(),
 			SerialNumber:      cfg.SerialNumber.ValueString(),
-		}, nil
+		}, apiDiags
 	case "vmware":
 		var cfg vmwareConfig
 		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		if cfgDiag.HasError() {
-			diags = append(diags, cfgDiag...)
-			return nil, diags
-		}
+		apiDiags = append(apiDiags, cfgDiag...)
 		return &megaport.VmwareConfig{
 			Vendor:            vendor,
 			ImageID:           int(cfg.ImageID.ValueInt64()),
@@ -439,9 +391,9 @@ func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConf
 			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
 			VcoAddress:        cfg.VcoAddress.ValueString(),
 			VcoActivationCode: cfg.VcoActivationCode.ValueString(),
-		}, nil
+		}, apiDiags
 	}
-	return nil, diags
+	return nil, apiDiags
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -870,10 +822,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		)
 	}
 	vendorConfig, vendorDiags := toAPIVendorConfig(ctx, plan.VendorConfig)
-	if vendorDiags.HasError() {
-		resp.Diagnostics.Append(vendorDiags...)
-		return
-	}
+	resp.Diagnostics = append(resp.Diagnostics, vendorDiags...)
 	mveReq.VendorConfig = vendorConfig
 
 	for _, vnic := range plan.NetworkInterfaces.Elements() {
@@ -920,10 +869,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// update the plan with the MVE info
 	apiDiags := plan.fromAPIMVE(ctx, mve)
-	if apiDiags.HasError() {
-		resp.Diagnostics.Append(apiDiags...)
-		return
-	}
+	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -955,10 +901,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	apiDiags := state.fromAPIMVE(ctx, mve)
-	if apiDiags.HasError() {
-		resp.Diagnostics.Append(apiDiags...)
-		return
-	}
+	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -1008,10 +951,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	apiDiags := state.fromAPIMVE(ctx, updatedMVE)
-	if apiDiags.HasError() {
-		resp.Diagnostics.Append(apiDiags...)
-		return
-	}
+	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
