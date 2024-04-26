@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -38,118 +37,38 @@ var (
 		"inner_vlan":     types.Int64Type,
 		"vnic_index":     types.Int64Type,
 		"secondary_name": types.StringType,
-		"partner_config": types.ObjectType{},
 	}
 
-	vxcResourcesAttrs = map[string]attr.Type{
-		"interface":      types.ListType{},
-		"virtual_router": types.ObjectType{},
-		"vll":            types.ObjectType{},
-		"csp_connection": types.ObjectType{},
-	}
-
-	vxcCSPConnectionAttrs = map[string]attr.Type{
-		"csp_connections": types.ListType{},
-	}
-
-	cspConnectionAWSAttrs = map[string]attr.Type{
-		"connect_type":        types.StringType,
-		"resource_name":       types.StringType,
-		"resource_type":       types.StringType,
-		"vlan":                types.Int64Type,
-		"account":             types.StringType,
-		"amazon_address":      types.StringType,
-		"asn":                 types.Int64Type,
-		"auth_key":            types.StringType,
-		"customer_address":    types.StringType,
-		"customer_ip_address": types.StringType,
-		"id":                  types.Int64Type,
-		"name":                types.StringType,
-		"owner_account":       types.StringType,
-		"peer_asn":            types.Int64Type,
-		"type":                types.StringType,
-		"vif_id":              types.StringType,
-	}
-
-	cspConnectionAWSHCAttrs = map[string]attr.Type{
-		"connect_type":  types.StringType,
-		"resource_name": types.StringType,
-		"resource_type": types.StringType,
-		"bandwidth":     types.Int64Type,
-		"name":          types.StringType,
-		"owner_account": types.StringType,
-		"bandwidths":    types.ListType{},
-		"connection_id": types.StringType,
-	}
-
-	cspConnectionAzureAttrs = map[string]attr.Type{
-		"connect_type":  types.StringType,
-		"resource_name": types.StringType,
-		"resource_type": types.StringType,
-		"bandwidth":     types.Int64Type,
-		"managed":       types.BoolType,
-		"megaports":     types.ListType{},
-		"ports":         types.ListType{},
-		"service_key":   types.StringType,
-		"vlan":          types.Int64Type,
-	}
-
-	cspConnectionAzureMegaportAttrs = map[string]attr.Type{
-		"port": types.Int64Type,
-		"type": types.StringType,
-		"vxc":  types.Int64Type,
-	}
-
-	cspConnectionAzurePortAttrs = map[string]attr.Type{
-		"service_id":      types.Int64Type,
-		"type":            types.StringType,
-		"vxc_service_ids": types.ListType{},
-	}
-
-	cspConnectionGoogleAttrs = map[string]attr.Type{
-		"bandwidth":     types.Int64Type,
-		"connect_type":  types.StringType,
-		"resource_name": types.StringType,
-		"resource_type": types.StringType,
-		"bandwidths":    types.ListType{},
-		"megaports":     types.ListType{},
-		"ports":         types.ListType{},
-		"csp_name":      types.StringType,
-		"pairing_key":   types.StringType,
-	}
-
-	cspConnectionGoogleMegaportAttrs = map[string]attr.Type{
-		"port": types.Int64Type,
-		"vxc":  types.Int64Type,
-	}
-
-	cspConnectionGooglePortAttrs = map[string]attr.Type{
-		"service_id":      types.Int64Type,
-		"vxc_service_ids": types.ListType{},
-	}
-
-	cspConnectionVirtualRouterAttrs = map[string]attr.Type{
-		"connect_type":        types.StringType,
-		"resource_name":       types.StringType,
-		"resource_type":       types.StringType,
-		"vlan":                types.Int64Type,
-		"interfaces":          types.ListType{},
-		"ip_addresses":        types.ListType{},
-		"virtual_router_name": types.StringType,
-	}
-
-	cspConnectionVirtualRouterInterfaceAttrs = map[string]attr.Type{
-		"ip_addresses": types.ListType{},
-	}
-
-	cspConnectionTransitAttrs = map[string]attr.Type{
+	cspConnectionFullAttrs = map[string]attr.Type{
 		"connect_type":         types.StringType,
 		"resource_name":        types.StringType,
 		"resource_type":        types.StringType,
+		"vlan":                 types.Int64Type,
+		"account":              types.StringType,
+		"amazon_address":       types.StringType,
+		"asn":                  types.Int64Type,
+		"auth_key":             types.StringType,
+		"customer_address":     types.StringType,
+		"customer_ip_address":  types.StringType,
 		"customer_ip4_address": types.StringType,
+		"id":                   types.Int64Type,
+		"name":                 types.StringType,
+		"owner_account":        types.StringType,
+		"peer_asn":             types.Int64Type,
+		"type":                 types.StringType,
+		"vif_id":               types.StringType,
+		"bandwidth":            types.Int64Type,
+		"bandwidths":           types.ListType{}.WithElementType(types.Int64Type),
+		"connection_id":        types.StringType,
+		"managed":              types.BoolType,
+		"service_key":          types.StringType,
+		"csp_name":             types.StringType,
+		"pairing_key":          types.StringType,
 		"customer_ip6_network": types.StringType,
 		"ipv4_gateway_address": types.StringType,
 		"ipv6_gateway_address": types.StringType,
+		"ip_addresses":         types.ListType{}.WithElementType(types.StringType),
+		"virtual_router_name":  types.StringType,
 	}
 
 	virtualRouterAttrs = map[string]attr.Type{
@@ -177,6 +96,55 @@ var (
 		"uid":       types.StringType,
 		"type":      types.StringType,
 		"new_speed": types.Int64Type,
+	}
+
+	portInterfaceAttrs = map[string]attr.Type{
+		"demarcation":   types.StringType,
+		"description":   types.StringType,
+		"id":            types.Int64Type,
+		"loa_template":  types.StringType,
+		"media":         types.StringType,
+		"name":          types.StringType,
+		"port_speed":    types.Int64Type,
+		"resource_name": types.StringType,
+		"resource_type": types.StringType,
+		"up":            types.Int64Type,
+	}
+
+	vxcPartnerConfigAttrs = map[string]attr.Type{
+		"partner":       types.StringType,
+		"aws_config":    types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
+		"azure_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
+		"google_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
+		"oracle_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+	}
+
+	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
+		"connect_type":        types.StringType,
+		"type":                types.StringType,
+		"owner_account":       types.StringType,
+		"asn":                 types.Int64Type,
+		"amazon_asn":          types.Int64Type,
+		"auth_key":            types.StringType,
+		"prefixes":            types.StringType,
+		"customer_ip_address": types.StringType,
+		"amazon_ip_address":   types.StringType,
+		"name":                types.StringType,
+	}
+
+	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
+		"connect_type": types.StringType,
+		"service_key":  types.StringType,
+	}
+
+	vxcPartnerConfigGoogleAttrs = map[string]attr.Type{
+		"connect_type": types.StringType,
+		"pairing_key":  types.StringType,
+	}
+
+	vxcPartnerConfigOracleAttrs = map[string]attr.Type{
+		"connect_type":       types.StringType,
+		"virtual_circuit_id": types.StringType,
 	}
 )
 
@@ -216,139 +184,43 @@ type vxcResourceModel struct {
 	AEndConfiguration types.Object `tfsdk:"a_end"`
 	BEndConfiguration types.Object `tfsdk:"b_end"`
 
-	Resources   types.Object `tfsdk:"resources"`
-	VXCApproval types.Object `tfsdk:"vxc_approval"`
+	AEndPartnerConfig types.Object `tfsdk:"a_end_partner_config"`
+	BEndPartnerConfig types.Object `tfsdk:"b_end_partner_config"`
+
+	// Resources   types.Object `tfsdk:"resources"`
+	VLL            types.Object `tfsdk:"vll"`
+	VirtualRouter  types.Object `tfsdk:"virtual_router"`
+	CSPConnections types.List   `tfsdk:"csp_connections"`
+	PortInterfaces types.List   `tfsdk:"port_interfaces"`
+	VXCApproval    types.Object `tfsdk:"vxc_approval"`
 }
 
-// vxcResourcesModel represents the resources associated with a VXC.
-type vxcResourcesModel struct {
-	Interface     types.List   `tfsdk:"interface"`
-	VirtualRouter types.Object `tfsdk:"virtual_router"`
-	VLL           types.Object `tfsdk:"vll"`
-	CSPConnection types.Object `tfsdk:"csp_connection"`
-}
-
-// vxcCSPConnectionModel represents the CSP connection schema data.
-type vxcCSPConnectionModel struct {
-	CSPConnections types.List `tfsdk:"csp_connections"`
-}
-
-// cspConnection is an interface to ensure the CSP connection is implemented.
-type cspConnection interface {
-	isCSPConnection()
-}
-
-// cspConnectionAWSModel represents the configuration of a CSP connection for AWS Virtual Interface.
-type cspConnectionAWSModel struct {
-	cspConnection
-	ConnectType       types.String `tfsdk:"connect_type"`
-	ResourceName      types.String `tfsdk:"resource_name"`
-	ResourceType      types.String `tfsdk:"resource_type"`
-	VLAN              types.Int64  `tfsdk:"vlan"`
-	Account           types.String `tfsdk:"account"`
-	AmazonAddress     types.String `tfsdk:"amazon_address"`
-	ASN               types.Int64  `tfsdk:"asn"`
-	AuthKey           types.String `tfsdk:"auth_key"`
-	CustomerAddress   types.String `tfsdk:"customer_address"`
-	CustomerIPAddress types.String `tfsdk:"customer_ip_address"`
-	ID                types.Int64  `tfsdk:"id"`
-	Name              types.String `tfsdk:"name"`
-	OwnerAccount      types.String `tfsdk:"owner_account"`
-	PeerASN           types.Int64  `tfsdk:"peer_asn"`
-	Type              types.String `tfsdk:"type"`
-	VIFID             types.String `tfsdk:"vif_id"`
-}
-
-// cspConnectionAWSHCModel represents the configuration of a CSP connection for AWS Hosted Connection.
-type cspConnectionAWSHCModel struct {
-	cspConnection
-	ConnectType  types.String `tfsdk:"connect_type"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Bandwidth    types.Int64  `tfsdk:"bandwidth"`
-	Name         types.String `tfsdk:"name"`
-	OwnerAccount types.String `tfsdk:"owner_account"`
-	Bandwidths   types.List   `tfsdk:"bandwidths"`
-	ConnectionID types.String `tfsdk:"connection_id"`
-}
-
-// cspConnectionAzureModel represents the configuration of a CSP connection for Azure ExpressRoute.
-type cspConnectionAzureModel struct {
-	cspConnection
-	ConnectType  types.String `tfsdk:"connect_type"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Bandwidth    types.Int64  `tfsdk:"bandwidth"`
-	Managed      types.Bool   `tfsdk:"managed"`
-	Megaports    types.List   `tfsdk:"megaports"`
-	Ports        types.List   `tfsdk:"ports"`
-	ServiceKey   types.String `tfsdk:"service_key"`
-	VLAN         types.Int64  `tfsdk:"vlan"`
-}
-
-// CSPConnectionAzureMegaport represents the configuration of a CSP connection for Azure ExpressRoute megaport.
-type cspConnectionAzureMegaportModel struct {
-	Port types.Int64  `tfsdk:"port"`
-	Type types.String `tfsdk:"type"`
-	VXC  types.Int64  `tfsdk:"vxc"`
-}
-
-// cspConnectionAzurePortModel represents the configuration of a CSP connection for Azure ExpressRoute port.
-type cspConnectionAzurePortModel struct {
-	ServiceID     types.Int64  `tfsdk:"service_id"`
-	Type          types.String `tfsdk:"type"`
-	VXCServiceIDs types.List   `tfsdk:"vxc_service_ids"`
-}
-
-// cspConnectionGoogleModel represents the configuration of a CSP connection for Google Cloud Interconnect.
-type cspConnectionGoogleModel struct {
-	cspConnection
-	Bandwidth    types.Int64  `tfsdk:"bandwidth"`
-	ConnectType  types.String `tfsdk:"connect_type"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Bandwidths   types.List   `tfsdk:"bandwidths"`
-	Megaports    types.List   `tfsdk:"megaports"`
-	Ports        types.List   `tfsdk:"ports"`
-	CSPName      types.String `tfsdk:"csp_name"`
-	PairingKey   types.String `tfsdk:"pairing_key"`
-}
-
-// cspConnectionGoogleMegaportModel represents the configuration of a CSP connection for Google Cloud Interconnect megaport.
-type cspConnectionGoogleMegaportModel struct {
-	Port types.Int64 `tfsdk:"port"`
-	VXC  types.Int64 `tfsdk:"vxc"`
-}
-
-// cspConnectionGooglePortModel represents the configuration of a CSP connection for Google Cloud Interconnect port.
-type cspConnectionGooglePortModel struct {
-	ServiceID     types.Int64 `tfsdk:"service_id"`
-	VXCServiceIDs types.List  `tfsdk:"vxc_service_ids"`
-}
-
-// cspConnectionVirtualRouterModel represents the configuration of a CSP connection for Virtual Router.
-type cspConnectionVirtualRouterModel struct {
-	cspConnection
-	ConnectType       types.String `tfsdk:"connect_type"`
-	ResourceName      types.String `tfsdk:"resource_name"`
-	ResourceType      types.String `tfsdk:"resource_type"`
-	VLAN              types.Int64  `tfsdk:"vlan"`
-	Interfaces        types.List   `tfsdk:"interfaces"`
-	IPAddresses       types.List   `tfsdk:"ip_addresses"`
-	VirtualRouterName types.String `tfsdk:"virtual_router_name"`
-}
-
-// cspConnectionVirtualRouterInterfaceModel represents the configuration of a CSP connection for Virtual Router interface.
-type cspConnectionVirtualRouterInterfaceModel struct {
-	IPAddresses types.List `tfsdk:"ip_addresses"`
-}
-
-// cspConnectionTransit represents the configuration of a CSP connection for a Transit VXC.
-type cspConnectionTransit struct {
-	cspConnection
+type cspConnectionModel struct {
 	ConnectType        types.String `tfsdk:"connect_type"`
 	ResourceName       types.String `tfsdk:"resource_name"`
 	ResourceType       types.String `tfsdk:"resource_type"`
+	VLAN               types.Int64  `tfsdk:"vlan"`
+	Account            types.String `tfsdk:"account"`
+	AmazonAddress      types.String `tfsdk:"amazon_address"`
+	ASN                types.Int64  `tfsdk:"asn"`
+	AuthKey            types.String `tfsdk:"auth_key"`
+	CustomerAddress    types.String `tfsdk:"customer_address"`
+	CustomerIPAddress  types.String `tfsdk:"customer_ip_address"`
+	ID                 types.Int64  `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	OwnerAccount       types.String `tfsdk:"owner_account"`
+	PeerASN            types.Int64  `tfsdk:"peer_asn"`
+	Type               types.String `tfsdk:"type"`
+	VIFID              types.String `tfsdk:"vif_id"`
+	Bandwidth          types.Int64  `tfsdk:"bandwidth"`
+	Bandwidths         types.List   `tfsdk:"bandwidths"`
+	ConnectionID       types.String `tfsdk:"connection_id"`
+	IPAddresses        types.List   `tfsdk:"ip_addresses"`
+	VirtualRouterName  types.String `tfsdk:"virtual_router_name"`
+	Managed            types.Bool   `tfsdk:"managed"`
+	ServiceKey         types.String `tfsdk:"service_key"`
+	CSPName            types.String `tfsdk:"csp_name"`
+	PairingKey         types.String `tfsdk:"pairing_key"`
 	CustomerIP4Address types.String `tfsdk:"customer_ip4_address"`
 	CustomerIP6Network types.String `tfsdk:"customer_ip6_network"`
 	IPv4GatewayAddress types.String `tfsdk:"ipv4_gateway_address"`
@@ -396,7 +268,6 @@ type vxcEndConfigurationModel struct {
 	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
 	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
-	PartnerConfig         types.Object `tfsdk:"partner_config"`
 }
 
 type vxcPartnerConfigurationModel struct {
@@ -533,77 +404,89 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	apiDiags = append(apiDiags, vxcApprovalDiags...)
 	orm.VXCApproval = vxcApproval
 
-	resourcesModel := &vxcResourcesModel{}
-	if v.Resources.Interface != nil {
-		interfaces := []types.Object{}
-		for _, i := range v.Resources.Interface {
-			interfaceModel := portInterfaceModel{
-				Demarcation:  types.StringValue(i.Demarcation),
-				Description:  types.StringValue(i.Description),
-				ID:           types.Int64Value(int64(i.ID)),
-				LOATemplate:  types.StringValue(i.LOATemplate),
-				Media:        types.StringValue(i.Media),
-				Name:         types.StringValue(i.Name),
-				PortSpeed:    types.Int64Value(int64(i.PortSpeed)),
-				ResourceName: types.StringValue(i.ResourceName),
-				ResourceType: types.StringValue(i.ResourceType),
-				Up:           types.Int64Value(int64(i.Up)),
+	if v.Resources != nil {
+		if v.Resources.Interface != nil {
+			interfaceObjects := []types.Object{}
+			for _, i := range v.Resources.Interface {
+				interfaceModel := &portInterfaceModel{
+					Demarcation:  types.StringValue(i.Demarcation),
+					Description:  types.StringValue(i.Description),
+					ID:           types.Int64Value(int64(i.ID)),
+					LOATemplate:  types.StringValue(i.LOATemplate),
+					Media:        types.StringValue(i.Media),
+					Name:         types.StringValue(i.Name),
+					PortSpeed:    types.Int64Value(int64(i.PortSpeed)),
+					ResourceName: types.StringValue(i.ResourceName),
+					ResourceType: types.StringValue(i.ResourceType),
+					Up:           types.Int64Value(int64(i.Up)),
+				}
+				interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portInterfaceAttrs, interfaceModel)
+				apiDiags = append(apiDiags, interfaceDiags...)
+				interfaceObjects = append(interfaceObjects, interfaceObject)
 			}
-			interfaceObj, interfaceObjDiags := types.ObjectValueFrom(ctx, vxcResourcesAttrs, interfaceModel)
-			apiDiags = append(apiDiags, interfaceObjDiags...)
-			interfaces = append(interfaces, interfaceObj)
+			portInterfaceList, interfaceListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs), interfaceObjects)
+			apiDiags = append(apiDiags, interfaceListDiags...)
+			orm.PortInterfaces = portInterfaceList
+		} else {
+			interfaceList := types.ListNull(types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs))
+			orm.PortInterfaces = interfaceList
 		}
-		portInterface, portInterfaceDiags := types.ListValueFrom(ctx, types.ObjectType{}, interfaces)
-		apiDiags = append(apiDiags, portInterfaceDiags...)
-		resourcesModel.Interface = portInterface
 	}
-	vllModel := &vllConfigModel{
-		AEndVLAN:      types.Int64Value(int64(v.Resources.VLL.AEndVLAN)),
-		BEndVLAN:      types.Int64Value(int64(v.Resources.VLL.BEndVLAN)),
-		Description:   types.StringValue(v.Resources.VLL.Description),
-		ID:            types.Int64Value(int64(v.Resources.VLL.ID)),
-		Name:          types.StringValue(v.Resources.VLL.Name),
-		RateLimitMBPS: types.Int64Value(int64(v.Resources.VLL.RateLimitMBPS)),
-		ResourceName:  types.StringValue(v.Resources.VLL.ResourceName),
-		ResourceType:  types.StringValue(v.Resources.VLL.ResourceType),
-	}
-	vll, vllDiags := types.ObjectValueFrom(ctx, vllConfigAttrs, vllModel)
-	apiDiags = append(apiDiags, vllDiags...)
-	resourcesModel.VLL = vll
 
-	virtualRouterModel := &virtualRouterModel{
-		MCRAsn:             types.Int64Value(int64(v.Resources.VirtualRouter.MCRAsn)),
-		ResourceName:       types.StringValue(v.Resources.VirtualRouter.ResourceName),
-		ResourceType:       types.StringValue(v.Resources.VirtualRouter.ResourceType),
-		Speed:              types.Int64Value(int64(v.Resources.VirtualRouter.Speed)),
-		BGPShutdownDefault: types.BoolValue(v.Resources.VirtualRouter.BGPShutdownDefault),
+	if v.Resources.VLL != nil {
+		vllModel := &vllConfigModel{
+			AEndVLAN:      types.Int64Value(int64(v.Resources.VLL.AEndVLAN)),
+			BEndVLAN:      types.Int64Value(int64(v.Resources.VLL.BEndVLAN)),
+			Description:   types.StringValue(v.Resources.VLL.Description),
+			ID:            types.Int64Value(int64(v.Resources.VLL.ID)),
+			Name:          types.StringValue(v.Resources.VLL.Name),
+			RateLimitMBPS: types.Int64Value(int64(v.Resources.VLL.RateLimitMBPS)),
+			ResourceName:  types.StringValue(v.Resources.VLL.ResourceName),
+			ResourceType:  types.StringValue(v.Resources.VLL.ResourceType),
+		}
+		vll, vllDiags := types.ObjectValueFrom(ctx, vllConfigAttrs, vllModel)
+		if vllDiags.HasError() {
+			fmt.Println(vllDiags)
+		}
+		apiDiags = append(apiDiags, vllDiags...)
+		orm.VLL = vll
 	}
-	virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttrs, virtualRouterModel)
-	apiDiags = append(apiDiags, virtualRouterDiags...)
-	resourcesModel.VirtualRouter = virtualRouter
 
-	cspConnectionModel := &vxcCSPConnectionModel{}
-	cspConnections := []types.Object{}
-	for _, c := range v.Resources.CSPConnection.CSPConnection {
-		cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
-		apiDiags = append(apiDiags, cspDiags...)
-		cspConnections = append(cspConnections, *cspConnection)
+	if v.Resources.VirtualRouter != nil {
+		virtualRouterModel := &virtualRouterModel{
+			MCRAsn:             types.Int64Value(int64(v.Resources.VirtualRouter.MCRAsn)),
+			ResourceName:       types.StringValue(v.Resources.VirtualRouter.ResourceName),
+			ResourceType:       types.StringValue(v.Resources.VirtualRouter.ResourceType),
+			Speed:              types.Int64Value(int64(v.Resources.VirtualRouter.Speed)),
+			BGPShutdownDefault: types.BoolValue(v.Resources.VirtualRouter.BGPShutdownDefault),
+		}
+		virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttrs, virtualRouterModel)
+		apiDiags = append(apiDiags, virtualRouterDiags...)
+		orm.VirtualRouter = virtualRouter
+	} else {
+		orm.VirtualRouter = types.ObjectNull(virtualRouterAttrs)
 	}
-	cspConnection, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}, cspConnections)
-	apiDiags = append(apiDiags, cspConnectionDiags...)
-	cspConnectionModel.CSPConnections = cspConnection
-	cspConnectionObj, cspConnectionObjDiags := types.ObjectValueFrom(ctx, vxcCSPConnectionAttrs, cspConnectionModel)
-	apiDiags = append(apiDiags, cspConnectionObjDiags...)
-	resourcesModel.CSPConnection = cspConnectionObj
-
-	resourcesObj, resourcesObjDiags := types.ObjectValueFrom(ctx, vxcResourcesAttrs, resourcesModel)
-	apiDiags = append(apiDiags, resourcesObjDiags...)
-	orm.Resources = resourcesObj
+	if v.Resources != nil && v.Resources.CSPConnection != nil {
+		cspConnections := []types.Object{}
+		for _, c := range v.Resources.CSPConnection.CSPConnection {
+			cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
+			apiDiags = append(apiDiags, cspDiags...)
+			cspConnections = append(cspConnections, *cspConnection)
+		}
+		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}, cspConnections)
+		apiDiags = append(apiDiags, cspConnectionDiags...)
+		orm.CSPConnections = cspConnectionsList
+	} else {
+		cspConnectionsList := types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs))
+		orm.CSPConnections = cspConnectionsList
+	}
 
 	if v.AttributeTags != nil {
 		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
 		apiDiags = append(apiDiags, attributeDiags...)
 		orm.AttributeTags = attributeTags
+	} else {
+		orm.AttributeTags = types.MapNull(types.StringType)
 	}
 	return apiDiags
 }
@@ -711,328 +594,288 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"shutdown": schema.BoolAttribute{
 				Description: "Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).",
+				Computed:    true,
 				Optional:    true,
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "A customer reference number to be included in billing information and invoices.",
+				Computed:    true,
 				Optional:    true,
 			},
-			"resources": schema.SingleNestedAttribute{
-				Description: "The resources associated with the VXC.",
+			"vll": schema.SingleNestedAttribute{
+				Description: "The VLL associated with the VXC.",
+				Computed:    true,
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"a_vlan": schema.Int64Attribute{
+						Description: "The A-End VLAN of the VLL.",
+						Computed:    true,
+					},
+					"b_vlan": schema.Int64Attribute{
+						Description: "The B-End VLAN of the VLL.",
+						Computed:    true,
+					},
+					"description": schema.StringAttribute{
+						Description: "The description of the VLL.",
+						Computed:    true,
+					},
+					"id": schema.Int64Attribute{
+						Description: "The ID of the VLL.",
+						Computed:    true,
+					},
+					"name": schema.StringAttribute{
+						Description: "The name of the VLL.",
+						Computed:    true,
+					},
+					"rate_limit_mbps": schema.Int64Attribute{
+						Description: "The rate limit in Mbps of the VLL.",
+						Computed:    true,
+					},
+					"resource_name": schema.StringAttribute{
+						Description: "The resource name of the VLL.",
+						Computed:    true,
+					},
+					"resource_type": schema.StringAttribute{
+						Description: "The resource type of the VLL.",
+						Computed:    true,
+					},
+				},
+			},
+			"csp_connections": schema.ListNestedAttribute{
+				Description: "The CSP connections associated with the VXC.",
+				Optional:    true,
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"connect_type": schema.StringAttribute{
+							Description: "The connection type of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"resource_name": schema.StringAttribute{
+							Description: "The resource name of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"resource_type": schema.StringAttribute{
+							Description: "The resource type of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"vlan": schema.Int64Attribute{
+							Description: "The VLAN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"owner_account": schema.StringAttribute{
+							Description: "The owner's AWS account of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"bandwidth": schema.Int64Attribute{
+							Description: "The bandwidth of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"bandwidths": schema.ListAttribute{
+							Description: "The bandwidths of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							ElementType: types.Int64Type,
+						},
+						"customer_ip_address": schema.StringAttribute{
+							Description: "The customer IP address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"customer_ip4_address": schema.StringAttribute{
+							Description: "The customer IPv4 address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"account": schema.StringAttribute{
+							Description: "The account of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"amazon_address": schema.StringAttribute{
+							Description: "The Amazon address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"asn": schema.Int64Attribute{
+							Description: "The ASN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"auth_key": schema.StringAttribute{
+							Description: "The authentication key of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"customer_address": schema.StringAttribute{
+							Description: "The customer address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"id": schema.Int64Attribute{
+							Description: "The ID of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"peer_asn": schema.Int64Attribute{
+							Description: "The peer ASN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "The type of the AWS Virtual Interface.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"vif_id": schema.StringAttribute{
+							Description: "The ID of the AWS Virtual Interface.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"connection_id": schema.StringAttribute{
+							Description: "The hosted connection ID of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"managed": schema.BoolAttribute{
+							Description: "Whether the CSP connection is managed.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"service_key": schema.StringAttribute{
+							Description: "The Azure service key of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"csp_name": schema.StringAttribute{
+							Description: "The name of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"pairing_key": schema.StringAttribute{
+							Description: "The pairing key of the Google Cloud connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"ip_addresses": schema.ListAttribute{
+							Description: "The IP addresses of the Virtual Router.",
+							Optional:    true,
+							Computed:    true,
+							ElementType: types.StringType,
+						},
+						"virtual_router_name": schema.StringAttribute{
+							Description: "The name of the Virtual Router.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"customer_ip6_network": schema.StringAttribute{
+							Description: "The customer IPv6 network of the Transit VXC connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"ipv4_gateway_address": schema.StringAttribute{
+							Description: "The IPv4 gateway address of the Transit VXC connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"ipv6_gateway_address": schema.StringAttribute{
+							Description: "The IPv6 gateway address of the Transit VXC connection.",
+							Optional:    true,
+							Computed:    true,
+						},
+					},
+				},
+			},
+			"port_interfaces": schema.ListNestedAttribute{
+				Description: "The interfaces associated with the VXC.",
+				Computed:    true,
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"demarcation": schema.StringAttribute{
+							Description: "The demarcation of the interface.",
+							Computed:    true,
+						},
+						"description": schema.StringAttribute{
+							Description: "The description of the interface.",
+							Computed:    true,
+						},
+						"id": schema.Int64Attribute{
+							Description: "The ID of the interface.",
+							Computed:    true,
+						},
+						"loa_template": schema.StringAttribute{
+							Description: "The LOA template of the interface.",
+							Computed:    true,
+						},
+						"media": schema.StringAttribute{
+							Description: "The media of the interface.",
+							Computed:    true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the interface.",
+							Computed:    true,
+						},
+						"port_speed": schema.Int64Attribute{
+							Description: "The port speed of the interface.",
+							Computed:    true,
+						},
+						"resource_name": schema.StringAttribute{
+							Description: "The resource name of the interface.",
+							Computed:    true,
+						},
+						"resource_type": schema.StringAttribute{
+							Description: "The resource type of the interface.",
+							Computed:    true,
+						},
+						"up": schema.Int64Attribute{
+							Description: "The up status of the interface.",
+							Computed:    true,
+						},
+					},
+				},
+			},
+			"virtual_router": schema.SingleNestedAttribute{
+				Description: "The virtual router associated with the VXC.",
+				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
-					"interface": schema.ListNestedAttribute{
-						Description: "The interfaces associated with the VXC.",
+					"mcr_asn": schema.Int64Attribute{
+						Description: "The MCR ASN of the virtual router.",
 						Computed:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"demarcation": schema.StringAttribute{
-									Description: "The demarcation of the interface.",
-									Computed:    true,
-								},
-								"description": schema.StringAttribute{
-									Description: "The description of the interface.",
-									Computed:    true,
-								},
-								"id": schema.Int64Attribute{
-									Description: "The ID of the interface.",
-									Computed:    true,
-								},
-								"loa_template": schema.StringAttribute{
-									Description: "The LOA template of the interface.",
-									Computed:    true,
-								},
-								"media": schema.StringAttribute{
-									Description: "The media of the interface.",
-									Computed:    true,
-								},
-								"name": schema.StringAttribute{
-									Description: "The name of the interface.",
-									Computed:    true,
-								},
-								"port_speed": schema.Int64Attribute{
-									Description: "The port speed of the interface.",
-									Computed:    true,
-								},
-								"resource_name": schema.StringAttribute{
-									Description: "The resource name of the interface.",
-									Computed:    true,
-								},
-								"resource_type": schema.StringAttribute{
-									Description: "The resource type of the interface.",
-									Computed:    true,
-								},
-								"up": schema.Int64Attribute{
-									Description: "The up status of the interface.",
-									Computed:    true,
-								},
-							},
-						},
 					},
-					"virtual_router": schema.SingleNestedAttribute{
-						Description: "The virtual router associated with the VXC.",
+					"resource_name": schema.StringAttribute{
+						Description: "The resource name of the virtual router.",
 						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"mcr_asn": schema.Int64Attribute{
-								Description: "The MCR ASN of the virtual router.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "The resource name of the virtual router.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "The resource type of the virtual router.",
-								Computed:    true,
-							},
-							"speed": schema.Int64Attribute{
-								Description: "The speed of the virtual router.",
-								Computed:    true,
-							},
-							"bgp_shutdown_default": schema.BoolAttribute{
-								Description: "Whether BGP Shutdown is enabled by default on the virtual router.",
-								Computed:    true,
-							},
-						},
 					},
-					"vll": schema.SingleNestedAttribute{
-						Description: "The VLL associated with the VXC.",
+					"resource_type": schema.StringAttribute{
+						Description: "The resource type of the virtual router.",
 						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"a_vlan": schema.Int64Attribute{
-								Description: "The A-End VLAN of the VLL.",
-								Computed:    true,
-							},
-							"b_vlan": schema.Int64Attribute{
-								Description: "The B-End VLAN of the VLL.",
-								Computed:    true,
-							},
-							"description": schema.StringAttribute{
-								Description: "The description of the VLL.",
-								Computed:    true,
-							},
-							"id": schema.Int64Attribute{
-								Description: "The ID of the VLL.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the VLL.",
-								Computed:    true,
-							},
-							"rate_limit_mbps": schema.Int64Attribute{
-								Description: "The rate limit in Mbps of the VLL.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "The resource name of the VLL.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "The resource type of the VLL.",
-								Computed:    true,
-							},
-						},
 					},
-					"csp_connection": schema.SingleNestedAttribute{
-						Description: "The CSP connection associated with the VXC.",
+					"speed": schema.Int64Attribute{
+						Description: "The speed of the virtual router.",
 						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"csp_connections": schema.ListNestedAttribute{
-								Description: "The CSP connections associated with the VXC.",
-								Computed:    true,
-								NestedObject: schema.NestedAttributeObject{
-									Attributes: map[string]schema.Attribute{
-										// Fields for all CSP Connections
-										"connect_type": schema.StringAttribute{
-											Description: "The connection type of the CSP connection.",
-											Computed:    true,
-										},
-										"resource_name": schema.StringAttribute{
-											Description: "The resource name of the CSP connection.",
-											Computed:    true,
-										},
-										"resource_type": schema.StringAttribute{
-											Description: "The resource type of the CSP connection.",
-											Computed:    true,
-										},
-										// Fields for AWS, Azure, and Virtual Router
-										"vlan": schema.Int64Attribute{
-											Description: "The VLAN of the CSP connection.",
-											Computed:    true,
-										},
-										// AWS CSP Connection Fields
-										"name": schema.StringAttribute{
-											Description: "The name of the CSP connection.",
-											Computed:    true,
-										},
-										"owner_account": schema.StringAttribute{
-											Description: "The owner's AWS account of the CSP connection.",
-											Computed:    true,
-										},
-										// Fields for AWS, Azure, and Google Cloud
-										"bandwidth": schema.Int64Attribute{
-											Description: "The bandwidth of the CSP connection.",
-											Computed:    true,
-										},
-										// Field for AWS and Google Cloud
-										"bandwidths": schema.ListAttribute{
-											Description: "The bandwidths of the CSP connection.",
-											Computed:    true,
-											ElementType: types.Int64Type,
-										},
-										// Fields for AWS VIF and Transit VXC
-										"customer_ip_address": schema.StringAttribute{
-											Description: "The customer IP address of the CSP connection.",
-											Computed:    true,
-										},
-										// AWS VIF CSP Connection Fields
-										"account": schema.StringAttribute{
-											Description: "The account of the CSP connection.",
-											Computed:    true,
-										},
-										"amazon_address": schema.StringAttribute{
-											Description: "The Amazon address of the CSP connection.",
-											Computed:    true,
-										},
-										"asn": schema.Int64Attribute{
-											Description: "The ASN of the CSP connection.",
-											Computed:    true,
-										},
-										"auth_key": schema.StringAttribute{
-											Description: "The authentication key of the CSP connection.",
-											Computed:    true,
-										},
-										"customer_address": schema.StringAttribute{
-											Description: "The customer address of the CSP connection.",
-											Computed:    true,
-										},
-
-										"id": schema.Int64Attribute{
-											Description: "The ID of the CSP connection.",
-											Computed:    true,
-										},
-										"peer_asn": schema.Int64Attribute{
-											Description: "The peer ASN of the CSP connection.",
-											Computed:    true,
-										},
-										"type": schema.StringAttribute{
-											Description: "The type of the AWS Virtual Interface.",
-											Computed:    true,
-										},
-										"vif_id": schema.StringAttribute{
-											Description: "The ID of the AWS Virtual Interface.",
-											Computed:    true,
-										},
-										// AWS Hosted Connection Fields
-										"connection_id": schema.StringAttribute{
-											Description: "The hosted connection ID of the CSP connection.",
-											Computed:    true,
-										},
-										// Azure and Google Cloud CSP Connection Fields
-										"ports": schema.ListNestedAttribute{
-											Description: "The ports of the CSP connection.",
-											Computed:    true,
-											NestedObject: schema.NestedAttributeObject{
-												Attributes: map[string]schema.Attribute{
-													"service_id": schema.Int64Attribute{
-														Description: "The service ID of the port.",
-														Computed:    true,
-													},
-													"vxc_service_ids": schema.ListAttribute{
-														Description: "The VXC service IDs of the port.",
-														Computed:    true,
-														ElementType: types.Int64Type,
-													},
-													"type": schema.StringAttribute{
-														Description: "The type of the port.",
-														Computed:    true,
-													},
-												},
-											},
-										},
-										"megaports": schema.ListNestedAttribute{
-											Description: "The Megaports of the CSP connection.",
-											Computed:    true,
-											NestedObject: schema.NestedAttributeObject{
-												Attributes: map[string]schema.Attribute{
-													"port": schema.Int64Attribute{
-														Description: "The numeric identifier for the port.",
-														Computed:    true,
-													},
-													"type": schema.StringAttribute{
-														Description: "The type of the Megaport.",
-														Computed:    true,
-													},
-													"vxc": schema.Int64Attribute{
-														Description: "The numeric identifier for the VXC (Google).",
-														Computed:    true,
-													},
-												},
-											},
-										},
-										// Azure Fields
-										"managed": schema.BoolAttribute{
-											Description: "Whether the CSP connection is managed.",
-											Computed:    true,
-										},
-										"service_key": schema.StringAttribute{
-											Description: "The service key of the CSP connection.",
-											Computed:    true,
-										},
-										// Google Cloud Fields
-										"csp_name": schema.StringAttribute{
-											Description: "The name of the CSP connection.",
-											Computed:    true,
-										},
-										"pairing_key": schema.StringAttribute{
-											Description: "The pairing key of the Google Cloud connection.",
-											Computed:    true,
-										},
-										// Virtual Router Fields
-										"interfaces": schema.ListNestedAttribute{
-											Description: "The interfaces of the Virtual Router connection.",
-											Computed:    true,
-											NestedObject: schema.NestedAttributeObject{
-												Attributes: map[string]schema.Attribute{
-													"ip_addresses": schema.ListAttribute{
-														Description: "The IP addresses of the interface.",
-														Computed:    true,
-														ElementType: types.StringType,
-													},
-												},
-											},
-										},
-										"ip_addresses": schema.ListAttribute{
-											Description: "The IP addresses of the Virtual Router.",
-											Computed:    true,
-											ElementType: types.StringType,
-										},
-										"virtual_router_name": schema.StringAttribute{
-											Description: "The name of the Virtual Router.",
-											Computed:    true,
-										},
-										// Transit VXC Fields
-										"customer_ip6_network": schema.StringAttribute{
-											Description: "The customer IPv6 network of the Transit VXC connection.",
-											Computed:    true,
-										},
-										"ipv4_gateway_address": schema.StringAttribute{
-											Description: "The IPv4 gateway address of the Transit VXC connection.",
-											Computed:    true,
-										},
-										"ipv6_gateway_address": schema.StringAttribute{
-											Description: "The IPv6 gateway address of the Transit VXC connection.",
-											Computed:    true,
-										},
-									},
-								},
-							},
-						},
+					},
+					"bgp_shutdown_default": schema.BoolAttribute{
+						Description: "Whether BGP Shutdown is enabled by default on the virtual router.",
+						Computed:    true,
 					},
 				},
 			},
 			"vxc_approval": schema.SingleNestedAttribute{
 				Description: "The VXC approval details.",
+				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"status": schema.StringAttribute{
@@ -1126,139 +969,22 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the A-End configuration.",
 						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.Int64{int64validator.AtLeast(1)},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
 						Optional:    true,
+						Computed:    true,
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
+						Computed:    true,
 						Optional:    true,
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the A-End configuration.",
 						Computed:    true,
-					},
-					"partner_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the A-End order configuration.",
-						Optional:    true,
-						Attributes: map[string]schema.Attribute{
-							"partner": schema.StringAttribute{
-								Description: "The partner of the partner configuration.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.OneOf("aws", "azure", "google", "oracle"),
-								},
-							},
-							"aws_config": schema.SingleNestedAttribute{
-								Description: "The AWS partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"type": schema.StringAttribute{
-										Description: "The type of the partner configuration. Required for AWS partner configurations.",
-										Required:    true,
-									},
-									"owner_account": schema.StringAttribute{
-										Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
-										Required:    true,
-									},
-									"asn": schema.Int64Attribute{
-										Description: "The ASN of the partner configuration.",
-										Required:    true,
-									},
-									"amazon_asn": schema.Int64Attribute{
-										Description: "The Amazon ASN of the partner configuration.",
-										Required:    true,
-									},
-									"auth_key": schema.StringAttribute{
-										Description: "The authentication key of the partner configuration.",
-										Required:    true,
-									},
-									"prefixes": schema.StringAttribute{
-										Description: "The prefixes of the partner configuration.",
-										Required:    true,
-									},
-									"customer_ip_address": schema.StringAttribute{
-										Description: "The customer IP address of the partner configuration.",
-										Required:    true,
-									},
-									"amazon_ip_address": schema.StringAttribute{
-										Description: "The Amazon IP address of the partner configuration.",
-										Required:    true,
-									},
-									"name": schema.StringAttribute{
-										Description: "The name of the partner configuration.",
-										Optional:    true,
-									},
-								},
-							},
-							"azure_config": schema.SingleNestedAttribute{
-								Description: "The Azure partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"service_key": schema.StringAttribute{
-										Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-										Required:    true,
-									},
-								},
-							},
-							"google_config": schema.SingleNestedAttribute{
-								Description: "The Google partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"pairing_key": schema.StringAttribute{
-										Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-										Required:    true,
-									},
-								},
-							},
-							"oracle_config": schema.SingleNestedAttribute{
-								Description: "The Oracle partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"virtual_circuit_id": schema.StringAttribute{
-										Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-										Required:    true,
-									},
-								},
-							},
-						},
 					},
 				},
 			},
@@ -1289,137 +1015,222 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the B-End configuration.",
 						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.Int64{int64validator.AtLeast(1)},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
 						Optional:    true,
+						Computed:    true,
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the B-End configuration.",
 						Optional:    true,
+						Computed:    true,
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the B-End configuration.",
 						Computed:    true,
 					},
-					"partner_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the B-End order configuration.",
+				},
+			},
+			"a_end_partner_config": schema.SingleNestedAttribute{
+				Description: "The partner configuration of the A-End order configuration.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"partner": schema.StringAttribute{
+						Description: "The partner of the partner configuration.",
+						Required:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+						},
+					},
+					"aws_config": schema.SingleNestedAttribute{
+						Description: "The AWS partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"partner": schema.StringAttribute{
-								Description: "The partner of the partner configuration.",
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
 								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.OneOf("aws", "azure", "google", "oracle"),
-								},
 							},
-							"aws_config": schema.SingleNestedAttribute{
-								Description: "The AWS partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"type": schema.StringAttribute{
-										Description: "The type of the partner configuration. Required for AWS partner configurations.",
-										Required:    true,
-									},
-									"owner_account": schema.StringAttribute{
-										Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
-										Required:    true,
-									},
-									"asn": schema.Int64Attribute{
-										Description: "The ASN of the partner configuration.",
-										Required:    true,
-									},
-									"amazon_asn": schema.Int64Attribute{
-										Description: "The Amazon ASN of the partner configuration.",
-										Required:    true,
-									},
-									"auth_key": schema.StringAttribute{
-										Description: "The authentication key of the partner configuration.",
-										Required:    true,
-									},
-									"prefixes": schema.StringAttribute{
-										Description: "The prefixes of the partner configuration.",
-										Required:    true,
-									},
-									"customer_ip_address": schema.StringAttribute{
-										Description: "The customer IP address of the partner configuration.",
-										Required:    true,
-									},
-									"amazon_ip_address": schema.StringAttribute{
-										Description: "The Amazon IP address of the partner configuration.",
-										Required:    true,
-									},
-									"name": schema.StringAttribute{
-										Description: "The name of the partner configuration.",
-										Optional:    true,
-									},
-								},
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Required:    true,
 							},
-							"azure_config": schema.SingleNestedAttribute{
-								Description: "The Azure partner configuration.",
-								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"service_key": schema.StringAttribute{
-										Description: "The service key of the partner configuration. Required for Azure partner configurations.",
-										Required:    true,
-									},
-								},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Required:    true,
 							},
-							"google_config": schema.SingleNestedAttribute{
-								Description: "The Google partner configuration.",
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
 								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("oracle_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"pairing_key": schema.StringAttribute{
-										Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
-										Required:    true,
-									},
-								},
 							},
-							"oracle_config": schema.SingleNestedAttribute{
-								Description: "The Oracle partner configuration.",
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
 								Optional:    true,
-								Validators: []validator.Object{
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("aws_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("azure_config")),
-									objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("google_config")),
-								},
-								Attributes: map[string]schema.Attribute{
-									"connect_type": schema.StringAttribute{
-										Description: "The connection type of the partner configuration. Required for all partner configurations.",
-										Required:    true,
-									},
-									"virtual_circuit_id": schema.StringAttribute{
-										Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
-										Required:    true,
-									},
-								},
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Required:    true,
+							},
+						},
+					},
+					"azure_config": schema.SingleNestedAttribute{
+						Description: "The Azure partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Required:    true,
+							},
+						},
+					},
+					"google_config": schema.SingleNestedAttribute{
+						Description: "The Google partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Required:    true,
+							},
+						},
+					},
+					"oracle_config": schema.SingleNestedAttribute{
+						Description: "The Oracle partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Required:    true,
+							},
+						},
+					},
+				},
+			},
+			"b_end_partner_config": schema.SingleNestedAttribute{
+				Description: "The partner configuration of the B-End order configuration.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"partner": schema.StringAttribute{
+						Description: "The partner of the partner configuration.",
+						Required:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+						},
+					},
+					"aws_config": schema.SingleNestedAttribute{
+						Description: "The AWS partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"type": schema.StringAttribute{
+								Description: "The type of the partner configuration. Required for AWS partner configurations.",
+								Required:    true,
+							},
+							"owner_account": schema.StringAttribute{
+								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
+								Required:    true,
+							},
+							"asn": schema.Int64Attribute{
+								Description: "The ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_asn": schema.Int64Attribute{
+								Description: "The Amazon ASN of the partner configuration.",
+								Optional:    true,
+							},
+							"auth_key": schema.StringAttribute{
+								Description: "The authentication key of the partner configuration.",
+								Optional:    true,
+							},
+							"prefixes": schema.StringAttribute{
+								Description: "The prefixes of the partner configuration.",
+								Optional:    true,
+							},
+							"customer_ip_address": schema.StringAttribute{
+								Description: "The customer IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"amazon_ip_address": schema.StringAttribute{
+								Description: "The Amazon IP address of the partner configuration.",
+								Optional:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the partner configuration.",
+								Required:    true,
+							},
+						},
+					},
+					"azure_config": schema.SingleNestedAttribute{
+						Description: "The Azure partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"service_key": schema.StringAttribute{
+								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
+								Required:    true,
+							},
+						},
+					},
+					"google_config": schema.SingleNestedAttribute{
+						Description: "The Google partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"pairing_key": schema.StringAttribute{
+								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
+								Required:    true,
+							},
+						},
+					},
+					"oracle_config": schema.SingleNestedAttribute{
+						Description: "The Oracle partner configuration.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"connect_type": schema.StringAttribute{
+								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Required:    true,
+							},
+							"virtual_circuit_id": schema.StringAttribute{
+								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
+								Required:    true,
 							},
 						},
 					},
@@ -1466,20 +1277,18 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ProductUID: a.UID.ValueString(),
 		VLAN:       int(a.VLAN.ValueInt64()),
 	}
-	if !a.PartnerConfig.IsNull() {
-		var aPartnerConfig vxcPartnerConfigurationModel
-		aPartnerDiags := a.PartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{})
-		if aPartnerDiags.HasError() {
-			resp.Diagnostics.Append(aPartnerDiags...)
-			return
-		}
 
-		if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
-			aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-				InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
-				NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
-			}
-		}
+	if a.VLAN.ValueInt64() == 0 {
+		a.VLAN = types.Int64Null()
+		aEndObj, aEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, a)
+		resp.Diagnostics.Append(aEndDiags...)
+		plan.AEndConfiguration = aEndObj
+	}
+
+	if !plan.AEndPartnerConfig.IsNull() {
+		var aPartnerConfig vxcPartnerConfigurationModel
+		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(aPartnerDiags...)
 		switch aPartnerConfig.Partner.ValueString() {
 		case "aws":
 			var awsConfig vxcPartnerConfigAWSModel
@@ -1497,6 +1306,23 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				AuthKey:      awsConfig.AuthKey.ValueString(),
 				Prefixes:     awsConfig.Prefixes.ValueString(),
 			}
+			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
+			resp.Diagnostics.Append(awsDiags...)
+
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    awsConfigObj,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "azure":
 			var azureConfig vxcPartnerConfigAzureModel
@@ -1509,6 +1335,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType: azureConfig.ConnectType.ValueString(),
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
+
+			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, azureConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azureConfigObj,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "google":
 			var googleConfig vxcPartnerConfigGoogleModel
@@ -1521,6 +1365,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType: googleConfig.ConnectType.ValueString(),
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
+			googleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, googleConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: googleConfigObj,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
+
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "oracle":
 			var oracleConfig vxcPartnerConfigOracleModel
@@ -1533,6 +1395,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType:      oracleConfig.ConnectType.ValueString(),
 				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
 			}
+
+			oracleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, oracleConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracleConfigObj,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		default:
 			resp.Diagnostics.AddError(
@@ -1541,8 +1421,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			)
 			return
 		}
-
 	}
+
 	buyReq.AEndConfiguration = *aEndConfig
 
 	var b vxcEndConfigurationModel
@@ -1555,20 +1435,22 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ProductUID: b.UID.ValueString(),
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
+	if a.VLAN.ValueInt64() == 0 {
+		a.VLAN = types.Int64Null()
+		aEndObj, aEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, a)
+		resp.Diagnostics.Append(aEndDiags...)
+		plan.AEndConfiguration = aEndObj
+	}
 	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
 		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
 			InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
 			NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
 		}
 	}
-	if !b.PartnerConfig.IsNull() {
+	if !plan.BEndPartnerConfig.IsNull() {
 		var bPartnerConfig vxcPartnerConfigurationModel
-		bPartnerDiags := b.PartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
-		if bPartnerDiags.HasError() {
-			resp.Diagnostics.Append(bPartnerDiags...)
-			return
-		}
-
+		bPartnerDiags := plan.AEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(bPartnerDiags...)
 		switch bPartnerConfig.Partner.ValueString() {
 		case "aws":
 			var awsConfig vxcPartnerConfigAWSModel
@@ -1586,7 +1468,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				AuthKey:      awsConfig.AuthKey.ValueString(),
 				Prefixes:     awsConfig.Prefixes.ValueString(),
 			}
-			bEndConfig.PartnerConfig = bEndPartnerConfig
+			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
+			resp.Diagnostics.Append(awsDiags...)
+
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             bPartnerConfig.Partner,
+				AWSPartnerConfig:    awsConfigObj,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
+			aEndConfig.PartnerConfig = bEndPartnerConfig
 		case "azure":
 			var azureConfig vxcPartnerConfigAzureModel
 			azureDiags := bPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
@@ -1598,6 +1497,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType: azureConfig.ConnectType.ValueString(),
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
+
+			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, azureConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             bPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azureConfigObj,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = bEndPartnerConfig
 		case "google":
 			var googleConfig vxcPartnerConfigGoogleModel
@@ -1610,7 +1527,25 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType: googleConfig.ConnectType.ValueString(),
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
-			bEndConfig.PartnerConfig = bEndPartnerConfig
+			googleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, googleConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             bPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: googleConfigObj,
+				OraclePartnerConfig: oracle,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
+
+			aEndConfig.PartnerConfig = bEndPartnerConfig
 		case "oracle":
 			var oracleConfig vxcPartnerConfigOracleModel
 			oracleDiags := bPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
@@ -1622,7 +1557,25 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				ConnectType:      oracleConfig.ConnectType.ValueString(),
 				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
 			}
-			bEndConfig.PartnerConfig = bEndPartnerConfig
+
+			oracleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, oracleConfig)
+			resp.Diagnostics.Append(azureDiags...)
+
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             bPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracleConfigObj,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
+			aEndConfig.PartnerConfig = bEndPartnerConfig
 		default:
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1631,6 +1584,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			return
 		}
 	}
+
 	buyReq.BEndConfiguration = *bEndConfig
 
 	createdVXC, err := r.client.VXCService.BuyVXC(ctx, buyReq)
@@ -1819,7 +1773,7 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Delete existing order
-	err := r.client.VXCService.DeleteVXC(ctx, state.UID.String(), &megaport.DeleteVXCRequest{
+	err := r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
 		DeleteNow: true,
 	})
 	if err != nil {
@@ -1859,7 +1813,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 	apiDiags := diag.Diagnostics{}
 	switch provider := c.(type) {
 	case *megaport.CSPConnectionAWS:
-		awsModel := &cspConnectionAWSModel{
+		awsModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
 			ResourceName:      types.StringValue(provider.ResourceName),
 			ResourceType:      types.StringValue(provider.ResourceType),
@@ -1877,11 +1831,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			Type:              types.StringValue(provider.Type),
 			VIFID:             types.StringValue(provider.VIFID),
 		}
-		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionAWSAttrs, awsModel)
+		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
 		apiDiags = append(apiDiags, awsDiags...)
 		return &awsObject, apiDiags
 	case *megaport.CSPConnectionAWSHC:
-		awsHCModel := &cspConnectionAWSHCModel{
+		awsHCModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
 			ResourceType: types.StringValue(provider.ResourceType),
@@ -1897,11 +1851,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		bandwidthList, bandwidthDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bandwidthDiags...)
 		awsHCModel.Bandwidths = bandwidthList
-		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionAWSHCAttrs, awsHCModel)
+		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
 		apiDiags = append(apiDiags, awsHCDiags...)
 		return &awsHCObject, apiDiags
 	case *megaport.CSPConnectionAzure:
-		azureModel := &cspConnectionAzureModel{
+		azureModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
 			ResourceType: types.StringValue(provider.ResourceType),
@@ -1910,46 +1864,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			ServiceKey:   types.StringValue(provider.ServiceKey),
 			VLAN:         types.Int64Value(int64(provider.VLAN)),
 		}
-		megaports := []types.Object{}
-		for _, m := range provider.Megaports {
-			megaportModel := &cspConnectionAzureMegaportModel{
-				Port: types.Int64Value(int64(m.Port)),
-				Type: types.StringValue(m.Type),
-				VXC:  types.Int64Value(int64(m.VXC)),
-			}
-			megaportObject, mpDiags := types.ObjectValueFrom(ctx, cspConnectionAzureMegaportAttrs, megaportModel)
-			apiDiags = append(apiDiags, mpDiags...)
-			megaports = append(megaports, megaportObject)
-		}
-		megaportsList, mpListDiags := types.ListValueFrom(ctx, types.ObjectType{}, megaports)
-		apiDiags = append(apiDiags, mpListDiags...)
-		azureModel.Megaports = megaportsList
-		ports := []types.Object{}
-		for _, p := range provider.Ports {
-			portModel := &cspConnectionAzurePortModel{
-				ServiceID: types.Int64Value(int64(p.ServiceID)),
-				Type:      types.StringValue(p.Type),
-			}
-			vxcServiceIDs := []int64{}
-
-			for _, v := range p.VXCServiceIDs {
-				vxcServiceIDs = append(vxcServiceIDs, int64(v))
-			}
-			vxcServiceIDList, serviceIdListDiags := types.ListValueFrom(ctx, types.Int64Type, vxcServiceIDs)
-			apiDiags = append(apiDiags, serviceIdListDiags...)
-			portModel.VXCServiceIDs = vxcServiceIDList
-			portObject, portObjDiags := types.ObjectValueFrom(ctx, cspConnectionAzurePortAttrs, portModel)
-			apiDiags = append(apiDiags, portObjDiags...)
-			ports = append(ports, portObject)
-		}
-		portsList, portsListDiags := types.ListValueFrom(ctx, types.ObjectType{}, ports)
-		apiDiags = append(apiDiags, portsListDiags...)
-		azureModel.Ports = portsList
-		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionAzureAttrs, azureModel)
+		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
 		apiDiags = append(apiDiags, azureObjDiags...)
 		return &azureObject, apiDiags
 	case *megaport.CSPConnectionGoogle:
-		googleModel := &cspConnectionGoogleModel{
+		googleModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
 			ResourceType: types.StringValue(provider.ResourceType),
@@ -1965,69 +1884,27 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bwListDiags...)
 		googleModel.Bandwidths = bandwidthList
-		megaports := []types.Object{}
-		for _, m := range provider.Megaports {
-			megaportModel := &cspConnectionGoogleMegaportModel{
-				Port: types.Int64Value(int64(m.Port)),
-				VXC:  types.Int64Value(int64(m.VXC)),
-			}
-			megaportObject, mpObjDiags := types.ObjectValueFrom(ctx, cspConnectionGoogleMegaportAttrs, megaportModel)
-			apiDiags = append(apiDiags, mpObjDiags...)
-			megaports = append(megaports, megaportObject)
-		}
-		megaportsList, mpListDiags := types.ListValueFrom(ctx, types.ObjectType{}, megaports)
-		apiDiags = append(apiDiags, mpListDiags...)
-		googleModel.Megaports = megaportsList
-		ports := []types.Object{}
-		for _, p := range provider.Ports {
-			portModel := &cspConnectionGooglePortModel{
-				ServiceID: types.Int64Value(int64(p.ServiceID)),
-			}
-			vxcServiceIDs := []int64{}
-			for _, v := range p.VXCServiceIDs {
-				vxcServiceIDs = append(vxcServiceIDs, int64(v))
-			}
-			vxcServiceIDList, vxcServiceIdListDiags := types.ListValueFrom(ctx, types.Int64Type, vxcServiceIDs)
-			apiDiags = append(apiDiags, vxcServiceIdListDiags...)
-			portModel.VXCServiceIDs = vxcServiceIDList
-			portObject, portObjDiags := types.ObjectValueFrom(ctx, cspConnectionGooglePortAttrs, portModel)
-			apiDiags = append(apiDiags, portObjDiags...)
-			ports = append(ports, portObject)
-		}
-		portsList, portsListDiags := types.ListValueFrom(ctx, types.ObjectType{}, ports)
-		apiDiags = append(apiDiags, portsListDiags...)
-		googleModel.Ports = portsList
-		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionGoogleAttrs, googleModel)
+		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
 		apiDiags = append(apiDiags, googleObjDiags...)
 		return &googleObject, apiDiags
 	case *megaport.CSPConnectionVirtualRouter:
-		virtualRouterModel := &cspConnectionVirtualRouterModel{
+		virtualRouterModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
 			ResourceName:      types.StringValue(provider.ResourceName),
 			ResourceType:      types.StringValue(provider.ResourceType),
 			VLAN:              types.Int64Value(int64(provider.VLAN)),
 			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
 		}
-		interfaces := []types.Object{}
-		for _, i := range provider.Interfaces {
-			interfaceModel := &cspConnectionVirtualRouterInterfaceModel{}
-			ipAddresses := []string{}
-			ipAddresses = append(ipAddresses, i.IPAddresses...)
-			ipAddressesList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
-			apiDiags = append(apiDiags, ipListDiags...)
-			interfaceModel.IPAddresses = ipAddressesList
-			interfaceObject, interfaceObjDiags := types.ObjectValueFrom(ctx, cspConnectionVirtualRouterInterfaceAttrs, interfaceModel)
-			apiDiags = append(apiDiags, interfaceObjDiags...)
-			interfaces = append(interfaces, interfaceObject)
-		}
-		interfacesList, interfaceListDiags := types.ListValueFrom(ctx, types.ObjectType{}, interfaces)
-		apiDiags = append(apiDiags, interfaceListDiags...)
-		virtualRouterModel.Interfaces = interfacesList
-		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionVirtualRouterAttrs, virtualRouterModel)
+		ipAddresses := []string{}
+		ipAddresses = append(ipAddresses, ipAddresses...)
+		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
+		apiDiags = append(apiDiags, ipListDiags...)
+		virtualRouterModel.IPAddresses = ipList
+		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
 		apiDiags = append(apiDiags, vrObjDiags...)
 		return &virtualRouterObject, apiDiags
 	case *megaport.CSPConnectionTransit:
-		transitModel := &cspConnectionTransit{
+		transitModel := &cspConnectionModel{
 			ConnectType:        types.StringValue(provider.ConnectType),
 			ResourceName:       types.StringValue(provider.ResourceName),
 			ResourceType:       types.StringValue(provider.ResourceType),
@@ -2036,7 +1913,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			IPv4GatewayAddress: types.StringValue(provider.IPv4GatewayAddress),
 			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
 		}
-		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionTransitAttrs, transitModel)
+		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
 		return &transitObject, apiDiags
 	}

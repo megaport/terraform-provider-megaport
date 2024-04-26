@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccMegaportVXC_Basic(t *testing.T) {
@@ -44,23 +45,51 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
                     port_uid = megaport_port.port_1.product_uid
 
                     a_end = {
-                        vlan = 0
                     }
 
                     b_end = {
                         product_uid = megaport_port.port_2.product_uid
-                        vlan = 0
                     }
                   }
                   `, portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName1),
-					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
-					resource.TestCheckResourceAttr("megaport_port.port", "market", "AU"),
-					resource.TestCheckResourceAttr("megaport_port.port", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "market", "AU"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "market", "AU"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "1000"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "1"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})
