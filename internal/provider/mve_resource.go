@@ -26,6 +26,32 @@ var (
 	_ resource.Resource                = &mveResource{}
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
+
+	resourcesAttrs = map[string]attr.Type{
+		"interface":       types.ObjectType{},
+		"virtual_machine": types.ListType{},
+	}
+
+	vnicAttrs = map[string]attr.Type{
+		"description": types.StringType,
+		"vlan":        types.Int64Type,
+	}
+
+	virtualMachineAttrs = map[string]attr.Type{
+		"id":            types.Int64Type,
+		"cpu_count":     types.Int64Type,
+		"image":         types.ObjectType{},
+		"resource_type": types.StringType,
+		"up":            types.BoolType,
+		"vnics":         types.ListType{},
+	}
+
+	virtualMachineImageAttrs = map[string]attr.Type{
+		"id":      types.Int64Type,
+		"vendor":  types.StringType,
+		"product": types.StringType,
+		"version": types.StringType,
+	}
 )
 
 // mveResourceModel maps the resource schema data.
@@ -245,11 +271,11 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 			Description: types.StringValue(n.Description),
 			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
-		vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+		vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
 		apiDiags = append(apiDiags, vnicDiags...)
 		vnics = append(vnics, vnic)
 	}
-	networkInterfaceList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
+	networkInterfaceList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vnicAttrs), vnics)
 	apiDiags = append(apiDiags, listDiags...)
 	orm.NetworkInterfaces = networkInterfaceList
 
@@ -267,7 +293,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 				ResourceName: types.StringValue(p.Resources.Interface.ResourceName),
 				ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
 			}
-			interfaceObject, interfaceDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, interfaceModel)
+			interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portInterfaceAttrs, interfaceModel)
 			apiDiags = append(apiDiags, interfaceDiags...)
 			resourcesModel.Interface = interfaceObject
 		}
@@ -286,7 +312,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 					Product: types.StringValue(vm.Image.Product),
 					Version: types.StringValue(vm.Image.Version),
 				}
-				image, imageDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, imageModel)
+				image, imageDiags := types.ObjectValueFrom(ctx, virtualMachineImageAttrs, imageModel)
 				apiDiags = append(apiDiags, imageDiags...)
 				vmModel.Image = image
 			}
@@ -296,21 +322,21 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 					Description: types.StringValue(vnic.Description),
 					VLAN:        types.Int64Value(int64(vnic.VLAN)),
 				}
-				vnic, vnicDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, model)
+				vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
 				apiDiags = append(apiDiags, vnicDiags...)
 				vnics = append(vnics, vnic)
 			}
-			vnicList, listDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, vnics)
+			vnicList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vnicAttrs), vnics)
 			apiDiags = append(apiDiags, listDiags...)
 			vmModel.Vnics = vnicList
-			vmObject, vmDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, vmModel)
+			vmObject, vmDiags := types.ObjectValueFrom(ctx, virtualMachineAttrs, vmModel)
 			apiDiags = append(apiDiags, vmDiags...)
 			virtualMachineObjects = append(virtualMachineObjects, vmObject)
 		}
-		virtualMachinesList, vmListDiags := types.ListValueFrom(context.Background(), types.ObjectType{}, virtualMachineObjects)
+		virtualMachinesList, vmListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(virtualMachineAttrs), virtualMachineObjects)
 		apiDiags = append(apiDiags, vmListDiags...)
 		resourcesModel.VirtualMachines = virtualMachinesList
-		resourcesObj, resourcesDiags := types.ObjectValueFrom(context.Background(), map[string]attr.Type{}, resourcesModel)
+		resourcesObj, resourcesDiags := types.ObjectValueFrom(ctx, resourcesAttrs, resourcesModel)
 		apiDiags = append(apiDiags, resourcesDiags...)
 		orm.Resources = resourcesObj
 	}
