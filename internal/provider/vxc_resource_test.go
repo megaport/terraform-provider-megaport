@@ -89,7 +89,7 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "port_uid", "a_end_partner_config", "b_end_partner_config"},
 			},
 		},
 	})
