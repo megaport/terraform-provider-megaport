@@ -8,7 +8,7 @@ go 1.21
 require (
 	github.com/aws/aws-sdk-go v1.25.3
 	github.com/hashicorp/terraform-plugin-sdk v1.9.1
-	github.com/megaport/megaportgo v0.2.1-beta
+	github.com/megaport/megaportgo v0.2.3-beta
 )
 
 require (
