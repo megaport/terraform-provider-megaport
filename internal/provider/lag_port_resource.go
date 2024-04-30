@@ -29,7 +29,7 @@ var (
 type lagPortResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
-	UID                   types.String `tfsdk:"uid"`
+	UID                   types.String `tfsdk:"product_uid"`
 	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
 	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
@@ -54,8 +54,8 @@ type lagPortResourceModel struct {
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
-	LagCount    types.Int64    `tfsdk:"lag_count"`
-	LagPortUIDs []types.String `tfsdk:"lag_port_uids"`
+	LagCount    types.Int64 `tfsdk:"lag_count"`
+	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
 
 	// AttributeTags         PortAttributeTags `tfsdk:"attribute_tags"`
 	// VXCResources          PortResources     `tfsdk:"resources"`
@@ -66,14 +66,11 @@ func (orm *lagPortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
-	orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
 	orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
-	orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.Locked = types.BoolValue(p.Locked)
 	orm.Market = types.StringValue(p.Market)
@@ -81,11 +78,37 @@ func (orm *lagPortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
 	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
 	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
 	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
 	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
 	orm.Virtual = types.BoolValue(p.Virtual)
+
+	if p.CreateDate != nil {
+		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+	if p.LiveDate != nil {
+		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
+	if p.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
+	if p.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
+
+	if p.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
+	} else {
+		orm.TerminateDate = types.StringNull()
+	}
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -100,7 +123,7 @@ type lagPortResource struct {
 
 // Metadata returns the resource type name.
 func (r *lagPortResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_port"
+	resp.TypeName = req.ProviderTypeName + "_lag_port"
 }
 
 // Schema defines the schema for the resource.
@@ -111,7 +134,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The last time the resource was updated.",
 				Computed:    true,
 			},
-			"uid": schema.StringAttribute{
+			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -202,13 +225,14 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre for the product.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
-			"contract_start_date": schema.BoolAttribute{
+			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract started.",
 				Computed:    true,
 			},
-			"contract_end_date": schema.BoolAttribute{
+			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
 			},
@@ -231,6 +255,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
 				Optional:    true,
+				Computed:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
@@ -239,6 +264,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the product.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -299,6 +325,8 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
 
+	fmt.Println("port ids", createdPort.TechnicalServiceUIDs)
+
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
 	if err != nil {
@@ -311,9 +339,15 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 
 	// update the plan with the port info
 	plan.fromAPIPort(port)
+
+	lagPortUids := []types.String{}
 	for _, uid := range createdPort.TechnicalServiceUIDs {
-		plan.LagPortUIDs = append(plan.LagPortUIDs, types.StringValue(uid))
+		lagPortUids = append(lagPortUids, types.StringValue(uid))
 	}
+	lagPortUidList, listDiags := types.ListValueFrom(ctx, types.StringType, lagPortUids)
+	resp.Diagnostics.Append(listDiags...)
+	plan.LagPortUIDs = lagPortUidList
+
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -449,7 +483,7 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Delete existing order
 	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:    state.UID.String(),
+		PortID:    state.UID.ValueString(),
 		DeleteNow: true,
 	})
 	if err != nil {

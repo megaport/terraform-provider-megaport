@@ -258,6 +258,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewlocationDataSource,
+		NewPartnerPortDataSource,
 	}
 }
 
@@ -266,6 +267,7 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewMCRResource,
 		NewPortResource,
+		NewLagPortResource,
 		NewMVEResource,
 		NewVXCResource,
 	}

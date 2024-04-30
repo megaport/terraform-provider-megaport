@@ -346,7 +346,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		orm.CreateDate = types.StringNull()
 	}
-
 	if v.LiveDate != nil {
 		orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
 	} else {
@@ -471,9 +470,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
 			cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
 			apiDiags = append(apiDiags, cspDiags...)
-			cspConnections = append(cspConnections, *cspConnection)
+			cspConnections = append(cspConnections, cspConnection)
 		}
-		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}, cspConnections)
+		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), cspConnections)
 		apiDiags = append(apiDiags, cspConnectionDiags...)
 		orm.CSPConnections = cspConnectionsList
 	} else {
@@ -1265,7 +1264,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	aEndObj := plan.AEndConfiguration
-	bEndOBj := plan.BEndConfiguration
+	bEndObj := plan.BEndConfiguration
 
 	var a vxcEndConfigurationModel
 	aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
@@ -1291,6 +1290,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.Append(aPartnerDiags...)
 		switch aPartnerConfig.Partner.ValueString() {
 		case "aws":
+			if aPartnerConfig.AWSPartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": AWS Partner configuration is required",
+				)
+				return
+			}
 			var awsConfig vxcPartnerConfigAWSModel
 			awsDiags := aPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
 			if awsDiags.HasError() {
@@ -1355,6 +1361,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "google":
+			if aPartnerConfig.GooglePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Google Partner configuration is required",
+				)
+				return
+			}
 			var googleConfig vxcPartnerConfigGoogleModel
 			googleDiags := aPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
 			if googleDiags.HasError() {
@@ -1385,6 +1398,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "oracle":
+			if aPartnerConfig.OraclePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Oracle Partner configuration is required",
+				)
+				return
+			}
 			var oracleConfig vxcPartnerConfigOracleModel
 			oracleDiags := aPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
 			if oracleDiags.HasError() {
@@ -1426,7 +1446,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	buyReq.AEndConfiguration = *aEndConfig
 
 	var b vxcEndConfigurationModel
-	bEndDiags := bEndOBj.As(ctx, &b, basetypes.ObjectAsOptions{})
+	bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
 	if bEndDiags.HasError() {
 		resp.Diagnostics.Append(bEndDiags...)
 		return
@@ -1435,11 +1455,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ProductUID: b.UID.ValueString(),
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
-	if a.VLAN.ValueInt64() == 0 {
-		a.VLAN = types.Int64Null()
-		aEndObj, aEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, a)
-		resp.Diagnostics.Append(aEndDiags...)
-		plan.AEndConfiguration = aEndObj
+	if b.VLAN.ValueInt64() == 0 {
+		b.VLAN = types.Int64Null()
+		bEndObj, bEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, b)
+		resp.Diagnostics.Append(bEndDiags...)
+		plan.BEndConfiguration = bEndObj
 	}
 	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
 		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
@@ -1449,10 +1469,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	if !plan.BEndPartnerConfig.IsNull() {
 		var bPartnerConfig vxcPartnerConfigurationModel
-		bPartnerDiags := plan.AEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
+		bPartnerDiags := plan.BEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
 		resp.Diagnostics.Append(bPartnerDiags...)
 		switch bPartnerConfig.Partner.ValueString() {
 		case "aws":
+			if bPartnerConfig.AWSPartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": AWS Partner configuration is required",
+				)
+				return
+			}
 			var awsConfig vxcPartnerConfigAWSModel
 			awsDiags := bPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
 			if awsDiags.HasError() {
@@ -1468,6 +1495,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				AuthKey:      awsConfig.AuthKey.ValueString(),
 				Prefixes:     awsConfig.Prefixes.ValueString(),
 			}
+
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
 			resp.Diagnostics.Append(awsDiags...)
 
@@ -1484,9 +1512,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = bEndPartnerConfig
+			plan.BEndPartnerConfig = partnerConfigObj
+			bEndConfig.PartnerConfig = bEndPartnerConfig
 		case "azure":
+			if bPartnerConfig.AzurePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Azure Partner configuration is required",
+				)
+				return
+			}
 			var azureConfig vxcPartnerConfigAzureModel
 			azureDiags := bPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
 			if azureDiags.HasError() {
@@ -1517,6 +1552,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = bEndPartnerConfig
 		case "google":
+			if bPartnerConfig.GooglePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Google Partner configuration is required",
+				)
+				return
+			}
 			var googleConfig vxcPartnerConfigGoogleModel
 			googleDiags := bPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
 			if googleDiags.HasError() {
@@ -1543,10 +1585,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
-			plan.AEndPartnerConfig = partnerConfigObj
+			plan.BEndPartnerConfig = partnerConfigObj
 
-			aEndConfig.PartnerConfig = bEndPartnerConfig
+			bEndConfig.PartnerConfig = bEndPartnerConfig
 		case "oracle":
+			if bPartnerConfig.OraclePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Oracle Partner configuration is required",
+				)
+				return
+			}
 			var oracleConfig vxcPartnerConfigOracleModel
 			oracleDiags := bPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
 			if oracleDiags.HasError() {
@@ -1574,8 +1623,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = bEndPartnerConfig
+			plan.BEndPartnerConfig = partnerConfigObj
+			bEndConfig.PartnerConfig = bEndPartnerConfig
 		default:
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1809,7 +1858,7 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
 
-func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (*types.Object, diag.Diagnostics) {
+func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
 	switch provider := c.(type) {
 	case *megaport.CSPConnectionAWS:
@@ -1833,7 +1882,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
 		apiDiags = append(apiDiags, awsDiags...)
-		return &awsObject, apiDiags
+		return awsObject, apiDiags
 	case *megaport.CSPConnectionAWSHC:
 		awsHCModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -1853,7 +1902,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		awsHCModel.Bandwidths = bandwidthList
 		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
 		apiDiags = append(apiDiags, awsHCDiags...)
-		return &awsHCObject, apiDiags
+		return awsHCObject, apiDiags
 	case *megaport.CSPConnectionAzure:
 		azureModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -1866,7 +1915,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
 		apiDiags = append(apiDiags, azureObjDiags...)
-		return &azureObject, apiDiags
+		return azureObject, apiDiags
 	case *megaport.CSPConnectionGoogle:
 		googleModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -1886,7 +1935,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		googleModel.Bandwidths = bandwidthList
 		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
 		apiDiags = append(apiDiags, googleObjDiags...)
-		return &googleObject, apiDiags
+		return googleObject, apiDiags
 	case *megaport.CSPConnectionVirtualRouter:
 		virtualRouterModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
@@ -1902,7 +1951,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		virtualRouterModel.IPAddresses = ipList
 		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
 		apiDiags = append(apiDiags, vrObjDiags...)
-		return &virtualRouterObject, apiDiags
+		return virtualRouterObject, apiDiags
 	case *megaport.CSPConnectionTransit:
 		transitModel := &cspConnectionModel{
 			ConnectType:        types.StringValue(provider.ConnectType),
@@ -1915,8 +1964,10 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
-		return &transitObject, apiDiags
+		return transitObject, apiDiags
+	default:
+		fmt.Println("provider type", provider)
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return nil, apiDiags
+	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 }
