@@ -2,9 +2,7 @@ package provider
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -75,16 +73,4 @@ func TestAccMegaportMCRVXC_Basic(t *testing.T) {
 			},
 		},
 	})
-}
-
-// GenerateRandomVLAN generates a random VLAN ID.
-func GenerateRandomVLAN() int {
-	// exclude reserved values 0 and 4095 as per 802.1q
-	return GenerateRandomNumber(1, 4094)
-}
-
-// GenerateRandomNumber generates a random number between an upper and lower bound.
-func GenerateRandomNumber(lowerBound int, upperBound int) int {
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return random.Intn(upperBound) + lowerBound
 }
