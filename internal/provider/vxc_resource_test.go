@@ -46,7 +46,7 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
                     }
 
                     b_end = {
-                        product_uid = megaport_port.port_2.product_uid
+                        ordered_product_uid = megaport_port.port_2.product_uid
                     }
                   }
                   `, portName1, portName2, vxcName),

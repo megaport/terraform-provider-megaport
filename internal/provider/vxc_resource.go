@@ -28,15 +28,17 @@ var (
 	_ resource.ResourceWithImportState = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
-		"owner_uid":      types.StringType,
-		"product_uid":    types.StringType,
-		"product_name":   types.StringType,
-		"location_id":    types.Int64Type,
-		"location":       types.StringType,
-		"vlan":           types.Int64Type,
-		"inner_vlan":     types.Int64Type,
-		"vnic_index":     types.Int64Type,
-		"secondary_name": types.StringType,
+		"owner_uid":           types.StringType,
+		"ordered_product_uid": types.StringType,
+		"product_uid":         types.StringType,
+		"product_name":        types.StringType,
+		"location_id":         types.Int64Type,
+		"location":            types.StringType,
+		"ordered_vlan":        types.Int64Type,
+		"vlan":                types.Int64Type,
+		"inner_vlan":          types.Int64Type,
+		"vnic_index":          types.Int64Type,
+		"secondary_name":      types.StringType,
 	}
 
 	cspConnectionFullAttrs = map[string]attr.Type{
@@ -260,10 +262,12 @@ type vxcApprovalModel struct {
 // vxcEndConfigurationModel maps the end configuration schema data.
 type vxcEndConfigurationModel struct {
 	OwnerUID              types.String `tfsdk:"owner_uid"`
-	UID                   types.String `tfsdk:"product_uid"`
+	OrderedProductUID     types.String `tfsdk:"ordered_product_uid"`
+	ProductUID            types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	Location              types.String `tfsdk:"location"`
+	OrderedVLAN           types.Int64  `tfsdk:"ordered_vlan"`
 	VLAN                  types.Int64  `tfsdk:"vlan"`
 	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
 	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
@@ -362,12 +366,18 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		orm.ContractEndDate = types.StringNull()
 	}
 
+	existingAEnd := &vxcEndConfigurationModel{}
+	aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
+	apiDiags = append(apiDiags, aEndDiags...)
+
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		UID:                   types.StringValue(v.AEndConfiguration.UID),
+		OrderedProductUID:     existingAEnd.OrderedProductUID,
+		ProductUID:            types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.AEndConfiguration.Location),
+		OrderedVLAN:           existingAEnd.OrderedVLAN,
 		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.AEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
@@ -377,12 +387,18 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
+	existingBEnd := &vxcEndConfigurationModel{}
+	bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
+	apiDiags = append(apiDiags, bEndDiags...)
+
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		UID:                   types.StringValue(v.BEndConfiguration.UID),
+		OrderedProductUID:     existingBEnd.OrderedProductUID,
+		ProductUID:            types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.BEndConfiguration.Location),
+		OrderedVLAN:           existingBEnd.OrderedVLAN,
 		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.BEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
@@ -444,9 +460,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 			ResourceType:  types.StringValue(v.Resources.VLL.ResourceType),
 		}
 		vll, vllDiags := types.ObjectValueFrom(ctx, vllConfigAttrs, vllModel)
-		if vllDiags.HasError() {
-			fmt.Println(vllDiags)
-		}
 		apiDiags = append(apiDiags, vllDiags...)
 		orm.VLL = vll
 	}
@@ -663,7 +676,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the CSP connection.",
-							Optional:    true,
 							Computed:    true,
 						},
 						"name": schema.StringAttribute{
@@ -949,6 +961,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The owner UID of the A-End configuration.",
 						Computed:    true,
 					},
+					"ordered_product_uid": schema.StringAttribute{
+						Description: "The initial ordered product UID of the A-End configuration.",
+						Optional:    true,
+					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the A-End configuration.",
 						Computed:    true,
@@ -965,11 +981,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the A-End configuration.",
 						Computed:    true,
 					},
+					"ordered_vlan": schema.Int64Attribute{
+						Description: "The initial ordered VLAN of the A-End configuration.",
+						Optional:    true,
+						Validators:  []validator.Int64{int64validator.AtLeast(0)},
+					},
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the A-End configuration.",
-						Optional:    true,
 						Computed:    true,
-						Validators:  []validator.Int64{int64validator.AtLeast(1)},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
@@ -995,9 +1014,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The owner UID of the B-End configuration.",
 						Computed:    true,
 					},
+					"ordered_product_uid": schema.StringAttribute{
+						Description: "The initial ordered product UID of the B-End configuration.",
+						Optional:    true,
+					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the B-End configuration.",
-						Optional:    true,
+						Computed:    true,
 					},
 					"product_name": schema.StringAttribute{
 						Description: "The product name of the B-End configuration.",
@@ -1011,11 +1034,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the B-End configuration.",
 						Computed:    true,
 					},
+					"ordered_vlan": schema.Int64Attribute{
+						Description: "The initial ordered VLAN of the B-End configuration.",
+						Optional:    true,
+						Validators:  []validator.Int64{int64validator.AtLeast(0)},
+					},
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the B-End configuration.",
-						Optional:    true,
 						Computed:    true,
-						Validators:  []validator.Int64{int64validator.AtLeast(1)},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
@@ -1273,15 +1299,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.UID.ValueString(),
+		ProductUID: a.OrderedProductUID.ValueString(),
 		VLAN:       int(a.VLAN.ValueInt64()),
 	}
 
-	if a.VLAN.ValueInt64() == 0 {
-		a.VLAN = types.Int64Null()
-		aEndObj, aEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, a)
-		resp.Diagnostics.Append(aEndDiags...)
-		plan.AEndConfiguration = aEndObj
+	if !a.OrderedVLAN.IsNull() {
+		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
+	} else {
+		aEndConfig.VLAN = 0
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
@@ -1452,14 +1477,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: b.UID.ValueString(),
+		ProductUID: b.OrderedProductUID.ValueString(),
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
-	if b.VLAN.ValueInt64() == 0 {
-		b.VLAN = types.Int64Null()
-		bEndObj, bEndDiags = types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, b)
-		resp.Diagnostics.Append(bEndDiags...)
-		plan.BEndConfiguration = bEndObj
+	if !b.OrderedVLAN.IsNull() {
+		bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
+	} else {
+		bEndConfig.VLAN = 0
 	}
 	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
 		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
@@ -1749,11 +1773,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
 	}
-	if !aEndPlan.UID.Equal(aEndState.UID) {
-		aEndProductUID = aEndPlan.UID.ValueString()
+	if !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
+		aEndProductUID = aEndPlan.ProductUID.ValueString()
 	}
-	if !bEndPlan.UID.Equal(bEndState.UID) {
-		bEndProductUID = bEndPlan.UID.ValueString()
+	if !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
+		bEndProductUID = bEndPlan.ProductUID.ValueString()
 	}
 	if !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
@@ -1861,7 +1885,7 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
 	switch provider := c.(type) {
-	case *megaport.CSPConnectionAWS:
+	case megaport.CSPConnectionAWS:
 		awsModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
 			ResourceName:      types.StringValue(provider.ResourceName),
@@ -1880,10 +1904,12 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			Type:              types.StringValue(provider.Type),
 			VIFID:             types.StringValue(provider.VIFID),
 		}
+		awsModel.Bandwidths = types.ListNull(types.Int64Type)
+		awsModel.IPAddresses = types.ListNull(types.StringType)
 		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
 		apiDiags = append(apiDiags, awsDiags...)
 		return awsObject, apiDiags
-	case *megaport.CSPConnectionAWSHC:
+	case megaport.CSPConnectionAWSHC:
 		awsHCModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
@@ -1900,10 +1926,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		bandwidthList, bandwidthDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bandwidthDiags...)
 		awsHCModel.Bandwidths = bandwidthList
+		awsHCModel.IPAddresses = types.ListNull(types.StringType)
 		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
 		apiDiags = append(apiDiags, awsHCDiags...)
 		return awsHCObject, apiDiags
-	case *megaport.CSPConnectionAzure:
+	case megaport.CSPConnectionAzure:
 		azureModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
@@ -1913,10 +1940,12 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			ServiceKey:   types.StringValue(provider.ServiceKey),
 			VLAN:         types.Int64Value(int64(provider.VLAN)),
 		}
+		azureModel.Bandwidths = types.ListNull(types.Int64Type)
+		azureModel.IPAddresses = types.ListNull(types.StringType)
 		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
 		apiDiags = append(apiDiags, azureObjDiags...)
 		return azureObject, apiDiags
-	case *megaport.CSPConnectionGoogle:
+	case megaport.CSPConnectionGoogle:
 		googleModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
 			ResourceName: types.StringValue(provider.ResourceName),
@@ -1930,13 +1959,14 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		for _, b := range provider.Bandwidths {
 			bandwidths = append(bandwidths, int64(b))
 		}
+		googleModel.IPAddresses = types.ListNull(types.StringType)
 		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bwListDiags...)
 		googleModel.Bandwidths = bandwidthList
 		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
 		apiDiags = append(apiDiags, googleObjDiags...)
 		return googleObject, apiDiags
-	case *megaport.CSPConnectionVirtualRouter:
+	case megaport.CSPConnectionVirtualRouter:
 		virtualRouterModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
 			ResourceName:      types.StringValue(provider.ResourceName),
@@ -1944,6 +1974,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			VLAN:              types.Int64Value(int64(provider.VLAN)),
 			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
 		}
+		virtualRouterModel.Bandwidths = types.ListNull(types.Int64Type)
 		ipAddresses := []string{}
 		ipAddresses = append(ipAddresses, ipAddresses...)
 		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
@@ -1952,7 +1983,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
 		apiDiags = append(apiDiags, vrObjDiags...)
 		return virtualRouterObject, apiDiags
-	case *megaport.CSPConnectionTransit:
+	case megaport.CSPConnectionTransit:
 		transitModel := &cspConnectionModel{
 			ConnectType:        types.StringValue(provider.ConnectType),
 			ResourceName:       types.StringValue(provider.ResourceName),
@@ -1962,11 +1993,11 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			IPv4GatewayAddress: types.StringValue(provider.IPv4GatewayAddress),
 			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
 		}
+		transitModel.Bandwidths = types.ListNull(types.Int64Type)
+		transitModel.IPAddresses = types.ListNull(types.StringType)
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
 		return transitObject, apiDiags
-	default:
-		fmt.Println("provider type", provider)
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags

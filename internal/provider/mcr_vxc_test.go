@@ -47,11 +47,11 @@ func TestAccMegaportMCRVXC_Basic(t *testing.T) {
                     contract_term_months = 1
                   
                     a_end = {
-                      vlan = 2191
+                      ordered_vlan = 2191
                     }
 
                     b_end = {
-                        product_uid = data.megaport_partner.aws_port.product_uid
+                        ordered_product_uid = data.megaport_partner.aws_port.product_uid
                     }
 
                     b_end_partner_config = {
