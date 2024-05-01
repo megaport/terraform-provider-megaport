@@ -10,6 +10,8 @@ import (
 func TestAccMegaportMCRVXC_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
+	vxcName2 := RandomTestName()
+	vxcName3 := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -66,9 +68,50 @@ func TestAccMegaportMCRVXC_Basic(t *testing.T) {
                         }
                     }
                   }
-                  `, mcrName, vxcName1, vxcName1),
+
+                  resource "megaport_vxc" "gcp_vxc" {
+                    product_name   = "%s"
+                    rate_limit = 1000
+                    contract_term_months = 1
+                    port_uid        = megaport_mcr.mcr.product_uid
+                  
+                    a_end = {
+                      ordered_vlan = 182
+                    }
+
+                    b_end = {}
+
+                    b_end_partner_config = {
+                        partner = "google"
+                        google_config = {
+                            pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
+                        }
+                    }
+                  }
+
+                  resource "megaport_vxc" "azure_vxc" {
+                    product_name   = "%s"
+                    rate_limit = 200
+                    contract_term_months = 1
+                    port_uid        = megaport_mcr.mcr.product_uid
+                  
+                    a_end = {
+                      ordered_vlan = 0
+                    }
+
+                    b_end = {}
+
+                    b_end_partner_config = {
+                        partner = "azure"
+                        azure_config = {
+                            service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+                        }
+                    }
+                  }
+                  `, mcrName, vxcName1, vxcName1, vxcName2, vxcName3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
 				),
 			},
 		},

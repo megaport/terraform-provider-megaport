@@ -135,17 +135,14 @@ var (
 	}
 
 	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
-		"connect_type": types.StringType,
-		"service_key":  types.StringType,
+		"service_key": types.StringType,
 	}
 
 	vxcPartnerConfigGoogleAttrs = map[string]attr.Type{
-		"connect_type": types.StringType,
-		"pairing_key":  types.StringType,
+		"pairing_key": types.StringType,
 	}
 
 	vxcPartnerConfigOracleAttrs = map[string]attr.Type{
-		"connect_type":       types.StringType,
 		"virtual_circuit_id": types.StringType,
 	}
 )
@@ -304,21 +301,18 @@ type vxcPartnerConfigAWSModel struct {
 // vxcPartnerConfigAzureModel maps the partner configuration schema data for Azure.
 type vxcPartnerConfigAzureModel struct {
 	vxcPartnerConfig
-	ConnectType types.String `tfsdk:"connect_type"`
-	ServiceKey  types.String `tfsdk:"service_key"`
+	ServiceKey types.String `tfsdk:"service_key"`
 }
 
 // vxcPartnerConfigGoogleModel maps the partner configuration schema data for Google.
 type vxcPartnerConfigGoogleModel struct {
 	vxcPartnerConfig
-	ConnectType types.String `tfsdk:"connect_type"`
-	PairingKey  types.String `tfsdk:"pairing_key"`
+	PairingKey types.String `tfsdk:"pairing_key"`
 }
 
 // vxcPartnerConfigOracleModel maps the partner configuration schema data for Oracle.
 type vxcPartnerConfigOracleModel struct {
 	vxcPartnerConfig
-	ConnectType      types.String `tfsdk:"connect_type"`
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
 }
 
@@ -955,7 +949,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"a_end": schema.SingleNestedAttribute{
 				Description: "The current A-End configuration of the VXC.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the A-End configuration.",
@@ -1008,7 +1003,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"b_end": schema.SingleNestedAttribute{
 				Description: "The current B-End configuration of the VXC.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the B-End configuration.",
@@ -1075,7 +1071,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Description: "The connection type of the partner configuration. Required for AWS partner configurations.",
 								Required:    true,
 							},
 							"type": schema.StringAttribute{
@@ -1120,10 +1116,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Azure partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"service_key": schema.StringAttribute{
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
@@ -1134,10 +1126,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Google partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"pairing_key": schema.StringAttribute{
 								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
 								Required:    true,
@@ -1148,10 +1136,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Oracle partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"virtual_circuit_id": schema.StringAttribute{
 								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
 								Required:    true,
@@ -1176,7 +1160,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
+								Description: "The connection type of the partner configuration. Required for AWS partner configurations.",
 								Required:    true,
 							},
 							"type": schema.StringAttribute{
@@ -1221,10 +1205,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Azure partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"service_key": schema.StringAttribute{
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
@@ -1235,10 +1215,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Google partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"pairing_key": schema.StringAttribute{
 								Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
 								Required:    true,
@@ -1249,10 +1225,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Oracle partner configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"connect_type": schema.StringAttribute{
-								Description: "The connection type of the partner configuration. Required for all partner configurations.",
-								Required:    true,
-							},
 							"virtual_circuit_id": schema.StringAttribute{
 								Description: "The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.",
 								Required:    true,
@@ -1362,12 +1334,29 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(azureDiags...)
 				return
 			}
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       azureConfig.ServiceKey.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "AZURE",
+			}
+			if !a.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			aEndConfig.ProductUID = partnerPortRes.ProductUID
 			aEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
-				ConnectType: azureConfig.ConnectType.ValueString(),
+				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
 
-			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, azureConfig)
+			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
 			resp.Diagnostics.Append(azureDiags...)
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
@@ -1400,11 +1389,29 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			aEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
-				ConnectType: googleConfig.ConnectType.ValueString(),
+				ConnectType: "GOOGLE",
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
-			googleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, googleConfig)
-			resp.Diagnostics.Append(azureDiags...)
+			googleConfigObj, googleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigGoogleAttrs, googleConfig)
+			resp.Diagnostics.Append(googleDiags...)
+
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       googleConfig.PairingKey.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "GOOGLE",
+			}
+			if !a.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			aEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1437,12 +1444,31 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			aEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
-				ConnectType:      oracleConfig.ConnectType.ValueString(),
+				ConnectType:      "ORACLE",
 				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
 			}
 
-			oracleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, oracleConfig)
-			resp.Diagnostics.Append(azureDiags...)
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       oracleConfig.VirtualCircuitId.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "ORACLE",
+			}
+			if !a.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			aEndConfig.ProductUID = partnerPortRes.ProductUID
+
+			oracleConfigObj, oracleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigOracleAttrs, oracleConfig)
+			resp.Diagnostics.Append(oracleDiags...)
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1553,12 +1579,30 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			bEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
-				ConnectType: azureConfig.ConnectType.ValueString(),
+				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
 
-			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, azureConfig)
+			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
 			resp.Diagnostics.Append(azureDiags...)
+
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       azureConfig.ServiceKey.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "AZURE",
+			}
+			if !b.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
@@ -1590,11 +1634,29 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			bEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
-				ConnectType: googleConfig.ConnectType.ValueString(),
+				ConnectType: "GOOGLE",
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
-			googleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, googleConfig)
-			resp.Diagnostics.Append(azureDiags...)
+			googleConfigObj, googleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigGoogleAttrs, googleConfig)
+			resp.Diagnostics.Append(googleDiags...)
+
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       googleConfig.PairingKey.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "GOOGLE",
+			}
+			if !b.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1627,12 +1689,30 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			bEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
-				ConnectType:      oracleConfig.ConnectType.ValueString(),
+				ConnectType:      "ORACLE",
 				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
 			}
 
-			oracleConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, oracleConfig)
-			resp.Diagnostics.Append(azureDiags...)
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       oracleConfig.VirtualCircuitId.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "ORACLE",
+			}
+			if !b.OrderedProductUID.IsNull() {
+				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
+
+			oracleConfigObj, oracleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigOracleAttrs, oracleConfig)
+			resp.Diagnostics.Append(oracleDiags...)
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
