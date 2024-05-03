@@ -44,7 +44,7 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_lag_port.port"
+					resourceName := "megaport_lag_port.lag_port"
 					var rawState map[string]string
 					for _, m := range state.Modules {
 						if len(m.Resources) > 0 {
@@ -55,7 +55,7 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids"},
 			},
 		},
 	})

@@ -325,8 +325,6 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
 
-	fmt.Println("port ids", createdPort.TechnicalServiceUIDs)
-
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
 	if err != nil {
@@ -339,7 +337,6 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 
 	// update the plan with the port info
 	plan.fromAPIPort(port)
-
 	lagPortUids := []types.String{}
 	for _, uid := range createdPort.TechnicalServiceUIDs {
 		lagPortUids = append(lagPortUids, types.StringValue(uid))
@@ -347,7 +344,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	lagPortUidList, listDiags := types.ListValueFrom(ctx, types.StringType, lagPortUids)
 	resp.Diagnostics.Append(listDiags...)
 	plan.LagPortUIDs = lagPortUidList
-
+	plan.UID = types.StringValue(createdID)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
