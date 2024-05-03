@@ -114,11 +114,12 @@ var (
 	}
 
 	vxcPartnerConfigAttrs = map[string]attr.Type{
-		"partner":       types.StringType,
-		"aws_config":    types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
-		"azure_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
-		"google_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
-		"oracle_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+		"partner":              types.StringType,
+		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
+		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
+		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
+		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+		"partner_a_end_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndAttrs),
 	}
 
 	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
@@ -144,6 +145,49 @@ var (
 
 	vxcPartnerConfigOracleAttrs = map[string]attr.Type{
 		"virtual_circuit_id": types.StringType,
+	}
+
+	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs)),
+	}
+
+	vxcPartnerConfigInterfaceAttrs = map[string]attr.Type{
+		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
+		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
+	}
+
+	ipRouteAttrs = map[string]attr.Type{
+		"prefix":      types.StringType,
+		"description": types.StringType,
+		"next_hop":    types.StringType,
+	}
+
+	bfdConfigAttrs = map[string]attr.Type{
+		"tx_interval": types.Int64Type,
+		"rx_interval": types.Int64Type,
+		"multiplier":  types.Int64Type,
+	}
+
+	bgpConnectionConfig = map[string]attr.Type{
+		"peer_asn":         types.Int64Type,
+		"local_ip_address": types.StringType,
+		"peer_ip_address":  types.StringType,
+		"password":         types.StringType,
+		"shutdown":         types.BoolType,
+		"description":      types.StringType,
+		"med_in":           types.Int64Type,
+		"med_out":          types.Int64Type,
+		"bfd_enabled":      types.BoolType,
+		"export_policy":    types.StringType,
+		"permit_export_to": types.ListType{}.WithElementType(types.StringType),
+		"deny_export_to":   types.ListType{}.WithElementType(types.StringType),
+		"import_whitelist": types.Int64Type,
+		"import_blacklist": types.Int64Type,
+		"export_whitelist": types.Int64Type,
+		"export_blacklist": types.Int64Type,
 	}
 )
 
@@ -277,6 +321,7 @@ type vxcPartnerConfigurationModel struct {
 	AzurePartnerConfig  types.Object `tfsdk:"azure_config"`
 	GooglePartnerConfig types.Object `tfsdk:"google_config"`
 	OraclePartnerConfig types.Object `tfsdk:"oracle_config"`
+	PartnerAEndConfig   types.Object `tfsdk:"partner_a_end_config"`
 }
 
 type vxcPartnerConfig interface {
@@ -314,6 +359,55 @@ type vxcPartnerConfigGoogleModel struct {
 type vxcPartnerConfigOracleModel struct {
 	vxcPartnerConfig
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
+}
+
+// vxcPartnerConfigAEndModel maps the partner configuration schema data for an A end.
+type vxcPartnerConfigAEndModel struct {
+	vxcPartnerConfig
+	Interfaces types.List `tfsdk:"interfaces"`
+}
+
+// vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
+type vxcPartnerConfigInterfaceModel struct {
+	IPAddresses    types.List   `tfsdk:"ip_addresses"`
+	IPRoutes       types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd            types.Object `tfsdk:"bfd"`
+	BgpConnections types.List   `tfsdk:"bgp_connections"`
+}
+
+// ipRouteModel maps the IP route schema data.
+type ipRouteModel struct {
+	Prefix      types.String `tfsdk:"prefix"`
+	Description types.String `tfsdk:"description"`
+	NextHop     types.String `tfsdk:"next_hop"`
+}
+
+// BfdConfig represents the configuration of BFD.
+type bfdConfigModel struct {
+	TxInterval types.Int64 `tfsdk:"tx_interval"`
+	RxInterval types.Int64 `tfsdk:"rx_interval"`
+	Multiplier types.Int64 `tfsdk:"multiplier"`
+}
+
+// BgpConnectionConfig represents the configuration of a BGP connection.
+type bgpConnectionConfigModel struct {
+	PeerAsn         types.Int64  `tfsdk:"peer_asn"`
+	LocalIPAddress  types.String `tfsdk:"local_ip_address"`
+	PeerIPAddress   types.String `tfsdk:"peer_ip_address"`
+	Password        types.String `tfsdk:"password"`
+	Shutdown        types.Bool   `tfsdk:"shutdown"`
+	Description     types.String `tfsdk:"description"`
+	MedIn           types.Int64  `tfsdk:"med_in"`
+	MedOut          types.Int64  `tfsdk:"med_out"`
+	BfdEnabled      types.Bool   `tfsdk:"bfd_enabled"`
+	ExportPolicy    types.String `tfsdk:"export_policy"`
+	PermitExportTo  types.List   `tfsdk:"permit_export_to"`
+	DenyExportTo    types.List   `tfsdk:"deny_export_to"`
+	ImportWhitelist types.Int64  `tfsdk:"import_whitelist"`
+	ImportBlacklist types.Int64  `tfsdk:"import_blacklist"`
+	ExportWhitelist types.Int64  `tfsdk:"export_whitelist"`
+	ExportBlacklist types.Int64  `tfsdk:"export_blacklist"`
 }
 
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
@@ -1142,6 +1236,142 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 					},
+					"partner_a_end_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the A-End order configuration. Only exists for A-End Configurations.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"interfaces": schema.ListNestedAttribute{
+								Description: "The interfaces of the partner configuration.",
+								Required:    true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"ip_addresses": schema.ListAttribute{
+											Description: "The IP addresses of the partner configuration.",
+											Optional:    true,
+											ElementType: types.StringType,
+										},
+										"ip_routes": schema.ListNestedAttribute{
+											Description: "The IP routes of the partner configuration.",
+											Optional:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"prefix": schema.StringAttribute{
+														Description: "The prefix of the IP route.",
+														Optional:    true,
+													},
+													"description": schema.StringAttribute{
+														Description: "The description of the IP route.",
+														Optional:    true,
+													},
+													"next_hop": schema.StringAttribute{
+														Description: "The next hop of the IP route.",
+														Optional:    true,
+													},
+												},
+											},
+										},
+										"nat_ip_addresses": schema.ListAttribute{
+											Description: "The NAT IP addresses of the partner configuration.",
+											Optional:    true,
+											ElementType: types.StringType,
+										},
+										"bfd": schema.SingleNestedAttribute{
+											Description: "The BFD of the partner configuration interface.",
+											Optional:    true,
+											Attributes: map[string]schema.Attribute{
+												"tx_interval": schema.Int64Attribute{
+													Description: "The transmit interval of the BFD.",
+													Optional:    true,
+												},
+												"rx_interval": schema.Int64Attribute{
+													Description: "The receive interval of the BFD.",
+													Optional:    true,
+												},
+												"multiplier": schema.Int64Attribute{
+													Description: "The multiplier of the BFD.",
+													Optional:    true,
+												},
+											},
+										},
+										"bgp_connections": schema.ListNestedAttribute{
+											Description: "The BGP connections of the partner configuration interface.",
+											Optional:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"peer_asn": schema.Int64Attribute{
+														Description: "The peer ASN of the BGP connection.",
+														Optional:    true,
+													},
+													"local_ip_address": schema.StringAttribute{
+														Description: "The local IP address of the BGP connection.",
+														Optional:    true,
+													},
+													"peer_ip_address": schema.StringAttribute{
+														Description: "The peer IP address of the BGP connection.",
+														Optional:    true,
+													},
+													"password": schema.StringAttribute{
+														Description: "The password of the BGP connection.",
+														Optional:    true,
+													},
+													"shutdown": schema.BoolAttribute{
+														Description: "Whether the BGP connection is shut down.",
+														Optional:    true,
+													},
+													"description": schema.StringAttribute{
+														Description: "The description of the BGP connection.",
+														Optional:    true,
+													},
+													"med_in": schema.Int64Attribute{
+														Description: "The MED in of the BGP connection.",
+														Optional:    true,
+													},
+													"med_out": schema.Int64Attribute{
+														Description: "The MED out of the BGP connection.",
+														Optional:    true,
+													},
+													"bfd_enabled": schema.BoolAttribute{
+														Description: "Whether BFD is enabled for the BGP connection.",
+														Optional:    true,
+													},
+													"export_policy": schema.StringAttribute{
+														Description: "The export policy of the BGP connection.",
+														Optional:    true,
+													},
+													"permit_export_to": schema.ListAttribute{
+														Description: "The permitted export to of the BGP connection.",
+														Optional:    true,
+														ElementType: types.StringType,
+													},
+													"deny_export_to": schema.ListAttribute{
+														Description: "The denied export to of the BGP connection.",
+														Optional:    true,
+														ElementType: types.StringType,
+													},
+													"import_whitelist": schema.Int64Attribute{
+														Description: "The import whitelist of the BGP connection.",
+														Optional:    true,
+													},
+													"import_blacklist": schema.Int64Attribute{
+														Description: "The import blacklist of the BGP connection.",
+														Optional:    true,
+													},
+													"export_whitelist": schema.Int64Attribute{
+														Description: "The export whitelist of the BGP connection.",
+														Optional:    true,
+													},
+													"export_blacklist": schema.Int64Attribute{
+														Description: "The export blacklist of the BGP connection.",
+														Optional:    true,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
@@ -1231,6 +1461,142 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 					},
+					"partner_a_end_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the A-End order configuration. Only exists for A-End Configurations and does not apply to B-End Partner Configuration.",
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"interfaces": schema.ListNestedAttribute{
+								Description: "The interfaces of the partner configuration.",
+								Required:    true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"ip_addresses": schema.ListAttribute{
+											Description: "The IP addresses of the partner configuration.",
+											Optional:    true,
+											ElementType: types.StringType,
+										},
+										"ip_routes": schema.ListNestedAttribute{
+											Description: "The IP routes of the partner configuration.",
+											Optional:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"prefix": schema.StringAttribute{
+														Description: "The prefix of the IP route.",
+														Optional:    true,
+													},
+													"description": schema.StringAttribute{
+														Description: "The description of the IP route.",
+														Optional:    true,
+													},
+													"next_hop": schema.StringAttribute{
+														Description: "The next hop of the IP route.",
+														Optional:    true,
+													},
+												},
+											},
+										},
+										"nat_ip_addresses": schema.ListAttribute{
+											Description: "The NAT IP addresses of the partner configuration.",
+											Optional:    true,
+											ElementType: types.StringType,
+										},
+										"bfd": schema.SingleNestedAttribute{
+											Description: "The BFD of the partner configuration interface.",
+											Optional:    true,
+											Attributes: map[string]schema.Attribute{
+												"tx_interval": schema.Int64Attribute{
+													Description: "The transmit interval of the BFD.",
+													Optional:    true,
+												},
+												"rx_interval": schema.Int64Attribute{
+													Description: "The receive interval of the BFD.",
+													Optional:    true,
+												},
+												"multiplier": schema.Int64Attribute{
+													Description: "The multiplier of the BFD.",
+													Optional:    true,
+												},
+											},
+										},
+										"bgp_connections": schema.ListNestedAttribute{
+											Description: "The BGP connections of the partner configuration interface.",
+											Optional:    true,
+											NestedObject: schema.NestedAttributeObject{
+												Attributes: map[string]schema.Attribute{
+													"peer_asn": schema.Int64Attribute{
+														Description: "The peer ASN of the BGP connection.",
+														Optional:    true,
+													},
+													"local_ip_address": schema.StringAttribute{
+														Description: "The local IP address of the BGP connection.",
+														Optional:    true,
+													},
+													"peer_ip_address": schema.StringAttribute{
+														Description: "The peer IP address of the BGP connection.",
+														Optional:    true,
+													},
+													"password": schema.StringAttribute{
+														Description: "The password of the BGP connection.",
+														Optional:    true,
+													},
+													"shutdown": schema.BoolAttribute{
+														Description: "Whether the BGP connection is shut down.",
+														Optional:    true,
+													},
+													"description": schema.StringAttribute{
+														Description: "The description of the BGP connection.",
+														Optional:    true,
+													},
+													"med_in": schema.Int64Attribute{
+														Description: "The MED in of the BGP connection.",
+														Optional:    true,
+													},
+													"med_out": schema.Int64Attribute{
+														Description: "The MED out of the BGP connection.",
+														Optional:    true,
+													},
+													"bfd_enabled": schema.BoolAttribute{
+														Description: "Whether BFD is enabled for the BGP connection.",
+														Optional:    true,
+													},
+													"export_policy": schema.StringAttribute{
+														Description: "The export policy of the BGP connection.",
+														Optional:    true,
+													},
+													"permit_export_to": schema.ListAttribute{
+														Description: "The permitted export to of the BGP connection.",
+														Optional:    true,
+														ElementType: types.StringType,
+													},
+													"deny_export_to": schema.ListAttribute{
+														Description: "The denied export to of the BGP connection.",
+														Optional:    true,
+														ElementType: types.StringType,
+													},
+													"import_whitelist": schema.Int64Attribute{
+														Description: "The import whitelist of the BGP connection.",
+														Optional:    true,
+													},
+													"import_blacklist": schema.Int64Attribute{
+														Description: "The import blacklist of the BGP connection.",
+														Optional:    true,
+													},
+													"export_whitelist": schema.Int64Attribute{
+														Description: "The export whitelist of the BGP connection.",
+														Optional:    true,
+													},
+													"export_blacklist": schema.Int64Attribute{
+														Description: "The export blacklist of the BGP connection.",
+														Optional:    true,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -1315,12 +1681,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             aPartnerConfig.Partner,
 				AWSPartnerConfig:    awsConfigObj,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -1362,12 +1730,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             aPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azureConfigObj,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -1416,12 +1786,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             aPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: googleConfigObj,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -1473,18 +1845,130 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             aPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracleConfigObj,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
+		case "a-end":
+			if aPartnerConfig.PartnerAEndConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": A-End Partner configuration is required",
+				)
+				return
+			}
+			var partnerConfigAEnd vxcPartnerConfigAEndModel
+			aEndDiags := aPartnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			if aEndDiags.HasError() {
+				resp.Diagnostics.Append(aEndDiags...)
+				return
+			}
+			aEndMegaportConfig := &megaport.VXCOrderAEndPartnerConfig{}
+			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
+			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, ifaceModels, false)
+			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
+			for _, iface := range ifaceModels {
+				toAppend := megaport.PartnerConfigInterface{}
+				if iface.IPAddresses.IsNull() {
+					ipAddresses := []string{}
+					ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
+					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
+					toAppend.IpAddresses = ipAddresses
+				}
+				if !iface.IPRoutes.IsNull() {
+					ipRoutes := []*ipRouteModel{}
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
+					for _, ipRoute := range ipRoutes {
+						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
+							Prefix:      ipRoute.Prefix.ValueString(),
+							Description: ipRoute.Description.ValueString(),
+							NextHop:     ipRoute.NextHop.ValueString(),
+						})
+					}
+				}
+				if !iface.NatIPAddresses.IsNull() {
+					natIPAddresses := []string{}
+					natDiags := iface.NatIPAddresses.ElementsAs(ctx, &natIPAddresses, true)
+					resp.Diagnostics = append(resp.Diagnostics, natDiags...)
+					toAppend.NatIpAddresses = natIPAddresses
+				}
+				if !iface.Bfd.IsNull() {
+					bfd := &bfdConfigModel{}
+					bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
+					resp.Diagnostics = append(resp.Diagnostics, bfdDiags...)
+					toAppend.Bfd = megaport.BfdConfig{
+						TxInterval: int(bfd.TxInterval.ValueInt64()),
+						RxInterval: int(bfd.RxInterval.ValueInt64()),
+						Multiplier: int(bfd.Multiplier.ValueInt64()),
+					}
+				}
+				if !iface.BgpConnections.IsNull() {
+					bgpConnections := []*bgpConnectionConfigModel{}
+					bgpDiags := iface.BgpConnections.ElementsAs(ctx, bgpConnections, false)
+					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
+					for _, bgpConnection := range bgpConnections {
+						bgpToAppend := megaport.BgpConnectionConfig{
+							PeerAsn:         int(bgpConnection.PeerAsn.ValueInt64()),
+							LocalIpAddress:  bgpConnection.LocalIPAddress.ValueString(),
+							PeerIpAddress:   bgpConnection.PeerIPAddress.ValueString(),
+							Password:        bgpConnection.Password.ValueString(),
+							Shutdown:        bgpConnection.Shutdown.ValueBool(),
+							Description:     bgpConnection.Description.ValueString(),
+							MedIn:           int(bgpConnection.MedIn.ValueInt64()),
+							MedOut:          int(bgpConnection.MedOut.ValueInt64()),
+							BfdEnabled:      bgpConnection.BfdEnabled.ValueBool(),
+							ExportPolicy:    bgpConnection.ExportPolicy.ValueString(),
+							ImportWhitelist: int(bgpConnection.ImportWhitelist.ValueInt64()),
+							ImportBlacklist: int(bgpConnection.ImportBlacklist.ValueInt64()),
+							ExportWhitelist: int(bgpConnection.ExportWhitelist.ValueInt64()),
+							ExportBlacklist: int(bgpConnection.ExportBlacklist.ValueInt64()),
+						}
+						if !bgpConnection.PermitExportTo.IsNull() {
+							permitExportTo := []string{}
+							permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
+							resp.Diagnostics = append(resp.Diagnostics, permitDiags...)
+							bgpToAppend.PermitExportTo = permitExportTo
+							bgpToAppend.PermitExportTo = permitExportTo
+						}
+						if !bgpConnection.DenyExportTo.IsNull() {
+							denyExportTo := []string{}
+							denyDiags := bgpConnection.DenyExportTo.ElementsAs(ctx, &denyExportTo, true)
+							resp.Diagnostics = append(resp.Diagnostics, denyDiags...)
+							bgpToAppend.DenyExportTo = denyExportTo
+						}
+						toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
+					}
+				}
+			}
+			aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndConfig)
+			resp.Diagnostics.Append(aEndDiags...)
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndConfigObj,
+			}
+			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = aEndPartnerConfigObj
+			aEndConfig.PartnerConfig = aEndMegaportConfig
 		default:
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1552,12 +2036,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             bPartnerConfig.Partner,
 				AWSPartnerConfig:    awsConfigObj,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -1607,12 +2093,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             bPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azureConfigObj,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -1661,12 +2149,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             bPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: googleConfigObj,
 				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -1717,12 +2207,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:             bPartnerConfig.Partner,
 				AWSPartnerConfig:    aws,
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracleConfigObj,
+				PartnerAEndConfig:   aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
