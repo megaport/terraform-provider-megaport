@@ -87,13 +87,13 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "port_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "port_uid", "a_end_partner_config", "b_end_partner_config", "a_end", "b_end"},
 			},
 		},
 	})
 }
 
-func TestAccMegaportMCRVXC_Basic(t *testing.T) {
+func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()

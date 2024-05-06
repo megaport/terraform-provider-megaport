@@ -184,10 +184,10 @@ var (
 		"export_policy":    types.StringType,
 		"permit_export_to": types.ListType{}.WithElementType(types.StringType),
 		"deny_export_to":   types.ListType{}.WithElementType(types.StringType),
-		"import_whitelist": types.Int64Type,
-		"import_blacklist": types.Int64Type,
-		"export_whitelist": types.Int64Type,
-		"export_blacklist": types.Int64Type,
+		"import_whitelist": types.StringType,
+		"import_blacklist": types.StringType,
+		"export_whitelist": types.StringType,
+		"export_blacklist": types.StringType,
 	}
 )
 
@@ -404,10 +404,10 @@ type bgpConnectionConfigModel struct {
 	ExportPolicy    types.String `tfsdk:"export_policy"`
 	PermitExportTo  types.List   `tfsdk:"permit_export_to"`
 	DenyExportTo    types.List   `tfsdk:"deny_export_to"`
-	ImportWhitelist types.Int64  `tfsdk:"import_whitelist"`
-	ImportBlacklist types.Int64  `tfsdk:"import_blacklist"`
-	ExportWhitelist types.Int64  `tfsdk:"export_whitelist"`
-	ExportBlacklist types.Int64  `tfsdk:"export_blacklist"`
+	ImportWhitelist types.String `tfsdk:"import_whitelist"`
+	ImportBlacklist types.String `tfsdk:"import_blacklist"`
+	ExportWhitelist types.String `tfsdk:"export_whitelist"`
+	ExportBlacklist types.String `tfsdk:"export_blacklist"`
 }
 
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
@@ -454,18 +454,24 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		orm.ContractEndDate = types.StringNull()
 	}
 
-	existingAEnd := &vxcEndConfigurationModel{}
-	aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
-	apiDiags = append(apiDiags, aEndDiags...)
+	var aEndOrderedProductUID, bEndOrderedProductUID string
+	var aEndOrderedVLAN, bEndOrderedVLAN int64
+	if !orm.AEndConfiguration.IsNull() {
+		existingAEnd := &vxcEndConfigurationModel{}
+		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, aEndDiags...)
+		aEndOrderedProductUID = existingAEnd.OrderedProductUID.ValueString()
+		aEndOrderedVLAN = existingAEnd.OrderedVLAN.ValueInt64()
+	}
 
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		OrderedProductUID:     existingAEnd.OrderedProductUID,
+		OrderedProductUID:     types.StringValue(aEndOrderedProductUID),
 		ProductUID:            types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.AEndConfiguration.Location),
-		OrderedVLAN:           existingAEnd.OrderedVLAN,
+		OrderedVLAN:           types.Int64Value(aEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.AEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
@@ -475,18 +481,22 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
-	existingBEnd := &vxcEndConfigurationModel{}
-	bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
-	apiDiags = append(apiDiags, bEndDiags...)
+	if !orm.BEndConfiguration.IsNull() {
+		existingBEnd := &vxcEndConfigurationModel{}
+		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, bEndDiags...)
+		bEndOrderedProductUID = existingBEnd.OrderedProductUID.ValueString()
+		bEndOrderedVLAN = existingBEnd.OrderedVLAN.ValueInt64()
+	}
 
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		OrderedProductUID:     existingBEnd.OrderedProductUID,
+		OrderedProductUID:     types.StringValue(bEndOrderedProductUID),
 		ProductUID:            types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.BEndConfiguration.Location),
-		OrderedVLAN:           existingBEnd.OrderedVLAN,
+		OrderedVLAN:           types.Int64Value(bEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
 		InnerVLAN:             types.Int64Value(int64(v.BEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
@@ -1053,6 +1063,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_product_uid": schema.StringAttribute{
 						Description: "The initial ordered product UID of the A-End configuration.",
 						Optional:    true,
+						Computed:    true,
 					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the A-End configuration.",
@@ -1073,6 +1084,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The initial ordered VLAN of the A-End configuration.",
 						Optional:    true,
+						Computed:    true,
 						Validators:  []validator.Int64{int64validator.AtLeast(0)},
 					},
 					"vlan": schema.Int64Attribute{
@@ -1107,6 +1119,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_product_uid": schema.StringAttribute{
 						Description: "The initial ordered product UID of the B-End configuration.",
 						Optional:    true,
+						Computed:    true,
 					},
 					"product_uid": schema.StringAttribute{
 						Description: "The product UID of the B-End configuration.",
@@ -1127,6 +1140,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The initial ordered VLAN of the B-End configuration.",
 						Optional:    true,
+						Computed:    true,
 						Validators:  []validator.Int64{int64validator.AtLeast(0)},
 					},
 					"vlan": schema.Int64Attribute{
@@ -1157,7 +1171,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "a-end"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1348,19 +1362,19 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.Int64Attribute{
+													"import_whitelist": schema.StringAttribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
 													},
-													"import_blacklist": schema.Int64Attribute{
+													"import_blacklist": schema.StringAttribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
 													},
-													"export_whitelist": schema.Int64Attribute{
+													"export_whitelist": schema.StringAttribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
 													},
-													"export_blacklist": schema.Int64Attribute{
+													"export_blacklist": schema.StringAttribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
 													},
@@ -1573,19 +1587,19 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.Int64Attribute{
+													"import_whitelist": schema.StringAttribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
 													},
-													"import_blacklist": schema.Int64Attribute{
+													"import_blacklist": schema.StringAttribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
 													},
-													"export_whitelist": schema.Int64Attribute{
+													"export_whitelist": schema.StringAttribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
 													},
-													"export_blacklist": schema.Int64Attribute{
+													"export_blacklist": schema.StringAttribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
 													},
@@ -1627,24 +1641,31 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.Shutdown = plan.Shutdown.ValueBool()
 	}
 
-	aEndObj := plan.AEndConfiguration
+	aEndConfig := &megaport.VXCOrderEndpointConfiguration{}
+	bEndConfig := &megaport.VXCOrderEndpointConfiguration{}
+	a := &vxcEndConfigurationModel{}
+	b := &vxcEndConfigurationModel{}
+
 	bEndObj := plan.BEndConfiguration
 
-	var a vxcEndConfigurationModel
-	aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
-	if aEndDiags.HasError() {
-		resp.Diagnostics.Append(aEndDiags...)
-		return
-	}
-	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.OrderedProductUID.ValueString(),
-		VLAN:       int(a.VLAN.ValueInt64()),
-	}
+	if !plan.AEndConfiguration.IsNull() {
+		aEndObj := plan.AEndConfiguration
 
-	if !a.OrderedVLAN.IsNull() {
-		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
+		aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
+		if aEndDiags.HasError() {
+			resp.Diagnostics.Append(aEndDiags...)
+			return
+		}
+		aEndConfig.ProductUID = a.OrderedProductUID.ValueString()
+		aEndConfig.VLAN = int(a.VLAN.ValueInt64())
+
+		if !a.OrderedVLAN.IsNull() {
+			aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
+		} else {
+			aEndConfig.VLAN = 0
+		}
 	} else {
-		aEndConfig.VLAN = 0
+		plan.AEndConfiguration = types.ObjectNull(vxcEndConfigurationAttrs)
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
@@ -1666,14 +1687,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(awsDiags...)
 				return
 			}
-			aEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
-				ConnectType:  awsConfig.ConnectType.ValueString(),
-				Type:         awsConfig.Type.ValueString(),
-				OwnerAccount: awsConfig.OwnerAccount.ValueString(),
-				ASN:          int(awsConfig.ASN.ValueInt64()),
-				AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
-				AuthKey:      awsConfig.AuthKey.ValueString(),
-				Prefixes:     awsConfig.Prefixes.ValueString(),
+			aEndPartnerConfig := megaport.VXCPartnerConfigAWS{
+				ConnectType:       awsConfig.ConnectType.ValueString(),
+				Type:              awsConfig.Type.ValueString(),
+				OwnerAccount:      awsConfig.OwnerAccount.ValueString(),
+				ASN:               int(awsConfig.ASN.ValueInt64()),
+				AmazonASN:         int(awsConfig.AmazonASN.ValueInt64()),
+				AuthKey:           awsConfig.AuthKey.ValueString(),
+				Prefixes:          awsConfig.Prefixes.ValueString(),
+				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
+				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
 			}
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
 			resp.Diagnostics.Append(awsDiags...)
@@ -1719,7 +1742,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 			aEndConfig.ProductUID = partnerPortRes.ProductUID
-			aEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
+			aEndPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
@@ -1758,7 +1781,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(googleDiags...)
 				return
 			}
-			aEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
+			aEndPartnerConfig := megaport.VXCPartnerConfigGoogle{
 				ConnectType: "GOOGLE",
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
@@ -1873,9 +1896,18 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			aEndMegaportConfig := &megaport.VXCOrderAEndPartnerConfig{}
+			prefixFilterListRes, err := r.client.MCRService.GetMCRPrefixFilterLists(ctx, plan.PortUID.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+
+			aEndMegaportConfig := megaport.VXCOrderAEndPartnerConfig{}
 			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
-			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, ifaceModels, false)
+			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, &ifaceModels, false)
 			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
 			for _, iface := range ifaceModels {
 				toAppend := megaport.PartnerConfigInterface{}
@@ -1915,24 +1947,48 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.BgpConnections.IsNull() {
 					bgpConnections := []*bgpConnectionConfigModel{}
-					bgpDiags := iface.BgpConnections.ElementsAs(ctx, bgpConnections, false)
+					bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
-							PeerAsn:         int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalIpAddress:  bgpConnection.LocalIPAddress.ValueString(),
-							PeerIpAddress:   bgpConnection.PeerIPAddress.ValueString(),
-							Password:        bgpConnection.Password.ValueString(),
-							Shutdown:        bgpConnection.Shutdown.ValueBool(),
-							Description:     bgpConnection.Description.ValueString(),
-							MedIn:           int(bgpConnection.MedIn.ValueInt64()),
-							MedOut:          int(bgpConnection.MedOut.ValueInt64()),
-							BfdEnabled:      bgpConnection.BfdEnabled.ValueBool(),
-							ExportPolicy:    bgpConnection.ExportPolicy.ValueString(),
-							ImportWhitelist: int(bgpConnection.ImportWhitelist.ValueInt64()),
-							ImportBlacklist: int(bgpConnection.ImportBlacklist.ValueInt64()),
-							ExportWhitelist: int(bgpConnection.ExportWhitelist.ValueInt64()),
-							ExportBlacklist: int(bgpConnection.ExportBlacklist.ValueInt64()),
+							PeerAsn:        int(bgpConnection.PeerAsn.ValueInt64()),
+							LocalIpAddress: bgpConnection.LocalIPAddress.ValueString(),
+							PeerIpAddress:  bgpConnection.PeerIPAddress.ValueString(),
+							Password:       bgpConnection.Password.ValueString(),
+							Shutdown:       bgpConnection.Shutdown.ValueBool(),
+							Description:    bgpConnection.Description.ValueString(),
+							MedIn:          int(bgpConnection.MedIn.ValueInt64()),
+							MedOut:         int(bgpConnection.MedOut.ValueInt64()),
+							BfdEnabled:     bgpConnection.BfdEnabled.ValueBool(),
+							ExportPolicy:   bgpConnection.ExportPolicy.ValueString(),
+						}
+						if !bgpConnection.ImportWhitelist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ImportWhitelist.ValueString() {
+									bgpToAppend.ImportWhitelist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ImportBlacklist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ImportBlacklist.ValueString() {
+									bgpToAppend.ImportBlacklist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ExportWhitelist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ExportWhitelist.ValueString() {
+									bgpToAppend.ExportWhitelist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ExportBlacklist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ExportBlacklist.ValueString() {
+									bgpToAppend.ExportBlacklist = prefixFilterList.Id
+								}
+							}
 						}
 						if !bgpConnection.PermitExportTo.IsNull() {
 							permitExportTo := []string{}
@@ -1950,8 +2006,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 						toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
 					}
 				}
+				aEndMegaportConfig.Interfaces = append(aEndMegaportConfig.Interfaces, toAppend)
 			}
-			aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndConfig)
+			aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, partnerConfigAEnd)
 			resp.Diagnostics.Append(aEndDiags...)
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1965,7 +2022,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				OraclePartnerConfig: oracle,
 				PartnerAEndConfig:   aEndConfigObj,
 			}
-			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndPartnerConfigModel)
+			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.AEndPartnerConfig = aEndPartnerConfigObj
 			aEndConfig.PartnerConfig = aEndMegaportConfig
@@ -1980,27 +2037,30 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.AEndConfiguration = *aEndConfig
 
-	var b vxcEndConfigurationModel
-	bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
-	if bEndDiags.HasError() {
-		resp.Diagnostics.Append(bEndDiags...)
-		return
-	}
-	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: b.OrderedProductUID.ValueString(),
-		VLAN:       int(b.VLAN.ValueInt64()),
-	}
-	if !b.OrderedVLAN.IsNull() {
-		bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
-	} else {
-		bEndConfig.VLAN = 0
-	}
-	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
-		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
+	if !plan.BEndConfiguration.IsNull() {
+		bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
+		if bEndDiags.HasError() {
+			resp.Diagnostics.Append(bEndDiags...)
+			return
 		}
+		bEndConfig.ProductUID = b.OrderedProductUID.ValueString()
+		bEndConfig.VLAN = int(b.VLAN.ValueInt64())
+
+		if !b.OrderedVLAN.IsNull() {
+			bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
+		} else {
+			bEndConfig.VLAN = 0
+		}
+		if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
+			bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
+				InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
+				NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
+			}
+		}
+	} else {
+		plan.BEndConfiguration = types.ObjectNull(vxcEndConfigurationAttrs)
 	}
+
 	if !plan.BEndPartnerConfig.IsNull() {
 		var bPartnerConfig vxcPartnerConfigurationModel
 		bPartnerDiags := plan.BEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
@@ -2020,14 +2080,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(awsDiags...)
 				return
 			}
-			bEndPartnerConfig := &megaport.VXCPartnerConfigAWS{
-				ConnectType:  awsConfig.ConnectType.ValueString(),
-				Type:         awsConfig.Type.ValueString(),
-				OwnerAccount: awsConfig.OwnerAccount.ValueString(),
-				ASN:          int(awsConfig.ASN.ValueInt64()),
-				AmazonASN:    int(awsConfig.AmazonASN.ValueInt64()),
-				AuthKey:      awsConfig.AuthKey.ValueString(),
-				Prefixes:     awsConfig.Prefixes.ValueString(),
+			bEndPartnerConfig := megaport.VXCPartnerConfigAWS{
+				ConnectType:       awsConfig.ConnectType.ValueString(),
+				Type:              awsConfig.Type.ValueString(),
+				OwnerAccount:      awsConfig.OwnerAccount.ValueString(),
+				ASN:               int(awsConfig.ASN.ValueInt64()),
+				AmazonASN:         int(awsConfig.AmazonASN.ValueInt64()),
+				AuthKey:           awsConfig.AuthKey.ValueString(),
+				Prefixes:          awsConfig.Prefixes.ValueString(),
+				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
+				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
 			}
 
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
@@ -2064,7 +2126,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(azureDiags...)
 				return
 			}
-			bEndPartnerConfig := &megaport.VXCPartnerConfigAzure{
+			bEndPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
@@ -2121,7 +2183,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(googleDiags...)
 				return
 			}
-			bEndPartnerConfig := &megaport.VXCPartnerConfigGoogle{
+			bEndPartnerConfig := megaport.VXCPartnerConfigGoogle{
 				ConnectType: "GOOGLE",
 				PairingKey:  googleConfig.PairingKey.ValueString(),
 			}
@@ -2162,7 +2224,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.BEndPartnerConfig = partnerConfigObj
-
 			bEndConfig.PartnerConfig = bEndPartnerConfig
 		case "oracle":
 			if bPartnerConfig.OraclePartnerConfig.IsNull() {
@@ -2178,7 +2239,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(oracleDiags...)
 				return
 			}
-			bEndPartnerConfig := &megaport.VXCPartnerConfigOracle{
+			bEndPartnerConfig := megaport.VXCPartnerConfigOracle{
 				ConnectType:      "ORACLE",
 				VirtualCircuitId: oracleConfig.VirtualCircuitId.ValueString(),
 			}
