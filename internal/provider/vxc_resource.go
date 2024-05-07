@@ -1641,36 +1641,32 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.Shutdown = plan.Shutdown.ValueBool()
 	}
 
-	aEndConfig := &megaport.VXCOrderEndpointConfiguration{}
-	bEndConfig := &megaport.VXCOrderEndpointConfiguration{}
-	a := &vxcEndConfigurationModel{}
-	b := &vxcEndConfigurationModel{}
-
+	aEndObj := plan.AEndConfiguration
 	bEndObj := plan.BEndConfiguration
 
-	if !plan.AEndConfiguration.IsNull() {
-		aEndObj := plan.AEndConfiguration
+	var a vxcEndConfigurationModel
+	aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
+	if aEndDiags.HasError() {
+		resp.Diagnostics.Append(aEndDiags...)
+		return
+	}
+	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
+		ProductUID: a.OrderedProductUID.ValueString(),
+		VLAN:       int(a.VLAN.ValueInt64()),
+	}
 
-		aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
-		if aEndDiags.HasError() {
-			resp.Diagnostics.Append(aEndDiags...)
-			return
-		}
-		aEndConfig.ProductUID = a.OrderedProductUID.ValueString()
-		aEndConfig.VLAN = int(a.VLAN.ValueInt64())
-
-		if !a.OrderedVLAN.IsNull() {
-			aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
-		} else {
-			aEndConfig.VLAN = 0
-		}
+	if !a.OrderedVLAN.IsNull() {
+		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
 	} else {
-		plan.AEndConfiguration = types.ObjectNull(vxcEndConfigurationAttrs)
+		aEndConfig.VLAN = 0
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
 		var aPartnerConfig vxcPartnerConfigurationModel
-		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{})
+		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{
+			UnhandledNullAsEmpty:    true,
+			UnhandledUnknownAsEmpty: true,
+		})
 		resp.Diagnostics.Append(aPartnerDiags...)
 		switch aPartnerConfig.Partner.ValueString() {
 		case "aws":
@@ -1883,6 +1879,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "a-end":
+
 			if aPartnerConfig.PartnerAEndConfig.IsNull() {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1911,7 +1908,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
 			for _, iface := range ifaceModels {
 				toAppend := megaport.PartnerConfigInterface{}
-				if iface.IPAddresses.IsNull() {
+				if !iface.IPAddresses.IsNull() {
 					ipAddresses := []string{}
 					ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
 					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
@@ -2037,30 +2034,27 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.AEndConfiguration = *aEndConfig
 
-	if !plan.BEndConfiguration.IsNull() {
-		bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
-		if bEndDiags.HasError() {
-			resp.Diagnostics.Append(bEndDiags...)
-			return
-		}
-		bEndConfig.ProductUID = b.OrderedProductUID.ValueString()
-		bEndConfig.VLAN = int(b.VLAN.ValueInt64())
-
-		if !b.OrderedVLAN.IsNull() {
-			bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
-		} else {
-			bEndConfig.VLAN = 0
-		}
-		if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
-			bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-				InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
-				NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
-			}
-		}
-	} else {
-		plan.BEndConfiguration = types.ObjectNull(vxcEndConfigurationAttrs)
+	var b vxcEndConfigurationModel
+	bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
+	if bEndDiags.HasError() {
+		resp.Diagnostics.Append(bEndDiags...)
+		return
 	}
-
+	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
+		ProductUID: b.OrderedProductUID.ValueString(),
+		VLAN:       int(b.VLAN.ValueInt64()),
+	}
+	if !b.OrderedVLAN.IsNull() {
+		bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
+	} else {
+		bEndConfig.VLAN = 0
+	}
+	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
+		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
+			InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
+			NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
+		}
+	}
 	if !plan.BEndPartnerConfig.IsNull() {
 		var bPartnerConfig vxcPartnerConfigurationModel
 		bPartnerDiags := plan.BEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
@@ -2290,6 +2284,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			return
 		}
 	}
+
+	buyReq.BEndConfiguration = *bEndConfig
 
 	buyReq.BEndConfiguration = *bEndConfig
 
