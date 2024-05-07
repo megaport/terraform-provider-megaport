@@ -34,6 +34,7 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `cost_centre` (String) Cost centre of the product.
 - `lag_id` (Number) Numeric ID of the LAG.
 - `locked` (Boolean) Whether the product is locked.
+- `prefix_filter_list` (Attributes) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_list))
 - `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
 ### Read-Only
@@ -58,6 +59,27 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
+
+<a id="nestedatt--prefix_filter_list"></a>
+### Nested Schema for `prefix_filter_list`
+
+Optional:
+
+- `address_family` (String) Address family of the prefix filter list.
+- `description` (String) Description of the prefix filter list.
+- `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_list--entries))
+
+<a id="nestedatt--prefix_filter_list--entries"></a>
+### Nested Schema for `prefix_filter_list.entries`
+
+Optional:
+
+- `action` (String) Action of the prefix filter list entry.
+- `ge` (Number) Greater than or equal to value of the prefix filter list entry.
+- `le` (Number) Less than or equal to value of the prefix filter list entry.
+- `prefix` (String) Prefix of the prefix filter list entry.
+
+
 
 <a id="nestedatt--virtual_router"></a>
 ### Nested Schema for `virtual_router`
