@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -15,6 +17,35 @@ import (
 var (
 	_ datasource.DataSource              = &locationDataSource{}
 	_ datasource.DataSourceWithConfigure = &locationDataSource{}
+
+	locationProductsAttrs = map[string]attr.Type{
+		"mcr":         types.BoolType,
+		"mcr_version": types.Int64Type,
+		"megaport":    types.ListType{}.WithElementType(types.Int64Type),
+		"mve":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(locationMVEAttrs)),
+		"mcr1":        types.ListType{}.WithElementType(types.Int64Type),
+		"mcr2":        types.ListType{}.WithElementType(types.Int64Type),
+	}
+
+	locationMVEAttrs = map[string]attr.Type{
+		"sizes":              types.ListType{}.WithElementType(types.StringType),
+		"details":            types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(locationMVEDetailsAttrs)),
+		"max_cpu_count":      types.Int64Type,
+		"version":            types.StringType,
+		"product":            types.StringType,
+		"vendor":             types.StringType,
+		"vendor_description": types.StringType,
+		"id":                 types.Int64Type,
+		"release_image":      types.BoolType,
+	}
+
+	locationMVEDetailsAttrs = map[string]attr.Type{
+		"size":           types.StringType,
+		"label":          types.StringType,
+		"cpu_core_count": types.Int64Type,
+		"ram_gb":         types.Int64Type,
+		"bandwidth_mbps": types.Int64Type,
+	}
 )
 
 // locationDataSource is the data source implementation.
@@ -24,44 +55,44 @@ type locationDataSource struct {
 
 // locationModel maps the data source schema data.
 type locationModel struct {
-	Name             types.String            `tfsdk:"name"`
-	Country          types.String            `tfsdk:"country"`
-	LiveDate         types.String            `tfsdk:"live_date"`
-	SiteCode         types.String            `tfsdk:"site_code"`
-	NetworkRegion    types.String            `tfsdk:"network_region"`
-	Address          map[string]types.String `tfsdk:"address"`
-	Campus           types.String            `tfsdk:"campus"`
-	Latitude         types.Float64           `tfsdk:"latitude"`
-	Longitude        types.Float64           `tfsdk:"longitude"`
-	Products         *locationProductsModel  `tfsdk:"products"`
-	Market           types.String            `tfsdk:"market"`
-	Metro            types.String            `tfsdk:"metro"`
-	VRouterAvailable types.Bool              `tfsdk:"v_router_available"`
-	ID               types.Int64             `tfsdk:"id"`
-	Status           types.String            `tfsdk:"status"`
+	Name             types.String  `tfsdk:"name"`
+	Country          types.String  `tfsdk:"country"`
+	LiveDate         types.String  `tfsdk:"live_date"`
+	SiteCode         types.String  `tfsdk:"site_code"`
+	NetworkRegion    types.String  `tfsdk:"network_region"`
+	Address          types.Map     `tfsdk:"address"`
+	Campus           types.String  `tfsdk:"campus"`
+	Latitude         types.Float64 `tfsdk:"latitude"`
+	Longitude        types.Float64 `tfsdk:"longitude"`
+	Products         types.Object  `tfsdk:"products"`
+	Market           types.String  `tfsdk:"market"`
+	Metro            types.String  `tfsdk:"metro"`
+	VRouterAvailable types.Bool    `tfsdk:"v_router_available"`
+	ID               types.Int64   `tfsdk:"id"`
+	Status           types.String  `tfsdk:"status"`
 }
 
 // locationProductsModel maps the data source schema data.
 type locationProductsModel struct {
-	MCR        bool                `tfsdk:"mcr"`
-	MCRVersion int                 `tfsdk:"mcr_version"`
-	Megaport   []int               `tfsdk:"megaport"`
-	MVE        []*locationMVEMovel `tfsdk:"mve"`
-	MCR1       []int               `tfsdk:"mcr1"`
-	MCR2       []int               `tfsdk:"mcr2"`
+	MCR        types.Bool  `tfsdk:"mcr"`
+	MCRVersion types.Int64 `tfsdk:"mcr_version"`
+	Megaport   types.List  `tfsdk:"megaport"`
+	MVE        types.List  `tfsdk:"mve"`
+	MCR1       types.List  `tfsdk:"mcr1"`
+	MCR2       types.List  `tfsdk:"mcr2"`
 }
 
 // locationMVEMovel maps the data source schema data.
 type locationMVEMovel struct {
-	Sizes             []types.String             `tfsdk:"sizes"`
-	Details           []*locationMVEDetailsModel `tfsdk:"details"`
-	MaxCPUCount       types.Int64                `tfsdk:"max_cpu_count"`
-	Version           types.String               `tfsdk:"version"`
-	Product           types.String               `tfsdk:"product"`
-	Vendor            types.String               `tfsdk:"vendor"`
-	VendorDescription types.String               `tfsdk:"vendor_description"`
-	ID                types.Int64                `tfsdk:"id"`
-	ReleaseImage      types.Bool                 `tfsdk:"release_image"`
+	Sizes             types.List   `tfsdk:"sizes"`
+	Details           types.List   `tfsdk:"details"`
+	MaxCPUCount       types.Int64  `tfsdk:"max_cpu_count"`
+	Version           types.String `tfsdk:"version"`
+	Product           types.String `tfsdk:"product"`
+	Vendor            types.String `tfsdk:"vendor"`
+	VendorDescription types.String `tfsdk:"vendor_description"`
+	ID                types.Int64  `tfsdk:"id"`
+	ReleaseImage      types.Bool   `tfsdk:"release_image"`
 }
 
 // locationMVEDetailsModel maps the data source schema data.
@@ -248,7 +279,8 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 	}
 }
 
-func (orm *locationModel) fromAPILocation(l *megaport.Location) {
+func (orm *locationModel) fromAPILocation(ctx context.Context, l *megaport.Location) diag.Diagnostics {
+	diags := diag.Diagnostics{}
 	orm.Name = types.StringValue(l.Name)
 	orm.Country = types.StringValue(l.Country)
 	if l.LiveDate != nil {
@@ -264,19 +296,29 @@ func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 	orm.VRouterAvailable = types.BoolValue(l.VRouterAvailable)
 	orm.ID = types.Int64Value(int64(l.ID))
 	orm.Status = types.StringValue(l.Status)
-	orm.Address = make(map[string]types.String)
 
-	for k, v := range l.Address {
-		orm.Address[k] = types.StringValue(v)
-	}
+	address, addressDiags := types.MapValueFrom(ctx, types.StringType, l.Address)
+	diags = append(diags, addressDiags...)
+	orm.Address = address
 
 	products := &locationProductsModel{
-		MCR:        l.Products.MCR,
-		MCRVersion: l.Products.MCRVersion,
-		Megaport:   l.Products.Megaport,
-		MCR1:       l.Products.MCR1,
-		MCR2:       l.Products.MCR2,
+		MCR:        types.BoolValue(l.Products.MCR),
+		MCRVersion: types.Int64Value(int64(l.Products.MCRVersion)),
 	}
+	megaportsList, mpListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.Megaport)
+	diags = append(diags, mpListDiags...)
+	products.Megaport = megaportsList
+
+	mcr1List, mcr1ListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.MCR1)
+	diags = append(diags, mcr1ListDiags...)
+	products.MCR1 = mcr1List
+
+	mcr2List, mcr2ListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.MCR2)
+	diags = append(diags, mcr2ListDiags...)
+	products.MCR2 = mcr2List
+
+	mveObjects := []types.Object{}
+
 	for _, mve := range l.Products.MVE {
 		m := &locationMVEMovel{
 			MaxCPUCount:       types.Int64Value(int64(mve.MaxCPUCount)),
@@ -287,6 +329,10 @@ func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 			ID:                types.Int64Value(int64(mve.ID)),
 			ReleaseImage:      types.BoolValue(mve.ReleaseImage),
 		}
+		sizesList, sizesListDiags := types.ListValueFrom(ctx, types.StringType, mve.Sizes)
+		diags = append(diags, sizesListDiags...)
+		m.Sizes = sizesList
+		detailsObjects := []types.Object{}
 		for _, detail := range mve.Details {
 			d := &locationMVEDetailsModel{
 				Size:          types.StringValue(detail.Size),
@@ -295,11 +341,25 @@ func (orm *locationModel) fromAPILocation(l *megaport.Location) {
 				RamGB:         types.Int64Value(int64(detail.RamGB)),
 				BandwidthMbps: types.Int64Value(int64(detail.BandwidthMbps)),
 			}
-			m.Details = append(m.Details, d)
+			detailObj, detailDiags := types.ObjectValueFrom(ctx, locationMVEDetailsAttrs, d)
+			diags = append(diags, detailDiags...)
+			detailsObjects = append(detailsObjects, detailObj)
 		}
-		products.MVE = append(products.MVE, m)
+		detailsList, detailsListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(locationMVEDetailsAttrs), detailsObjects)
+		diags = append(diags, detailsListDiags...)
+		m.Details = detailsList
+		mveObj, mveDiags := types.ObjectValueFrom(ctx, locationMVEAttrs, m)
+		diags = append(diags, mveDiags...)
+		mveObjects = append(mveObjects, mveObj)
 	}
-	orm.Products = products
+	mveList, mveListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(locationMVEAttrs), mveObjects)
+	diags = append(diags, mveListDiags...)
+	products.MVE = mveList
+	productsObj, productsDiags := types.ObjectValueFrom(ctx, locationProductsAttrs, products)
+	diags = append(diags, productsDiags...)
+	orm.Products = productsObj
+
+	return diags
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -322,7 +382,8 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	state.fromAPILocation(location)
+	apiDiags := state.fromAPILocation(ctx, location)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Set state
 	diags = resp.State.Set(ctx, &state)
