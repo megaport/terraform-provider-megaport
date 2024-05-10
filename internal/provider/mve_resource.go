@@ -12,7 +12,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -28,8 +32,8 @@ var (
 	_ resource.ResourceWithImportState = &mveResource{}
 
 	resourcesAttrs = map[string]attr.Type{
-		"interface":       types.ObjectType{},
-		"virtual_machine": types.ListType{},
+		"interface":       types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),
+		"virtual_machine": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(virtualMachineAttrs)),
 	}
 
 	vnicAttrs = map[string]attr.Type{
@@ -40,10 +44,10 @@ var (
 	virtualMachineAttrs = map[string]attr.Type{
 		"id":            types.Int64Type,
 		"cpu_count":     types.Int64Type,
-		"image":         types.ObjectType{},
+		"image":         types.ObjectType{}.WithAttributeTypes(virtualMachineImageAttrs),
 		"resource_type": types.StringType,
 		"up":            types.BoolType,
-		"vnics":         types.ListType{},
+		"vnics":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vnicAttrs)),
 	}
 
 	virtualMachineImageAttrs = map[string]attr.Type{
@@ -71,7 +75,7 @@ type mveResourceModel struct {
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxcpermitted"`
+	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
@@ -137,72 +141,23 @@ type mveVirtualMachineImageModel struct {
 	Version types.String `tfsdk:"version"`
 }
 
-// vendorConfigModel is an interface for MVE vendor configuration.
-type vendorConfigModel interface {
-	IsVendorConfig()
-}
-
-// arubaConfigModel represents the configuration for an Aruba MVE.
-type arubaConfigModel struct {
-	vendorConfigModel
-	Vendor      types.String `tfsdk:"vendor"`
-	ImageID     types.Int64  `tfsdk:"image_id"`
-	ProductSize types.String `tfsdk:"product_size"`
-	AccountName types.String `tfsdk:"account_name"`
-	AccountKey  types.String `tfsdk:"account_key"`
-}
-
-// ciscoConfigModel represents the configuration for a Cisco MVE.
-type ciscoConfigModel struct {
-	vendorConfigModel
+// vendorConfigModel represents the vendor configuration for an MVE.
+type vendorConfigModel struct {
 	Vendor            types.String `tfsdk:"vendor"`
 	ImageID           types.Int64  `tfsdk:"image_id"`
 	ProductSize       types.String `tfsdk:"product_size"`
+	AccountName       types.String `tfsdk:"account_name"`
+	AccountKey        types.String `tfsdk:"account_key"`
 	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
 	CloudInit         types.String `tfsdk:"cloud_init"`
-}
-
-// fortinetConfigModel represents the configuration for a Fortinet MVE.
-type fortinetConfigModel struct {
-	vendorConfigModel
-	Vendor            types.String `tfsdk:"vendor"`
-	ImageID           types.Int64  `tfsdk:"image_id"`
-	ProductSize       types.String `tfsdk:"product_size"`
-	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
 	LicenseData       types.String `tfsdk:"license_data"`
-}
-
-// paloAltoConfigModel represents the configuration for a Palo Alto MVE.
-type paloAltoConfigModel struct {
-	vendorConfigModel
-	Vendor            types.String `tfsdk:"vendor"`
-	ImageID           types.Int64  `tfsdk:"image_id"`
-	ProductSize       types.String `tfsdk:"product_size"`
-	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
 	AdminPasswordHash types.String `tfsdk:"admin_password_hash"`
-	LicenseData       types.String `tfsdk:"license_data"`
-}
-
-// versaConfigModel represents the configuration for a Versa MVE.
-type versaConfigModel struct {
-	vendorConfigModel
-	Vendor            types.String `tfsdk:"vendor"`
-	ImageID           types.Int64  `tfsdk:"image_id"`
-	ProductSize       types.String `tfsdk:"product_size"`
 	DirectorAddress   types.String `tfsdk:"director_address"`
 	ControllerAddress types.String `tfsdk:"controller_address"`
 	LocalAuth         types.String `tfsdk:"local_auth"`
 	RemoteAuth        types.String `tfsdk:"remote_auth"`
 	SerialNumber      types.String `tfsdk:"serial_number"`
-}
-
-// vmwareConfigModel represents the configuration for a VMware MVE.
-type vmwareConfig struct {
-	vendorConfigModel
-	Vendor            types.String `tfsdk:"vendor"`
-	ImageID           types.Int64  `tfsdk:"image_id"`
-	ProductSize       types.String `tfsdk:"product_size"`
-	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	SystemTag         types.String `tfsdk:"system_tag"`
 	VcoAddress        types.String `tfsdk:"vco_address"`
 	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
 }
@@ -232,37 +187,37 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.Vendor = types.StringValue(p.Vendor)
 	orm.Size = types.StringValue(p.Size)
+	orm.LiveDate = types.StringValue("")
+	orm.TerminateDate = types.StringValue("")
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	} else {
-		orm.CreateDate = types.StringNull()
+		orm.CreateDate = types.StringValue("")
 	}
 	if p.TerminateDate != nil {
 		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
-	} else {
-		orm.TerminateDate = types.StringNull()
 	}
 	if p.LiveDate != nil {
 		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
 	}
 	if p.ContractStartDate != nil {
 		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
 	} else {
-		orm.ContractStartDate = types.StringNull()
+		orm.ContractStartDate = types.StringValue("")
 	}
 	if p.ContractEndDate != nil {
 		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
 	} else {
-		orm.ContractEndDate = types.StringNull()
+		orm.ContractEndDate = types.StringValue("")
 	}
 
 	if p.AttributeTags != nil {
 		tags, tagDiags := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
 		apiDiags = append(apiDiags, tagDiags...)
 		orm.AttributeTags = tags
+	} else {
+		orm.AttributeTags = types.MapNull(types.StringType)
 	}
 
 	vnics := []types.Object{}
@@ -292,10 +247,13 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 				PortSpeed:    types.Int64Value(int64(p.Resources.Interface.PortSpeed)),
 				ResourceName: types.StringValue(p.Resources.Interface.ResourceName),
 				ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
+				Up:           types.Int64Value(int64(p.Resources.Interface.Up)),
 			}
 			interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portInterfaceAttrs, interfaceModel)
 			apiDiags = append(apiDiags, interfaceDiags...)
 			resourcesModel.Interface = interfaceObject
+		} else {
+			resourcesModel.Interface = types.ObjectNull(portInterfaceAttrs)
 		}
 		virtualMachineObjects := []types.Object{}
 		for _, vm := range p.Resources.VirtualMachines {
@@ -315,6 +273,8 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 				image, imageDiags := types.ObjectValueFrom(ctx, virtualMachineImageAttrs, imageModel)
 				apiDiags = append(apiDiags, imageDiags...)
 				vmModel.Image = image
+			} else {
+				vmModel.Image = types.ObjectNull(virtualMachineImageAttrs)
 			}
 			vnics := []types.Object{}
 			for _, vnic := range vm.Vnics {
@@ -343,82 +303,73 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	return apiDiags
 }
 
-func toAPIVendorConfig(ctx context.Context, o types.Object) (megaport.VendorConfig, diag.Diagnostics) {
+func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
-	vendor := o.Attributes()["vendor"].String()
-	switch vendor {
+
+	switch v.Vendor.ValueString() {
 	case "aruba":
-		var cfg arubaConfigModel
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.ArubaConfig{
-			Vendor:      vendor,
-			ImageID:     int(cfg.ImageID.ValueInt64()),
-			ProductSize: cfg.ProductSize.ValueString(),
-			AccountName: cfg.AccountName.ValueString(),
-			AccountKey:  cfg.AccountName.ValueString(),
-		}, apiDiags
+		arubaConfig := &megaport.ArubaConfig{
+			Vendor:      v.Vendor.ValueString(),
+			ImageID:     int(v.ImageID.ValueInt64()),
+			ProductSize: v.ProductSize.ValueString(),
+			AccountName: v.AccountName.ValueString(),
+			AccountKey:  v.AccountKey.ValueString(),
+			SystemTag:   v.SystemTag.ValueString(),
+		}
+		return arubaConfig, apiDiags
 	case "cisco":
-		var cfg ciscoConfigModel
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.CiscoConfig{
-			Vendor:            vendor,
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			CloudInit:         cfg.CloudInit.ValueString(),
-		}, apiDiags
+		ciscoConfig := &megaport.CiscoConfig{
+			Vendor:            v.Vendor.ValueString(),
+			ImageID:           int(v.ImageID.ValueInt64()),
+			ProductSize:       v.ProductSize.ValueString(),
+			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			CloudInit:         v.CloudInit.ValueString(),
+		}
+		return ciscoConfig, apiDiags
 	case "fortinet":
-		var cfg fortinetConfigModel
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.FortinetConfig{
-			Vendor:            vendor,
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			LicenseData:       cfg.LicenseData.ValueString(),
-		}, apiDiags
+		fortinetConfig := &megaport.FortinetConfig{
+			Vendor:            v.Vendor.ValueString(),
+			ImageID:           int(v.ImageID.ValueInt64()),
+			ProductSize:       v.ProductSize.ValueString(),
+			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			LicenseData:       v.LicenseData.ValueString(),
+		}
+		return fortinetConfig, apiDiags
 	case "palo_alto":
-		var cfg paloAltoConfigModel
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.PaloAltoConfig{
-			Vendor:            vendor,
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
-			LicenseData:       cfg.LicenseData.ValueString(),
-		}, apiDiags
+		paloAltoConfig := &megaport.PaloAltoConfig{
+			Vendor:            v.Vendor.ValueString(),
+			ImageID:           int(v.ImageID.ValueInt64()),
+			ProductSize:       v.ProductSize.ValueString(),
+			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
+			LicenseData:       v.LicenseData.ValueString(),
+		}
+		return paloAltoConfig, apiDiags
 	case "versa":
-		var cfg versaConfigModel
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.VersaConfig{
-			Vendor:            vendor,
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			DirectorAddress:   cfg.DirectorAddress.ValueString(),
-			ControllerAddress: cfg.ControllerAddress.ValueString(),
-			LocalAuth:         cfg.LocalAuth.ValueString(),
-			RemoteAuth:        cfg.RemoteAuth.ValueString(),
-			SerialNumber:      cfg.SerialNumber.ValueString(),
-		}, apiDiags
+		versaConfig := &megaport.VersaConfig{
+			Vendor:            v.Vendor.ValueString(),
+			ImageID:           int(v.ImageID.ValueInt64()),
+			ProductSize:       v.ProductSize.ValueString(),
+			DirectorAddress:   v.DirectorAddress.ValueString(),
+			ControllerAddress: v.ControllerAddress.ValueString(),
+			LocalAuth:         v.LocalAuth.ValueString(),
+			RemoteAuth:        v.RemoteAuth.ValueString(),
+			SerialNumber:      v.SerialNumber.ValueString(),
+		}
+		return versaConfig, apiDiags
 	case "vmware":
-		var cfg vmwareConfig
-		cfgDiag := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, cfgDiag...)
-		return &megaport.VmwareConfig{
-			Vendor:            vendor,
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			VcoAddress:        cfg.VcoAddress.ValueString(),
-			VcoActivationCode: cfg.VcoActivationCode.ValueString(),
-		}, apiDiags
+		vmwareConfig := &megaport.VmwareConfig{
+			Vendor:            v.Vendor.ValueString(),
+			ImageID:           int(v.ImageID.ValueInt64()),
+			ProductSize:       v.ProductSize.ValueString(),
+			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			VcoAddress:        v.VcoAddress.ValueString(),
+			VcoActivationCode: v.VcoActivationCode.ValueString(),
+		}
+		return vmwareConfig, apiDiags
 	}
+	apiDiags.AddError("vendor not supported",
+		"vendor not supported")
 	return nil, apiDiags
 }
 
@@ -445,6 +396,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the MVE was updated by the Terraform Provider.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
@@ -467,6 +421,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the MVE was created.",
@@ -500,7 +457,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The market the MVE is in.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
@@ -508,6 +465,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
+				},
+			},
+			"product_type": schema.StringAttribute{
+				Description: "The type of product (MVE).",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
@@ -520,6 +484,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"usage_algorithm": schema.StringAttribute{
 				Description: "The usage algorithm of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The company UID of the MVE.",
@@ -545,18 +512,30 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
 				Description: "Whether VXC is auto approved.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"secondary_name": schema.StringAttribute{
 				Description: "The secondary name of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"company_name": schema.StringAttribute{
 				Description: "The company name of the MVE.",
@@ -568,42 +547,64 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"virtual": schema.BoolAttribute{
 				Description: "Whether the MVE is virtual.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"buyout_port": schema.BoolAttribute{
 				Description: "Whether the port is buyout.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the MVE is locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the MVE is admin locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the MVE is cancelable.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vendor": schema.StringAttribute{
 				Description: "The vendor of the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"mve_size": schema.StringAttribute{
 				Description: "The size of the MVE.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"attribute_tags": schema.MapAttribute{
 				Description: "The attribute tags of the MVE.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"network_interfaces": schema.ListNestedAttribute{
+			"vnics": schema.ListNestedAttribute{
 				Description: "The network interfaces of the MVE.",
 				Optional:    true,
+				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"description": schema.StringAttribute{
@@ -615,6 +616,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Required:    true,
 						},
 					},
+				},
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
@@ -686,6 +690,10 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The serial number for the vendor config. Required for Versa MVE.",
 						Optional:    true,
 					},
+					"system_tag": schema.StringAttribute{
+						Description: "The system tag for the vendor config. Required for Aruba MVE.",
+						Optional:    true,
+					},
 					"vco_address": schema.StringAttribute{
 						Description: "The VCO address for the vendor config. Required for VMware MVE.",
 						Optional:    true,
@@ -699,6 +707,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"resources": schema.SingleNestedAttribute{
 				Description: "The resources associated with the MVE.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"interface": schema.SingleNestedAttribute{
 						Description: "The port interface of the MVE.",
@@ -743,10 +754,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Description: "The resource type of the port interface.",
 								Computed:    true,
 							},
-							"up": schema.BoolAttribute{
+							"up": schema.Int64Attribute{
 								Description: "Whether the port interface is up.",
 								Computed:    true,
 							},
+						},
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"virtual_machine": schema.ListNestedAttribute{
@@ -847,8 +861,14 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 			"vendor config required", "vendor config required",
 		)
 	}
-	vendorConfig, vendorDiags := toAPIVendorConfig(ctx, plan.VendorConfig)
-	resp.Diagnostics = append(resp.Diagnostics, vendorDiags...)
+	vcModel := &vendorConfigModel{}
+	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
+	resp.Diagnostics = append(resp.Diagnostics, vcDiags...)
+	vendorConfig, apiVCDiags := toAPIVendorConfig(vcModel)
+	resp.Diagnostics = append(resp.Diagnostics, apiVCDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	mveReq.VendorConfig = vendorConfig
 
 	for _, vnic := range plan.NetworkInterfaces.Elements() {

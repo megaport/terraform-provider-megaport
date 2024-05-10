@@ -24,7 +24,7 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 
 ### Optional
 
-- `network_interfaces` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--network_interfaces))
+- `vnics` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
 
@@ -45,6 +45,7 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
 - `mve_size` (String) The size of the MVE.
 - `product_id` (Number) The Numeric ID of the MVE.
+- `product_type` (String) The type of product (MVE).
 - `product_uid` (String) The unique identifier of the MVE.
 - `provisioning_status` (String) The provisioning status of the MVE.
 - `resources` (Attributes) The resources associated with the MVE. (see [below for nested schema](#nestedatt--resources))
@@ -78,12 +79,13 @@ Optional:
 - `local_auth` (String) The local auth for the vendor config. Required for Versa MVE.
 - `remote_auth` (String) The remote auth for the vendor config. Required for Versa MVE.
 - `serial_number` (String) The serial number for the vendor config. Required for Versa MVE.
+- `system_tag` (String) The system tag for the vendor config. Required for Aruba MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. Required for VMware MVE.
 - `vco_address` (String) The VCO address for the vendor config. Required for VMware MVE.
 
 
-<a id="nestedatt--network_interfaces"></a>
-### Nested Schema for `network_interfaces`
+<a id="nestedatt--vnics"></a>
+### Nested Schema for `vnics`
 
 Required:
 
@@ -113,7 +115,7 @@ Read-Only:
 - `port_speed` (Number) The port speed of the port interface.
 - `resource_name` (String) The resource name of the port interface.
 - `resource_type` (String) The resource type of the port interface.
-- `up` (Boolean) Whether the port interface is up.
+- `up` (Number) Whether the port interface is up.
 
 
 <a id="nestedatt--resources--virtual_machine"></a>
