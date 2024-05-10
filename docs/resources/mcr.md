@@ -27,65 +27,71 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 ### Optional
 
 - `admin_locked` (Boolean) Whether the product is admin locked.
+- `aggregation_id` (Number) Numeric ID of the aggregation.
 - `asn` (Number) ASN in the MCR order configuration.
 - `buyout_port` (Boolean) Whether the product is bought out.
+- `cancelable` (Boolean) Whether the product is cancelable.
 - `cost_centre` (String) Cost centre of the product.
+- `lag_id` (Number) Numeric ID of the LAG.
 - `locked` (Boolean) Whether the product is locked.
+- `prefix_filter_list` (Attributes) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_list))
+- `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
 ### Read-Only
 
 - `attribute_tags` (Map of String) Attribute tags of the product.
-- `cancelable` (Boolean) Whether the product is cancelable.
+- `company_name` (String) Name of the company.
 - `company_uid` (String) Megaport Company UID of the product.
 - `contract_end_date` (String) Contract end date of the product.
 - `contract_start_date` (String) Contract start date of the product.
 - `create_date` (String) Date the product was created.
 - `created_by` (String) User who created the product.
+- `lag_primary` (Boolean) Whether the product is a LAG primary.
 - `last_updated` (String) Last updated by the Terraform provider.
 - `live_date` (String) Date the product went live.
 - `product_id` (Number) Numeric ID of the product.
+- `product_type` (String) Type of the product.
 - `product_uid` (String) UID identifier of the product.
 - `provisioning_status` (String) Provisioning status of the product.
-- `resources` (Attributes) Resources associated with the product. (see [below for nested schema](#nestedatt--resources))
+- `secondary_name` (String) Secondary name of the product.
 - `terminate_date` (String) Date the product will be terminated.
 - `usage_algorithm` (String) Usage algorithm of the product.
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
 
-<a id="nestedatt--resources"></a>
-### Nested Schema for `resources`
+<a id="nestedatt--prefix_filter_list"></a>
+### Nested Schema for `prefix_filter_list`
 
-Read-Only:
+Optional:
 
-- `interface` (Attributes) Port interface associated with the product. (see [below for nested schema](#nestedatt--resources--interface))
-- `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--resources--virtual_router))
+- `address_family` (String) Address family of the prefix filter list.
+- `description` (String) Description of the prefix filter list.
+- `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_list--entries))
 
-<a id="nestedatt--resources--interface"></a>
-### Nested Schema for `resources.interface`
+<a id="nestedatt--prefix_filter_list--entries"></a>
+### Nested Schema for `prefix_filter_list.entries`
 
-Read-Only:
+Optional:
 
-- `demarcation` (String) Demarcation of the interface.
-- `description` (String) Description of the interface.
-- `id` (Number) Numeric ID of the interface.
-- `loa_template` (String) LOA template of the interface.
-- `media` (String) Media of the interface.
-- `name` (String) Name of the interface.
-- `port_speed` (Number) Bandwidth speed of the interface.
-- `resource_name` (String) Resource name of the interface.
-- `resource_type` (String) Resource type of the interface.
-- `up` (Boolean) Whether the interface is up.
+- `action` (String) Action of the prefix filter list entry.
+- `ge` (Number) Greater than or equal to value of the prefix filter list entry.
+- `le` (Number) Less than or equal to value of the prefix filter list entry.
+- `prefix` (String) Prefix of the prefix filter list entry.
 
 
-<a id="nestedatt--resources--virtual_router"></a>
-### Nested Schema for `resources.virtual_router`
 
-Read-Only:
+<a id="nestedatt--virtual_router"></a>
+### Nested Schema for `virtual_router`
+
+Optional:
 
 - `asn` (Number) ASN of the virtual router.
-- `id` (Number) Numeric ID of the virtual router.
 - `name` (String) Name of the virtual router.
 - `resource_name` (String) Resource name of the virtual router.
 - `resource_type` (String) Resource type of the virtual router.
 - `speed` (Number) Speed of the virtual router.
+
+Read-Only:
+
+- `id` (Number) Numeric ID of the virtual router.

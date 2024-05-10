@@ -256,7 +256,10 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 
 // DataSources defines the data sources implemented in the provider.
 func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewlocationDataSource,
+		NewPartnerPortDataSource,
+	}
 }
 
 // Resources defines the resources implemented in the provider.
@@ -264,6 +267,8 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewMCRResource,
 		NewPortResource,
+		NewLagPortResource,
 		NewMVEResource,
+		NewVXCResource,
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -19,13 +20,13 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &portResource{}
-	_ resource.ResourceWithConfigure   = &portResource{}
-	_ resource.ResourceWithImportState = &portResource{}
+	_ resource.Resource                = &lagPortResource{}
+	_ resource.ResourceWithConfigure   = &lagPortResource{}
+	_ resource.ResourceWithImportState = &lagPortResource{}
 )
 
-// singlePortResourceModel maps the resource schema data.
-type singlePortResourceModel struct {
+// lagPortResourceModel maps the resource schema data.
+type lagPortResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
 	UID                   types.String `tfsdk:"product_uid"`
@@ -53,53 +54,23 @@ type singlePortResourceModel struct {
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
+	LagCount    types.Int64 `tfsdk:"lag_count"`
+	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
+
 	// AttributeTags         PortAttributeTags `tfsdk:"attribute_tags"`
 	// VXCResources          PortResources     `tfsdk:"resources"`
 }
 
-// portInterfaceModel represents a port interface
-type portInterfaceModel struct {
-	Demarcation  types.String `tfsdk:"demarcation"`
-	Description  types.String `tfsdk:"description"`
-	ID           types.Int64  `tfsdk:"id"`
-	LOATemplate  types.String `tfsdk:"loa_template"`
-	Media        types.String `tfsdk:"media"`
-	Name         types.String `tfsdk:"name"`
-	PortSpeed    types.Int64  `tfsdk:"port_speed"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Up           types.Int64  `tfsdk:"up"`
-}
-
-func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
+func (orm *lagPortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
-	if p.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
-	if p.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	if p.CreateDate != nil {
-		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
+	orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
-	if p.LiveDate != nil {
-		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.Locked = types.BoolValue(p.Locked)
 	orm.Market = types.StringValue(p.Market)
@@ -107,34 +78,56 @@ func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
 	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
+	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
+	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
+	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
+	orm.Virtual = types.BoolValue(p.Virtual)
+
+	if p.CreateDate != nil {
+		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+	if p.LiveDate != nil {
+		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
+	if p.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
+	if p.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
+
 	if p.TerminateDate != nil {
 		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
 	} else {
 		orm.TerminateDate = types.StringNull()
 	}
-	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
-	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
-	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
-	orm.Virtual = types.BoolValue(p.Virtual)
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
-func NewPortResource() resource.Resource {
-	return &portResource{}
+func NewLagPortResource() resource.Resource {
+	return &lagPortResource{}
 }
 
-// portResource is the resource implementation.
-type portResource struct {
+// lagPortResource is the resource implementation.
+type lagPortResource struct {
 	client *megaport.Client
 }
 
 // Metadata returns the resource type name.
-func (r *portResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_port"
+func (r *lagPortResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_lag_port"
 }
 
 // Schema defines the schema for the resource.
-func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
@@ -276,14 +269,26 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"lag_count": schema.Int64Attribute{
+				Description: "The number of LAG ports.",
+				Required:    true,
+			},
+			"lag_port_uids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The unique identifiers of the LAG ports.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
 
 // Create a new resource.
-func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan singlePortResourceModel
+	var plan lagPortResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -296,10 +301,11 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
 		LocationId:            int(plan.LocationID.ValueInt64()),
 		Market:                plan.Market.ValueString(),
+		LagCount:              int(plan.LagCount.ValueInt64()),
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           10 * time.Minute,
+		WaitForTime:           5 * time.Minute,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -309,10 +315,10 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	if len(createdPort.TechnicalServiceUIDs) != 1 {
+	if len(createdPort.TechnicalServiceUIDs) < 2 {
 		resp.Diagnostics.AddError(
 			"Unexpected number of ports created",
-			fmt.Sprintf("Expected 1 port, got: %d. The IDs were: %v Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs), createdPort.TechnicalServiceUIDs),
+			fmt.Sprintf("Expected greater than one port, got: %d. The IDs were: %v Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs), createdPort.TechnicalServiceUIDs),
 		)
 		return
 	}
@@ -331,6 +337,14 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// update the plan with the port info
 	plan.fromAPIPort(port)
+	lagPortUids := []types.String{}
+	for _, uid := range createdPort.TechnicalServiceUIDs {
+		lagPortUids = append(lagPortUids, types.StringValue(uid))
+	}
+	lagPortUidList, listDiags := types.ListValueFrom(ctx, types.StringType, lagPortUids)
+	resp.Diagnostics.Append(listDiags...)
+	plan.LagPortUIDs = lagPortUidList
+	plan.UID = types.StringValue(createdID)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -342,9 +356,9 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 }
 
 // Read resource information.
-func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state singlePortResourceModel
+	var state lagPortResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -371,8 +385,8 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 }
 
-func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan, state singlePortResourceModel
+func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state lagPortResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -455,10 +469,9 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
+func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state singlePortResourceModel
+	var state lagPortResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -480,7 +493,7 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *portResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -498,11 +511,7 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 	r.client = client
 }
 
-func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
+func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -14,14 +16,25 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
 
-// Ensure the implementation satisfies the expected interfaces.
 var (
+	// Ensure the implementation satisfies the expected interfaces.
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+
+	// Object Schema Attributes
+	virtualRouterAttributes = map[string]attr.Type{
+		"id":            types.Int64Type,
+		"asn":           types.Int64Type,
+		"name":          types.StringType,
+		"resource_name": types.StringType,
+		"resource_type": types.StringType,
+		"speed":         types.Int64Type,
+	}
 )
 
 // mcrResourceModel maps the resource schema data.
@@ -43,7 +56,7 @@ type mcrResourceModel struct {
 	LocationID            types.Int64  `tfsdk:"location_id"`
 	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxcpermitted"`
+	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	LAGPrimary            types.Bool   `tfsdk:"lag_primary"`
@@ -56,44 +69,54 @@ type mcrResourceModel struct {
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	ASN                   types.Int64  `tfsdk:"asn"`
 
-	Virtual       types.Bool                    `tfsdk:"virtual"`
-	BuyoutPort    types.Bool                    `tfsdk:"buyout_port"`
-	Locked        types.Bool                    `tfsdk:"locked"`
-	AdminLocked   types.Bool                    `tfsdk:"admin_locked"`
-	Cancelable    types.Bool                    `tfsdk:"cancelable"`
-	AttributeTags map[types.String]types.String `tfsdk:"attribute_tags"`
-	Resources     *mcrResourcesModel            `tfsdk:"resources"`
-}
+	Virtual       types.Bool   `tfsdk:"virtual"`
+	BuyoutPort    types.Bool   `tfsdk:"buyout_port"`
+	Locked        types.Bool   `tfsdk:"locked"`
+	AdminLocked   types.Bool   `tfsdk:"admin_locked"`
+	Cancelable    types.Bool   `tfsdk:"cancelable"`
+	AttributeTags types.Map    `tfsdk:"attribute_tags"`
+	VirtualRouter types.Object `tfsdk:"virtual_router"`
 
-// mcrResourcesModel represents the associated interface and virtual router
-type mcrResourcesModel struct {
-	Interface     *portInterfaceModel    `tfsdk:"interface"`
-	VirtualRouter *mcrVirtualRouterModel `tfsdk:"virtual_router"`
+	PrefixFilterList types.Object `tfsdk:"prefix_filter_list"`
 }
 
 // mcrVirtualRouterModel represents the virtual router associated with the MCR
 type mcrVirtualRouterModel struct {
 	ID           types.Int64  `tfsdk:"id"`
-	ASN          types.Int64  `tfsdk:"mcr_asn"`
+	ASN          types.Int64  `tfsdk:"asn"`
 	Name         types.String `tfsdk:"name"`
 	ResourceName types.String `tfsdk:"resource_name"`
 	ResourceType types.String `tfsdk:"resource_type"`
 	Speed        types.Int64  `tfsdk:"speed"`
 }
 
+// mcrPrefixFilterListModel represents the prefix filter list associated with the MCR
+type mcrPrefixFilterListModel struct {
+	Description   types.String `tfsdk:"description"`
+	AddressFamily types.String `tfsdk:"address_family"`
+	Entries       types.List   `tfsdk:"entries"`
+}
+
+// MCRPrefixListEntry represents an entry in a prefix filter list.
+type mcrPrefixListEntryModel struct {
+	Action types.String `tfsdk:"action"`
+	Prefix types.String `tfsdk:"prefix"`
+	Ge     types.Int64  `tfsdk:"ge"`
+	Le     types.Int64  `tfsdk:"le"`
+}
+
 // fromAPIMCR maps the API MCR response to the resource schema.
-func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
+func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) diag.Diagnostics {
+	apiDiags := diag.Diagnostics{}
+
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
 	orm.Name = types.StringValue(m.Name)
 	orm.Type = types.StringValue(m.Type)
 	orm.ProvisioningStatus = types.StringValue(m.ProvisioningStatus)
-	orm.CreateDate = types.StringValue(m.CreateDate.String())
 	orm.CreatedBy = types.StringValue(m.CreatedBy)
 	orm.CostCentre = types.StringValue(m.CostCentre)
 	orm.PortSpeed = types.Int64Value(int64(m.PortSpeed))
-	orm.TerminateDate = types.StringValue(m.TerminateDate.String())
-	orm.LiveDate = types.StringValue(m.LiveDate.String())
 	orm.Market = types.StringValue(m.Market)
 	orm.LocationID = types.Int64Value(int64(m.LocationID))
 	orm.UsageAlgorithm = types.StringValue(m.UsageAlgorithm)
@@ -106,8 +129,6 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.AggregationID = types.Int64Value(int64(m.AggregationID))
 	orm.CompanyUID = types.StringValue(m.CompanyUID)
 	orm.CompanyName = types.StringValue(m.CompanyName)
-	orm.ContractStartDate = types.StringValue(m.ContractStartDate.String())
-	orm.ContractEndDate = types.StringValue(m.ContractEndDate.String())
 	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
 	orm.Virtual = types.BoolValue(m.Virtual)
 	orm.BuyoutPort = types.BoolValue(m.BuyoutPort)
@@ -115,37 +136,58 @@ func (orm *mcrResourceModel) fromAPIMCR(m *megaport.MCR) {
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
 
-	if m.AttributeTags != nil {
-		orm.AttributeTags = make(map[types.String]types.String)
-		for k, v := range m.AttributeTags {
-			orm.AttributeTags[types.StringValue(k)] = types.StringValue(v)
-		}
+	if m.CreateDate != nil {
+		orm.CreateDate = types.StringValue(m.CreateDate.String())
+	} else {
+		orm.CreateDate = types.StringValue("")
+	}
+	if m.TerminateDate != nil {
+		orm.TerminateDate = types.StringValue(m.TerminateDate.String())
+	} else {
+		orm.TerminateDate = types.StringValue("")
+	}
+	if m.LiveDate != nil {
+		orm.LiveDate = types.StringValue(m.LiveDate.String())
+	} else {
+		orm.LiveDate = types.StringValue("")
+	}
+	if m.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(m.ContractStartDate.String())
+	} else {
+		orm.ContractStartDate = types.StringValue("")
+	}
+	if m.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+	} else {
+		orm.ContractEndDate = types.StringValue("")
 	}
 
-	orm.Resources = &mcrResourcesModel{
-		Interface: &portInterfaceModel{
-			Demarcation:  types.StringValue(m.Resources.Interface.Demarcation),
-			Description:  types.StringValue(m.Resources.Interface.Description),
-			ID:           types.Int64Value(int64(m.Resources.Interface.ID)),
-			LOATemplate:  types.StringValue(m.Resources.Interface.LOATemplate),
-			Media:        types.StringValue(m.Resources.Interface.Media),
-			Name:         types.StringValue(m.Resources.Interface.Name),
-			PortSpeed:    types.Int64Value(int64(m.Resources.Interface.PortSpeed)),
-			ResourceName: types.StringValue(m.Resources.Interface.ResourceName),
-			ResourceType: types.StringValue(m.Resources.Interface.ResourceType),
-		},
-		VirtualRouter: &mcrVirtualRouterModel{
-			ID:           types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
-			ASN:          types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
-			Name:         types.StringValue(m.Resources.VirtualRouter.Name),
-			ResourceName: types.StringValue(m.Resources.VirtualRouter.ResourceName),
-			ResourceType: types.StringValue(m.Resources.VirtualRouter.ResourceType),
-			Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
-		},
+	if m.AttributeTags != nil {
+		attributeTags := make(map[string]attr.Value)
+		for k, v := range m.AttributeTags {
+			attributeTags[k] = types.StringValue(v)
+		}
+		tags, tagDiags := types.MapValue(types.StringType, attributeTags)
+		apiDiags = append(apiDiags, tagDiags...)
+		orm.AttributeTags = tags
 	}
+
+	virtualRouterModel := mcrVirtualRouterModel{
+		ID:           types.Int64Value(int64(m.Resources.VirtualRouter.ID)),
+		ASN:          types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
+		Name:         types.StringValue(m.Resources.VirtualRouter.Name),
+		ResourceName: types.StringValue(m.Resources.VirtualRouter.ResourceName),
+		ResourceType: types.StringValue(m.Resources.VirtualRouter.ResourceType),
+		Speed:        types.Int64Value(int64(m.Resources.VirtualRouter.Speed)),
+	}
+
+	virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouterModel)
+	apiDiags = append(apiDiags, virtualRouterDiags...)
+	orm.VirtualRouter = virtualRouter
+	return apiDiags
 }
 
-// NewPortResource is a helper function to simplify the provider implementation.
+// NewPortResource is a helper function to simplify the provider implemeantation.
 func NewMCRResource() resource.Resource {
 	return &mcrResource{}
 }
@@ -186,6 +228,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"product_name": schema.StringAttribute{
 				Description: "Name of the product.",
 				Required:    true,
+			},
+			"product_type": schema.StringAttribute{
+				Description: "Type of the product.",
+				Computed:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "Provisioning status of the product.",
@@ -263,6 +309,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "Cost centre of the product.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"contract_start_date": schema.StringAttribute{
@@ -278,6 +325,28 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"secondary_name": schema.StringAttribute{
+				Description: "Secondary name of the product.",
+				Computed:    true,
+			},
+			"lag_primary": schema.BoolAttribute{
+				Description: "Whether the product is a LAG primary.",
+				Computed:    true,
+			},
+			"lag_id": schema.Int64Attribute{
+				Description: "Numeric ID of the LAG.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"aggregation_id": schema.Int64Attribute{
+				Description: "Numeric ID of the aggregation.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"company_name": schema.StringAttribute{
+				Description: "Name of the company.",
+				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
@@ -302,17 +371,21 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"buyout_port": schema.BoolAttribute{
 				Description: "Whether the product is bought out.",
 				Optional:    true,
+				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the product is admin locked.",
+				Computed:    true,
 				Optional:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"attribute_tags": schema.MapAttribute{
@@ -320,88 +393,80 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Attribute tags of the product.",
 				Computed:    true,
 			},
-			"resources": schema.SingleNestedAttribute{
-				Computed:    true,
-				Description: "Resources associated with the product.",
+			"prefix_filter_list": schema.SingleNestedAttribute{
+				Description: "Prefix filter list associated with the product.",
+				Optional:    true,
 				Attributes: map[string]schema.Attribute{
-					"interface": schema.SingleNestedAttribute{
-						Computed:    true,
-						Description: "Port interface associated with the product.",
-						Attributes: map[string]schema.Attribute{
-							"demarcation": schema.StringAttribute{
-								Description: "Demarcation of the interface.",
-								Computed:    true,
-							},
-							"description": schema.StringAttribute{
-								Description: "Description of the interface.",
-								Computed:    true,
-							},
-							"id": schema.Int64Attribute{
-								Description: "Numeric ID of the interface.",
-								Computed:    true,
-							},
-							"loa_template": schema.StringAttribute{
-								Description: "LOA template of the interface.",
-								Computed:    true,
-							},
-							"media": schema.StringAttribute{
-								Description: "Media of the interface.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "Name of the interface.",
-								Computed:    true,
-							},
-							"port_speed": schema.Int64Attribute{
-								Description: "Bandwidth speed of the interface.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "Resource name of the interface.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "Resource type of the interface.",
-								Computed:    true,
-							},
-							"up": schema.BoolAttribute{
-								Description: "Whether the interface is up.",
-								Computed:    true,
+					"description": schema.StringAttribute{
+						Description: "Description of the prefix filter list.",
+						Optional:    true,
+					},
+					"address_family": schema.StringAttribute{
+						Description: "Address family of the prefix filter list.",
+						Optional:    true,
+					},
+					"entries": schema.ListNestedAttribute{
+						Description: "Entries in the prefix filter list.",
+						Optional:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"action": schema.StringAttribute{
+									Description: "Action of the prefix filter list entry.",
+									Optional:    true,
+								},
+								"prefix": schema.StringAttribute{
+									Description: "Prefix of the prefix filter list entry.",
+									Optional:    true,
+								},
+								"ge": schema.Int64Attribute{
+									Description: "Greater than or equal to value of the prefix filter list entry.",
+									Optional:    true,
+								},
+								"le": schema.Int64Attribute{
+									Description: "Less than or equal to value of the prefix filter list entry.",
+									Optional:    true,
+								},
 							},
 						},
 					},
-					"virtual_router": schema.SingleNestedAttribute{
+				},
+			},
+			"virtual_router": schema.SingleNestedAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Virtual router associated with the product.",
+				Attributes: map[string]schema.Attribute{
+					"id": schema.Int64Attribute{
+						Description: "Numeric ID of the virtual router.",
 						Computed:    true,
-						Description: "Virtual router associated with the product.",
-						Attributes: map[string]schema.Attribute{
-							"id": schema.Int64Attribute{
-								Description: "Numeric ID of the virtual router.",
-								Computed:    true,
-								PlanModifiers: []planmodifier.Int64{
-									int64planmodifier.UseStateForUnknown(),
-								},
-							},
-							"asn": schema.Int64Attribute{
-								Description: "ASN of the virtual router.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "Name of the virtual router.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "Resource name of the virtual router.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "Resource type of the virtual router.",
-								Computed:    true,
-							},
-							"speed": schema.Int64Attribute{
-								Description: "Speed of the virtual router.",
-								Computed:    true,
-							},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
 						},
+					},
+					"asn": schema.Int64Attribute{
+						Description: "ASN of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"name": schema.StringAttribute{
+						Description: "Name of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"resource_name": schema.StringAttribute{
+						Description: "Resource name of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"resource_type": schema.StringAttribute{
+						Description: "Resource type of the virtual router.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"speed": schema.Int64Attribute{
+						Description: "Speed of the virtual router.",
+						Optional:    true,
+						Computed:    true,
 					},
 				},
 			},
@@ -454,8 +519,48 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the MCR info
-	plan.fromAPIMCR(mcr)
+	apiDiags := plan.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
+
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+
+	// Create Prefix Filter List for MCR Upon Creation
+	if !plan.PrefixFilterList.IsNull() {
+		pfFilterListModel := &mcrPrefixFilterListModel{}
+		prefixFilterObjDiags := plan.PrefixFilterList.As(ctx, pfFilterListModel, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(prefixFilterObjDiags...)
+
+		megaportPrefixFilterList := megaport.MCRPrefixFilterList{
+			Description:   pfFilterListModel.Description.ValueString(),
+			AddressFamily: pfFilterListModel.AddressFamily.ValueString(),
+		}
+
+		if !pfFilterListModel.Entries.IsNull() {
+			listEntries := []*mcrPrefixListEntryModel{}
+			prefixListEntriesDiags := pfFilterListModel.Entries.ElementsAs(ctx, &listEntries, false)
+			resp.Diagnostics.Append(prefixListEntriesDiags...)
+			for _, entry := range listEntries {
+				megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, &megaport.MCRPrefixListEntry{
+					Action: entry.Action.ValueString(),
+					Prefix: entry.Prefix.ValueString(),
+					Ge:     int(entry.Ge.ValueInt64()),
+					Le:     int(entry.Le.ValueInt64()),
+				})
+			}
+		}
+		prefixFilterListReq := &megaport.CreateMCRPrefixFilterListRequest{
+			MCRID:            createdID,
+			PrefixFilterList: megaportPrefixFilterList,
+		}
+		_, err = r.client.MCRService.CreatePrefixFilterList(ctx, prefixFilterListReq)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating prefix filter list",
+				"Could not create prefix filter list for MCR with ID "+createdID+": "+err.Error(),
+			)
+			return
+		}
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -485,7 +590,8 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	state.fromAPIMCR(mcr)
+	apiDiags := state.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -540,7 +646,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	state.fromAPIMCR(mcr)
+	apiDiags := state.fromAPIMCR(ctx, mcr)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Update the state with the new values
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -564,7 +671,7 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Delete existing order
 	_, err := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
-		MCRID:     state.UID.String(),
+		MCRID:     state.UID.ValueString(),
 		DeleteNow: true,
 	})
 	if err != nil {
@@ -597,5 +704,5 @@ func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest
 
 func (r *mcrResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
-	resource.ImportStatePassthroughID(ctx, path.Root("uid"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
