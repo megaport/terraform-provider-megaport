@@ -656,60 +656,25 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		WaitForUpdate:         true,
 	})
 
-	// // Generate API request body from plan
-	// var hashicupsItems []hashicups.OrderItem
-	// for _, item := range plan.Items {
-	// 	hashicupsItems = append(hashicupsItems, hashicups.OrderItem{
-	// 		Coffee: hashicups.Coffee{
-	// 			ID: int(item.Coffee.ID.ValueInt64()),
-	// 		},
-	// 		Quantity: int(item.Quantity.ValueInt64()),
-	// 	})
-	// }
+	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
+	if portErr != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading port",
+			"Could not read port with ID "+plan.UID.ValueString()+": "+portErr.Error(),
+		)
+		return
+	}
 
-	// // Update existing order
-	// _, err := r.client.UpdateOrder(plan.ID.ValueString(), hashicupsItems)
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Error Updating HashiCups Order",
-	// 		"Could not update order, unexpected error: "+err.Error(),
-	// 	)
-	// 	return
-	// }
+	// Update the state
+	state.fromAPIPort(ctx, port)
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	// // Fetch updated items from GetOrder as UpdateOrder items are not
-	// // populated.
-	// order, err := r.client.GetOrder(plan.ID.ValueString())
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Error Reading HashiCups Order",
-	// 		"Could not read HashiCups order ID "+plan.ID.ValueString()+": "+err.Error(),
-	// 	)
-	// 	return
-	// }
-
-	// // Update resource state with updated items and timestamp
-	// plan.Items = []orderItemModel{}
-	// for _, item := range order.Items {
-	// 	plan.Items = append(plan.Items, orderItemModel{
-	// 		Coffee: orderItemCoffeeModel{
-	// 			ID:          types.Int64Value(int64(item.Coffee.ID)),
-	// 			Name:        types.StringValue(item.Coffee.Name),
-	// 			Teaser:      types.StringValue(item.Coffee.Teaser),
-	// 			Description: types.StringValue(item.Coffee.Description),
-	// 			Price:       types.Float64Value(item.Coffee.Price),
-	// 			Image:       types.StringValue(item.Coffee.Image),
-	// 		},
-	// 		Quantity: types.Int64Value(int64(item.Quantity)),
-	// 	})
-	// }
-	// plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// diags = resp.State.Set(ctx, plan)
-	// resp.Diagnostics.Append(diags...)
-	// if resp.Diagnostics.HasError() {
-	// 	return
-	// }
+	// Set state to fully populated data
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

@@ -2429,6 +2429,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	apiDiags := state.fromAPIVXC(ctx, vxc)
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
