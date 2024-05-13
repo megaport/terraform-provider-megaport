@@ -224,6 +224,9 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		megaport.WithEnvironment(megaportGoEnv),
 		megaport.WithCredentials(accessKey, secretKey),
 		megaport.WithLogHandler(tfhandler{}),
+		megaport.WithCustomHeaders(map[string]string{
+			"x-app": "terraform",
+		}),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(
