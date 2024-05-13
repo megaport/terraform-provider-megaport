@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestAccMegaportMVE_Basic(t *testing.T) {
+func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	resource.Test(t, resource.TestCase{
@@ -34,7 +34,19 @@ func TestAccMegaportMVE_Basic(t *testing.T) {
                   }`, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
 		},

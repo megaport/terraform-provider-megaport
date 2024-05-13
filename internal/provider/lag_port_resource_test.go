@@ -35,6 +35,12 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
 				),
 			},
 			// ImportState testing
@@ -55,7 +61,7 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids"},
+				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 		},
 	})

@@ -33,6 +33,12 @@ func TestAccMegaportSinglePort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_port.port", "market", "AU"),
 					resource.TestCheckResourceAttr("megaport_port.port", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
 				),
 			},
 			// ImportState testing
@@ -53,7 +59,7 @@ func TestAccMegaportSinglePort_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 		},
 	})

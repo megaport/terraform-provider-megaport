@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -57,11 +58,13 @@ type lagPortResourceModel struct {
 	LagCount    types.Int64 `tfsdk:"lag_count"`
 	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
 
-	// AttributeTags         PortAttributeTags `tfsdk:"attribute_tags"`
-	// VXCResources          PortResources     `tfsdk:"resources"`
+	AttributeTags types.Object `tfsdk:"attribute_tags"`
+	VXCResources  types.Object `tfsdk:"resources"`
 }
 
-func (orm *lagPortResourceModel) fromAPIPort(p *megaport.Port) {
+func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
+	diags := diag.Diagnostics{}
+
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.Cancelable = types.BoolValue(p.Cancelable)
@@ -109,6 +112,48 @@ func (orm *lagPortResourceModel) fromAPIPort(p *megaport.Port) {
 	} else {
 		orm.TerminateDate = types.StringNull()
 	}
+
+	attributeTagsModel := &portAttributeTagsModel{}
+	terminatedServiceDetailsModel := &portTerminatedServiceDetailsModel{
+		Device: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Device),
+	}
+	locationModel := &portTerminatedServiceDetailsLocationModel{
+		ID:       types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Location.ID)),
+		Name:     types.StringValue(p.AttributeTags.TerminatedServiceDetails.Location.Name),
+		SiteCode: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Location.SiteCode),
+	}
+	interfaceModel := &portTerminatedServiceDetailsInterfaceModel{
+		ResourceType: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.ResourceType),
+		Demarcation:  types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.Demarcation),
+		LOATemplate:  types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.LOATemplate),
+		Media:        types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.Media),
+		PortSpeed:    types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Interface.PortSpeed)),
+		ResourceName: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.ResourceName),
+		Up:           types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Interface.Up)),
+		Shutdown:     types.BoolValue(p.AttributeTags.TerminatedServiceDetails.Interface.Shutdown),
+	}
+	locationObject, locationDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsLocationAttrs, locationModel)
+	diags = append(diags, locationDiags...)
+	interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsInterfaceAttrs, interfaceModel)
+	diags = append(diags, interfaceDiags...)
+	terminatedServiceDetailsModel.Location = locationObject
+	terminatedServiceDetailsModel.Interface = interfaceObject
+	terminatedServiceDetailsObject, terminatedServiceDetailsDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsAttrs, terminatedServiceDetailsModel)
+	diags = append(diags, terminatedServiceDetailsDiags...)
+	attributeTagsModel.TerminatedServiceDetails = terminatedServiceDetailsObject
+	attributeTagsObject, attributeTagsDiags := types.ObjectValueFrom(ctx, portAttributeTagsAttrs, attributeTagsModel)
+	diags = append(diags, attributeTagsDiags...)
+	orm.AttributeTags = attributeTagsObject
+
+	resourcesModel := &portResourcesModel{}
+	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
+	diags = append(diags, interfaceDiags...)
+	resourcesModel.Interface = interfaceObj
+	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
+	diags = append(diags, resourcesDiags...)
+	orm.VXCResources = resourcesObject
+
+	return diags
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -281,6 +326,145 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"attribute_tags": schema.SingleNestedAttribute{
+				Description: "The attribute tags of the product.",
+				Optional:    true,
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"terminated_service_details": schema.SingleNestedAttribute{
+						Description: "The terminated service details of the product.",
+						Optional:    true,
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"location": schema.SingleNestedAttribute{
+								Description: "The location of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+								Attributes: map[string]schema.Attribute{
+									"id": schema.Int64Attribute{
+										Description: "The ID of the location.",
+										Computed:    true,
+									},
+									"name": schema.StringAttribute{
+										Description: "The name of the location.",
+										Computed:    true,
+									},
+									"site_code": schema.StringAttribute{
+										Description: "The site code of the location.",
+										Computed:    true,
+									},
+								},
+							},
+							"interface": schema.SingleNestedAttribute{
+								Description: "The interface of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+								Attributes: map[string]schema.Attribute{
+									"resource_type": schema.StringAttribute{
+										Description: "The resource type of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"demarcation": schema.StringAttribute{
+										Description: "The demarcation of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"loa_template": schema.StringAttribute{
+										Description: "The LOA template of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"media": schema.StringAttribute{
+										Description: "The media of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"port_speed": schema.Int64Attribute{
+										Description: "The port speed of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"resource_name": schema.StringAttribute{
+										Description: "The resource name of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"up": schema.Int64Attribute{
+										Description: "The up status of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"shutdown": schema.BoolAttribute{
+										Description: "The shutdown status of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+								},
+							},
+							"device": schema.StringAttribute{
+								Description: "The device of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+				},
+			},
+			"resources": schema.SingleNestedAttribute{
+				Description: "VXC Resources attached to port.",
+				Optional:    true,
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"interface": schema.SingleNestedAttribute{
+						Description: "Port interface details.",
+						Optional:    true,
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"demarcation": schema.StringAttribute{
+								Description: "The demarcation of the interface.",
+								Computed:    true,
+							},
+							"description": schema.StringAttribute{
+								Description: "The description of the interface.",
+								Computed:    true,
+							},
+							"id": schema.Int64Attribute{
+								Description: "The ID of the interface.",
+								Computed:    true,
+							},
+							"loa_template": schema.StringAttribute{
+								Description: "The LOA template of the interface.",
+								Computed:    true,
+							},
+							"media": schema.StringAttribute{
+								Description: "The media of the interface.",
+								Computed:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the interface.",
+								Computed:    true,
+							},
+							"port_speed": schema.Int64Attribute{
+								Description: "The port speed of the interface.",
+								Computed:    true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "The resource name of the interface.",
+								Computed:    true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "The resource type of the interface.",
+								Computed:    true,
+							},
+							"up": schema.Int64Attribute{
+								Description: "The up status of the interface.",
+								Computed:    true,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -336,7 +520,8 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// update the plan with the port info
-	plan.fromAPIPort(port)
+	apiDiags := plan.fromAPIPort(ctx, port)
+	resp.Diagnostics.Append(apiDiags...)
 	lagPortUids := []types.String{}
 	for _, uid := range createdPort.TechnicalServiceUIDs {
 		lagPortUids = append(lagPortUids, types.StringValue(uid))
@@ -375,7 +560,8 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.fromAPIPort(port)
+	apiDiags := state.fromAPIPort(ctx, port)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)

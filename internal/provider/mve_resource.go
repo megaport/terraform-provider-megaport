@@ -237,19 +237,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	if p.Resources != nil {
 		resourcesModel := &mveResourcesModel{}
 		if p.Resources.Interface != nil {
-			interfaceModel := &portInterfaceModel{
-				Demarcation:  types.StringValue(p.Resources.Interface.Demarcation),
-				Description:  types.StringValue(p.Resources.Interface.Description),
-				ID:           types.Int64Value(int64(p.Resources.Interface.ID)),
-				LOATemplate:  types.StringValue(p.Resources.Interface.LOATemplate),
-				Media:        types.StringValue(p.Resources.Interface.Media),
-				Name:         types.StringValue(p.Resources.Interface.Name),
-				PortSpeed:    types.Int64Value(int64(p.Resources.Interface.PortSpeed)),
-				ResourceName: types.StringValue(p.Resources.Interface.ResourceName),
-				ResourceType: types.StringValue(p.Resources.Interface.ResourceType),
-				Up:           types.Int64Value(int64(p.Resources.Interface.Up)),
-			}
-			interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portInterfaceAttrs, interfaceModel)
+			interfaceObject, interfaceDiags := fromAPIPortInterface(ctx, p.Resources.Interface)
 			apiDiags = append(apiDiags, interfaceDiags...)
 			resourcesModel.Interface = interfaceObject
 		} else {

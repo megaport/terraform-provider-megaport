@@ -10,6 +10,7 @@ import (
 
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	mcrName := RandomTestName()
+	prefixFilterName := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -25,7 +26,26 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
                     contract_term_months        = 1
 					market = "AU"
 					marketplace_visibility = false
-                  }`, mcrName),
+
+					prefix_filter_list = {
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 24
+							le      = 24
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 24
+						  }
+						]
+					  }
+                  }`, mcrName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -33,6 +53,12 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "market", "AU"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
 				),
 			},
 			// ImportState testing
@@ -53,7 +79,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "prefix_filter_list"},
 			},
 		},
 	})

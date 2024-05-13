@@ -100,19 +100,6 @@ var (
 		"new_speed": types.Int64Type,
 	}
 
-	portInterfaceAttrs = map[string]attr.Type{
-		"demarcation":   types.StringType,
-		"description":   types.StringType,
-		"id":            types.Int64Type,
-		"loa_template":  types.StringType,
-		"media":         types.StringType,
-		"name":          types.StringType,
-		"port_speed":    types.Int64Type,
-		"resource_name": types.StringType,
-		"resource_type": types.StringType,
-		"up":            types.Int64Type,
-	}
-
 	vxcPartnerConfigAttrs = map[string]attr.Type{
 		"partner":              types.StringType,
 		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
@@ -521,19 +508,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		if v.Resources.Interface != nil {
 			interfaceObjects := []types.Object{}
 			for _, i := range v.Resources.Interface {
-				interfaceModel := &portInterfaceModel{
-					Demarcation:  types.StringValue(i.Demarcation),
-					Description:  types.StringValue(i.Description),
-					ID:           types.Int64Value(int64(i.ID)),
-					LOATemplate:  types.StringValue(i.LOATemplate),
-					Media:        types.StringValue(i.Media),
-					Name:         types.StringValue(i.Name),
-					PortSpeed:    types.Int64Value(int64(i.PortSpeed)),
-					ResourceName: types.StringValue(i.ResourceName),
-					ResourceType: types.StringValue(i.ResourceType),
-					Up:           types.Int64Value(int64(i.Up)),
-				}
-				interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portInterfaceAttrs, interfaceModel)
+				interfaceObject, interfaceDiags := fromAPIPortInterface(ctx, i)
 				apiDiags = append(apiDiags, interfaceDiags...)
 				interfaceObjects = append(interfaceObjects, interfaceObject)
 			}

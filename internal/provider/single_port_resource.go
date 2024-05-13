@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,6 +24,47 @@ var (
 	_ resource.Resource                = &portResource{}
 	_ resource.ResourceWithConfigure   = &portResource{}
 	_ resource.ResourceWithImportState = &portResource{}
+
+	portAttributeTagsAttrs = map[string]attr.Type{
+		"terminated_service_details": types.ObjectType{}.WithAttributeTypes(portTerminatedServiceDetailsAttrs),
+	}
+	portTerminatedServiceDetailsAttrs = map[string]attr.Type{
+		"location":  types.ObjectType{}.WithAttributeTypes(portTerminatedServiceDetailsLocationAttrs),
+		"interface": types.ObjectType{}.WithAttributeTypes(portTerminatedServiceDetailsInterfaceAttrs),
+		"device":    types.StringType,
+	}
+	portTerminatedServiceDetailsLocationAttrs = map[string]attr.Type{
+		"id":        types.Int64Type,
+		"name":      types.StringType,
+		"site_code": types.StringType,
+	}
+	portTerminatedServiceDetailsInterfaceAttrs = map[string]attr.Type{
+		"resource_type": types.StringType,
+		"demarcation":   types.StringType,
+		"loa_template":  types.StringType,
+		"media":         types.StringType,
+		"port_speed":    types.Int64Type,
+		"resource_name": types.StringType,
+		"up":            types.Int64Type,
+		"shutdown":      types.BoolType,
+	}
+
+	portResourcesAttrs = map[string]attr.Type{
+		"interface": types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),
+	}
+
+	portInterfaceAttrs = map[string]attr.Type{
+		"demarcation":   types.StringType,
+		"description":   types.StringType,
+		"id":            types.Int64Type,
+		"loa_template":  types.StringType,
+		"media":         types.StringType,
+		"name":          types.StringType,
+		"port_speed":    types.Int64Type,
+		"resource_name": types.StringType,
+		"resource_type": types.StringType,
+		"up":            types.Int64Type,
+	}
 )
 
 // singlePortResourceModel maps the resource schema data.
@@ -53,8 +96,39 @@ type singlePortResourceModel struct {
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
-	// AttributeTags         PortAttributeTags `tfsdk:"attribute_tags"`
-	// VXCResources          PortResources     `tfsdk:"resources"`
+	AttributeTags types.Object `tfsdk:"attribute_tags"`
+	VXCResources  types.Object `tfsdk:"resources"`
+}
+
+type portAttributeTagsModel struct {
+	TerminatedServiceDetails types.Object `tfsdk:"terminated_service_details"`
+}
+
+type portTerminatedServiceDetailsModel struct {
+	Location  types.Object `tfsdk:"location"`
+	Interface types.Object `tfsdk:"interface"`
+	Device    types.String `tfsdk:"device"`
+}
+
+type portTerminatedServiceDetailsLocationModel struct {
+	ID       types.Int64  `tfsdk:"id"`
+	Name     types.String `tfsdk:"name"`
+	SiteCode types.String `tfsdk:"site_code"`
+}
+
+type portTerminatedServiceDetailsInterfaceModel struct {
+	ResourceType types.String `tfsdk:"resource_type"`
+	Demarcation  types.String `tfsdk:"demarcation"`
+	LOATemplate  types.String `tfsdk:"loa_template"`
+	Media        types.String `tfsdk:"media"`
+	PortSpeed    types.Int64  `tfsdk:"port_speed"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	Up           types.Int64  `tfsdk:"up"`
+	Shutdown     types.Bool   `tfsdk:"shutdown"`
+}
+
+type portResourcesModel struct {
+	Interface types.Object `tfsdk:"interface"`
 }
 
 // portInterfaceModel represents a port interface
@@ -71,7 +145,8 @@ type portInterfaceModel struct {
 	Up           types.Int64  `tfsdk:"up"`
 }
 
-func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
+func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
+	diags := diag.Diagnostics{}
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.Cancelable = types.BoolValue(p.Cancelable)
@@ -116,6 +191,48 @@ func (orm *singlePortResourceModel) fromAPIPort(p *megaport.Port) {
 	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
 	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
 	orm.Virtual = types.BoolValue(p.Virtual)
+
+	attributeTagsModel := &portAttributeTagsModel{}
+	terminatedServiceDetailsModel := &portTerminatedServiceDetailsModel{
+		Device: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Device),
+	}
+	locationModel := &portTerminatedServiceDetailsLocationModel{
+		ID:       types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Location.ID)),
+		Name:     types.StringValue(p.AttributeTags.TerminatedServiceDetails.Location.Name),
+		SiteCode: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Location.SiteCode),
+	}
+	interfaceModel := &portTerminatedServiceDetailsInterfaceModel{
+		ResourceType: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.ResourceType),
+		Demarcation:  types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.Demarcation),
+		LOATemplate:  types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.LOATemplate),
+		Media:        types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.Media),
+		PortSpeed:    types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Interface.PortSpeed)),
+		ResourceName: types.StringValue(p.AttributeTags.TerminatedServiceDetails.Interface.ResourceName),
+		Up:           types.Int64Value(int64(p.AttributeTags.TerminatedServiceDetails.Interface.Up)),
+		Shutdown:     types.BoolValue(p.AttributeTags.TerminatedServiceDetails.Interface.Shutdown),
+	}
+	locationObject, locationDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsLocationAttrs, locationModel)
+	diags = append(diags, locationDiags...)
+	interfaceObject, interfaceDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsInterfaceAttrs, interfaceModel)
+	diags = append(diags, interfaceDiags...)
+	terminatedServiceDetailsModel.Location = locationObject
+	terminatedServiceDetailsModel.Interface = interfaceObject
+	terminatedServiceDetailsObject, terminatedServiceDetailsDiags := types.ObjectValueFrom(ctx, portTerminatedServiceDetailsAttrs, terminatedServiceDetailsModel)
+	diags = append(diags, terminatedServiceDetailsDiags...)
+	attributeTagsModel.TerminatedServiceDetails = terminatedServiceDetailsObject
+	attributeTagsObject, attributeTagsDiags := types.ObjectValueFrom(ctx, portAttributeTagsAttrs, attributeTagsModel)
+	diags = append(diags, attributeTagsDiags...)
+	orm.AttributeTags = attributeTagsObject
+
+	resourcesModel := &portResourcesModel{}
+	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
+	diags = append(diags, interfaceDiags...)
+	resourcesModel.Interface = interfaceObj
+	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
+	diags = append(diags, resourcesDiags...)
+	orm.VXCResources = resourcesObject
+
+	return diags
 }
 
 // NewPortResource is a helper function to simplify the provider implementation.
@@ -276,6 +393,145 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"attribute_tags": schema.SingleNestedAttribute{
+				Description: "The attribute tags of the product.",
+				Optional:    true,
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"terminated_service_details": schema.SingleNestedAttribute{
+						Description: "The terminated service details of the product.",
+						Optional:    true,
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"location": schema.SingleNestedAttribute{
+								Description: "The location of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+								Attributes: map[string]schema.Attribute{
+									"id": schema.Int64Attribute{
+										Description: "The ID of the location.",
+										Computed:    true,
+									},
+									"name": schema.StringAttribute{
+										Description: "The name of the location.",
+										Computed:    true,
+									},
+									"site_code": schema.StringAttribute{
+										Description: "The site code of the location.",
+										Computed:    true,
+									},
+								},
+							},
+							"interface": schema.SingleNestedAttribute{
+								Description: "The interface of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+								Attributes: map[string]schema.Attribute{
+									"resource_type": schema.StringAttribute{
+										Description: "The resource type of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"demarcation": schema.StringAttribute{
+										Description: "The demarcation of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"loa_template": schema.StringAttribute{
+										Description: "The LOA template of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"media": schema.StringAttribute{
+										Description: "The media of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"port_speed": schema.Int64Attribute{
+										Description: "The port speed of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"resource_name": schema.StringAttribute{
+										Description: "The resource name of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"up": schema.Int64Attribute{
+										Description: "The up status of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"shutdown": schema.BoolAttribute{
+										Description: "The shutdown status of the interface.",
+										Optional:    true,
+										Computed:    true,
+									},
+								},
+							},
+							"device": schema.StringAttribute{
+								Description: "The device of the terminated service.",
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+				},
+			},
+			"resources": schema.SingleNestedAttribute{
+				Description: "VXC Resources attached to port.",
+				Optional:    true,
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"interface": schema.SingleNestedAttribute{
+						Description: "Port interface details.",
+						Optional:    true,
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"demarcation": schema.StringAttribute{
+								Description: "The demarcation of the interface.",
+								Computed:    true,
+							},
+							"description": schema.StringAttribute{
+								Description: "The description of the interface.",
+								Computed:    true,
+							},
+							"id": schema.Int64Attribute{
+								Description: "The ID of the interface.",
+								Computed:    true,
+							},
+							"loa_template": schema.StringAttribute{
+								Description: "The LOA template of the interface.",
+								Computed:    true,
+							},
+							"media": schema.StringAttribute{
+								Description: "The media of the interface.",
+								Computed:    true,
+							},
+							"name": schema.StringAttribute{
+								Description: "The name of the interface.",
+								Computed:    true,
+							},
+							"port_speed": schema.Int64Attribute{
+								Description: "The port speed of the interface.",
+								Computed:    true,
+							},
+							"resource_name": schema.StringAttribute{
+								Description: "The resource name of the interface.",
+								Computed:    true,
+							},
+							"resource_type": schema.StringAttribute{
+								Description: "The resource type of the interface.",
+								Computed:    true,
+							},
+							"up": schema.Int64Attribute{
+								Description: "The up status of the interface.",
+								Computed:    true,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -330,7 +586,8 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	// update the plan with the port info
-	plan.fromAPIPort(port)
+	apiDiags := plan.fromAPIPort(ctx, port)
+	resp.Diagnostics.Append(apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -361,7 +618,8 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	state.fromAPIPort(port)
+	apiDiags := state.fromAPIPort(ctx, port)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -505,4 +763,21 @@ func (r *portResource) ImportState(ctx context.Context, req resource.ImportState
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+func fromAPIPortInterface(ctx context.Context, p *megaport.PortInterface) (types.Object, diag.Diagnostics) {
+	portInterfaceModel := &portInterfaceModel{
+		Demarcation:  types.StringValue(p.Demarcation),
+		Description:  types.StringValue(p.Description),
+		ID:           types.Int64Value(int64(p.ID)),
+		LOATemplate:  types.StringValue(p.LOATemplate),
+		Media:        types.StringValue(p.Media),
+		Name:         types.StringValue(p.Name),
+		PortSpeed:    types.Int64Value(int64(p.PortSpeed)),
+		ResourceName: types.StringValue(p.ResourceName),
+		ResourceType: types.StringValue(p.ResourceType),
+		Up:           types.Int64Value(int64(p.Up)),
+	}
+	portInterfaceObject, diags := types.ObjectValueFrom(ctx, portInterfaceAttrs, portInterfaceModel)
+	return portInterfaceObject, diags
 }

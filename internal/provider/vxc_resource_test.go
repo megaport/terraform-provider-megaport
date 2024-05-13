@@ -216,18 +216,18 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
 				  }
-				  
+
 				  data "megaport_location" "syd_gs" {
 					name = "Global Switch Sydney West"
 				  }
-				  
+
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
 				  }
-				  
+
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
 					location_id             = data.megaport_location.bne_nxt1.id
@@ -236,7 +236,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
-				  
+
 					prefix_filter_list = {
 					  description     = "%s"
 					  address_family  = "IPv4"
@@ -256,17 +256,17 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					  ]
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "aws_vxc" {
 					product_name           = "%s"
 					rate_limit             = 1000
 					port_uid               = megaport_mcr.mcr.product_uid
 					contract_term_months   = 1
-				  
+
 					a_end = {
 					  ordered_vlan = 0
 					}
-				  
+
 					a_end_partner_config = {
 					  partner = "a-end"
 					  partner_a_end_config = {
@@ -297,11 +297,11 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						}]
 					  }
 					}
-				  
+
 					b_end = {
 					  ordered_product_uid = data.megaport_partner.aws_port.product_uid
 					}
-				  
+
 					b_end_partner_config = {
 					  partner = "aws"
 					  aws_config = {
