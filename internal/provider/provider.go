@@ -230,10 +230,10 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to Create HashiCups API Client",
-			"An unexpected error occurred when creating the HashiCups API client. "+
+			"Unable to Create Megaport API Client",
+			"An unexpected error occurred when creating the Megaport API client. "+
 				"If the error is not clear, please contact the provider developers.\n\n"+
-				"HashiCups Client Error: "+err.Error(),
+				"Megaport Client Error: "+err.Error(),
 		)
 		return
 	}
@@ -244,12 +244,12 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 			"Unable to Create Megaport API Client",
 			"An unexpected error occurred when creating the Megaport API client. "+
 				"If the error is not clear, please contact the provider developers.\n\n"+
-				"HashiCups Client Error: "+err.Error(),
+				"Megaport Client Error: "+err.Error(),
 		)
 		return
 	}
 
-	// Make the HashiCups client available during DataSource and Resource
+	// Make the Megaport client available during DataSource and Resource
 	// type Configure methods.
 	resp.DataSourceData = megaportClient
 	resp.ResourceData = megaportClient
