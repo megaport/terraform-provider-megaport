@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -218,7 +219,8 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// TODO: potentially pipe the output of the megaport logger to the tflog package
+	// Build a useragent string with some useful infromation about the client
+	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
 	megaportClient, err := megaport.New(nil,
 		megaport.WithEnvironment(megaportGoEnv),
@@ -227,6 +229,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		megaport.WithCustomHeaders(map[string]string{
 			"x-app": "terraform",
 		}),
+		megaport.WithUserAgent(userAgent),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(
