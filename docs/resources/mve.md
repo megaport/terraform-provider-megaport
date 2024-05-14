@@ -73,13 +73,20 @@ Optional:
 - `admin_password_hash` (String) The admin password hash for the vendor config. Required for Palo Alto MVE.
 - `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, Palo Alto, and Vmware MVEs.
 - `cloud_init` (String) The cloud init for the vendor config. Required for Cisco MVE.
-- `controller_address` (String) The controller address for the vendor config. Required for Versa MVE.
+- `controller_address` (String) The controldler address for the vendor config. Required for Versa MVE.
 - `director_address` (String) The director address for the vendor config. Required for Versa MVE.
+- `fmc_ip_address` (String) The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.
+- `fmc_nat_id` (String) The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.
+- `fmc_registration_key` (String) The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `license_data` (String) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
 - `local_auth` (String) The local auth for the vendor config. Required for Versa MVE.
+- `manage_locally` (Boolean) Whether to manage the MVE locally. Required for Cisco MVE.
+- `mve_label` (String) The MVE label for the vendor config.
 - `remote_auth` (String) The remote auth for the vendor config. Required for Versa MVE.
 - `serial_number` (String) The serial number for the vendor config. Required for Versa MVE.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs.
 - `system_tag` (String) The system tag for the vendor config. Required for Aruba MVE.
+- `token` (String) The token for the vendor config. Required for Meraki MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. Required for VMware MVE.
 - `vco_address` (String) The VCO address for the vendor config. Required for VMware MVE.
 

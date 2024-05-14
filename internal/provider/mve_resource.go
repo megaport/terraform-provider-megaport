@@ -143,23 +143,30 @@ type mveVirtualMachineImageModel struct {
 
 // vendorConfigModel represents the vendor configuration for an MVE.
 type vendorConfigModel struct {
-	Vendor            types.String `tfsdk:"vendor"`
-	ImageID           types.Int64  `tfsdk:"image_id"`
-	ProductSize       types.String `tfsdk:"product_size"`
-	AccountName       types.String `tfsdk:"account_name"`
-	AccountKey        types.String `tfsdk:"account_key"`
-	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
-	CloudInit         types.String `tfsdk:"cloud_init"`
-	LicenseData       types.String `tfsdk:"license_data"`
-	AdminPasswordHash types.String `tfsdk:"admin_password_hash"`
-	DirectorAddress   types.String `tfsdk:"director_address"`
-	ControllerAddress types.String `tfsdk:"controller_address"`
-	LocalAuth         types.String `tfsdk:"local_auth"`
-	RemoteAuth        types.String `tfsdk:"remote_auth"`
-	SerialNumber      types.String `tfsdk:"serial_number"`
-	SystemTag         types.String `tfsdk:"system_tag"`
-	VcoAddress        types.String `tfsdk:"vco_address"`
-	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
+	Vendor             types.String `tfsdk:"vendor"`
+	ImageID            types.Int64  `tfsdk:"image_id"`
+	ProductSize        types.String `tfsdk:"product_size"`
+	MVELabel           types.String `tfsdk:"mve_label"`
+	AccountName        types.String `tfsdk:"account_name"`
+	AccountKey         types.String `tfsdk:"account_key"`
+	AdminSSHPublicKey  types.String `tfsdk:"admin_ssh_public_key"`
+	CloudInit          types.String `tfsdk:"cloud_init"`
+	LicenseData        types.String `tfsdk:"license_data"`
+	AdminPasswordHash  types.String `tfsdk:"admin_password_hash"`
+	DirectorAddress    types.String `tfsdk:"director_address"`
+	ControllerAddress  types.String `tfsdk:"controller_address"`
+	LocalAuth          types.String `tfsdk:"local_auth"`
+	RemoteAuth         types.String `tfsdk:"remote_auth"`
+	ManageLocally      types.Bool   `tfsdk:"manage_locally"`
+	SerialNumber       types.String `tfsdk:"serial_number"`
+	SSHPublicKey       types.String `tfsdk:"ssh_public_key"`
+	SystemTag          types.String `tfsdk:"system_tag"`
+	VcoAddress         types.String `tfsdk:"vco_address"`
+	VcoActivationCode  types.String `tfsdk:"vco_activation_code"`
+	Token              types.String `tfsdk:"token"`
+	FMCIPAddress       types.String `tfsdk:"fmc_ip_address"`
+	FMCRegistrationKey types.String `tfsdk:"fmc_registration_key"`
+	FMCNatID           types.String `tfsdk:"fmc_nat_id"`
 }
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
@@ -293,13 +300,13 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
-
 	switch v.Vendor.ValueString() {
 	case "aruba":
 		arubaConfig := &megaport.ArubaConfig{
 			Vendor:      v.Vendor.ValueString(),
 			ImageID:     int(v.ImageID.ValueInt64()),
 			ProductSize: v.ProductSize.ValueString(),
+			MVELabel:    v.MVELabel.ValueString(),
 			AccountName: v.AccountName.ValueString(),
 			AccountKey:  v.AccountKey.ValueString(),
 			SystemTag:   v.SystemTag.ValueString(),
@@ -307,11 +314,17 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 		return arubaConfig, apiDiags
 	case "cisco":
 		ciscoConfig := &megaport.CiscoConfig{
-			Vendor:            v.Vendor.ValueString(),
-			ImageID:           int(v.ImageID.ValueInt64()),
-			ProductSize:       v.ProductSize.ValueString(),
-			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
-			CloudInit:         v.CloudInit.ValueString(),
+			Vendor:             v.Vendor.ValueString(),
+			ImageID:            int(v.ImageID.ValueInt64()),
+			ProductSize:        v.ProductSize.ValueString(),
+			MVELabel:           v.MVELabel.ValueString(),
+			AdminSSHPublicKey:  v.AdminSSHPublicKey.ValueString(),
+			SSHPublicKey:       v.SSHPublicKey.ValueString(),
+			ManageLocally:      v.ManageLocally.ValueBool(),
+			CloudInit:          v.CloudInit.ValueString(),
+			FMCIPAddress:       v.FMCIPAddress.ValueString(),
+			FMCNatID:           v.FMCNatID.ValueString(),
+			FMCRegistrationKey: v.FMCRegistrationKey.ValueString(),
 		}
 		return ciscoConfig, apiDiags
 	case "fortinet":
@@ -319,7 +332,9 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			Vendor:            v.Vendor.ValueString(),
 			ImageID:           int(v.ImageID.ValueInt64()),
 			ProductSize:       v.ProductSize.ValueString(),
+			MVELabel:          v.MVELabel.ValueString(),
 			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return fortinetConfig, apiDiags
@@ -328,6 +343,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			Vendor:            v.Vendor.ValueString(),
 			ImageID:           int(v.ImageID.ValueInt64()),
 			ProductSize:       v.ProductSize.ValueString(),
+			MVELabel:          v.MVELabel.ValueString(),
 			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
 			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
@@ -338,6 +354,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			Vendor:            v.Vendor.ValueString(),
 			ImageID:           int(v.ImageID.ValueInt64()),
 			ProductSize:       v.ProductSize.ValueString(),
+			MVELabel:          v.MVELabel.ValueString(),
 			DirectorAddress:   v.DirectorAddress.ValueString(),
 			ControllerAddress: v.ControllerAddress.ValueString(),
 			LocalAuth:         v.LocalAuth.ValueString(),
@@ -350,11 +367,22 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			Vendor:            v.Vendor.ValueString(),
 			ImageID:           int(v.ImageID.ValueInt64()),
 			ProductSize:       v.ProductSize.ValueString(),
+			MVELabel:          v.MVELabel.ValueString(),
 			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			VcoAddress:        v.VcoAddress.ValueString(),
 			VcoActivationCode: v.VcoActivationCode.ValueString(),
 		}
 		return vmwareConfig, apiDiags
+	case "meraki":
+		merakiConfig := &megaport.MerakiConfig{
+			Vendor:      v.Vendor.ValueString(),
+			ImageID:     int(v.ImageID.ValueInt64()),
+			ProductSize: v.ProductSize.ValueString(),
+			MVELabel:    v.MVELabel.ValueString(),
+			Token:       v.Token.ValueString(),
+		}
+		return merakiConfig, apiDiags
 	}
 	apiDiags.AddError("vendor not supported",
 		"vendor not supported")
@@ -634,6 +662,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
+					"mve_label": schema.StringAttribute{
+						Description: "The MVE label for the vendor config.",
+						Optional:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
 					"account_name": schema.StringAttribute{
 						Description: "The account name for the vendor config. Required for Aruba MVE.",
 						Optional:    true,
@@ -644,6 +679,10 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
 						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, Palo Alto, and Vmware MVEs.",
+						Optional:    true,
+					},
+					"ssh_public_key": schema.StringAttribute{
+						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
@@ -663,7 +702,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"controller_address": schema.StringAttribute{
-						Description: "The controller address for the vendor config. Required for Versa MVE.",
+						Description: "The controldler address for the vendor config. Required for Versa MVE.",
+						Optional:    true,
+					},
+					"manage_locally": schema.BoolAttribute{
+						Description: "Whether to manage the MVE locally. Required for Cisco MVE.",
 						Optional:    true,
 					},
 					"local_auth": schema.StringAttribute{
@@ -688,6 +731,22 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vco_activation_code": schema.StringAttribute{
 						Description: "The VCO activation code for the vendor config. Required for VMware MVE.",
+						Optional:    true,
+					},
+					"fmc_ip_address": schema.StringAttribute{
+						Description: "The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Optional:    true,
+					},
+					"fmc_registration_key": schema.StringAttribute{
+						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Optional:    true,
+					},
+					"fmc_nat_id": schema.StringAttribute{
+						Description: "The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Optional:    true,
+					},
+					"token": schema.StringAttribute{
+						Description: "The token for the vendor config. Required for Meraki MVE.",
 						Optional:    true,
 					},
 				},

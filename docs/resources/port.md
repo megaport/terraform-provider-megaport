@@ -26,9 +26,11 @@ description: |-
 
 ### Optional
 
+- `attribute_tags` (Attributes) The attribute tags of the product. (see [below for nested schema](#nestedatt--attribute_tags))
 - `cost_centre` (String) The cost centre for the product.
 - `diversity_zone` (String) The diversity zone of the product.
 - `locked` (Boolean) Whether the product is locked.
+- `resources` (Attributes) VXC Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only
 
@@ -48,3 +50,69 @@ description: |-
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto-approved on this product.
 - `vxc_permitted` (Boolean) Whether VXC is permitted on this product.
+
+<a id="nestedatt--attribute_tags"></a>
+### Nested Schema for `attribute_tags`
+
+Optional:
+
+- `terminated_service_details` (Attributes) The terminated service details of the product. (see [below for nested schema](#nestedatt--attribute_tags--terminated_service_details))
+
+<a id="nestedatt--attribute_tags--terminated_service_details"></a>
+### Nested Schema for `attribute_tags.terminated_service_details`
+
+Optional:
+
+- `device` (String) The device of the terminated service.
+- `interface` (Attributes) The interface of the terminated service. (see [below for nested schema](#nestedatt--attribute_tags--terminated_service_details--interface))
+- `location` (Attributes) The location of the terminated service. (see [below for nested schema](#nestedatt--attribute_tags--terminated_service_details--location))
+
+<a id="nestedatt--attribute_tags--terminated_service_details--interface"></a>
+### Nested Schema for `attribute_tags.terminated_service_details.interface`
+
+Optional:
+
+- `demarcation` (String) The demarcation of the interface.
+- `loa_template` (String) The LOA template of the interface.
+- `media` (String) The media of the interface.
+- `port_speed` (Number) The port speed of the interface.
+- `resource_name` (String) The resource name of the interface.
+- `resource_type` (String) The resource type of the interface.
+- `shutdown` (Boolean) The shutdown status of the interface.
+- `up` (Number) The up status of the interface.
+
+
+<a id="nestedatt--attribute_tags--terminated_service_details--location"></a>
+### Nested Schema for `attribute_tags.terminated_service_details.location`
+
+Read-Only:
+
+- `id` (Number) The ID of the location.
+- `name` (String) The name of the location.
+- `site_code` (String) The site code of the location.
+
+
+
+
+<a id="nestedatt--resources"></a>
+### Nested Schema for `resources`
+
+Optional:
+
+- `interface` (Attributes) Port interface details. (see [below for nested schema](#nestedatt--resources--interface))
+
+<a id="nestedatt--resources--interface"></a>
+### Nested Schema for `resources.interface`
+
+Read-Only:
+
+- `demarcation` (String) The demarcation of the interface.
+- `description` (String) The description of the interface.
+- `id` (Number) The ID of the interface.
+- `loa_template` (String) The LOA template of the interface.
+- `media` (String) The media of the interface.
+- `name` (String) The name of the interface.
+- `port_speed` (Number) The port speed of the interface.
+- `resource_name` (String) The resource name of the interface.
+- `resource_type` (String) The resource type of the interface.
+- `up` (Number) The up status of the interface.
