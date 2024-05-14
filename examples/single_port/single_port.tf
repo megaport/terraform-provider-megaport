@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    megaport = {
+      source  = "megaport/megaport"
+      version = "1.0.0-beta1"
+    }
+  }
+}
 provider "megaport" {
   environment            = "staging"
   access_key             = "access_key"
