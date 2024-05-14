@@ -1,6 +1,4 @@
-# Overview
 # Megaport Terraform Provider
----
 
 The `terraform-provider-megaport` or Megaport Terraform Provider lets you create and manage
 Megaport's product and services using the [Megaport API](https://dev.megaport.com).
