@@ -480,7 +480,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"resources": schema.SingleNestedAttribute{
-				Description: "VXC Resources attached to port.",
+				Description: "Interface details",
 				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
