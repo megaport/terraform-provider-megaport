@@ -2371,28 +2371,28 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	if aEndPlan.VLAN.Equal(aEndState.VLAN) {
+	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
 		aEndVlan = int(aEndPlan.VLAN.ValueInt64())
 	}
-	if bEndPlan.VLAN.Equal(bEndState.VLAN) {
+	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
 	}
-	if !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
+	if !aEndPlan.ProductUID.IsNull() && !bEndPlan.ProductUID.Equal(aEndState.ProductUID) {
 		aEndProductUID = aEndPlan.ProductUID.ValueString()
 	}
-	if !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
+	if !bEndPlan.ProductUID.IsNull() && !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
 		bEndProductUID = bEndPlan.ProductUID.ValueString()
 	}
-	if !plan.RateLimit.Equal(state.RateLimit) {
+	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
 	}
-	if !plan.CostCentre.Equal(state.CostCentre) {
+	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
 		costCentre = plan.CostCentre.ValueString()
 	}
-	if !plan.Shutdown.Equal(state.Shutdown) {
+	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown = plan.Shutdown.ValueBool()
 	}
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		term = int(plan.ContractTermMonths.ValueInt64())
 	}
 
