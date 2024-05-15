@@ -527,6 +527,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
+				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),

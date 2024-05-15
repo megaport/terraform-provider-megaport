@@ -277,7 +277,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"market": schema.StringAttribute{
 				Description: "Market the product is in.",
-				Required:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -350,7 +350,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
 			"asn": schema.Int64Attribute{
 				Description: "ASN in the MCR order configuration.",

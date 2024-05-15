@@ -317,7 +317,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
-				Required:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -362,7 +362,8 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted on this product.",
