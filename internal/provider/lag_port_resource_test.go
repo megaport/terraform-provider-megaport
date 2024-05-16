@@ -10,6 +10,9 @@ import (
 
 func TestAccMegaportLAGPort_Basic(t *testing.T) {
 	portName := RandomTestName()
+	costCentreName := RandomTestName()
+	portNameNew := RandomTestName()
+	costCentreNameNew := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -20,20 +23,20 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 				}
 					resource "megaport_lag_port" "lag_port" {
 			        product_name  = "%s"
+					cost_centre = "%s"
 			        port_speed  = 10000
 			        location_id = data.megaport_location.bne_nxt1.id
-			        contract_term_months        = 1
-					market = "AU"
-					marketplace_visibility = false
+			        contract_term_months        = 12
+					marketplace_visibility = true
                     lag_count = 3
-			      }`, portName),
+			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "1"),
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "market", "AU"),
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "true"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreName),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
@@ -62,6 +65,37 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					return rawState["product_uid"], nil
 				},
 				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+			},
+			// Update Testing
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				}
+					resource "megaport_lag_port" "lag_port" {
+			        product_name  = "%s"
+					cost_centre = "%s"
+			        port_speed  = 10000
+			        location_id = data.megaport_location.bne_nxt1.id
+			        contract_term_months        = 12
+					marketplace_visibility = false
+                    lag_count = 3
+			      }`, portNameNew, costCentreNameNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreNameNew),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
+				),
 			},
 		},
 	})

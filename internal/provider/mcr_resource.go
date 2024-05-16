@@ -277,10 +277,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"market": schema.StringAttribute{
 				Description: "Market the product is in.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Computed:    true,
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "Location ID of the product.",
@@ -489,6 +486,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Term:             int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:        int(plan.PortSpeed.ValueInt64()),
 		LocationID:       int(plan.LocationID.ValueInt64()),
+		CostCentre:       plan.CostCentre.ValueString(),
 		WaitForProvision: true,
 		WaitForTime:      10 * time.Minute,
 	}
@@ -613,17 +611,27 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// Check on changes
 	var name, costCentre string
-	if !plan.Name.Equal(state.Name) {
+	var marketplaceVisibility bool
+	if !plan.Name.IsNull() && !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
+	} else {
+		name = state.Name.ValueString()
 	}
-	if !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.Name.ValueString()
+	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
+		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
+	}
+	if !plan.MarketplaceVisibility.IsNull() && !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
+		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
+	} else {
+		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
-		MarketplaceVisibility: plan.MarketplaceVisibility.ValueBool(),
+		MarketplaceVisibility: marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})
@@ -646,13 +654,13 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIMCR(ctx, mcr)
+	apiDiags := plan.fromAPIMCR(ctx, mcr)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Update the state with the new values
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	diags := resp.State.Set(ctx, state)
+	diags := resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -11,47 +11,46 @@ import (
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
+	costCentreName := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
-				}
-				resource "megaport_mcr" "mcr" {
-                    product_name  = "%s"
-                    port_speed  = 1000
-                    location_id = data.megaport_location.bne_nxt1.id
-                    contract_term_months        = 1
-					market = "AU"
-					marketplace_visibility = false
-
+				  resource "megaport_mcr" "mcr" {
+					product_name             = "%s"
+					port_speed               = 1000
+					location_id              = 5
+					contract_term_months     = 12
+					cost_centre              = "%s"
+					marketplace_visibility   = true
+				  
 					prefix_filter_list = {
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 24
-							le      = 24
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 24
-							le      = 24
-						  }
-						]
-					  }
-                  }`, mcrName, prefixFilterName),
+					  description     = "%s"
+					  address_family  = "IPv4"
+					  entries = [
+						{
+						  action  = "permit"
+						  prefix  = "10.0.1.0/24"
+						  ge      = 24
+						  le      = 24
+						},
+						{
+						  action  = "deny"
+						  prefix  = "10.0.2.0/24"
+						  ge      = 24
+						  le      = 24
+						}
+					  ]
+					}
+				  }
+				  `, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "1"),
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "market", "AU"),
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "true"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),

@@ -317,10 +317,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Computed:    true,
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the product.",
@@ -551,9 +548,9 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
 		LocationId:            int(plan.LocationID.ValueInt64()),
-		Market:                plan.Market.ValueString(),
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
+		CostCentre:            plan.CostCentre.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           10 * time.Minute,
 	})
@@ -641,17 +638,27 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Check on changes
 	var name, costCentre string
+	var marketplaceVisibility bool
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
+	} else {
+		name = state.Name.ValueString()
 	}
 	if !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.Name.ValueString()
+		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
+	}
+	if !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
+		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
+	} else {
+		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
 	r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
-		MarketplaceVisibility: plan.MarketplaceVisibility.ValueBool(),
+		MarketplaceVisibility: marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})

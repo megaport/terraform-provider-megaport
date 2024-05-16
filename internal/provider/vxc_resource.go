@@ -2371,29 +2371,45 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	if aEndPlan.VLAN.Equal(aEndState.VLAN) {
+	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
 		aEndVlan = int(aEndPlan.VLAN.ValueInt64())
+	} else {
+		aEndVlan = int(aEndState.VLAN.ValueInt64())
 	}
-	if bEndPlan.VLAN.Equal(bEndState.VLAN) {
+	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
+	} else {
+		bEndVlan = int(bEndState.VLAN.ValueInt64())
 	}
-	if !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
+	if !aEndPlan.ProductUID.IsNull() && !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
 		aEndProductUID = aEndPlan.ProductUID.ValueString()
+	} else {
+		aEndProductUID = aEndState.ProductUID.ValueString()
 	}
-	if !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
+	if !bEndPlan.ProductUID.IsNull() && !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
 		bEndProductUID = bEndPlan.ProductUID.ValueString()
+	} else {
+		bEndProductUID = bEndState.ProductUID.ValueString()
 	}
-	if !plan.RateLimit.Equal(state.RateLimit) {
+	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
+	} else {
+		rateLimit = int(state.RateLimit.ValueInt64())
 	}
-	if !plan.CostCentre.Equal(state.CostCentre) {
+	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
 		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
 	}
-	if !plan.Shutdown.Equal(state.Shutdown) {
+	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown = plan.Shutdown.ValueBool()
+	} else {
+		shutdown = state.Shutdown.ValueBool()
 	}
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		term = int(plan.ContractTermMonths.ValueInt64())
+	} else {
+		term = int(state.ContractTermMonths.ValueInt64())
 	}
 
 	updateReq := &megaport.UpdateVXCRequest{
@@ -2408,7 +2424,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		Term:           &term,
 	}
 
-	_, err := r.client.VXCService.UpdateVXC(ctx, plan.ID.String(), updateReq)
+	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
