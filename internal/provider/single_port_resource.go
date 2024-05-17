@@ -658,7 +658,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
-		MarketplaceVisibility: marketplaceVisibility,
+		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})

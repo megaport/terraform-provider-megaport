@@ -631,7 +631,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
-		MarketplaceVisibility: marketplaceVisibility,
+		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})
