@@ -255,8 +255,12 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Bandwidth speed of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
+					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+						fmt.Println("port_speed (planned, state)", req.PlanValue, req.StateValue)
+						if req.PlanValue != req.StateValue {
+							resp.RequiresReplace = true
+						}
+					}, "Description for func", "Description for func in Markdown")},
 				Validators: []validator.Int64{
 					int64validator.OneOf(1000, 2500, 5000, 10000),
 				},
@@ -271,9 +275,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "Date the product went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "Market the product is in.",
@@ -283,7 +284,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Location ID of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+						if req.PlanValue != req.StateValue {
+							resp.RequiresReplace = true
+						}
+					}, "Description for func", "Description for func in Markdown"),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
@@ -312,16 +317,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_start_date": schema.StringAttribute{
 				Description: "Contract start date of the product.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "Contract end date of the product.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"secondary_name": schema.StringAttribute{
 				Description: "Secondary name of the product.",
@@ -481,14 +480,22 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	var marketplaceVisibility bool
+	if !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
+	} else {
+		marketplaceVisibility = false
+	}
+
 	buyReq := &megaport.BuyMCRRequest{
-		Name:             plan.Name.ValueString(),
-		Term:             int(plan.ContractTermMonths.ValueInt64()),
-		PortSpeed:        int(plan.PortSpeed.ValueInt64()),
-		LocationID:       int(plan.LocationID.ValueInt64()),
-		CostCentre:       plan.CostCentre.ValueString(),
-		WaitForProvision: true,
-		WaitForTime:      10 * time.Minute,
+		Name:                  plan.Name.ValueString(),
+		Term:                  int(plan.ContractTermMonths.ValueInt64()),
+		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
+		LocationID:            int(plan.LocationID.ValueInt64()),
+		CostCentre:            plan.CostCentre.ValueString(),
+		MarketplaceVisibility: &marketplaceVisibility,
+		WaitForProvision:      true,
+		WaitForTime:           10 * time.Minute,
 	}
 
 	if !plan.ASN.IsNull() {

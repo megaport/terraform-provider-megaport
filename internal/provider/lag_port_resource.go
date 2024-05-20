@@ -59,7 +59,7 @@ type lagPortResourceModel struct {
 	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
 
 	AttributeTags types.Object `tfsdk:"attribute_tags"`
-	VXCResources  types.Object `tfsdk:"resources"`
+	Resources     types.Object `tfsdk:"resources"`
 }
 
 func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
@@ -151,7 +151,7 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	resourcesModel.Interface = interfaceObj
 	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
 	diags = append(diags, resourcesDiags...)
-	orm.VXCResources = resourcesObject
+	orm.Resources = resourcesObject
 
 	return diags
 }
@@ -204,9 +204,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
@@ -219,32 +216,37 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The speed of the port in Mbps.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+						if req.PlanValue != req.StateValue {
+							resp.RequiresReplace = true
+						}
+					}, "Description for func", "Description for func in Markdown"),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
 				Description: "The date the product will be terminated.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+						if req.PlanValue != req.StateValue {
+							resp.RequiresReplace = true
+						}
+					}, "Description for func", "Description for func in Markdown"),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
@@ -409,7 +411,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"resources": schema.SingleNestedAttribute{
-				Description: "VXC Resources attached to port.",
+				Description: "Resources attached to port.",
 				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{

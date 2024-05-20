@@ -659,16 +659,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
@@ -987,16 +981,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract starts.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The UID of the company the product is associated with.",
@@ -1028,8 +1016,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"a_end": schema.SingleNestedAttribute{
 				Description: "The current A-End configuration of the VXC.",
-				Optional:    true,
-				Computed:    true,
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the A-End configuration.",
@@ -1041,7 +1028,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"product_uid": schema.StringAttribute{
-						Description: "The product UID of the A-End configuration.",
+						Description: "The current product UID of the A-End configuration.",
 						Computed:    true,
 					},
 					"product_name": schema.StringAttribute{
@@ -1084,8 +1071,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"b_end": schema.SingleNestedAttribute{
 				Description: "The current B-End configuration of the VXC.",
-				Optional:    true,
-				Computed:    true,
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the B-End configuration.",
@@ -1097,7 +1083,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"product_uid": schema.StringAttribute{
-						Description: "The product UID of the B-End configuration.",
+						Description: "The current product UID of the B-End configuration.",
 						Computed:    true,
 					},
 					"product_name": schema.StringAttribute{

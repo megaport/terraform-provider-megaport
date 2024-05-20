@@ -472,6 +472,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"market": schema.StringAttribute{
 				Description: "The market the MVE is in.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The location ID of the MVE.",
