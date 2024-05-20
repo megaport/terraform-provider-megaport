@@ -24,7 +24,6 @@ resource "megaport_mcr" "mcr" {
   product_name             = "Megaport Example MCR A-End"
   location_id              = data.megaport_location.bne_nxt1.id
   marketplace_visibility   = false
-  market                   = "AU"
   contract_term_months     = 1
   port_speed               = 5000
   asn                      = 64555

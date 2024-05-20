@@ -14,7 +14,6 @@ resource "megaport_port" "port_1" {
   port_speed              = 1000
   location_id             = data.megaport_location.loc.id
   contract_term_months    = 1
-  market                  = "AU"
   marketplace_visibility  = false
 }
 
@@ -23,7 +22,6 @@ resource "megaport_port" "port_2" {
   port_speed              = 1000
   location_id             = data.megaport_location.loc.id
   contract_term_months    = 1
-  market                  = "AU"
   marketplace_visibility  = false
 }
 
