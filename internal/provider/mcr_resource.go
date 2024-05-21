@@ -255,12 +255,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Bandwidth speed of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
-						fmt.Println("port_speed (planned, state)", req.PlanValue, req.StateValue)
-						if req.PlanValue != req.StateValue {
-							resp.RequiresReplace = true
-						}
-					}, "Description for func", "Description for func in Markdown")},
+					int64planmodifier.RequiresReplace(),
+				},
 				Validators: []validator.Int64{
 					int64validator.OneOf(1000, 2500, 5000, 10000),
 				},
@@ -284,11 +280,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Location ID of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
-						if req.PlanValue != req.StateValue {
-							resp.RequiresReplace = true
-						}
-					}, "Description for func", "Description for func in Markdown"),
+					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{

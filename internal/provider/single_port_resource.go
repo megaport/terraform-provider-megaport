@@ -295,11 +295,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: "The speed of the port in Mbps.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
-						if req.PlanValue != req.StateValue {
-							resp.RequiresReplace = true
-						}
-					}, "Description for func", "Description for func in Markdown"),
+					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
@@ -321,11 +317,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: "The numeric location ID of the product.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
-						if req.PlanValue != req.StateValue {
-							resp.RequiresReplace = true
-						}
-					}, "Description for func", "Description for func in Markdown"),
+					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
