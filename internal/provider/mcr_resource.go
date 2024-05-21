@@ -472,22 +472,14 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	var marketplaceVisibility bool
-	if !plan.MarketplaceVisibility.IsNull() {
-		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
-	} else {
-		marketplaceVisibility = false
-	}
-
 	buyReq := &megaport.BuyMCRRequest{
-		Name:                  plan.Name.ValueString(),
-		Term:                  int(plan.ContractTermMonths.ValueInt64()),
-		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
-		LocationID:            int(plan.LocationID.ValueInt64()),
-		CostCentre:            plan.CostCentre.ValueString(),
-		MarketplaceVisibility: &marketplaceVisibility,
-		WaitForProvision:      true,
-		WaitForTime:           10 * time.Minute,
+		Name:             plan.Name.ValueString(),
+		Term:             int(plan.ContractTermMonths.ValueInt64()),
+		PortSpeed:        int(plan.PortSpeed.ValueInt64()),
+		LocationID:       int(plan.LocationID.ValueInt64()),
+		CostCentre:       plan.CostCentre.ValueString(),
+		WaitForProvision: true,
+		WaitForTime:      10 * time.Minute,
 	}
 
 	if !plan.ASN.IsNull() {
