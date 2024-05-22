@@ -28,17 +28,16 @@ var (
 	_ resource.ResourceWithImportState = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
-		"owner_uid":           types.StringType,
-		"ordered_product_uid": types.StringType,
-		"product_uid":         types.StringType,
-		"product_name":        types.StringType,
-		"location_id":         types.Int64Type,
-		"location":            types.StringType,
-		"ordered_vlan":        types.Int64Type,
-		"vlan":                types.Int64Type,
-		"inner_vlan":          types.Int64Type,
-		"vnic_index":          types.Int64Type,
-		"secondary_name":      types.StringType,
+		"owner_uid":      types.StringType,
+		"product_uid":    types.StringType,
+		"product_name":   types.StringType,
+		"location_id":    types.Int64Type,
+		"location":       types.StringType,
+		"ordered_vlan":   types.Int64Type,
+		"vlan":           types.Int64Type,
+		"inner_vlan":     types.Int64Type,
+		"vnic_index":     types.Int64Type,
+		"secondary_name": types.StringType,
 	}
 
 	cspConnectionFullAttrs = map[string]attr.Type{
@@ -210,7 +209,6 @@ type vxcResourceModel struct {
 	ContractEndDate   types.String `tfsdk:"contract_end_date"`
 	Shutdown          types.Bool   `tfsdk:"shutdown"`
 
-	PortUID           types.String `tfsdk:"port_uid"`
 	AEndConfiguration types.Object `tfsdk:"a_end"`
 	BEndConfiguration types.Object `tfsdk:"b_end"`
 
@@ -290,7 +288,6 @@ type vxcApprovalModel struct {
 // vxcEndConfigurationModel maps the end configuration schema data.
 type vxcEndConfigurationModel struct {
 	OwnerUID              types.String `tfsdk:"owner_uid"`
-	OrderedProductUID     types.String `tfsdk:"ordered_product_uid"`
 	ProductUID            types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
@@ -441,19 +438,16 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		orm.ContractEndDate = types.StringNull()
 	}
 
-	var aEndOrderedProductUID, bEndOrderedProductUID string
 	var aEndOrderedVLAN, bEndOrderedVLAN int64
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
 		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, aEndDiags...)
-		aEndOrderedProductUID = existingAEnd.OrderedProductUID.ValueString()
 		aEndOrderedVLAN = existingAEnd.OrderedVLAN.ValueInt64()
 	}
 
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		OrderedProductUID:     types.StringValue(aEndOrderedProductUID),
 		ProductUID:            types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
@@ -472,13 +466,11 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		existingBEnd := &vxcEndConfigurationModel{}
 		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, bEndDiags...)
-		bEndOrderedProductUID = existingBEnd.OrderedProductUID.ValueString()
 		bEndOrderedVLAN = existingBEnd.OrderedVLAN.ValueInt64()
 	}
 
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		OrderedProductUID:     types.StringValue(bEndOrderedProductUID),
 		ProductUID:            types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
@@ -623,10 +615,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"rate_limit": schema.Int64Attribute{
 				Description: "The rate limit of the product.",
-				Required:    true,
-			},
-			"port_uid": schema.StringAttribute{
-				Description: "The UID of the port the VXC is connected to.",
 				Required:    true,
 			},
 			"product_type": schema.StringAttribute{
@@ -1022,14 +1010,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The owner UID of the A-End configuration.",
 						Computed:    true,
 					},
-					"ordered_product_uid": schema.StringAttribute{
-						Description: "The initial ordered product UID of the A-End configuration.",
-						Optional:    true,
-						Computed:    true,
-					},
 					"product_uid": schema.StringAttribute{
-						Description: "The current product UID of the A-End configuration.",
-						Computed:    true,
+						Description: "The product UID of the A-End configuration.",
+						Required:    true,
 					},
 					"product_name": schema.StringAttribute{
 						Description: "The product name of the A-End configuration.",
@@ -1077,13 +1060,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The owner UID of the B-End configuration.",
 						Computed:    true,
 					},
-					"ordered_product_uid": schema.StringAttribute{
-						Description: "The initial ordered product UID of the B-End configuration.",
-						Optional:    true,
-						Computed:    true,
-					},
 					"product_uid": schema.StringAttribute{
 						Description: "The current product UID of the B-End configuration.",
+						Optional:    true,
 						Computed:    true,
 					},
 					"product_name": schema.StringAttribute{
@@ -1589,7 +1568,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	buyReq := &megaport.BuyVXCRequest{
-		PortUID:   plan.PortUID.ValueString(),
 		VXCName:   plan.Name.ValueString(),
 		Term:      int(plan.ContractTermMonths.ValueInt64()),
 		RateLimit: int(plan.RateLimit.ValueInt64()),
@@ -1612,9 +1590,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.OrderedProductUID.ValueString(),
+		ProductUID: a.ProductUID.ValueString(),
 		VLAN:       int(a.VLAN.ValueInt64()),
 	}
+	buyReq.PortUID = a.ProductUID.ValueString()
 
 	if !a.OrderedVLAN.IsNull() {
 		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
@@ -1687,9 +1666,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "AZURE",
 			}
-			if !a.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
-			}
+			partnerPortReq.ProductID = a.ProductUID.ValueString()
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -1750,9 +1727,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "GOOGLE",
 			}
-			if !a.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
-			}
+			partnerPortReq.ProductID = a.ProductUID.ValueString()
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -1805,9 +1780,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "ORACLE",
 			}
-			if !a.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = a.OrderedProductUID.ValueString()
-			}
+			partnerPortReq.ProductID = a.ProductUID.ValueString()
+
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 
 			if err != nil {
@@ -1854,7 +1828,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterListRes, err := r.client.MCRService.GetMCRPrefixFilterLists(ctx, plan.PortUID.ValueString())
+			prefixFilterListRes, err := r.client.MCRService.GetMCRPrefixFilterLists(ctx, a.ProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2002,7 +1976,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: b.OrderedProductUID.ValueString(),
+		ProductUID: b.ProductUID.ValueString(),
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
 	if !b.OrderedVLAN.IsNull() {
@@ -2094,8 +2068,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "AZURE",
 			}
-			if !b.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			if !b.ProductUID.IsNull() {
+				partnerPortReq.ProductID = b.ProductUID.ValueString()
 			}
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
@@ -2150,8 +2124,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "GOOGLE",
 			}
-			if !b.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			if !b.ProductUID.IsNull() {
+				partnerPortReq.ProductID = b.ProductUID.ValueString()
 			}
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
@@ -2204,8 +2178,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				PortSpeed: int(plan.RateLimit.ValueInt64()),
 				Partner:   "ORACLE",
 			}
-			if !b.OrderedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.OrderedProductUID.ValueString()
+			if !b.ProductUID.IsNull() {
+				partnerPortReq.ProductID = b.ProductUID.ValueString()
 			}
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {

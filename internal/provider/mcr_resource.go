@@ -645,13 +645,13 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := plan.fromAPIMCR(ctx, mcr)
+	apiDiags := state.fromAPIMCR(ctx, mcr)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Update the state with the new values
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	diags := resp.State.Set(ctx, &plan)
+	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

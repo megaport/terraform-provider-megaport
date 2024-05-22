@@ -41,13 +41,13 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
                     product_name   = "%s"
                     rate_limit = 1000
                     contract_term_months = 12
-                    port_uid = megaport_port.port_1.product_uid
 
                     a_end = {
+                        product_uid = megaport_port.port_1.product_uid
                     }
 
                     b_end = {
-                        ordered_product_uid = megaport_port.port_2.product_uid
+                        product_uid = megaport_port.port_2.product_uid
                     }
                   }
                   `, portName1, portName2, vxcName),
@@ -86,7 +86,7 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "port_uid", "a_end_partner_config", "b_end_partner_config", "a_end", "b_end", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"last_updated", "a_end_partner_config", "b_end_partner_config", "a_end", "b_end", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 			// Update Tests
 			{
@@ -95,36 +95,36 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 					name = "NextDC B1"
 				}
 					resource "megaport_port" "port_1" {
-                    product_name  = "%s"
-                    port_speed  = 1000
-                    location_id = data.megaport_location.loc.id
-                    contract_term_months        = 12
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
 					cost_centre = "test"
 					marketplace_visibility = false
-                  }
-                  resource "megaport_port" "port_2" {
-                    product_name  = "%s"
-                    port_speed  = 1000
-                    location_id = data.megaport_location.loc.id
-                    contract_term_months        = 12
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
 					cost_centre = "test"
 					marketplace_visibility = false
-                  }
-                  resource "megaport_vxc" "vxc" {
-                    product_name   = "%s"
+			      }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
 					cost_centre = "%s"
-                    rate_limit = 500
-                    port_uid = megaport_port.port_1.product_uid
+			        rate_limit = 500
 					contract_term_months = 12
 
-                    a_end = {
-                    }
+			        a_end = {
+			            product_uid = megaport_port.port_1.product_uid
+			        }
 
-                    b_end = {
-                        ordered_product_uid = megaport_port.port_2.product_uid
-                    }
-                  }
-                  `, portName1, portName2, vxcNameNew, costCentreNew),
+			        b_end = {
+			            product_uid = megaport_port.port_2.product_uid
+			        }
+			      }
+			      `, portName1, portName2, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -184,15 +184,15 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                   resource "megaport_vxc" "aws_vxc" {
                     product_name   = "%s"
                     rate_limit = 1000
-                    port_uid = megaport_mcr.mcr.product_uid
                     contract_term_months = 1
 
                     a_end = {
+                      product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 2191
                     }
 
                     b_end = {
-                        ordered_product_uid = data.megaport_partner.aws_port.product_uid
+                        product_uid = data.megaport_partner.aws_port.product_uid
                     }
 
                     b_end_partner_config = {
@@ -212,9 +212,9 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                     product_name   = "%s"
                     rate_limit = 1000
                     contract_term_months = 1
-                    port_uid        = megaport_mcr.mcr.product_uid
 
                     a_end = {
+                      product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 182
                     }
 
@@ -232,9 +232,9 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                     product_name   = "%s"
                     rate_limit = 200
                     contract_term_months = 1
-                    port_uid        = megaport_mcr.mcr.product_uid
 
                     a_end = {
+                      product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 0
                     }
 
@@ -270,15 +270,15 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					name = "NextDC B1"
 				  }
 
-				  data "megaport_location" "syd_gs" {
-					name = "Global Switch Sydney West"
+				  data "megaport_location" "syd_ndc" {
+					name = "NextDC C1"
 				  }
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-					location_id  = data.megaport_location.syd_gs.id
+					location_id  = data.megaport_location.syd_ndc.id
 				  }
 
 				  resource "megaport_mcr" "mcr" {
@@ -312,10 +312,10 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 				  resource "megaport_vxc" "aws_vxc" {
 					product_name           = "%s"
 					rate_limit             = 1000
-					port_uid               = megaport_mcr.mcr.product_uid
 					contract_term_months   = 1
 
 					a_end = {
+                      product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 0
 					}
 
@@ -351,7 +351,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					}
 
 					b_end = {
-					  ordered_product_uid = data.megaport_partner.aws_port.product_uid
+					  product_uid = aws_port.product_uid
 					}
 
 					b_end_partner_config = {
