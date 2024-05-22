@@ -351,7 +351,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					}
 
 					b_end = {
-					  product_uid = aws_port.product_uid
+					  product_uid = data.megaport_partner.aws_port.product_uid
 					}
 
 					b_end_partner_config = {
