@@ -591,13 +591,21 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
-	r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
+	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error modifying port",
+			"Could not modify port with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
 	if portErr != nil {
