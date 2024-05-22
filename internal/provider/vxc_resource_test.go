@@ -43,11 +43,11 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
                     contract_term_months = 12
 
                     a_end = {
-                        product_uid = megaport_port.port_1.product_uid
+                        requested_product_uid = megaport_port.port_1.product_uid
                     }
 
                     b_end = {
-                        product_uid = megaport_port.port_2.product_uid
+                        requested_product_uid = megaport_port.port_2.product_uid
                     }
                   }
                   `, portName1, portName2, vxcName),
@@ -117,11 +117,11 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 					contract_term_months = 12
 
 			        a_end = {
-			            product_uid = megaport_port.port_1.product_uid
+			            requested_product_uid = megaport_port.port_1.product_uid
 			        }
 
 			        b_end = {
-			            product_uid = megaport_port.port_2.product_uid
+			            requested_product_uid = megaport_port.port_2.product_uid
 			        }
 			      }
 			      `, portName1, portName2, vxcNameNew, costCentreNew),
@@ -187,12 +187,12 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                     contract_term_months = 1
 
                     a_end = {
-                      product_uid = megaport_mcr.mcr.product_uid
+                      requested_product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 2191
                     }
 
                     b_end = {
-                        product_uid = data.megaport_partner.aws_port.product_uid
+                        requested_product_uid = data.megaport_partner.aws_port.product_uid
                     }
 
                     b_end_partner_config = {
@@ -214,7 +214,7 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                     contract_term_months = 1
 
                     a_end = {
-                      product_uid = megaport_mcr.mcr.product_uid
+                      requested_product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 182
                     }
 
@@ -234,7 +234,7 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                     contract_term_months = 1
 
                     a_end = {
-                      product_uid = megaport_mcr.mcr.product_uid
+                      requested_product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 0
                     }
 
@@ -315,7 +315,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months   = 1
 
 					a_end = {
-                      product_uid = megaport_mcr.mcr.product_uid
+                      requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 0
 					}
 
@@ -351,7 +351,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					}
 
 					b_end = {
-					  product_uid = data.megaport_partner.aws_port.product_uid
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
 					}
 
 					b_end_partner_config = {
