@@ -28,7 +28,6 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					location_id              = data.megaport_location.bne_nxt1.id
 					contract_term_months     = 12
 					cost_centre              = "%s"
-					marketplace_visibility   = true
 
 					prefix_filter_list = {
 					  description     = "%s"
@@ -54,7 +53,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "true"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
@@ -96,7 +95,6 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					location_id              = data.megaport_location.bne_nxt1.id
 					contract_term_months     = 12
 					cost_centre              = "%s"
-					marketplace_visibility   = false
 
 					prefix_filter_list = {
 					  description     = "%s"
@@ -122,7 +120,6 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
