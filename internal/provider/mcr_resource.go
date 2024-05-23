@@ -68,6 +68,7 @@ type mcrResourceModel struct {
 	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	ASN                   types.Int64  `tfsdk:"asn"`
+	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
 	Virtual       types.Bool   `tfsdk:"virtual"`
 	BuyoutPort    types.Bool   `tfsdk:"buyout_port"`
@@ -236,6 +237,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "Provisioning status of the product.",
 				Computed:    true,
+			},
+			"diversity_zone": schema.StringAttribute{
+				Description: "Diversity zone of the product.",
+				Optional:    true,
 			},
 			"create_date": schema.StringAttribute{
 				Description: "Date the product was created.",
@@ -484,6 +489,10 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if !plan.ASN.IsNull() {
 		buyReq.MCRAsn = int(plan.ASN.ValueInt64())
+	}
+
+	if !plan.DiversityZone.IsNull() {
+		buyReq.DiversityZone = plan.DiversityZone.ValueString()
 	}
 
 	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)
