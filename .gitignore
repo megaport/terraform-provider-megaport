@@ -24,6 +24,8 @@ website/node_modules
 *.iml
 *.test
 *.iml
+!command/test-fixtures/**/*.tfstate
+*.lock.hcl
 
 website/vendor
 
