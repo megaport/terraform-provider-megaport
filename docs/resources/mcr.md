@@ -19,7 +19,6 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 
 - `contract_term_months` (Number) Contract term in months.
 - `location_id` (Number) Location ID of the product.
-- `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `port_speed` (Number) Bandwidth speed of the product.
 - `product_name` (String) Name of the product.
@@ -49,6 +48,7 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `lag_primary` (Boolean) Whether the product is a LAG primary.
 - `last_updated` (String) Last updated by the Terraform provider.
 - `live_date` (String) Date the product went live.
+- `market` (String) Market the product is in.
 - `product_id` (Number) Numeric ID of the product.
 - `product_type` (String) Type of the product.
 - `product_uid` (String) UID identifier of the product.

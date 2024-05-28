@@ -14,6 +14,6 @@ resource "megaport_port" "port" {
   port_speed              = 1000
   location_id             = data.megaport_location.bne_nxt1.id
   contract_term_months    = 1
-  market                  = "AU"
   marketplace_visibility  = false
+  cost_centre             = "Megaport Single Port Example"
 }

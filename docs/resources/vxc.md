@@ -17,16 +17,15 @@ description: |-
 
 ### Required
 
+- `a_end` (Attributes) The current A-End configuration of the VXC. (see [below for nested schema](#nestedatt--a_end))
+- `b_end` (Attributes) The current B-End configuration of the VXC. (see [below for nested schema](#nestedatt--b_end))
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
-- `port_uid` (String) The UID of the port the VXC is connected to.
 - `product_name` (String) The name of the product.
 - `rate_limit` (Number) The rate limit of the product.
 
 ### Optional
 
-- `a_end` (Attributes) The current A-End configuration of the VXC. (see [below for nested schema](#nestedatt--a_end))
 - `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. (see [below for nested schema](#nestedatt--a_end_partner_config))
-- `b_end` (Attributes) The current B-End configuration of the VXC. (see [below for nested schema](#nestedatt--b_end))
 - `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices.
 - `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
@@ -62,10 +61,14 @@ description: |-
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
 
+Required:
+
+- `requested_product_uid` (String) The Product UID requested by the user for the A-End configuration.
+
 Optional:
 
+- `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
-- `ordered_product_uid` (String) The initial ordered product UID of the A-End configuration.
 - `ordered_vlan` (Number) The initial ordered VLAN of the A-End configuration.
 - `vnic_index` (Number) The network interface index of the A-End configuration.
 
@@ -75,9 +78,29 @@ Read-Only:
 - `location_id` (Number) The location ID of the A-End configuration.
 - `owner_uid` (String) The owner UID of the A-End configuration.
 - `product_name` (String) The product name of the A-End configuration.
-- `product_uid` (String) The product UID of the A-End configuration.
 - `secondary_name` (String) The secondary name of the A-End configuration.
 - `vlan` (Number) The VLAN of the A-End configuration.
+
+
+<a id="nestedatt--b_end"></a>
+### Nested Schema for `b_end`
+
+Optional:
+
+- `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
+- `inner_vlan` (Number) The inner VLAN of the B-End configuration.
+- `ordered_vlan` (Number) The initial ordered VLAN of the B-End configuration.
+- `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
+- `vnic_index` (Number) The network interface index of the B-End configuration.
+
+Read-Only:
+
+- `location` (String) The location of the B-End configuration.
+- `location_id` (Number) The location ID of the B-End configuration.
+- `owner_uid` (String) The owner UID of the B-End configuration.
+- `product_name` (String) The product name of the B-End configuration.
+- `secondary_name` (String) The secondary name of the B-End configuration.
+- `vlan` (Number) The VLAN of the B-End configuration.
 
 
 <a id="nestedatt--a_end_partner_config"></a>
@@ -201,27 +224,6 @@ Optional:
 
 
 
-
-
-<a id="nestedatt--b_end"></a>
-### Nested Schema for `b_end`
-
-Optional:
-
-- `inner_vlan` (Number) The inner VLAN of the B-End configuration.
-- `ordered_product_uid` (String) The initial ordered product UID of the B-End configuration.
-- `ordered_vlan` (Number) The initial ordered VLAN of the B-End configuration.
-- `vnic_index` (Number) The network interface index of the B-End configuration.
-
-Read-Only:
-
-- `location` (String) The location of the B-End configuration.
-- `location_id` (Number) The location ID of the B-End configuration.
-- `owner_uid` (String) The owner UID of the B-End configuration.
-- `product_name` (String) The product name of the B-End configuration.
-- `product_uid` (String) The product UID of the B-End configuration.
-- `secondary_name` (String) The secondary name of the B-End configuration.
-- `vlan` (Number) The VLAN of the B-End configuration.
 
 
 <a id="nestedatt--b_end_partner_config"></a>

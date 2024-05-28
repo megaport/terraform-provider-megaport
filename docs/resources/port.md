@@ -19,7 +19,6 @@ description: |-
 
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
 - `location_id` (Number) The numeric location ID of the product.
-- `market` (String) The market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace.
 - `port_speed` (Number) The speed of the port in Mbps.
 - `product_name` (String) The name of the product.
@@ -30,7 +29,7 @@ description: |-
 - `cost_centre` (String) The cost centre for the product.
 - `diversity_zone` (String) The diversity zone of the product.
 - `locked` (Boolean) Whether the product is locked.
-- `resources` (Attributes) VXC Resources attached to port. (see [below for nested schema](#nestedatt--resources))
+- `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only
 
@@ -42,6 +41,7 @@ description: |-
 - `created_by` (String) The user who created the product.
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
+- `market` (String) The market the product is in.
 - `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
 - `provisioning_status` (String) The provisioning status of the product.

@@ -97,7 +97,7 @@ type singlePortResourceModel struct {
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
 	AttributeTags types.Object `tfsdk:"attribute_tags"`
-	VXCResources  types.Object `tfsdk:"resources"`
+	Resources     types.Object `tfsdk:"resources"`
 }
 
 type portAttributeTagsModel struct {
@@ -230,7 +230,7 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	resourcesModel.Interface = interfaceObj
 	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
 	diags = append(diags, resourcesDiags...)
-	orm.VXCResources = resourcesObject
+	orm.Resources = resourcesObject
 
 	return diags
 }
@@ -283,9 +283,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
@@ -304,22 +301,16 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"terminate_date": schema.StringAttribute{
 				Description: "The date the product will be terminated.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
-				Required:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
@@ -479,7 +470,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"resources": schema.SingleNestedAttribute{
-				Description: "VXC Resources attached to port.",
+				Description: "Resources attached to port.",
 				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
@@ -551,9 +542,9 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
 		LocationId:            int(plan.LocationID.ValueInt64()),
-		Market:                plan.Market.ValueString(),
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
+		CostCentre:            plan.CostCentre.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           10 * time.Minute,
 	})
@@ -641,20 +632,37 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Check on changes
 	var name, costCentre string
+	var marketplaceVisibility bool
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
+	} else {
+		name = state.Name.ValueString()
 	}
 	if !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.Name.ValueString()
+		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
+	}
+	if !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
+		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
+	} else {
+		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
-	r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
+	_, modifyErr := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
-		MarketplaceVisibility: plan.MarketplaceVisibility.ValueBool(),
+		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 	})
+	if modifyErr != nil {
+		resp.Diagnostics.AddError(
+			"Error Updating port",
+			"Could not update port with ID "+plan.UID.ValueString()+": "+modifyErr.Error(),
+		)
+		return
+	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
 	if portErr != nil {

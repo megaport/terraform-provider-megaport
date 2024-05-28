@@ -1015,14 +1015,16 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Check on changes
-	var name types.String
+	var name string
 	if !plan.Name.Equal(state.Name) {
-		name = plan.Name
+		name = plan.Name.ValueString()
+	} else {
+		name = state.Name.ValueString()
 	}
 
 	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
 		MVEID:         state.UID.ValueString(),
-		Name:          name.String(),
+		Name:          name,
 		WaitForUpdate: true,
 	})
 
