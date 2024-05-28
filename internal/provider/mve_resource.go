@@ -98,6 +98,7 @@ type mveResourceModel struct {
 	NetworkInterfaces types.List   `tfsdk:"vnics"`
 	AttributeTags     types.Map    `tfsdk:"attribute_tags"`
 	Resources         types.Object `tfsdk:"resources"`
+	LocationDetails   types.Object `tfsdk:"location_details"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -295,6 +296,19 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 		apiDiags = append(apiDiags, resourcesDiags...)
 		orm.Resources = resourcesObj
 	}
+
+	if p.LocationDetails != nil {
+		locationDetailsModel := &productLocationDetailsModel{
+			Name:    types.StringValue(p.LocationDetails.Name),
+			City:    types.StringValue(p.LocationDetails.City),
+			Metro:   types.StringValue(p.LocationDetails.Metro),
+			Country: types.StringValue(p.LocationDetails.Country),
+		}
+		locationDetailsObject, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, locationDetailsModel)
+		apiDiags = append(apiDiags, locationDetailsDiags...)
+		orm.LocationDetails = locationDetailsObject
+	}
+
 	return apiDiags
 }
 
@@ -635,6 +649,48 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"location_details": schema.SingleNestedAttribute{
+				Description: "The location details of the product.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						Description: "The name of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"city": schema.StringAttribute{
+						Description: "The city of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"metro": schema.StringAttribute{
+						Description: "The metro of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"country": schema.StringAttribute{
+						Description: "The country of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{

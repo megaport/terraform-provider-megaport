@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -58,8 +59,9 @@ type lagPortResourceModel struct {
 	LagCount    types.Int64 `tfsdk:"lag_count"`
 	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
 
-	AttributeTags types.Object `tfsdk:"attribute_tags"`
-	Resources     types.Object `tfsdk:"resources"`
+	AttributeTags   types.Object `tfsdk:"attribute_tags"`
+	Resources       types.Object `tfsdk:"resources"`
+	LocationDetails types.Object `tfsdk:"location_details"`
 }
 
 func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
@@ -152,6 +154,18 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
 	diags = append(diags, resourcesDiags...)
 	orm.Resources = resourcesObject
+
+	if p.LocationDetails != nil {
+		locationDetailsModel := &productLocationDetailsModel{
+			Name:    types.StringValue(p.LocationDetails.Name),
+			City:    types.StringValue(p.LocationDetails.City),
+			Metro:   types.StringValue(p.LocationDetails.Metro),
+			Country: types.StringValue(p.LocationDetails.Country),
+		}
+		locationDetailsObject, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, locationDetailsModel)
+		diags = append(diags, locationDetailsDiags...)
+		orm.LocationDetails = locationDetailsObject
+	}
 
 	return diags
 }
@@ -315,6 +329,48 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"location_details": schema.SingleNestedAttribute{
+				Description: "The location details of the product.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						Description: "The name of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"city": schema.StringAttribute{
+						Description: "The city of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"metro": schema.StringAttribute{
+						Description: "The metro of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"country": schema.StringAttribute{
+						Description: "The country of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
 				},
 			},
 			"attribute_tags": schema.SingleNestedAttribute{
