@@ -29,11 +29,12 @@ resource "megaport_vxc" "vxc" {
   product_name           = "Megaport VXC"
   rate_limit             = 1000
   contract_term_months   = 1
-  port_uid               = megaport_port.port_1.product_uid
 
-  a_end = {}
+  a_end = {
+    requested_product_uid = megaport_port.port_1.product_uid
+  }
 
   b_end = {
-    ordered_product_uid = megaport_port.port_2.product_uid
+    requested_product_uid = megaport_port.port_2.product_uid
   }
 }
