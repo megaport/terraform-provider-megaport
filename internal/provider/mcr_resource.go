@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -68,14 +69,16 @@ type mcrResourceModel struct {
 	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	ASN                   types.Int64  `tfsdk:"asn"`
+	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
-	Virtual       types.Bool   `tfsdk:"virtual"`
-	BuyoutPort    types.Bool   `tfsdk:"buyout_port"`
-	Locked        types.Bool   `tfsdk:"locked"`
-	AdminLocked   types.Bool   `tfsdk:"admin_locked"`
-	Cancelable    types.Bool   `tfsdk:"cancelable"`
-	AttributeTags types.Map    `tfsdk:"attribute_tags"`
-	VirtualRouter types.Object `tfsdk:"virtual_router"`
+	Virtual         types.Bool   `tfsdk:"virtual"`
+	BuyoutPort      types.Bool   `tfsdk:"buyout_port"`
+	Locked          types.Bool   `tfsdk:"locked"`
+	AdminLocked     types.Bool   `tfsdk:"admin_locked"`
+	Cancelable      types.Bool   `tfsdk:"cancelable"`
+	AttributeTags   types.Map    `tfsdk:"attribute_tags"`
+	VirtualRouter   types.Object `tfsdk:"virtual_router"`
+	LocationDetails types.Object `tfsdk:"location_details"`
 
 	PrefixFilterList types.Object `tfsdk:"prefix_filter_list"`
 }
@@ -184,6 +187,19 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) di
 	virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttributes, virtualRouterModel)
 	apiDiags = append(apiDiags, virtualRouterDiags...)
 	orm.VirtualRouter = virtualRouter
+
+	if m.LocationDetails != nil {
+		locationDetailsModel := &productLocationDetailsModel{
+			Name:    types.StringValue(m.LocationDetails.Name),
+			City:    types.StringValue(m.LocationDetails.City),
+			Metro:   types.StringValue(m.LocationDetails.Metro),
+			Country: types.StringValue(m.LocationDetails.Country),
+		}
+		locationDetails, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, locationDetailsModel)
+		apiDiags = append(apiDiags, locationDetailsDiags...)
+		orm.LocationDetails = locationDetails
+	}
+
 	return apiDiags
 }
 
@@ -236,6 +252,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "Provisioning status of the product.",
 				Computed:    true,
+			},
+			"diversity_zone": schema.StringAttribute{
+				Description: "Diversity zone of the product.",
+				Optional:    true,
 			},
 			"create_date": schema.StringAttribute{
 				Description: "Date the product was created.",
@@ -338,7 +358,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
 			"asn": schema.Int64Attribute{
 				Description: "ASN in the MCR order configuration.",
@@ -380,6 +401,48 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				ElementType: types.StringType,
 				Description: "Attribute tags of the product.",
 				Computed:    true,
+			},
+			"location_details": schema.SingleNestedAttribute{
+				Description: "The location details of the product.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						Description: "The name of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"city": schema.StringAttribute{
+						Description: "The city of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"metro": schema.StringAttribute{
+						Description: "The metro of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"country": schema.StringAttribute{
+						Description: "The country of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+				},
 			},
 			"prefix_filter_list": schema.SingleNestedAttribute{
 				Description: "Prefix filter list associated with the product.",
@@ -484,6 +547,10 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if !plan.ASN.IsNull() {
 		buyReq.MCRAsn = int(plan.ASN.ValueInt64())
+	}
+
+	if !plan.DiversityZone.IsNull() {
+		buyReq.DiversityZone = plan.DiversityZone.ValueString()
 	}
 
 	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)

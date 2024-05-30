@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -39,6 +40,7 @@ var (
 		"inner_vlan":            types.Int64Type,
 		"vnic_index":            types.Int64Type,
 		"secondary_name":        types.StringType,
+		"location_details":      types.ObjectType{}.WithAttributeTypes(productLocationDetailsAttrs),
 	}
 
 	cspConnectionFullAttrs = map[string]attr.Type{
@@ -298,6 +300,7 @@ type vxcEndConfigurationModel struct {
 	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
 	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
+	LocationDetails       types.Object `tfsdk:"location_details"`
 }
 
 type vxcPartnerConfigurationModel struct {
@@ -462,6 +465,15 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
 	}
+	aEndLocationDetailsModel := &productLocationDetailsModel{
+		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
+		City:    types.StringValue(v.AEndConfiguration.LocationDetails.City),
+		Metro:   types.StringValue(v.AEndConfiguration.LocationDetails.Metro),
+		Country: types.StringValue(v.AEndConfiguration.LocationDetails.Country),
+	}
+	aEndLocationDetails, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, aEndLocationDetailsModel)
+	apiDiags = append(apiDiags, locationDetailsDiags...)
+	aEndModel.LocationDetails = aEndLocationDetails
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
 	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
@@ -487,6 +499,15 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
 	}
+	bEndLocationDetailsModel := &productLocationDetailsModel{
+		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
+		City:    types.StringValue(v.AEndConfiguration.LocationDetails.City),
+		Metro:   types.StringValue(v.AEndConfiguration.LocationDetails.Metro),
+		Country: types.StringValue(v.AEndConfiguration.LocationDetails.Country),
+	}
+	bEndLocationDetails, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, bEndLocationDetailsModel)
+	apiDiags = append(apiDiags, locationDetailsDiags...)
+	bEndModel.LocationDetails = bEndLocationDetails
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
 	apiDiags = append(apiDiags, bEndDiags...)
 	orm.BEndConfiguration = bEnd
@@ -1037,6 +1058,48 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the A-End configuration.",
 						Computed:    true,
 					},
+					"location_details": schema.SingleNestedAttribute{
+						Description: "The location details of the product.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.UseStateForUnknown(),
+						},
+						Attributes: map[string]schema.Attribute{
+							"name": schema.StringAttribute{
+								Description: "The name of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"city": schema.StringAttribute{
+								Description: "The city of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"metro": schema.StringAttribute{
+								Description: "The metro of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"country": schema.StringAttribute{
+								Description: "The country of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+						},
+					},
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The initial ordered VLAN of the A-End configuration.",
 						Optional:    true,
@@ -1046,6 +1109,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the A-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
@@ -1093,6 +1159,48 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the B-End configuration.",
 						Computed:    true,
 					},
+					"location_details": schema.SingleNestedAttribute{
+						Description: "The location details of the product.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.UseStateForUnknown(),
+						},
+						Attributes: map[string]schema.Attribute{
+							"name": schema.StringAttribute{
+								Description: "The name of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"city": schema.StringAttribute{
+								Description: "The city of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"metro": schema.StringAttribute{
+								Description: "The metro of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"country": schema.StringAttribute{
+								Description: "The country of the location.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+						},
+					},
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The initial ordered VLAN of the B-End configuration.",
 						Optional:    true,
@@ -1102,6 +1210,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"vlan": schema.Int64Attribute{
 						Description: "The VLAN of the B-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
@@ -2349,24 +2460,17 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
 		aEndVlan = int(aEndPlan.VLAN.ValueInt64())
+		aEndState.VLAN = aEndPlan.VLAN
 	} else {
 		aEndVlan = int(aEndState.VLAN.ValueInt64())
 	}
 	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
+		bEndState.VLAN = bEndPlan.VLAN
 	} else {
 		bEndVlan = int(bEndState.VLAN.ValueInt64())
 	}
-	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
-		aEndProductUID = aEndPlan.RequestedProductUID.ValueString()
-	} else {
-		aEndProductUID = aEndState.CurrentProductUID.ValueString()
-	}
-	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
-		bEndProductUID = bEndPlan.RequestedProductUID.ValueString()
-	} else {
-		bEndProductUID = bEndState.CurrentProductUID.ValueString()
-	}
+
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		rateLimit = int(plan.RateLimit.ValueInt64())
 	} else {
@@ -2389,15 +2493,24 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	updateReq := &megaport.UpdateVXCRequest{
-		Name:           &name,
-		AEndVLAN:       &aEndVlan,
-		BEndVLAN:       &bEndVlan,
-		AEndProductUID: &aEndProductUID,
-		BEndProductUID: &bEndProductUID,
-		CostCentre:     &costCentre,
-		Shutdown:       &shutdown,
-		RateLimit:      &rateLimit,
-		Term:           &term,
+		Name:       &name,
+		AEndVLAN:   &aEndVlan,
+		BEndVLAN:   &bEndVlan,
+		CostCentre: &costCentre,
+		Shutdown:   &shutdown,
+		RateLimit:  &rateLimit,
+		Term:       &term,
+	}
+
+	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
+		aEndProductUID = aEndPlan.RequestedProductUID.ValueString()
+		updateReq.AEndProductUID = &aEndProductUID
+		aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+	}
+	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
+		bEndProductUID = bEndPlan.RequestedProductUID.ValueString()
+		updateReq.BEndProductUID = &bEndProductUID
+		bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
 	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
@@ -2409,6 +2522,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		)
 		return
 	}
+
+	// Update state with any changes from plan configuration following successful update
+	aEndStateObj, aEndStateDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndState)
+	resp.Diagnostics.Append(aEndStateDiags...)
+	state.AEndConfiguration = aEndStateObj
+	bEndStateObj, bEndStateDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndState)
+	resp.Diagnostics.Append(bEndStateDiags...)
+	state.BEndConfiguration = bEndStateObj
 
 	// Get refreshed vxc value from API
 	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())

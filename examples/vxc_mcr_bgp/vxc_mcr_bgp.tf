@@ -23,7 +23,6 @@ data "megaport_partner" "aws_port" {
 resource "megaport_mcr" "mcr" {
   product_name             = "Megaport Example MCR"
   location_id              = data.megaport_location.bne_nxt1.id
-  marketplace_visibility   = false
   contract_term_months     = 1
   port_speed               = 5000
   asn                      = 64555
@@ -52,10 +51,10 @@ resource "megaport_mcr" "mcr" {
 resource "megaport_vxc" "aws_vxc" {
   product_name           = "Megaport Example VXC - AWS"
   rate_limit             = 1000
-  port_uid               = megaport_mcr.mcr.product_uid
   contract_term_months   = 1
 
   a_end = {
+    requested_product_uid = megaport_mcr.mcr.product_uid
     ordered_vlan = 0
   }
 
@@ -93,7 +92,7 @@ resource "megaport_vxc" "aws_vxc" {
   }
 
   b_end = {
-    ordered_product_uid = data.megaport_partner.aws_port.product_uid
+    requested_product_uid = data.megaport_partner.aws_port.product_uid
   }
 
   b_end_partner_config = {

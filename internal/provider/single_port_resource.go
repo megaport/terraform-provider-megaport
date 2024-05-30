@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -65,6 +66,13 @@ var (
 		"resource_type": types.StringType,
 		"up":            types.Int64Type,
 	}
+
+	productLocationDetailsAttrs = map[string]attr.Type{
+		"name":    types.StringType,
+		"city":    types.StringType,
+		"metro":   types.StringType,
+		"country": types.StringType,
+	}
 )
 
 // singlePortResourceModel maps the resource schema data.
@@ -96,8 +104,9 @@ type singlePortResourceModel struct {
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
-	AttributeTags types.Object `tfsdk:"attribute_tags"`
-	Resources     types.Object `tfsdk:"resources"`
+	AttributeTags   types.Object `tfsdk:"attribute_tags"`
+	Resources       types.Object `tfsdk:"resources"`
+	LocationDetails types.Object `tfsdk:"location_details"`
 }
 
 type portAttributeTagsModel struct {
@@ -143,6 +152,13 @@ type portInterfaceModel struct {
 	ResourceName types.String `tfsdk:"resource_name"`
 	ResourceType types.String `tfsdk:"resource_type"`
 	Up           types.Int64  `tfsdk:"up"`
+}
+
+type productLocationDetailsModel struct {
+	Name    types.String `tfsdk:"name"`
+	City    types.String `tfsdk:"city"`
+	Metro   types.String `tfsdk:"metro"`
+	Country types.String `tfsdk:"country"`
 }
 
 func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
@@ -231,6 +247,18 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
 	diags = append(diags, resourcesDiags...)
 	orm.Resources = resourcesObject
+
+	if p.LocationDetails != nil {
+		locationDetailsModel := &productLocationDetailsModel{
+			Name:    types.StringValue(p.LocationDetails.Name),
+			City:    types.StringValue(p.LocationDetails.City),
+			Metro:   types.StringValue(p.LocationDetails.Metro),
+			Country: types.StringValue(p.LocationDetails.Country),
+		}
+		locationDetailsObject, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, locationDetailsModel)
+		diags = append(diags, locationDetailsDiags...)
+		orm.LocationDetails = locationDetailsObject
+	}
 
 	return diags
 }
@@ -465,6 +493,48 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 								Optional:    true,
 								Computed:    true,
 							},
+						},
+					},
+				},
+			},
+			"location_details": schema.SingleNestedAttribute{
+				Description: "The location details of the product.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						Description: "The name of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"city": schema.StringAttribute{
+						Description: "The city of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"metro": schema.StringAttribute{
+						Description: "The metro of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"country": schema.StringAttribute{
+						Description: "The country of the location.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 				},
