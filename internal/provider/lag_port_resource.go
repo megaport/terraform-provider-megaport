@@ -540,7 +540,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading port",
+			"Error Creating Port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
