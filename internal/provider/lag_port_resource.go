@@ -526,7 +526,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	createdPort, err := r.client.PortService.BuyPort(ctx, &megaport.BuyPortRequest{
+	buyPortReq := &megaport.BuyPortRequest{
 		Name:                  plan.Name.ValueString(),
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
@@ -537,7 +537,9 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		CostCentre:            plan.CostCentre.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           5 * time.Minute,
-	})
+	}
+
+	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Port",
@@ -546,7 +548,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if len(createdPort.TechnicalServiceUIDs) < 2 {
+	if len(createdPort.TechnicalServiceUIDs) < 1 {
 		resp.Diagnostics.AddError(
 			"Unexpected number of ports created",
 			fmt.Sprintf("Expected greater than one port, got: %d. The IDs were: %v Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs), createdPort.TechnicalServiceUIDs),

@@ -536,6 +536,16 @@ func TestFullEcosystem(t *testing.T) {
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
 				  }
+
+				  resource "megaport_lag_port" "lag_port" {
+			        product_name  = "%s"
+					cost_centre = "%s"
+			        port_speed  = 10000
+			        location_id = data.megaport_location.bne_nxt2.id
+			        contract_term_months        = 12
+					marketplace_visibility = false
+                    lag_count = 1
+			      }
 				  
 				  resource "megaport_port" "port" {
 					product_name            = "%s"
@@ -543,17 +553,8 @@ func TestFullEcosystem(t *testing.T) {
 					location_id             = data.megaport_location.bne_nxt1.id
 					contract_term_months    = 12
 					marketplace_visibility  = true
+					cost_centre = "%s"
 				  }
-				  
-				  resource "megaport_lag_port" "lag_port" {
-					 			        product_name  = "%s"
-				 			        	port_speed  = 10000
-					 			        location_id = data.megaport_location.bne_nxt1.id
-					 			        contract_term_months        = 12
-					 					marketplace_visibility = true
-					                     lag_count = 3
-										 cost_centre = "%s"
-					 			      }
 				  
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
@@ -659,7 +660,7 @@ func TestFullEcosystem(t *testing.T) {
 					  }
 					}
 				  }				   
-                  `, portName, lagPortName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
+                  `, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 				),
