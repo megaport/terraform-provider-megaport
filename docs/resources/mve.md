@@ -24,6 +24,7 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 
 ### Optional
 
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `vnics` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
@@ -89,6 +90,17 @@ Optional:
 - `token` (String) The token for the vendor config. Required for Meraki MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. Required for VMware MVE.
 - `vco_address` (String) The VCO address for the vendor config. Required for VMware MVE.
+
+
+<a id="nestedatt--location_details"></a>
+### Nested Schema for `location_details`
+
+Optional:
+
+- `city` (String) The city of the location.
+- `country` (String) The country of the location.
+- `metro` (String) The metro of the location.
+- `name` (String) The name of the location.
 
 
 <a id="nestedatt--vnics"></a>

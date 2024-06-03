@@ -15,6 +15,6 @@ resource "megaport_lag_port" "lag_port" {
   location_id              = data.megaport_location.bne_nxt1.id
   contract_term_months     = 1
   marketplace_visibility   = false
-  lag_count                = 3
+  lag_count                = 1
   cost_centre              = "Lag Port Example"
 }

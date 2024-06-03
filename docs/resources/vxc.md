@@ -69,6 +69,7 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--a_end--location_details))
 - `ordered_vlan` (Number) The initial ordered VLAN of the A-End configuration.
 - `vnic_index` (Number) The network interface index of the A-End configuration.
 
@@ -81,6 +82,17 @@ Read-Only:
 - `secondary_name` (String) The secondary name of the A-End configuration.
 - `vlan` (Number) The VLAN of the A-End configuration.
 
+<a id="nestedatt--a_end--location_details"></a>
+### Nested Schema for `a_end.location_details`
+
+Optional:
+
+- `city` (String) The city of the location.
+- `country` (String) The country of the location.
+- `metro` (String) The metro of the location.
+- `name` (String) The name of the location.
+
+
 
 <a id="nestedatt--b_end"></a>
 ### Nested Schema for `b_end`
@@ -89,6 +101,7 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--b_end--location_details))
 - `ordered_vlan` (Number) The initial ordered VLAN of the B-End configuration.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
 - `vnic_index` (Number) The network interface index of the B-End configuration.
@@ -101,6 +114,17 @@ Read-Only:
 - `product_name` (String) The product name of the B-End configuration.
 - `secondary_name` (String) The secondary name of the B-End configuration.
 - `vlan` (Number) The VLAN of the B-End configuration.
+
+<a id="nestedatt--b_end--location_details"></a>
+### Nested Schema for `b_end.location_details`
+
+Optional:
+
+- `city` (String) The city of the location.
+- `country` (String) The country of the location.
+- `metro` (String) The metro of the location.
+- `name` (String) The name of the location.
+
 
 
 <a id="nestedatt--a_end_partner_config"></a>

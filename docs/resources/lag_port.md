@@ -29,6 +29,7 @@ description: |-
 - `attribute_tags` (Attributes) The attribute tags of the product. (see [below for nested schema](#nestedatt--attribute_tags))
 - `cost_centre` (String) The cost centre for the product.
 - `diversity_zone` (String) The diversity zone of the product.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
@@ -94,6 +95,17 @@ Read-Only:
 - `site_code` (String) The site code of the location.
 
 
+
+
+<a id="nestedatt--location_details"></a>
+### Nested Schema for `location_details`
+
+Optional:
+
+- `city` (String) The city of the location.
+- `country` (String) The country of the location.
+- `metro` (String) The metro of the location.
+- `name` (String) The name of the location.
 
 
 <a id="nestedatt--resources"></a>

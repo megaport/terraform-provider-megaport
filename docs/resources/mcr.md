@@ -19,7 +19,6 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 
 - `contract_term_months` (Number) Contract term in months.
 - `location_id` (Number) Location ID of the product.
-- `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `port_speed` (Number) Bandwidth speed of the product.
 - `product_name` (String) Name of the product.
 
@@ -31,8 +30,11 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `buyout_port` (Boolean) Whether the product is bought out.
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `cost_centre` (String) Cost centre of the product.
+- `diversity_zone` (String) Diversity zone of the product.
 - `lag_id` (Number) Numeric ID of the LAG.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
+- `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `prefix_filter_list` (Attributes) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_list))
 - `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
@@ -59,6 +61,17 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `virtual` (Boolean) Whether the product is virtual.
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
+
+<a id="nestedatt--location_details"></a>
+### Nested Schema for `location_details`
+
+Optional:
+
+- `city` (String) The city of the location.
+- `country` (String) The country of the location.
+- `metro` (String) The metro of the location.
+- `name` (String) The name of the location.
+
 
 <a id="nestedatt--prefix_filter_list"></a>
 ### Nested Schema for `prefix_filter_list`
