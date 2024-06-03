@@ -28,14 +28,14 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 			        location_id = data.megaport_location.bne_nxt1.id
 			        contract_term_months        = 12
 					marketplace_visibility = true
-                    lag_count = 3
+                    lag_count = 1
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "true"),
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreName),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
@@ -79,14 +79,14 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 			        location_id = data.megaport_location.bne_nxt1.id
 			        contract_term_months        = 12
 					marketplace_visibility = false
-                    lag_count = 3
+                    lag_count = 1
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreNameNew),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
