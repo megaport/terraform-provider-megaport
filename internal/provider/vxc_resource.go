@@ -1782,6 +1782,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "azure":
+			if aPartnerConfig.AzurePartnerConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Azure Partner configuration is required",
+				)
+				return
+			}
 			var azureConfig vxcPartnerConfigAzureModel
 			azureDiags := aPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
 			if azureDiags.HasError() {
@@ -1798,7 +1805,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -1859,7 +1866,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -1910,11 +1917,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
 
 			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -1941,7 +1947,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
 		case "a-end":
-
 			if aPartnerConfig.PartnerAEndConfig.IsNull() {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2202,7 +2207,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -2258,7 +2263,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -2312,7 +2317,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
@@ -2355,7 +2360,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating VXC",
-			"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+			"Could not order VXC with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
 	}
