@@ -61,7 +61,7 @@ resource "megaport_vxc" "gcp_vxc" {
   contract_term_months    = 1
 
   a_end = {
-    requested_product_uid = = megaport_mcr.mcr.product_uid
+    requested_product_uid = megaport_mcr.mcr.product_uid
     ordered_vlan = 182
   }
 
