@@ -331,10 +331,10 @@ func (orm *partnerPortModel) fromAPIPartnerPort(port *megaport.PartnerMegaport) 
 	orm.VXCPermitted = types.BoolValue(port.VXCPermitted)
 }
 
-func FilterPartnerMegaports(new []*megaport.PartnerMegaport, toFilter bool) []*megaport.PartnerMegaport {
+func FilterPartnerMegaports(parnterPorts []*megaport.PartnerMegaport, toFilter bool) []*megaport.PartnerMegaport {
 	var filtered []*megaport.PartnerMegaport
 	if toFilter {
-		filtered = append(filtered, new...)
+		filtered = append(filtered, parnterPorts...)
 	}
 	return filtered
 }

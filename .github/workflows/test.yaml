@@ -1,15 +1,18 @@
 # Terraform Provider testing workflow.
 name: Tests
 
-# This GitHub action runs your tests for each pull request and push.
-# Optionally, you can turn it on using a schedule for regular testing.
 on:
-  pull_request:
-    paths-ignore:
-      - 'README.md'
   push:
     paths-ignore:
-      - 'README.md'
+      - 'README.md'  
+    branches:
+      - 'main'
+  pull_request_target:
+    paths-ignore:
+      - 'README.md'  
+    branches:
+      - 'main'
+  workflow_dispatch:
 
 # Testing only needs permissions to read the repository contents.
 permissions:
@@ -83,5 +86,5 @@ jobs:
           TF_ACC: "1"
           MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
           MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
-        run: go test -v -cover ./internal/provider/
-        timeout-minutes: 20
+        run: go test -v -timeout=30m -cover ./internal/provider/
+        timeout-minutes: 30
