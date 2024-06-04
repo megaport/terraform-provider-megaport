@@ -6,15 +6,23 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAccMegaportMCR_Basic(t *testing.T) {
+type MCRProviderTestSuite ProviderTestSuite
+
+func TestMCRProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRProviderTestSuite))
+}
+
+func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{

@@ -5,12 +5,21 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAccMegaportMVEAruba_Basic(t *testing.T) {
+type MVEArubaProviderTestSuite ProviderTestSuite
+type MVEVersaProviderTestSuite ProviderTestSuite
+
+func TestMVEArubaProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MVEArubaProviderTestSuite))
+}
+
+func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -53,9 +62,14 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 	})
 }
 
-func TestAccMegaportMVEVersa_Basic(t *testing.T) {
+func TestMVEVersaProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MVEVersaProviderTestSuite))
+}
+
+func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 	mveName := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
