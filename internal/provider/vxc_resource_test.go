@@ -10,9 +10,7 @@ import (
 )
 
 type VXCBasicProviderTestSuite ProviderTestSuite
-type VXCMCRWithCSPsProviderTestSuite ProviderTestSuite
-type VXCBGPProviderTestSuite ProviderTestSuite
-type VXCFullEcosystemProviderTestSuite ProviderTestSuite
+type VXCWithCSPsProviderTestSuite ProviderTestSuite
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
 	t.Parallel()
@@ -285,12 +283,12 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
-func TestVXCMCRWithCSPsProviderTestSuite(t *testing.T) {
+func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCMCRWithCSPsProviderTestSuite))
+	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
 }
 
-func (suite *VXCMCRWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
+func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
@@ -400,12 +398,7 @@ func (suite *VXCMCRWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basi
 	})
 }
 
-func TestVXCBGPProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCBGPProviderTestSuite))
-}
-
-func (suite *VXCBGPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
+func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
@@ -523,12 +516,7 @@ func (suite *VXCBGPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	})
 }
 
-func TestVXCFullEcosystemProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCFullEcosystemProviderTestSuite))
-}
-
-func (suite *VXCFullEcosystemProviderTestSuite) TestFullEcosystem() {
+func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
