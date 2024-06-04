@@ -30,7 +30,7 @@ linters-settings:
     attr-only: true
     # Enforce using context methods on logger. This is very useful for us because it means we
     # can easily integrate with the tflog package in terraform and pipe all log output correctly.
-    context-only: true
+    context: all
     # Enforce a single key naming convention.
     # Values: snake, kebab, camel, pascal
     # Default: ""
