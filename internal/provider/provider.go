@@ -219,7 +219,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Build a useragent string with some useful infromation about the client
+	// Build a useragent string with some useful information about the client
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
 	megaportClient, err := megaport.New(nil,

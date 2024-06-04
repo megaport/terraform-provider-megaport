@@ -1,8 +1,8 @@
 provider "megaport" {
-  environment            = "staging"
-  access_key             = "access_key"
-  secret_key             = "secret_Key"
-  accept_purchase_terms  = true
+  environment           = "staging"
+  access_key            = "access_key"
+  secret_key            = "secret_Key"
+  accept_purchase_terms = true
 }
 
 data "megaport_location" "loc" {
@@ -10,25 +10,25 @@ data "megaport_location" "loc" {
 }
 
 resource "megaport_port" "port_1" {
-  product_name            = "Megaport Port A-End"
-  port_speed              = 1000
-  location_id             = data.megaport_location.loc.id
-  contract_term_months    = 1
-  marketplace_visibility  = false
+  product_name           = "Megaport Port A-End"
+  port_speed             = 1000
+  location_id            = data.megaport_location.loc.id
+  contract_term_months   = 1
+  marketplace_visibility = false
 }
 
 resource "megaport_port" "port_2" {
-  product_name            = "Megaport Port B-End"
-  port_speed              = 1000
-  location_id             = data.megaport_location.loc.id
-  contract_term_months    = 1
-  marketplace_visibility  = false
+  product_name           = "Megaport Port B-End"
+  port_speed             = 1000
+  location_id            = data.megaport_location.loc.id
+  contract_term_months   = 1
+  marketplace_visibility = false
 }
 
 resource "megaport_vxc" "vxc" {
-  product_name           = "Megaport VXC"
-  rate_limit             = 1000
-  contract_term_months   = 1
+  product_name         = "Megaport VXC"
+  rate_limit           = 1000
+  contract_term_months = 1
 
   a_end = {
     requested_product_uid = megaport_port.port_1.product_uid
