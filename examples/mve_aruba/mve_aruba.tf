@@ -10,16 +10,16 @@ data "megaport_location" "bne_nxt1" {
 }
 
 resource "megaport_mve" "mve" {
-  product_name           = "Megaport MVE Example"
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 1
+  product_name         = "Megaport MVE Example"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
 
   vendor_config = {
-    vendor        = "aruba"
-    product_size  = "MEDIUM"
-    image_id      = 23
-    account_name  = "Aruba Test Account"
-    account_key   = "12345678"
-    system_tag    = "Preconfiguration-aruba-test-1"
+    vendor       = "aruba"
+    product_size = "MEDIUM"
+    image_id     = 23
+    account_name = "Aruba Test Account"
+    account_key  = "12345678"
+    system_tag   = "Preconfiguration-aruba-test-1"
   }
 }

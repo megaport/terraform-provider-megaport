@@ -21,12 +21,12 @@ data "megaport_partner" "aws_port" {
 }
 
 resource "megaport_mcr" "mcr" {
-  product_name             = "Megaport Example MCR"
-  location_id              = data.megaport_location.bne_nxt1.id
-  contract_term_months     = 1
-  port_speed               = 5000
-  asn                      = 64555
-  cost_centre              = "MCR Example"
+  product_name         = "Megaport Example MCR"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+  port_speed           = 5000
+  asn                  = 64555
+  cost_centre          = "MCR Example"
 
   prefix_filter_list = {
     description    = "Megaport Example Prefix Filter List"
@@ -49,13 +49,13 @@ resource "megaport_mcr" "mcr" {
 }
 
 resource "megaport_vxc" "aws_vxc" {
-  product_name           = "Megaport Example VXC - AWS"
-  rate_limit             = 1000
-  contract_term_months   = 1
+  product_name         = "Megaport Example VXC - AWS"
+  rate_limit           = 1000
+  contract_term_months = 1
 
   a_end = {
     requested_product_uid = megaport_mcr.mcr.product_uid
-    ordered_vlan = 0
+    ordered_vlan          = 0
   }
 
   a_end_partner_config = {
@@ -72,16 +72,16 @@ resource "megaport_vxc" "aws_vxc" {
           }
           bgp_connections = [
             {
-              peer_asn           = 64512
-              local_ip_address   = "10.0.0.1"
-              peer_ip_address    = "10.0.0.2"
-              password           = "notARealPassword"
-              shutdown           = false
-              description        = "BGP Connection 1"
-              med_in             = 100
-              med_out            = 100
-              bfd_enabled        = true
-              export_policy      = "deny"
+              peer_asn          = 64512
+              local_ip_address  = "10.0.0.1"
+              peer_ip_address   = "10.0.0.2"
+              password          = "notARealPassword"
+              shutdown          = false
+              description       = "BGP Connection 1"
+              med_in            = 100
+              med_out           = 100
+              bfd_enabled       = true
+              export_policy     = "deny"
               permit_export_to  = ["10.0.1.2"]
               import_white_list = "Megaport Example Prefix Filter List"
             }
@@ -98,12 +98,12 @@ resource "megaport_vxc" "aws_vxc" {
   b_end_partner_config = {
     partner = "aws"
     aws_config = {
-      name           = "Megaport Example VXC - AWS"
-      asn            = 64550
-      type           = "private"
-      connect_type   = "AWSHC"
-      amazon_asn     = 64551
-      owner_account  = "684021030471"
+      name          = "Megaport Example VXC - AWS"
+      asn           = 64550
+      type          = "private"
+      connect_type  = "AWSHC"
+      amazon_asn    = 64551
+      owner_account = "684021030471"
     }
   }
 }
