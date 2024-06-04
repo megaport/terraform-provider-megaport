@@ -22,7 +22,7 @@ linters:
     - unconvert
     - unparam
     - unused
-    - vet
+    - govet
     - sloglint
 linters-settings:
   sloglint:
