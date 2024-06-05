@@ -620,7 +620,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading port",
+			"Error buying port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
