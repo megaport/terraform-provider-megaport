@@ -30,7 +30,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 						account_name = "%s"
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
-                    }
+                    }mv
                   }`, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
@@ -62,23 +62,25 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
-				}
-				resource "megaport_mve" "mve" {
-                    product_name  = "%s"
-                    location_id = data.megaport_location.bne_nxt1.id
-                    contract_term_months        = 1
-
-                    vendor_config = {
-                        vendor = "versa"
-                        product_size = "LARGE"
-                        image_id = 20
-						director_address = "director1.versa.com"
-						controller_address = "controller1.versa.com"
-						local_auth = "SDWAN-Branch@Versa.com"
-						remote_auth = "Controller-1-staging@Versa.com"
-						serial_number = "Megaport-Hub1"
-                    }
-                  }`, mveName),
+				  }
+				  
+				  resource "megaport_mve" "mve" {
+					product_name             = "%s"
+					location_id              = data.megaport_location.bne_nxt1.id
+					contract_term_months     = 1
+				  
+					vendor_config = {
+					  vendor             = "versa"
+					  product_size       = "LARGE"
+					  image_id           = 20
+					  director_address   = "director1.versa.com"
+					  controller_address = "controller1.versa.com"
+					  local_auth         = "SDWAN-Branch@Versa.com"
+					  remote_auth        = "Controller-1-staging@Versa.com"
+					  serial_number      = "Megaport-Hub1"
+					}
+				  }
+				  `, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),

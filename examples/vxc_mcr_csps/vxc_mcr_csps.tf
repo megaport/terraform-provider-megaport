@@ -26,6 +26,7 @@ resource "megaport_mcr" "mcr" {
   contract_term_months = 1
   port_speed           = 5000
   asn                  = 64555
+  cost_centre          = "MCR Example"
 }
 
 resource "megaport_vxc" "aws_vxc" {
