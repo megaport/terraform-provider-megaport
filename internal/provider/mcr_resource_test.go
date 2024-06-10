@@ -29,7 +29,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
-					prefix_filter_list = {
+					prefix_filter_lists = [{
 					  description     = "%s"
 					  address_family  = "IPv4"
 					  entries = [
@@ -46,7 +46,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  le      = 24
 						}
 					  ]
-					}
+					}]
 				  }
 				  `, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -82,7 +82,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "prefix_filter_list"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "prefix_filter_lists", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -96,7 +96,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
-					prefix_filter_list = {
+					prefix_filter_lists = [{
 					  description     = "%s"
 					  address_family  = "IPv4"
 					  entries = [
@@ -113,7 +113,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  le      = 24
 						}
 					  ]
-					}
+					}]
 				  }
 				  `, mcrNameNew, costCentreNameNew, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(

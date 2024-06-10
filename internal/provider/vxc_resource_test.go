@@ -416,7 +416,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					port_speed              = 5000
 					asn                     = 64555
 
-					prefix_filter_list = {
+					prefix_filter_lists = [{
 					  description     = "%s"
 					  address_family  = "IPv4"
 					  entries = [
@@ -433,7 +433,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						  le      = 24
 						}
 					  ]
-					}
+					}]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
@@ -521,15 +521,15 @@ func TestFullEcosystem(t *testing.T) {
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
 				  }
-				  
+
 				  data "megaport_location" "bne_nxt2" {
 					name = "NextDC B2"
 				  }
-				  
+
 				  data "megaport_location" "syd_gs" {
 					name = "Global Switch Sydney West"
 				  }
-				  
+
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
 					company_name = "AWS"
@@ -546,7 +546,7 @@ func TestFullEcosystem(t *testing.T) {
 					marketplace_visibility = false
                     lag_count = 1
 			      }
-				  
+
 				  resource "megaport_port" "port" {
 					product_name            = "%s"
 					port_speed              = 1000
@@ -555,7 +555,7 @@ func TestFullEcosystem(t *testing.T) {
 					marketplace_visibility  = true
 					cost_centre = "%s"
 				  }
-				  
+
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
 					port_speed              = 2500
@@ -568,46 +568,46 @@ func TestFullEcosystem(t *testing.T) {
 					product_name           = "%s"
 					rate_limit             = 1000
 					contract_term_months   = 12
-				  
+
 					a_end = {
 					  requested_product_uid = megaport_port.port.product_uid
 					}
-				  
+
 					b_end = {
 					  requested_product_uid = megaport_lag_port.lag_port.product_uid
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "mcr_vxc" {
 					product_name           = "%s"
 					rate_limit             = 1000
 					contract_term_months   = 12
-				  
+
 					a_end = {
 					  requested_product_uid = megaport_port.port.product_uid
 					  ordered_vlan = 181
 					}
-				  
+
 					b_end = {
 					  requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 181
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "aws_vxc" {
 					product_name            = "%s"
 					rate_limit              = 1000
 					contract_term_months    = 1
-				  
+
 					a_end = {
 					  requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 191
 					}
-				  
+
 					b_end = {
 					  requested_product_uid = data.megaport_partner.aws_port.product_uid
 					}
-				  
+
 					b_end_partner_config = {
 					  partner = "aws"
 					  aws_config = {
@@ -620,19 +620,19 @@ func TestFullEcosystem(t *testing.T) {
 					  }
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "gcp_vxc" {
 					product_name            = "%s"
 					rate_limit              = 1000
 					contract_term_months    = 12
-				  
+
 					a_end = {
 					  requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 182
 					}
-				  
+
 					b_end = {}
-				  
+
 					b_end_partner_config = {
 					  partner = "google"
 					  google_config = {
@@ -640,26 +640,26 @@ func TestFullEcosystem(t *testing.T) {
 					  }
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "azure_vxc" {
 					product_name            = "%s"
 					rate_limit              = 200
 					contract_term_months    = 12
-				  
+
 					a_end = {
 					  requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 0
 					}
-				  
+
 					b_end = {}
-				  
+
 					b_end_partner_config = {
 					  partner = "azure"
 					  azure_config = {
 						service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 					  }
 					}
-				  }				   
+				  }
                   `, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
