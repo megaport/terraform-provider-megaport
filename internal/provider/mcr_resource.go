@@ -468,6 +468,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"prefix_filter_lists": schema.ListNestedAttribute{
 				Description: "Prefix filter list associated with the product.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
