@@ -35,7 +35,7 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
-- `prefix_filter_list` (Attributes) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_list))
+- `prefix_filter_lists` (Attributes List) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_lists))
 - `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
 ### Read-Only
@@ -73,17 +73,21 @@ Optional:
 - `name` (String) The name of the location.
 
 
-<a id="nestedatt--prefix_filter_list"></a>
-### Nested Schema for `prefix_filter_list`
+<a id="nestedatt--prefix_filter_lists"></a>
+### Nested Schema for `prefix_filter_lists`
 
 Optional:
 
 - `address_family` (String) Address family of the prefix filter list.
 - `description` (String) Description of the prefix filter list.
-- `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_list--entries))
+- `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_lists--entries))
 
-<a id="nestedatt--prefix_filter_list--entries"></a>
-### Nested Schema for `prefix_filter_list.entries`
+Read-Only:
+
+- `id` (Number) Numeric ID of the prefix filter list.
+
+<a id="nestedatt--prefix_filter_lists--entries"></a>
+### Nested Schema for `prefix_filter_lists.entries`
 
 Optional:
 

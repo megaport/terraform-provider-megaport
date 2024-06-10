@@ -28,7 +28,7 @@ resource "megaport_mcr" "mcr" {
   asn                  = 64555
   cost_centre          = "MCR Example"
 
-  prefix_filter_list = {
+  prefix_filter_lists = [{
     description    = "Megaport Example Prefix Filter List"
     address_family = "IPv4"
     entries = [
@@ -45,7 +45,7 @@ resource "megaport_mcr" "mcr" {
         le     = 24
       }
     ]
-  }
+  }]
 }
 
 resource "megaport_vxc" "aws_vxc" {
