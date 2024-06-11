@@ -21,7 +21,7 @@ type partnerPortDataSource struct {
 	client *megaport.Client
 }
 
-// locationModel maps the data source schema data.
+// partnerPortModel maps the data source schema data.
 type partnerPortModel struct {
 	ConnectType   types.String `tfsdk:"connect_type"`
 	ProductUID    types.String `tfsdk:"product_uid"`
@@ -110,11 +110,10 @@ func (d *partnerPortDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	// READ LOGIC GOES HERE
 	partnerPorts, listErr := d.client.PartnerService.ListPartnerMegaports(ctx)
 	if listErr != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading VXC",
+			"Error listing partner ports",
 			"Could not list partner ports: "+listErr.Error(),
 		)
 		return
