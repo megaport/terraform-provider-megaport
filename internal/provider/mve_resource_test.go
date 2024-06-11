@@ -31,6 +31,13 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
                     }
+
+					vnics = [{
+						description = "Data Plane"
+					}, 
+					{
+						description = "Control Plane"
+					}]
                   }`, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
@@ -78,6 +85,13 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 						remote_auth = "Controller-1-staging@Versa.com"
 						serial_number = "Megaport-Hub1"
                     }
+
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					}]
                   }`, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),

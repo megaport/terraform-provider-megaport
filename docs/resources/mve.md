@@ -109,7 +109,6 @@ Optional:
 Required:
 
 - `description` (String) The description of the network interface.
-- `vlan` (Number) The VLAN of the network interface.
 
 
 <a id="nestedatt--resources"></a>

@@ -14,6 +14,15 @@ resource "megaport_mve" "mve" {
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 1
 
+  vnics = [
+    {
+      description = "Data Plane"
+    },
+    {
+      description = "Control Plane"
+    }
+  ]
+
   vendor_config = {
     vendor       = "aruba"
     product_size = "MEDIUM"
