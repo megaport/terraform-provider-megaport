@@ -222,6 +222,9 @@ func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(m *megaport.Pref
 	orm.ID = types.Int64Value(int64(m.Id))
 	orm.Description = types.StringValue(m.Description)
 	orm.AddressFamily = types.StringValue(m.AddressFamily)
+	if orm.Entries.IsNull() {
+		orm.Entries = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes))
+	}
 }
 
 // NewPortResource is a helper function to simplify the provider implemeantation.
@@ -621,9 +624,10 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	apiDiags := plan.fromAPIMCR(ctx, mcr)
 	resp.Diagnostics.Append(apiDiags...)
 
+	pfFilterLists := []*mcrPrefixFilterListModel{}
+
 	// Create Prefix Filter List for MCR Upon Creation
-	if !plan.PrefixFilterLists.IsNull() {
-		pfFilterLists := []*mcrPrefixFilterListModel{}
+	if !plan.PrefixFilterLists.IsNull() && len(plan.PrefixFilterLists.Elements()) > 0 { // Check if Prefix Filter List is not null and has elements
 		listDiags := plan.PrefixFilterLists.ElementsAs(ctx, &pfFilterLists, false)
 		resp.Diagnostics.Append(listDiags...)
 
@@ -708,8 +712,13 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	resp.Diagnostics.Append(apiDiags...)
 
 	pfFilterListModels := []*mcrPrefixFilterListModel{}
-	pfFilterListStateDiags := state.PrefixFilterLists.ElementsAs(ctx, &pfFilterListModels, false)
-	resp.Diagnostics.Append(pfFilterListStateDiags...)
+
+	if !state.PrefixFilterLists.IsNull() {
+		pfFilterListStateDiags := state.PrefixFilterLists.ElementsAs(ctx, &pfFilterListModels, false)
+		resp.Diagnostics.Append(pfFilterListStateDiags...)
+	} else {
+		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+	}
 
 	prefixFilterLists, prefixFilterListErr := r.client.MCRService.GetMCRPrefixFilterLists(ctx, state.UID.ValueString())
 	if prefixFilterListErr != nil {
@@ -719,20 +728,24 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		)
 		return
 	}
-	prefixFilterObjects := []types.Object{}
-	for i, prefixFilterList := range prefixFilterLists {
-		prefixFilterListModel := &mcrPrefixFilterListModel{}
-		if !state.PrefixFilterLists.IsNull() {
-			prefixFilterListModel = pfFilterListModels[i]
+	if len(prefixFilterLists) > 0 {
+		prefixFilterObjects := []types.Object{}
+		for i, prefixFilterList := range prefixFilterLists {
+			prefixFilterListModel := &mcrPrefixFilterListModel{}
+			if !state.PrefixFilterLists.IsNull() {
+				prefixFilterListModel = pfFilterListModels[i]
+			}
+			prefixFilterListModel.fromAPIMCRPrefixFilterList(prefixFilterList)
+			prefixFilterObj, prefixFilterDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, prefixFilterListModel)
+			resp.Diagnostics.Append(prefixFilterDiags...)
+			prefixFilterObjects = append(prefixFilterObjects, prefixFilterObj)
 		}
-		prefixFilterListModel.fromAPIMCRPrefixFilterList(prefixFilterList)
-		prefixFilterObj, prefixFilterDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, prefixFilterListModel)
-		resp.Diagnostics.Append(prefixFilterDiags...)
-		prefixFilterObjects = append(prefixFilterObjects, prefixFilterObj)
+		prefixFilterList, prefixFilterListsDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), prefixFilterObjects)
+		state.PrefixFilterLists = prefixFilterList
+		resp.Diagnostics.Append(prefixFilterListsDiags...)
+	} else {
+		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
 	}
-	prefixFilterList, prefixFilterListsDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), prefixFilterObjects)
-	state.PrefixFilterLists = prefixFilterList
-	resp.Diagnostics.Append(prefixFilterListsDiags...)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
