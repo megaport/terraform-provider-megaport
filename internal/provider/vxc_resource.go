@@ -192,6 +192,7 @@ type vxcResourceModel struct {
 	RateLimit          types.Int64  `tfsdk:"rate_limit"`
 	DistanceBand       types.String `tfsdk:"distance_band"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
+	PromoCode          types.String `tfsdk:"promo_code"`
 
 	SecondaryName  types.String `tfsdk:"secondary_name"`
 	UsageAlgorithm types.String `tfsdk:"usage_algorithm"`
@@ -663,6 +664,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"usage_algorithm": schema.StringAttribute{
 				Description: "The usage algorithm of the product.",
 				Computed:    true,
+			},
+			"promo_code": schema.StringAttribute{
+				Description: "The promo code of the product.",
+				Optional:    true,
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
@@ -1698,6 +1703,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		VXCName:   plan.Name.ValueString(),
 		Term:      int(plan.ContractTermMonths.ValueInt64()),
 		RateLimit: int(plan.RateLimit.ValueInt64()),
+		PromoCode: plan.PromoCode.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      10 * time.Minute,
