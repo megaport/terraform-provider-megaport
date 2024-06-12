@@ -536,7 +536,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		DiversityZone:         plan.DiversityZone.ValueString(),
 		CostCentre:            plan.CostCentre.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           5 * time.Minute,
+		WaitForTime:           r.client.WaitForTime,
 	}
 
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
@@ -655,6 +655,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
+		WaitForTime:           r.client.WaitForTime,
 	})
 
 	if err != nil {

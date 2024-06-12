@@ -6,7 +6,9 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -25,6 +27,7 @@ type megaportProviderModel struct {
 	AccessKey     types.String `tfsdk:"access_key"`
 	SecretKey     types.String `tfsdk:"secret_key"`
 	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
+	WaitTime      types.Int64  `tfsdk:"wait_time"` // Wait Time for creating and updating resources in Megaport API - default is 5 minutes.
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -74,6 +77,13 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"accept_purchase_terms": schema.BoolAttribute{
 				Required: true,
+			},
+			"wait_time": schema.Int64Attribute{
+				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 5.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
 			},
 		},
 	}
@@ -138,6 +148,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	environment := os.Getenv("MEGAPORT_ENVIRONMENT")
 	accessKey := os.Getenv("MEGAPORT_ACCESS_KEY")
 	secretKey := os.Getenv("MEGAPORT_SECRET_KEY")
+	waitTime := 10
 	acceptTerms := false
 	if strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "true" ||
 		strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "yes" {
@@ -160,10 +171,15 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		acceptTerms = config.TermsAccepted.ValueBool()
 	}
 
+	if !config.WaitTime.IsNull() {
+		waitTime = int(config.WaitTime.ValueInt64())
+	}
+
 	ctx = tflog.SetField(ctx, "environment", environment)
 	ctx = tflog.SetField(ctx, "access_key", accessKey)
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
+	ctx = tflog.SetField(ctx, "wait_time", waitTime)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
@@ -230,6 +246,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 			"x-app": "terraform",
 		}),
 		megaport.WithUserAgent(userAgent),
+		megaport.WithCustomWaitTime((time.Duration(waitTime) * time.Minute)),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(

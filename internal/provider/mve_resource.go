@@ -956,7 +956,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
 
 		WaitForProvision: true,
-		WaitForTime:      10 * time.Minute,
+		WaitForTime:      r.client.WaitForTime,
 	}
 
 	if plan.VendorConfig.IsNull() {
@@ -1082,6 +1082,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		MVEID:         state.UID.ValueString(),
 		Name:          name,
 		WaitForUpdate: true,
+		WaitForTime:   r.client.WaitForTime,
 	})
 
 	if err != nil {
