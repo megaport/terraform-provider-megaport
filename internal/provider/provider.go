@@ -82,7 +82,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Required: true,
 			},
 			"wait_time": schema.Int64Attribute{
-				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 5.",
+				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),

@@ -24,4 +24,4 @@ description: |-
 ### Optional
 
 - `environment` (String)
-- `wait_time` (Number) The time to wait in minutes for creating and updating resources in Megaport API. Default value is 5.
+- `wait_time` (Number) The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.
