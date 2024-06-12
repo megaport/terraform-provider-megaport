@@ -1700,7 +1700,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		RateLimit: int(plan.RateLimit.ValueInt64()),
 
 		WaitForProvision: true,
-		WaitForTime:      r.client.WaitForTime,
+		WaitForTime:      10 * time.Minute,
 	}
 
 	if !plan.Shutdown.IsNull() {
@@ -2498,15 +2498,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	updateReq := &megaport.UpdateVXCRequest{
-		Name:          &name,
-		AEndVLAN:      &aEndVlan,
-		BEndVLAN:      &bEndVlan,
-		CostCentre:    &costCentre,
-		Shutdown:      &shutdown,
-		RateLimit:     &rateLimit,
-		Term:          &term,
-		WaitForUpdate: true,
-		WaitForTime:   r.client.WaitForTime,
+		Name:       &name,
+		AEndVLAN:   &aEndVlan,
+		BEndVLAN:   &bEndVlan,
+		CostCentre: &costCentre,
+		Shutdown:   &shutdown,
+		RateLimit:  &rateLimit,
+		Term:       &term,
 	}
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
