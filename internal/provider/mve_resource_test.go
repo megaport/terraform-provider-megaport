@@ -37,7 +37,14 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}, 
 					{
 						description = "Control Plane"
-					}]
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}
+					]
                   }`, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
@@ -88,10 +95,17 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 
 					vnics = [{
 						description = "Data Plane"
-					},
+					}, 
 					{
 						description = "Control Plane"
-					}]
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}
+					]
                   }`, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),

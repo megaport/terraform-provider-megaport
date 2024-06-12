@@ -20,6 +20,9 @@ resource "megaport_mve" "mve" {
     },
     {
       description = "Control Plane"
+    },
+    {
+      description = "Management Plane
     }
   ]
 
