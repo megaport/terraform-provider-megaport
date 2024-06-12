@@ -1700,7 +1700,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		RateLimit: int(plan.RateLimit.ValueInt64()),
 
 		WaitForProvision: true,
-		WaitForTime:      r.client.WaitForTime,
+		WaitForTime:      waitForTime,
 	}
 
 	if !plan.Shutdown.IsNull() {
@@ -2506,7 +2506,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		RateLimit:     &rateLimit,
 		Term:          &term,
 		WaitForUpdate: true,
-		WaitForTime:   r.client.WaitForTime,
+		WaitForTime:   waitForTime,
 	}
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
