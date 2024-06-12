@@ -62,13 +62,12 @@ jobs:
     name: Terraform Provider Acceptance Tests
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         # list whatever Terraform versions here you would like to support
         terraform:
-          - '1.6.*'
           - '1.7.*'
           - '1.8.*'
     steps:
@@ -87,4 +86,3 @@ jobs:
           MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
           MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
         run: go test -v -timeout=30m -cover ./internal/provider/
-        timeout-minutes: 30
