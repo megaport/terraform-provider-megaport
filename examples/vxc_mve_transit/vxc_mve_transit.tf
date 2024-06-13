@@ -9,10 +9,6 @@ data "megaport_location" "bne_nxt1" {
   name = "NextDC B1"
 }
 
-data "megaport_location" "bne_nxt2" {
-  name = "NextDC B2"
-}
-
 data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
@@ -67,7 +63,6 @@ resource "megaport_vxc" "transit_vxc" {
   
   a_end = {
     requested_product_uid = megaport_mve.mve.product_uid
-    inner_vlan            = 100
     vnic_index            = 2
   }
   
