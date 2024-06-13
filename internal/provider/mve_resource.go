@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -38,6 +37,10 @@ var (
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
+	}
+
+	vmVnicAttrs = map[string]attr.Type{
+		"description": types.StringType,
 		"vlan":        types.Int64Type,
 	}
 
@@ -47,7 +50,7 @@ var (
 		"image":         types.ObjectType{}.WithAttributeTypes(virtualMachineImageAttrs),
 		"resource_type": types.StringType,
 		"up":            types.BoolType,
-		"vnics":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vnicAttrs)),
+		"vnics":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vmVnicAttrs)),
 	}
 
 	virtualMachineImageAttrs = map[string]attr.Type{
@@ -104,18 +107,18 @@ type mveResourceModel struct {
 // mveNetworkInterfaceModel represents a vNIC.
 type mveNetworkInterfaceModel struct {
 	Description types.String `tfsdk:"description"`
+}
+
+// mveVMNetworkInterfaceModel represents a vNIC from the API with VLAN.
+type mveVMNetworkInterfaceModel struct {
+	Description types.String `tfsdk:"description"`
 	VLAN        types.Int64  `tfsdk:"vlan"`
 }
 
-func toAPINetworkInterface(o types.Object) (*megaport.MVENetworkInterface, error) {
-	vnic, err := strconv.Atoi(o.Attributes()["vlan"].String())
-	if err != nil {
-		return nil, err
-	}
+func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
 	return &megaport.MVENetworkInterface{
-		Description: o.Attributes()["description"].String(),
-		VLAN:        vnic,
-	}, nil
+		Description: orm.Description.ValueString(),
+	}
 }
 
 // mveResourcesModel represents the resources associated with an MVE.
@@ -232,7 +235,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	for _, n := range p.NetworkInterfaces {
 		model := &mveNetworkInterfaceModel{
 			Description: types.StringValue(n.Description),
-			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
 		vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
 		apiDiags = append(apiDiags, vnicDiags...)
@@ -274,15 +276,15 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 			}
 			vnics := []types.Object{}
 			for _, vnic := range vm.Vnics {
-				model := &mveNetworkInterfaceModel{
+				model := &mveVMNetworkInterfaceModel{
 					Description: types.StringValue(vnic.Description),
 					VLAN:        types.Int64Value(int64(vnic.VLAN)),
 				}
-				vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
+				vnic, vnicDiags := types.ObjectValueFrom(ctx, vmVnicAttrs, model)
 				apiDiags = append(apiDiags, vnicDiags...)
 				vnics = append(vnics, vnic)
 			}
-			vnicList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vnicAttrs), vnics)
+			vnicList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vmVnicAttrs), vnics)
 			apiDiags = append(apiDiags, listDiags...)
 			vmModel.Vnics = vnicList
 			vmObject, vmDiags := types.ObjectValueFrom(ctx, virtualMachineAttrs, vmModel)
@@ -641,10 +643,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The description of the network interface.",
 							Required:    true,
 						},
-						"vlan": schema.Int64Attribute{
-							Description: "The VLAN of the network interface.",
-							Required:    true,
-						},
 					},
 				},
 				PlanModifiers: []planmodifier.List{
@@ -974,24 +972,14 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	mveReq.VendorConfig = vendorConfig
 
-	for _, vnic := range plan.NetworkInterfaces.Elements() {
-		vnic, ok := vnic.(types.Object)
-		if !ok {
-			resp.Diagnostics.AddError(
-				"Invalid VNIC",
-				"Invalid VNIC",
-			)
-			return
+	if !plan.NetworkInterfaces.IsNull() && len(plan.NetworkInterfaces.Elements()) > 0 {
+		vnicModels := []*mveNetworkInterfaceModel{}
+		vnicDiags := plan.NetworkInterfaces.ElementsAs(ctx, &vnicModels, false)
+		resp.Diagnostics = append(resp.Diagnostics, vnicDiags...)
+		for _, vnicModel := range vnicModels {
+			vnic := toAPINetworkInterface(vnicModel)
+			mveReq.Vnics = append(mveReq.Vnics, *vnic)
 		}
-		toAPI, err := toAPINetworkInterface(vnic)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Invalid VNIC",
-				"Invalid VNIC: "+err.Error(),
-			)
-			return
-		}
-		mveReq.Vnics = append(mveReq.Vnics, *toAPI)
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)

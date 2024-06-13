@@ -1728,6 +1728,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = 0
 	}
 
+	if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
+		aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
+			InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
+			NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+		}
+	}
+
 	if !plan.AEndPartnerConfig.IsNull() {
 		var aPartnerConfig vxcPartnerConfigurationModel
 		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{
