@@ -547,13 +547,13 @@ func TestMVE_AWS_VXC(t *testing.T) {
                     contract_term_months        = 1
 
 					vnics = [
-								{
-								description = "to_aws"
-								},
-								{
+						{
+							description = "to_aws"
+						},
+						{
 								description = "to_port"
-								},
-							]
+						},
+					]
 
                     vendor_config = {
                         vendor = "aruba"
