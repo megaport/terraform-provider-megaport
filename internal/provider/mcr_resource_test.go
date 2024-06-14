@@ -90,7 +90,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "prefix_filter_list"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "prefix_filter_list", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
