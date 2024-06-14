@@ -103,6 +103,7 @@ type singlePortResourceModel struct {
 	Locked                types.Bool   `tfsdk:"locked"`
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
+	PromoCode             types.String `tfsdk:"promo_code"`
 
 	AttributeTags   types.Object `tfsdk:"attribute_tags"`
 	Resources       types.Object `tfsdk:"resources"`
@@ -371,6 +372,10 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Computed:    true,
 			},
+			"promo_code": schema.StringAttribute{
+				Description: "The promo code for the product.",
+				Optional:    true,
+			},
 			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract started.",
 				Computed:    true,
@@ -615,6 +620,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
 		CostCentre:            plan.CostCentre.ValueString(),
+		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           waitForTime,
 	})

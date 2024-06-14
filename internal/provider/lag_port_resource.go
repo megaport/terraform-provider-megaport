@@ -55,6 +55,7 @@ type lagPortResourceModel struct {
 	Locked                types.Bool   `tfsdk:"locked"`
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
+	PromoCode             types.String `tfsdk:"promo_code"`
 
 	LagCount    types.Int64 `tfsdk:"lag_count"`
 	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
@@ -261,6 +262,10 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
 				},
+			},
+			"promo_code": schema.StringAttribute{
+				Description: "The promo code for the product.",
+				Optional:    true,
 			},
 			"usage_algorithm": schema.StringAttribute{
 				Description: "The usage algorithm for the product.",
@@ -535,6 +540,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		MarketPlaceVisibility: plan.MarketplaceVisibility.ValueBool(),
 		DiversityZone:         plan.DiversityZone.ValueString(),
 		CostCentre:            plan.CostCentre.ValueString(),
+		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           waitForTime,
 	}

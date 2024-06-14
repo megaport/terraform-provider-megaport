@@ -30,7 +30,6 @@ type megaportProviderModel struct {
 	AccessKey     types.String `tfsdk:"access_key"`
 	SecretKey     types.String `tfsdk:"secret_key"`
 	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
-	WaitTime      types.Int64  `tfsdk:"wait_time"` // Wait Time for creating and updating resources in Megaport API - default is 5 minutes.
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -151,8 +150,8 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	environment := os.Getenv("MEGAPORT_ENVIRONMENT")
 	accessKey := os.Getenv("MEGAPORT_ACCESS_KEY")
 	secretKey := os.Getenv("MEGAPORT_SECRET_KEY")
-	waitTime := 10
 	acceptTerms := false
+	waitTime := 10
 	if strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "true" ||
 		strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "yes" {
 		acceptTerms = true
@@ -174,15 +173,10 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		acceptTerms = config.TermsAccepted.ValueBool()
 	}
 
-	if !config.WaitTime.IsNull() {
-		waitTime = int(config.WaitTime.ValueInt64())
-	}
-
 	ctx = tflog.SetField(ctx, "environment", environment)
 	ctx = tflog.SetField(ctx, "access_key", accessKey)
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
-	ctx = tflog.SetField(ctx, "wait_time", waitTime)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")

@@ -17,7 +17,6 @@ provider "megaport" {
   access_key = "%s"
   secret_key     = "%s"
   accept_purchase_terms = true
-  wait_time = 20
 }
 `, os.Getenv("MEGAPORT_ACCESS_KEY"), os.Getenv("MEGAPORT_SECRET_KEY"))
 

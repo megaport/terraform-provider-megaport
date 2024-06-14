@@ -83,6 +83,7 @@ type mveResourceModel struct {
 	ContractStartDate     types.String `tfsdk:"contract_start_date"`
 	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
+	PromoCode             types.String `tfsdk:"promo_code"`
 
 	Virtual     types.Bool `tfsdk:"virtual"`
 	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
@@ -616,6 +617,10 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"promo_code": schema.StringAttribute{
+				Description: "The promo code of the MVE.",
+				Optional:    true,
+			},
 			"mve_size": schema.StringAttribute{
 				Description: "The size of the MVE.",
 				Computed:    true,
@@ -954,6 +959,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		LocationID: int(plan.LocationID.ValueInt64()),
 		Name:       plan.Name.ValueString(),
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
+		PromoCode:  plan.PromoCode.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
