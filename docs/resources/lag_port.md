@@ -31,6 +31,7 @@ description: |-
 - `diversity_zone` (String) The diversity zone of the product.
 - `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
+- `promo_code` (String) The promo code for the product.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only

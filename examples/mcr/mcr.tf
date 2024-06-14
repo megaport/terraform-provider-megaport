@@ -16,20 +16,20 @@ resource "megaport_mcr" "mcr" {
   contract_term_months = 1
 
   prefix_filter_list = {
-    description     = "Megaport Prefix Filter List"
-    address_family  = "IPv4"
+    description    = "Megaport Prefix Filter List"
+    address_family = "IPv4"
     entries = [
       {
-        action  = "permit"
-        prefix  = "10.0.1.0/24"
-        ge      = 24
-        le      = 24
+        action = "permit"
+        prefix = "10.0.1.0/24"
+        ge     = 24
+        le     = 24
       },
       {
-        action  = "deny"
-        prefix  = "10.0.2.0/24"
-        ge      = 24
-        le      = 24
+        action = "deny"
+        prefix = "10.0.2.0/24"
+        ge     = 24
+        le     = 24
       }
     ]
   }

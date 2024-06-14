@@ -30,6 +30,7 @@ description: |-
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices.
 - `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
+- `promo_code` (String) The promo code of the product.
 - `shutdown` (Boolean) Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).
 - `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
 - `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
