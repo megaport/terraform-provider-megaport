@@ -416,7 +416,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					port_speed              = 5000
 					asn                     = 64555
 
-					prefix_filter_list = {
+					prefix_filter_lists = [{
 					  description     = "%s"
 					  address_family  = "IPv4"
 					  entries = [
@@ -433,7 +433,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						  le      = 24
 						}
 					  ]
-					}
+					}]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
