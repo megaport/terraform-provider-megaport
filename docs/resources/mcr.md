@@ -36,6 +36,7 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 - `locked` (Boolean) Whether the product is locked.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `prefix_filter_list` (Attributes) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_list))
+- `promo_code` (String) Promo code of the product.
 - `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
 ### Read-Only
