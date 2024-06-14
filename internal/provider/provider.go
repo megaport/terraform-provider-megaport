@@ -6,7 +6,9 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -18,6 +20,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// Set by Provider Config, is 10 minutes by default.
+var waitForTime time.Duration
 
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
@@ -74,6 +79,13 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"accept_purchase_terms": schema.BoolAttribute{
 				Required: true,
+			},
+			"wait_time": schema.Int64Attribute{
+				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
 			},
 		},
 	}
@@ -139,6 +151,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	accessKey := os.Getenv("MEGAPORT_ACCESS_KEY")
 	secretKey := os.Getenv("MEGAPORT_SECRET_KEY")
 	acceptTerms := false
+	waitTime := 10
 	if strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "true" ||
 		strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "yes" {
 		acceptTerms = true
@@ -222,6 +235,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Build a useragent string with some useful information about the client
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
+	waitForTime = (time.Duration(waitTime) * time.Minute)
 	megaportClient, err := megaport.New(nil,
 		megaport.WithEnvironment(megaportGoEnv),
 		megaport.WithCredentials(accessKey, secretKey),
