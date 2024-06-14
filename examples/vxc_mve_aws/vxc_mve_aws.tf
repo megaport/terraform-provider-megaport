@@ -34,9 +34,9 @@ resource "megaport_port" "port" {
 }
 
 resource "megaport_mve" "mve" {
-  product_name           = "Megaport Aruba MVE"
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 1
+  product_name         = "Megaport Aruba MVE"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
 
   vnics = [
     {
@@ -61,17 +61,17 @@ resource "megaport_vxc" "aws_vxc" {
   product_name         = "Megaport MVE VXC AWS"
   rate_limit           = 100
   contract_term_months = 1
-  
+
   a_end = {
     requested_product_uid = megaport_mve.mve.product_uid
     inner_vlan            = 100
     vnic_index            = 0
   }
-  
+
   b_end = {
     requested_product_uid = data.megaport_partner.aws_port.product_uid
   }
-  
+
   b_end_partner_config = {
     partner = "aws"
     aws_config = {

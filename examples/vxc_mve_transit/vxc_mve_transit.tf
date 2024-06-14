@@ -14,10 +14,10 @@ data "megaport_location" "syd_gs" {
 }
 
 data "megaport_partner" "internet_port" {
-  connect_type  = "TRANSIT"
-  company_name  = "Networks"
-  product_name  = "Megaport Internet"
-  location_id   = data.megaport_location.syd_gs.id
+  connect_type = "TRANSIT"
+  company_name = "Networks"
+  product_name = "Megaport Internet"
+  location_id  = data.megaport_location.syd_gs.id
 }
 
 resource "megaport_port" "port" {
@@ -30,9 +30,9 @@ resource "megaport_port" "port" {
 }
 
 resource "megaport_mve" "mve" {
-  product_name           = "Megaport Aruba MVE"
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 1
+  product_name         = "Megaport Aruba MVE"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
 
   vnics = [
     {
@@ -47,12 +47,12 @@ resource "megaport_mve" "mve" {
   ]
 
   vendor_config = {
-    vendor        = "aruba"
-    product_size  = "MEDIUM"
-    image_id      = 23
-    account_name  = "Megaport Aruba MVE"
-    account_key   = "Megaport Aruba MVE"
-    system_tag    = "Preconfiguration-aruba-test-1"
+    vendor       = "aruba"
+    product_size = "MEDIUM"
+    image_id     = 23
+    account_name = "Megaport Aruba MVE"
+    account_key  = "Megaport Aruba MVE"
+    system_tag   = "Preconfiguration-aruba-test-1"
   }
 }
 
@@ -60,16 +60,16 @@ resource "megaport_vxc" "transit_vxc" {
   product_name         = "Transit VXC Example"
   rate_limit           = 100
   contract_term_months = 1
-  
+
   a_end = {
     requested_product_uid = megaport_mve.mve.product_uid
     vnic_index            = 2
   }
-  
+
   b_end = {
     requested_product_uid = data.megaport_partner.internet_port.product_uid
   }
-  
+
   b_end_partner_config = {
     partner = "transit"
   }
