@@ -594,7 +594,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		CostCentre:       plan.CostCentre.ValueString(),
 		PromoCode:        plan.PromoCode.ValueString(),
 		WaitForProvision: true,
-		WaitForTime:      10 * time.Minute,
+		WaitForTime:      waitForTime,
 	}
 
 	if !plan.ASN.IsNull() {
@@ -796,6 +796,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
+		WaitForTime:           waitForTime,
 	})
 
 	if err != nil {

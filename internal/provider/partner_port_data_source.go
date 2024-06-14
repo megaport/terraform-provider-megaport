@@ -21,7 +21,7 @@ type partnerPortDataSource struct {
 	client *megaport.Client
 }
 
-// locationModel maps the data source schema data.
+// partnerPortModel maps the data source schema data.
 type partnerPortModel struct {
 	ConnectType   types.String `tfsdk:"connect_type"`
 	ProductUID    types.String `tfsdk:"product_uid"`
