@@ -84,6 +84,7 @@ type mcrResourceModel struct {
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	ASN                   types.Int64  `tfsdk:"asn"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
+	PromoCode             types.String `tfsdk:"promo_code"`
 
 	Virtual         types.Bool   `tfsdk:"virtual"`
 	BuyoutPort      types.Bool   `tfsdk:"buyout_port"`
@@ -279,6 +280,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "Diversity zone of the product.",
+				Optional:    true,
+			},
+			"promo_code": schema.StringAttribute{
+				Description: "Promo code of the product.",
 				Optional:    true,
 			},
 			"create_date": schema.StringAttribute{
@@ -587,6 +592,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		PortSpeed:        int(plan.PortSpeed.ValueInt64()),
 		LocationID:       int(plan.LocationID.ValueInt64()),
 		CostCentre:       plan.CostCentre.ValueString(),
+		PromoCode:        plan.PromoCode.ValueString(),
 		WaitForProvision: true,
 		WaitForTime:      10 * time.Minute,
 	}
