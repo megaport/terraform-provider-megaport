@@ -1243,7 +1243,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "a-end"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "a-end", "transit"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1468,7 +1468,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "transit"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1732,6 +1732,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
 	} else {
 		aEndConfig.VLAN = 0
+	}
+
+	if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
+		aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
+			InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
+			NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+		}
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
@@ -2096,6 +2103,28 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.AEndPartnerConfig = aEndPartnerConfigObj
 			aEndConfig.PartnerConfig = aEndMegaportConfig
+		case "transit":
+			aEndPartnerConfig := &megaport.VXCPartnerConfigTransit{
+				ConnectType: "TRANSIT",
+			}
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             aPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
+				PartnerAEndConfig:   aEndPartner,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = partnerConfigObj
+			aEndConfig.PartnerConfig = aEndPartnerConfig
 		default:
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -2342,6 +2371,28 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				AzurePartnerConfig:  azure,
 				GooglePartnerConfig: google,
 				OraclePartnerConfig: oracleConfigObj,
+				PartnerAEndConfig:   aEndPartner,
+			}
+
+			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.BEndPartnerConfig = partnerConfigObj
+			bEndConfig.PartnerConfig = bEndPartnerConfig
+		case "transit":
+			bEndPartnerConfig := &megaport.VXCPartnerConfigTransit{
+				ConnectType: "TRANSIT",
+			}
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:             bPartnerConfig.Partner,
+				AWSPartnerConfig:    aws,
+				AzurePartnerConfig:  azure,
+				GooglePartnerConfig: google,
+				OraclePartnerConfig: oracle,
 				PartnerAEndConfig:   aEndPartner,
 			}
 

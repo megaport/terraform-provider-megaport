@@ -30,6 +30,7 @@ type megaportProviderModel struct {
 	AccessKey     types.String `tfsdk:"access_key"`
 	SecretKey     types.String `tfsdk:"secret_key"`
 	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
+	WaitTime      types.Int64  `tfsdk:"wait_time"`
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -177,6 +178,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	ctx = tflog.SetField(ctx, "access_key", accessKey)
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
+	ctx = tflog.SetField(ctx, "wait_time", waitTime)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
