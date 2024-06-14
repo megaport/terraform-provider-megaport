@@ -25,6 +25,7 @@ Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
 ### Optional
 
 - `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
+- `promo_code` (String) The promo code of the MVE.
 - `vnics` (Attributes List) The network interfaces of the MVE. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
