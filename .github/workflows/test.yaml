@@ -7,7 +7,7 @@ on:
       - 'README.md'  
     branches:
       - 'main'
-  pull_request_target:
+  pull_request:
     paths-ignore:
       - 'README.md'  
     branches:
@@ -41,8 +41,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4 
-        with: 
-          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-go@v5 
         with:
           go-version-file: 'go.mod'
@@ -59,32 +57,48 @@ jobs:
           git diff --compact-summary --exit-code || \
             (echo; echo "Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."; exit 1)
 
-  # Run acceptance tests in a matrix with Terraform CLI versions
-  test:
-    name: Terraform Provider Acceptance Tests
+  # Run unit tests 
+  unit-test:
+    name: Terraform Provider Unit Tests
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # list whatever Terraform versions here you would like to support
-        terraform:
-          - '1.7.*'
-          - '1.8.*'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5 
         with:
           go-version-file: 'go.mod'
           cache: true
-      - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
-        with:
-          terraform_version: ${{ matrix.terraform }}
-          terraform_wrapper: false
       - run: go mod download
-      - env:
-          TF_ACC: "1"
-          MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
-          MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
-        run: go test -v -timeout=30m -cover ./internal/provider/
+      - run: go test -v -timeout=30m -cover ./internal/provider/
+
+  # TODO: reenable these once we get a better public workflow for PRs
+  # # Run acceptance tests in a matrix with Terraform CLI versions
+  # test:
+  #   name: Terraform Provider Acceptance Tests
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       # list whatever Terraform versions here you would like to support
+  #       terraform:
+  #         - '1.7.*'
+  #         - '1.8.*'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-go@v5 
+  #       with:
+  #         go-version-file: 'go.mod'
+  #         cache: true
+  #     - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
+  #       with:
+  #         terraform_version: ${{ matrix.terraform }}
+  #         terraform_wrapper: false
+  #     - run: go mod download
+  #     - env:
+  #         TF_ACC: "1"
+  #         MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
+  #         MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
+  #       run: go test -v -timeout=30m -cover ./internal/provider/

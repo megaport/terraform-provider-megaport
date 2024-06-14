@@ -15,6 +15,7 @@ resource "megaport_port" "port_1" {
   location_id            = data.megaport_location.loc.id
   contract_term_months   = 1
   marketplace_visibility = false
+  cost_centre            = "Megaport Port A-End"
 }
 
 resource "megaport_port" "port_2" {
@@ -23,6 +24,7 @@ resource "megaport_port" "port_2" {
   location_id            = data.megaport_location.loc.id
   contract_term_months   = 1
   marketplace_visibility = false
+  cost_centre            = "Megaport Port B-End"
 }
 
 resource "megaport_vxc" "vxc" {

@@ -960,7 +960,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		PromoCode:  plan.PromoCode.ValueString(),
 
 		WaitForProvision: true,
-		WaitForTime:      10 * time.Minute,
+		WaitForTime:      waitForTime,
 	}
 
 	if plan.VendorConfig.IsNull() {
@@ -1076,6 +1076,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		MVEID:         state.UID.ValueString(),
 		Name:          name,
 		WaitForUpdate: true,
+		WaitForTime:   waitForTime,
 	})
 
 	if err != nil {
