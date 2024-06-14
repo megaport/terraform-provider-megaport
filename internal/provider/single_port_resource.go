@@ -622,7 +622,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		CostCentre:            plan.CostCentre.ValueString(),
 		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           10 * time.Minute,
+		WaitForTime:           waitForTime,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -731,6 +731,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
+		WaitForTime:           waitForTime,
 	})
 	if modifyErr != nil {
 		resp.Diagnostics.AddError(
