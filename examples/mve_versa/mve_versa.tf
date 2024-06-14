@@ -10,9 +10,9 @@ data "megaport_location" "bne_nxt1" {
 }
 
 resource "megaport_mve" "mve" {
-  product_name             = "Megaport Versa MVE Example"
-  location_id              = data.megaport_location.bne_nxt1.id
-  contract_term_months     = 1
+  product_name         = "Megaport Versa MVE Example"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
 
   vendor_config = {
     vendor             = "versa"
