@@ -192,6 +192,7 @@ type vxcResourceModel struct {
 	RateLimit          types.Int64  `tfsdk:"rate_limit"`
 	DistanceBand       types.String `tfsdk:"distance_band"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
+	PromoCode          types.String `tfsdk:"promo_code"`
 
 	SecondaryName  types.String `tfsdk:"secondary_name"`
 	UsageAlgorithm types.String `tfsdk:"usage_algorithm"`
@@ -664,6 +665,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The usage algorithm of the product.",
 				Computed:    true,
 			},
+			"promo_code": schema.StringAttribute{
+				Description: "The promo code of the product.",
+				Optional:    true,
+			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
 				Computed:    true,
@@ -1101,13 +1106,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The initial ordered VLAN of the A-End configuration.",
+						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
 						Computed:    true,
-						Validators:  []validator.Int64{int64validator.AtLeast(0)},
+						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
-						Description: "The VLAN of the A-End configuration.",
+						Description: "The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
@@ -1202,13 +1207,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The initial ordered VLAN of the B-End configuration.",
+						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
 						Computed:    true,
-						Validators:  []validator.Int64{int64validator.AtLeast(0)},
+						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
-						Description: "The VLAN of the B-End configuration.",
+						Description: "The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
@@ -1698,6 +1703,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		VXCName:   plan.Name.ValueString(),
 		Term:      int(plan.ContractTermMonths.ValueInt64()),
 		RateLimit: int(plan.RateLimit.ValueInt64()),
+		PromoCode: plan.PromoCode.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      10 * time.Minute,
