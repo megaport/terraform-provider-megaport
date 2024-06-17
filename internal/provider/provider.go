@@ -72,14 +72,17 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				},
 			},
 			"access_key": schema.StringAttribute{
-				Required: true,
+				Optional:    true,
+				Description: "The API access key. Can also be set using the environment variable MEGAPORT_ACCESS_KEY",
 			},
 			"secret_key": schema.StringAttribute{
-				Required:  true,
-				Sensitive: true,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The API secret key. Can also be set using the environment variable MEGAPORT_SECRET_KEY",
 			},
 			"accept_purchase_terms": schema.BoolAttribute{
-				Required: true,
+				Optional:    true,
+				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
 			"wait_time": schema.Int64Attribute{
 				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
