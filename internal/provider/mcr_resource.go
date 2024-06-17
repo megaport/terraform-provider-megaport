@@ -12,12 +12,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -35,6 +35,20 @@ var (
 		"resource_name": types.StringType,
 		"resource_type": types.StringType,
 		"speed":         types.Int64Type,
+	}
+
+	mcrPrefixFilterListModelAttributes = map[string]attr.Type{
+		"id":             types.Int64Type,
+		"description":    types.StringType,
+		"address_family": types.StringType,
+		"entries":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes)),
+	}
+
+	mcrPrefixListEntryAttributes = map[string]attr.Type{
+		"action": types.StringType,
+		"prefix": types.StringType,
+		"ge":     types.Int64Type,
+		"le":     types.Int64Type,
 	}
 )
 
@@ -81,7 +95,7 @@ type mcrResourceModel struct {
 	VirtualRouter   types.Object `tfsdk:"virtual_router"`
 	LocationDetails types.Object `tfsdk:"location_details"`
 
-	PrefixFilterList types.Object `tfsdk:"prefix_filter_list"`
+	PrefixFilterLists types.List `tfsdk:"prefix_filter_lists"`
 }
 
 // mcrVirtualRouterModel represents the virtual router associated with the MCR
@@ -96,6 +110,7 @@ type mcrVirtualRouterModel struct {
 
 // mcrPrefixFilterListModel represents the prefix filter list associated with the MCR
 type mcrPrefixFilterListModel struct {
+	ID            types.Int64  `tfsdk:"id"`
 	Description   types.String `tfsdk:"description"`
 	AddressFamily types.String `tfsdk:"address_family"`
 	Entries       types.List   `tfsdk:"entries"`
@@ -202,6 +217,15 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR) di
 	}
 
 	return apiDiags
+}
+
+func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(m *megaport.PrefixFilterList) {
+	orm.ID = types.Int64Value(int64(m.Id))
+	orm.Description = types.StringValue(m.Description)
+	orm.AddressFamily = types.StringValue(m.AddressFamily)
+	if orm.Entries.IsNull() {
+		orm.Entries = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes))
+	}
 }
 
 // NewPortResource is a helper function to simplify the provider implemeantation.
@@ -449,38 +473,60 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 				},
 			},
-			"prefix_filter_list": schema.SingleNestedAttribute{
+			"prefix_filter_lists": schema.ListNestedAttribute{
 				Description: "Prefix filter list associated with the product.",
 				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"description": schema.StringAttribute{
-						Description: "Description of the prefix filter list.",
-						Optional:    true,
-					},
-					"address_family": schema.StringAttribute{
-						Description: "Address family of the prefix filter list.",
-						Optional:    true,
-					},
-					"entries": schema.ListNestedAttribute{
-						Description: "Entries in the prefix filter list.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"action": schema.StringAttribute{
-									Description: "Action of the prefix filter list entry.",
-									Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.Int64Attribute{
+							Description: "Numeric ID of the prefix filter list.",
+							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
+						},
+						"description": schema.StringAttribute{
+							Description: "Description of the prefix filter list.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"address_family": schema.StringAttribute{
+							Description: "Address family of the prefix filter list.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"entries": schema.ListNestedAttribute{
+							Description: "Entries in the prefix filter list.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.List{
+								listplanmodifier.UseStateForUnknown(),
+							},
+							NestedObject: schema.NestedAttributeObject{
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.UseStateForUnknown(),
 								},
-								"prefix": schema.StringAttribute{
-									Description: "Prefix of the prefix filter list entry.",
-									Optional:    true,
-								},
-								"ge": schema.Int64Attribute{
-									Description: "Greater than or equal to value of the prefix filter list entry.",
-									Optional:    true,
-								},
-								"le": schema.Int64Attribute{
-									Description: "Less than or equal to value of the prefix filter list entry.",
-									Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"action": schema.StringAttribute{
+										Description: "Action of the prefix filter list entry.",
+										Optional:    true,
+									},
+									"prefix": schema.StringAttribute{
+										Description: "Prefix of the prefix filter list entry.",
+										Optional:    true,
+									},
+									"ge": schema.Int64Attribute{
+										Description: "Greater than or equal to value of the prefix filter list entry.",
+										Optional:    true,
+									},
+									"le": schema.Int64Attribute{
+										Description: "Less than or equal to value of the prefix filter list entry.",
+										Optional:    true,
+									},
 								},
 							},
 						},
@@ -584,45 +630,61 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	apiDiags := plan.fromAPIMCR(ctx, mcr)
 	resp.Diagnostics.Append(apiDiags...)
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	pfFilterLists := []*mcrPrefixFilterListModel{}
 
 	// Create Prefix Filter List for MCR Upon Creation
-	if !plan.PrefixFilterList.IsNull() {
-		pfFilterListModel := &mcrPrefixFilterListModel{}
-		prefixFilterObjDiags := plan.PrefixFilterList.As(ctx, pfFilterListModel, basetypes.ObjectAsOptions{})
-		resp.Diagnostics.Append(prefixFilterObjDiags...)
+	if !plan.PrefixFilterLists.IsNull() && len(plan.PrefixFilterLists.Elements()) > 0 { // Check if Prefix Filter List is not null and has elements
+		listDiags := plan.PrefixFilterLists.ElementsAs(ctx, &pfFilterLists, false)
+		resp.Diagnostics.Append(listDiags...)
 
-		megaportPrefixFilterList := megaport.MCRPrefixFilterList{
-			Description:   pfFilterListModel.Description.ValueString(),
-			AddressFamily: pfFilterListModel.AddressFamily.ValueString(),
-		}
+		prefixFilterListObjs := []types.Object{}
+		for _, pfFilterListModel := range pfFilterLists {
 
-		if !pfFilterListModel.Entries.IsNull() {
-			listEntries := []*mcrPrefixListEntryModel{}
-			prefixListEntriesDiags := pfFilterListModel.Entries.ElementsAs(ctx, &listEntries, false)
-			resp.Diagnostics.Append(prefixListEntriesDiags...)
-			for _, entry := range listEntries {
-				megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, &megaport.MCRPrefixListEntry{
-					Action: entry.Action.ValueString(),
-					Prefix: entry.Prefix.ValueString(),
-					Ge:     int(entry.Ge.ValueInt64()),
-					Le:     int(entry.Le.ValueInt64()),
-				})
+			megaportPrefixFilterList := megaport.MCRPrefixFilterList{
+				Description:   pfFilterListModel.Description.ValueString(),
+				AddressFamily: pfFilterListModel.AddressFamily.ValueString(),
 			}
+
+			if !pfFilterListModel.Entries.IsNull() {
+				listEntries := []*mcrPrefixListEntryModel{}
+				prefixListEntriesDiags := pfFilterListModel.Entries.ElementsAs(ctx, &listEntries, false)
+				resp.Diagnostics.Append(prefixListEntriesDiags...)
+				for _, entry := range listEntries {
+					megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, &megaport.MCRPrefixListEntry{
+						Action: entry.Action.ValueString(),
+						Prefix: entry.Prefix.ValueString(),
+						Ge:     int(entry.Ge.ValueInt64()),
+						Le:     int(entry.Le.ValueInt64()),
+					})
+				}
+			} else {
+				pfFilterListModel.Entries = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes))
+			}
+			prefixFilterListReq := &megaport.CreateMCRPrefixFilterListRequest{
+				MCRID:            createdID,
+				PrefixFilterList: megaportPrefixFilterList,
+			}
+			createRes, err := r.client.MCRService.CreatePrefixFilterList(ctx, prefixFilterListReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating prefix filter list",
+					"Could not create prefix filter list for MCR with ID "+createdID+": "+err.Error(),
+				)
+				return
+			}
+			pfFilterListModel.ID = types.Int64Value(int64(createRes.PrefixFilterListID))
+			prefixFilterListObj, prefixFilterDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, pfFilterListModel)
+			resp.Diagnostics.Append(prefixFilterDiags...)
+			prefixFilterListObjs = append(prefixFilterListObjs, prefixFilterListObj)
 		}
-		prefixFilterListReq := &megaport.CreateMCRPrefixFilterListRequest{
-			MCRID:            createdID,
-			PrefixFilterList: megaportPrefixFilterList,
-		}
-		_, err = r.client.MCRService.CreatePrefixFilterList(ctx, prefixFilterListReq)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating prefix filter list",
-				"Could not create prefix filter list for MCR with ID "+createdID+": "+err.Error(),
-			)
-			return
-		}
+		prefixFilterList, prefixFilterListsDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), prefixFilterListObjs)
+		resp.Diagnostics.Append(prefixFilterListsDiags...)
+		plan.PrefixFilterLists = prefixFilterList
+	} else {
+		plan.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
 	}
+
+	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -654,6 +716,42 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 	apiDiags := state.fromAPIMCR(ctx, mcr)
 	resp.Diagnostics.Append(apiDiags...)
+
+	pfFilterListModels := []*mcrPrefixFilterListModel{}
+
+	if !state.PrefixFilterLists.IsNull() {
+		pfFilterListStateDiags := state.PrefixFilterLists.ElementsAs(ctx, &pfFilterListModels, false)
+		resp.Diagnostics.Append(pfFilterListStateDiags...)
+	} else {
+		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+	}
+
+	prefixFilterLists, prefixFilterListErr := r.client.MCRService.GetMCRPrefixFilterLists(ctx, state.UID.ValueString())
+	if prefixFilterListErr != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Prefix Filter Lists",
+			"Could not read prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+prefixFilterListErr.Error(),
+		)
+		return
+	}
+	if len(prefixFilterLists) > 0 {
+		prefixFilterObjects := []types.Object{}
+		for i, prefixFilterList := range prefixFilterLists {
+			prefixFilterListModel := &mcrPrefixFilterListModel{}
+			if !state.PrefixFilterLists.IsNull() {
+				prefixFilterListModel = pfFilterListModels[i]
+			}
+			prefixFilterListModel.fromAPIMCRPrefixFilterList(prefixFilterList)
+			prefixFilterObj, prefixFilterDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, prefixFilterListModel)
+			resp.Diagnostics.Append(prefixFilterDiags...)
+			prefixFilterObjects = append(prefixFilterObjects, prefixFilterObj)
+		}
+		prefixFilterList, prefixFilterListsDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), prefixFilterObjects)
+		state.PrefixFilterLists = prefixFilterList
+		resp.Diagnostics.Append(prefixFilterListsDiags...)
+	} else {
+		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)

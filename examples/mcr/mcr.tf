@@ -15,8 +15,8 @@ resource "megaport_mcr" "mcr" {
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 1
 
-  prefix_filter_list = {
-    description    = "Megaport Prefix Filter List"
+  prefix_filter_lists = [{
+    description    = "Megaport Example Prefix Filter List"
     address_family = "IPv4"
     entries = [
       {
@@ -32,5 +32,5 @@ resource "megaport_mcr" "mcr" {
         le     = 24
       }
     ]
-  }
+  }]
 }
