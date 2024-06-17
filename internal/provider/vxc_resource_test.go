@@ -25,6 +25,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	portName4 := RandomTestName()
 	vxcName := RandomTestName()
 	vxcNameNew := RandomTestName()
+	costCentreName := RandomTestName()
 	costCentreNew := RandomTestName()
 
 	resource.Test(suite.T(), resource.TestCase{
@@ -67,6 +68,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                     product_name   = "%s"
                     rate_limit = 1000
                     contract_term_months = 12
+					cost_centre = "%s"
 
                     a_end = {
                         requested_product_uid = megaport_port.port_1.product_uid
@@ -76,7 +78,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                         requested_product_uid = megaport_port.port_2.product_uid
                     }
                   }
-                  `, portName1, portName2, portName3, portName4, vxcName),
+                  `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),

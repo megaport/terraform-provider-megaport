@@ -1700,10 +1700,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	buyReq := &megaport.BuyVXCRequest{
-		VXCName:   plan.Name.ValueString(),
-		Term:      int(plan.ContractTermMonths.ValueInt64()),
-		RateLimit: int(plan.RateLimit.ValueInt64()),
-		PromoCode: plan.PromoCode.ValueString(),
+		VXCName:    plan.Name.ValueString(),
+		Term:       int(plan.ContractTermMonths.ValueInt64()),
+		RateLimit:  int(plan.RateLimit.ValueInt64()),
+		PromoCode:  plan.PromoCode.ValueString(),
+		CostCentre: plan.CostCentre.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
