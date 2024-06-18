@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -707,10 +708,22 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Get refreshed mcr value from API
 	mcr, err := r.client.MCRService.GetMCR(ctx, state.UID.ValueString())
 	if err != nil {
+		// MCR has been deleted or is not found
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error Reading MCR",
 			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
+		return
+	}
+
+	// If the MCR has been deleted
+	if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
