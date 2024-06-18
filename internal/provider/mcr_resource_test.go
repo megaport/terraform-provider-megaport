@@ -37,7 +37,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  action  = "permit"
 						  prefix  = "10.0.1.0/24"
 						  ge      = 24
-						  le      = 24
+						  le      = 32
 						},
 						{
 						  action  = "deny"
@@ -104,7 +104,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  action  = "permit"
 						  prefix  = "10.0.1.0/24"
 						  ge      = 24
-						  le      = 24
+						  le      = 32
 						},
 						{
 						  action  = "deny"
