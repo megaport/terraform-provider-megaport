@@ -375,12 +375,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"lag_id": schema.Int64Attribute{
 				Description: "Numeric ID of the LAG.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"aggregation_id": schema.Int64Attribute{
 				Description: "Numeric ID of the aggregation.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"company_name": schema.StringAttribute{
@@ -389,7 +387,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"asn": schema.Int64Attribute{
@@ -410,18 +407,15 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"buyout_port": schema.BoolAttribute{
 				Description: "Whether the product is bought out.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
 				Computed:    true,
-				Optional:    true,
 			},
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the product is admin locked.",
 				Computed:    true,
-				Optional:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
@@ -434,7 +428,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"location_details": schema.SingleNestedAttribute{
 				Description: "The location details of the product.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
@@ -539,7 +532,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"virtual_router": schema.SingleNestedAttribute{
-				Optional:    true,
 				Computed:    true,
 				Description: "Virtual router associated with the product.",
 				Attributes: map[string]schema.Attribute{
