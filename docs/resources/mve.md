@@ -203,5 +203,5 @@ Import is supported using the following syntax:
 
 ```shell
 # Order can be imported by specifying the Product UID.
-terraform import megaport_vxc.example "<PRODUCT_UID>"
+terraform import megaport_mve.example "<PRODUCT_UID>"
 ```
