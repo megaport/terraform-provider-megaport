@@ -726,7 +726,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
 	}
 
-	prefixFilterLists, prefixFilterListErr := r.client.MCRService.GetMCRPrefixFilterLists(ctx, state.UID.ValueString())
+	prefixFilterLists, prefixFilterListErr := r.client.MCRService.ListMCRPrefixFilterLists(ctx, state.UID.ValueString())
 	if prefixFilterListErr != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Prefix Filter Lists",
