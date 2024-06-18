@@ -228,10 +228,13 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "The speed of the port in Mbps.",
+				Description: "The speed of the port in Mbps. Can be 10000 (10 G) or 100000 (100 G, where available).",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
+				},
+				Validators: []validator.Int64{
+					int64validator.OneOf(10000, 100000),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
@@ -264,7 +267,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code for the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"usage_algorithm": schema.StringAttribute{
@@ -279,9 +282,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "The cost centre for the product.",
-				Optional:    true,
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.",
 				Computed:    true,
+				Optional:    true,
 			},
 			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract started.",
@@ -304,7 +307,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:    true,
 			},
 			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual.",
+				Description: "Whether the product is virtual. Always false for LAG orders.",
 				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
@@ -325,8 +328,11 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"lag_count": schema.Int64Attribute{
-				Description: "The number of LAG ports.",
+				Description: "The number of LAG ports. Valid values are between 1 and 8.",
 				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.Between(1, 8),
+				},
 			},
 			"lag_port_uids": schema.ListAttribute{
 				ElementType: types.StringType,

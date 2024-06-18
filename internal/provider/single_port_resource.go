@@ -302,7 +302,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"product_name": schema.StringAttribute{
-				Description: "The name of the product.",
+				Description: "The name of the product. Specify a name for the Port that is easily identifiable, particularly if you plan on having more than one Port.",
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
@@ -368,12 +368,12 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "The cost centre for the product.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the Port is not automatically updated with the Port service level reference number.",
 				Optional:    true,
 				Computed:    true,
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code for the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"contract_start_date": schema.StringAttribute{
@@ -385,7 +385,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the product is visible in the marketplace.",
+				Description: "Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.",
 				Required:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{

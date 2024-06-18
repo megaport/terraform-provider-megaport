@@ -68,15 +68,15 @@ func (d *mveSizeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 							Computed:    true,
 						},
 						"label": schema.StringAttribute{
-							Description: "Label of the MVE Size",
+							Description: "Label of the MVE Size. The compute sizes are 2/8, 4/16, 8/32, and 12/48, where the first number is the CPU and the second number is the GB of available RAM. Each size has 4 GB of RAM for every vCPU allocated.",
 							Computed:    true,
 						},
 						"cpu_core_count": schema.Int64Attribute{
-							Description: "Number of CPU Cores",
+							Description: "Number of CPU Cores.",
 							Computed:    true,
 						},
 						"ram_gb": schema.StringAttribute{
-							Description: "Amount of RAM in GB",
+							Description: "Amount of RAM in GB.",
 							Computed:    true,
 						},
 					},

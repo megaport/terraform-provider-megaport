@@ -19,24 +19,24 @@ Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
 
 - `contract_term_months` (Number) Contract term in months.
 - `location_id` (Number) Location ID of the product.
-- `port_speed` (Number) Bandwidth speed of the product.
-- `product_name` (String) Name of the product.
+- `port_speed` (Number) Bandwidth speed of the product. The MCR can scale from 1 Gbps to 10 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports four speeds: 1000, 2500, 5000, and 10000 MBPS
+- `product_name` (String) Name of the product. Specify a name for the MCR that is easily identifiable as yours, particularly if you plan on provisioning more than one MCR.
 
 ### Optional
 
 - `admin_locked` (Boolean) Whether the product is admin locked.
 - `aggregation_id` (Number) Numeric ID of the aggregation.
-- `asn` (Number) ASN in the MCR order configuration.
+- `asn` (Number) Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.
 - `buyout_port` (Boolean) Whether the product is bought out.
 - `cancelable` (Boolean) Whether the product is cancelable.
-- `cost_centre` (String) Cost centre of the product.
-- `diversity_zone` (String) Diversity zone of the product.
+- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the MCR is not automatically updated with the MCR service level reference number.
+- `diversity_zone` (String) Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.
 - `lag_id` (Number) Numeric ID of the LAG.
 - `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `prefix_filter_lists` (Attributes List) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_lists))
-- `promo_code` (String) Promo code of the product.
+- `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 
 ### Read-Only
@@ -77,10 +77,13 @@ Optional:
 <a id="nestedatt--prefix_filter_lists"></a>
 ### Nested Schema for `prefix_filter_lists`
 
+Required:
+
+- `address_family` (String) The IP address standard of the IP network addresses in the prefix filter list.
+- `description` (String) Description of the prefix filter list.
+
 Optional:
 
-- `address_family` (String) Address family of the prefix filter list.
-- `description` (String) Description of the prefix filter list.
 - `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_lists--entries))
 
 Read-Only:
@@ -90,12 +93,15 @@ Read-Only:
 <a id="nestedatt--prefix_filter_lists--entries"></a>
 ### Nested Schema for `prefix_filter_lists.entries`
 
+Required:
+
+- `action` (String) The action to take for the network address in the filter list. Accepted values are permit and deny.
+- `prefix` (String) The network address of the prefix filter list entry.
+
 Optional:
 
-- `action` (String) Action of the prefix filter list entry.
-- `ge` (Number) Greater than or equal to value of the prefix filter list entry.
-- `le` (Number) Less than or equal to value of the prefix filter list entry.
-- `prefix` (String) Prefix of the prefix filter list entry.
+- `ge` (Number) The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).
+- `le` (Number) The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).
 
 
 

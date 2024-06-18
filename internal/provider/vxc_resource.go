@@ -666,7 +666,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code of the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"created_by": schema.StringAttribute{
@@ -697,7 +697,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional:    true,
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.",
 				Computed:    true,
 				Optional:    true,
 			},

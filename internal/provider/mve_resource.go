@@ -620,7 +620,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code of the MVE.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"mve_size": schema.StringAttribute{
@@ -697,25 +697,25 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
-				Description: "The vendor configuration of the MVE.",
+				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
-						Description: "The vendor of the MVE.",
+						Description: "The name of vendor of the MVE.",
 						Required:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"image_id": schema.Int64Attribute{
-						Description: "The image ID of the MVE.",
+						Description: "The image ID of the MVE. Indicates the software version.",
 						Required:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.RequiresReplace(),
 						},
 					},
 					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config.",
+						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.",
 						Required:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
@@ -729,11 +729,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"account_name": schema.StringAttribute{
-						Description: "The account name for the vendor config. Required for Aruba MVE.",
+						Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"account_key": schema.StringAttribute{
-						Description: "The account key for the vendor config. Required for Aruba MVE.",
+						Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
@@ -741,11 +741,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs.",
+						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config. Required for Cisco MVE.",
+						Description: "The cloud init for the vendor config. The bootstrap configuration file. Download this for your device from vManage. Required for Cisco MVE.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
@@ -757,11 +757,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"director_address": schema.StringAttribute{
-						Description: "The director address for the vendor config. Required for Versa MVE.",
+						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"controller_address": schema.StringAttribute{
-						Description: "The controldler address for the vendor config. Required for Versa MVE.",
+						Description: "The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"manage_locally": schema.BoolAttribute{
@@ -769,27 +769,27 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"local_auth": schema.StringAttribute{
-						Description: "The local auth for the vendor config. Required for Versa MVE.",
+						Description: "The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"remote_auth": schema.StringAttribute{
-						Description: "The remote auth for the vendor config. Required for Versa MVE.",
+						Description: "The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"serial_number": schema.StringAttribute{
-						Description: "The serial number for the vendor config. Required for Versa MVE.",
+						Description: "The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"system_tag": schema.StringAttribute{
-						Description: "The system tag for the vendor config. Required for Aruba MVE.",
+						Description: "The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"vco_address": schema.StringAttribute{
-						Description: "The VCO address for the vendor config. Required for VMware MVE.",
+						Description: "The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.",
 						Optional:    true,
 					},
 					"vco_activation_code": schema.StringAttribute{
-						Description: "The VCO activation code for the vendor config. Required for VMware MVE.",
+						Description: "The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.",
 						Optional:    true,
 					},
 					"fmc_ip_address": schema.StringAttribute{

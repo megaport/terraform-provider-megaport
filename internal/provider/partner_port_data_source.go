@@ -51,7 +51,7 @@ func (d *partnerPortDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 		Description: "Partner Port",
 		Attributes: map[string]schema.Attribute{
 			"connect_type": &schema.StringAttribute{
-				Description: "The type of connection for the partner port.",
+				Description: "The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX toi display France-IX Ports that you can connect to.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -93,7 +93,7 @@ func (d *partnerPortDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 				Computed:    true,
 			},
 			"vxc_permitted": &schema.BoolAttribute{
-				Description: "Whether VXCs are permitted on the partner port.",
+				Description: "Whether VXCs are permitted on the partner port. If false, you can not create a VXC on this port. If true, you can create a VXC on this port.",
 				Computed:    true,
 			},
 		},

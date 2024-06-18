@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -267,7 +269,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_name": schema.StringAttribute{
-				Description: "Name of the product.",
+				Description: "Name of the product. Specify a name for the MCR that is easily identifiable as yours, particularly if you plan on provisioning more than one MCR.",
 				Required:    true,
 			},
 			"product_type": schema.StringAttribute{
@@ -279,11 +281,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "Diversity zone of the product.",
+				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.",
 				Optional:    true,
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "Promo code of the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"create_date": schema.StringAttribute{
@@ -301,7 +303,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "Bandwidth speed of the product.",
+				Description: "Bandwidth speed of the product. The MCR can scale from 1 Gbps to 10 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports four speeds: 1000, 2500, 5000, and 10000 MBPS",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
@@ -351,7 +353,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "Cost centre of the product.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the MCR is not automatically updated with the MCR service level reference number.",
 				Computed:    true,
 				Optional:    true,
 			},
@@ -391,7 +393,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"asn": schema.Int64Attribute{
-				Description: "ASN in the MCR order configuration.",
+				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.",
 				Optional:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
@@ -491,13 +493,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"description": schema.StringAttribute{
 							Description: "Description of the prefix filter list.",
-							Optional:    true,
-							Computed:    true,
+							Required:    true,
 						},
 						"address_family": schema.StringAttribute{
-							Description: "Address family of the prefix filter list.",
-							Optional:    true,
-							Computed:    true,
+							Description: "The IP address standard of the IP network addresses in the prefix filter list.",
+							Required:    true,
 						},
 						"entries": schema.ListNestedAttribute{
 							Description: "Entries in the prefix filter list.",
@@ -506,25 +506,31 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							PlanModifiers: []planmodifier.List{
 								listplanmodifier.UseStateForUnknown(),
 							},
+							Validators: []validator.List{
+								listvalidator.SizeBetween(1, 200),
+							},
 							NestedObject: schema.NestedAttributeObject{
 								PlanModifiers: []planmodifier.Object{
 									objectplanmodifier.UseStateForUnknown(),
 								},
 								Attributes: map[string]schema.Attribute{
 									"action": schema.StringAttribute{
-										Description: "Action of the prefix filter list entry.",
-										Optional:    true,
+										Description: "The action to take for the network address in the filter list. Accepted values are permit and deny.",
+										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.OneOf("permit", "deny"),
+										},
 									},
 									"prefix": schema.StringAttribute{
-										Description: "Prefix of the prefix filter list entry.",
-										Optional:    true,
+										Description: "The network address of the prefix filter list entry.",
+										Required:    true,
 									},
 									"ge": schema.Int64Attribute{
-										Description: "Greater than or equal to value of the prefix filter list entry.",
+										Description: "The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).",
 										Optional:    true,
 									},
 									"le": schema.Int64Attribute{
-										Description: "Less than or equal to value of the prefix filter list entry.",
+										Description: "The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).",
 										Optional:    true,
 									},
 								},
