@@ -313,7 +313,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"cancelable": schema.BoolAttribute{
@@ -345,7 +344,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"location_details": schema.SingleNestedAttribute{
 				Description: "The location details of the product.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
@@ -387,7 +385,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"attribute_tags": schema.SingleNestedAttribute{
 				Description: "The attribute tags of the product.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"terminated_service_details": schema.SingleNestedAttribute{
@@ -472,7 +469,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources attached to port.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"interface": schema.SingleNestedAttribute{
