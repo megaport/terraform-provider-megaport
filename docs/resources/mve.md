@@ -196,3 +196,12 @@ Read-Only:
 
 - `description` (String) The description of the network interface.
 - `vlan` (Number) The VLAN of the network interface.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Order can be imported by specifying the Product UID.
+terraform import megaport_vxc.example "<PRODUCT_UID>"
+```

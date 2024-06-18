@@ -147,3 +147,12 @@ Optional:
 Read-Only:
 
 - `id` (Number) Numeric ID of the virtual router.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Order can be imported by specifying the Product UID.
+terraform import megaport_mcr.example "<PRODUCT_UID>"
+```

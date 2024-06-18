@@ -143,3 +143,12 @@ Read-Only:
 - `resource_name` (String) The resource name of the interface.
 - `resource_type` (String) The resource type of the interface.
 - `up` (Number) The up status of the interface.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Order can be imported by specifying the Product UID.
+terraform import megaport_lag_port.example "<PRODUCT_UID>"
+```

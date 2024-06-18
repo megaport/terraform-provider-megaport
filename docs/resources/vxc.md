@@ -486,3 +486,12 @@ Read-Only:
 - `status` (String) The status of the VXC approval.
 - `type` (String) The type of the VXC approval.
 - `uid` (String) The UID of the VXC approval.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Order can be imported by specifying the Product UID.
+terraform import megaport_vxc.example "<PRODUCT_UID>"
+```
