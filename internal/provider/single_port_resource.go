@@ -403,7 +403,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"cancelable": schema.BoolAttribute{
@@ -420,7 +419,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"attribute_tags": schema.SingleNestedAttribute{
 				Description: "The attribute tags of the product.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"terminated_service_details": schema.SingleNestedAttribute{
@@ -505,7 +503,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"location_details": schema.SingleNestedAttribute{
 				Description: "The location details of the product.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
@@ -547,7 +544,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources attached to port.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"interface": schema.SingleNestedAttribute{

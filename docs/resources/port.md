@@ -36,16 +36,13 @@ resource "megaport_port" "port" {
 
 ### Optional
 
-- `attribute_tags` (Attributes) The attribute tags of the product. (see [below for nested schema](#nestedatt--attribute_tags))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the Port is not automatically updated with the Port service level reference number.
 - `diversity_zone` (String) The diversity zone of the product.
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
-- `locked` (Boolean) Whether the product is locked.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
-- `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only
 
+- `attribute_tags` (Attributes) The attribute tags of the product. (see [below for nested schema](#nestedatt--attribute_tags))
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) The unique identifier of the company.
 - `contract_end_date` (String) The date the contract ends.
@@ -54,10 +51,13 @@ resource "megaport_port" "port" {
 - `created_by` (String) The user who created the product.
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
+- `locked` (Boolean) Whether the product is locked.
 - `market` (String) The market the product is in.
 - `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
 - `provisioning_status` (String) The provisioning status of the product.
+- `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 - `terminate_date` (String) The date the product will be terminated.
 - `usage_algorithm` (String) The usage algorithm for the product.
 - `virtual` (Boolean) Whether the product is virtual.
