@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -751,17 +753,36 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 	detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
+	wg := sync.WaitGroup{}
+	mux := sync.Mutex{}
+	errs := []error{}
 	for _, l := range prefixFilterLists {
-		detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), l.Id)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Reading Prefix Filter List",
-				fmt.Sprintf("Could not read prefix filter list with ID %d", l.Id)+err.Error(),
-			)
-			return
-		}
-		detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
+		wg.Add(1)
+		go func(list *megaport.PrefixFilterList) {
+			defer wg.Done()
+			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+			if err != nil {
+				mux.Lock()
+				errs = append(errs, err)
+				mux.Unlock()
+			}
+			mux.Lock()
+			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
+			mux.Unlock()
+		}(l)
 	}
+	wg.Wait()
+	if len(errs) > 0 {
+		resp.Diagnostics.AddError(
+			"Error Reading Prefix Filter Lists",
+			"Could not read prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errs[0].Error(),
+		)
+		return
+	}
+
+	sort.Slice(detailedPrefixFilterLists, func(i, j int) bool {
+		return detailedPrefixFilterLists[i].ID < detailedPrefixFilterLists[j].ID
+	})
 
 	parsedListObjs := []types.Object{}
 

@@ -11,6 +11,8 @@ import (
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
+	prefixFilterName2 := RandomTestName()
+	prefixFilterName3 := RandomTestName()
 	costCentreName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
@@ -46,9 +48,45 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  le      = 24
 						}
 					  ]
-					}]
+					},
+					{
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/25"
+							ge      = 25
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 24
+						  }
+						]
+					  }, 
+					  {
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/26"
+							ge      = 26
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 24
+						  }
+						]
+					  }]
 				  }
-				  `, mcrName, costCentreName, prefixFilterName),
+				  `, mcrName, costCentreName, prefixFilterName, prefixFilterName2, prefixFilterName3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -97,25 +135,61 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					cost_centre              = "%s"
 
 					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 24
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 24
+						  }
+						]
+					  },
+					  {
+						  description     = "%s"
+						  address_family  = "IPv4"
+						  entries = [
+							{
+							  action  = "permit"
+							  prefix  = "10.0.1.0/25"
+							  ge      = 25
+							  le      = 32
+							},
+							{
+							  action  = "deny"
+							  prefix  = "10.0.2.0/24"
+							  ge      = 24
+							  le      = 24
+							}
+						  ]
+						}, 
 						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 32
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					}]
+						  description     = "%s"
+						  address_family  = "IPv4"
+						  entries = [
+							{
+							  action  = "permit"
+							  prefix  = "10.0.1.0/26"
+							  ge      = 26
+							  le      = 32
+							},
+							{
+							  action  = "deny"
+							  prefix  = "10.0.2.0/24"
+							  ge      = 24
+							  le      = 24
+							}
+						  ]
+						}]
 				  }
-				  `, mcrNameNew, costCentreNameNew, prefixFilterName),
+				  `, mcrNameNew, costCentreNameNew, prefixFilterName, prefixFilterName2, prefixFilterName3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
