@@ -53,7 +53,6 @@ resource "megaport_mve" "mve" {
 
 ### Optional
 
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
 
@@ -71,6 +70,7 @@ resource "megaport_mve" "mve" {
 - `created_by` (String) The user who created the MVE.
 - `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
 - `live_date` (String) The date the MVE went live.
+- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the MVE is locked.
 - `market` (String) The market the MVE is in.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
@@ -122,6 +122,14 @@ Optional:
 - `vco_address` (String) The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.
 
 
+<a id="nestedatt--vnics"></a>
+### Nested Schema for `vnics`
+
+Required:
+
+- `description` (String) The description of the network interface.
+
+
 <a id="nestedatt--location_details"></a>
 ### Nested Schema for `location_details`
 
@@ -131,14 +139,6 @@ Optional:
 - `country` (String) The country of the location.
 - `metro` (String) The metro of the location.
 - `name` (String) The name of the location.
-
-
-<a id="nestedatt--vnics"></a>
-### Nested Schema for `vnics`
-
-Required:
-
-- `description` (String) The description of the network interface.
 
 
 <a id="nestedatt--resources"></a>

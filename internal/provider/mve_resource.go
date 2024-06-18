@@ -656,7 +656,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"location_details": schema.SingleNestedAttribute{
 				Description: "The location details of the product.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
