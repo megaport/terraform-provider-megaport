@@ -425,7 +425,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"attribute_tags": schema.MapAttribute{

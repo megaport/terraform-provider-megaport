@@ -56,7 +56,6 @@ resource "megaport_mcr" "mcr" {
 - `aggregation_id` (Number) Numeric ID of the aggregation.
 - `asn` (Number) Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.
 - `buyout_port` (Boolean) Whether the product is bought out.
-- `cancelable` (Boolean) Whether the product is cancelable.
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the MCR is not automatically updated with the MCR service level reference number.
 - `diversity_zone` (String) Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.
 - `lag_id` (Number) Numeric ID of the LAG.
@@ -70,6 +69,7 @@ resource "megaport_mcr" "mcr" {
 ### Read-Only
 
 - `attribute_tags` (Map of String) Attribute tags of the product.
+- `cancelable` (Boolean) Whether the product is cancelable.
 - `company_name` (String) Name of the company.
 - `company_uid` (String) Megaport Company UID of the product.
 - `contract_end_date` (String) Contract end date of the product.
