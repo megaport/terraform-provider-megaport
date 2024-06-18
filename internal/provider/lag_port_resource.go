@@ -254,7 +254,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"location_id": schema.Int64Attribute{
-				Description: "The numeric location ID of the product.",
+				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),

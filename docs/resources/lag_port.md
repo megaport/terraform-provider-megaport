@@ -31,7 +31,7 @@ resource "megaport_lag_port" "lag_port" {
 
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
 - `lag_count` (Number) The number of LAG ports. Valid values are between 1 and 8.
-- `location_id` (Number) The numeric location ID of the product.
+- `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace.
 - `port_speed` (Number) The speed of the port in Mbps. Can be 10000 (10 G) or 100000 (100 G, where available).
 - `product_name` (String) The name of the product.
