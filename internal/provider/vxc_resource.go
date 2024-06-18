@@ -705,7 +705,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"vll": schema.SingleNestedAttribute{
 				Description: "The VLL associated with the VXC.",
 				Computed:    true,
-				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"a_vlan": schema.Int64Attribute{
 						Description: "The A-End VLAN of the VLL.",
@@ -743,7 +742,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"csp_connections": schema.ListNestedAttribute{
 				Description: "The CSP connections associated with the VXC.",
-				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -899,7 +897,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"port_interfaces": schema.ListNestedAttribute{
 				Description: "The interfaces associated with the VXC.",
 				Computed:    true,
-				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"demarcation": schema.StringAttribute{
@@ -947,7 +944,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"virtual_router": schema.SingleNestedAttribute{
 				Description: "The virtual router associated with the VXC.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"mcr_asn": schema.Int64Attribute{
@@ -974,7 +970,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"vxc_approval": schema.SingleNestedAttribute{
 				Description: "The VXC approval details.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"status": schema.StringAttribute{

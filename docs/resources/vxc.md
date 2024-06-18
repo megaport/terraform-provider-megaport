@@ -44,13 +44,8 @@ resource "megaport_vxc" "vxc" {
 - `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. (see [below for nested schema](#nestedatt--a_end_partner_config))
 - `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
-- `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
-- `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `shutdown` (Boolean) Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).
-- `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
-- `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
-- `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
 ### Read-Only
 
@@ -63,10 +58,12 @@ resource "megaport_vxc" "vxc" {
 - `contract_start_date` (String) The date the contract starts.
 - `create_date` (String) The date the product was created.
 - `created_by` (String) The user who created the product.
+- `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `distance_band` (String) The distance band of the product.
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
 - `locked` (Boolean) Whether the product is locked.
+- `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
@@ -74,6 +71,9 @@ resource "megaport_vxc" "vxc" {
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
+- `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
+- `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
+- `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
