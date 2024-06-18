@@ -3,12 +3,12 @@
 page_title: "megaport_mve_sizes Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  MVE Images
+  MVE Size Data Source. Returns a list of currently available MVE sizes and details for each size.
 ---
 
 # megaport_mve_sizes (Data Source)
 
-MVE Images
+MVE Size Data Source. Returns a list of currently available MVE sizes and details for each size.
 
 
 

@@ -3,12 +3,12 @@
 page_title: "megaport_partner Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Partner Port
+  Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.
 ---
 
 # megaport_partner (Data Source)
 
-Partner Port
+Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.
 
 ## Example Usage
 

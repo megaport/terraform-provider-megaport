@@ -17,7 +17,7 @@ MVE Images
 
 ### Read-Only
 
-- `mve_images` (Attributes List) List of MVE Images (see [below for nested schema](#nestedatt--mve_images))
+- `mve_images` (Attributes List) List of MVE Images. Returns a list of currently supported MVE images and details for each image, including image ID, version, product, and vendor. (see [below for nested schema](#nestedatt--mve_images))
 
 <a id="nestedatt--mve_images"></a>
 ### Nested Schema for `mve_images`

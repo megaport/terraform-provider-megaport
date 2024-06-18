@@ -48,7 +48,7 @@ func (d *partnerPortDataSource) Metadata(_ context.Context, req datasource.Metad
 // Schema defines the schema for the data source.
 func (d *partnerPortDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Partner Port",
+		Description: "Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.",
 		Attributes: map[string]schema.Attribute{
 			"connect_type": &schema.StringAttribute{
 				Description: "The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX toi display France-IX Ports that you can connect to.",

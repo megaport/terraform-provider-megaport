@@ -56,7 +56,7 @@ func (d *mveSizeDataSource) Metadata(_ context.Context, req datasource.MetadataR
 // Schema defines the schema for the data source.
 func (d *mveSizeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "MVE Images",
+		Description: "MVE Size Data Source. Returns a list of currently available MVE sizes and details for each size.",
 		Attributes: map[string]schema.Attribute{
 			"mve_sizes": &schema.ListNestedAttribute{
 				Description: "List of MVE Sizes",
