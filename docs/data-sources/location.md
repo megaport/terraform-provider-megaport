@@ -13,7 +13,7 @@ Location
 ## Example Usage
 
 ```terraform
-data "megaport_location" "loc" {
+data "megaport_location" "bne_nxt1" {
   name = "NextDC B1"
 }
 ```
