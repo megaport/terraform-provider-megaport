@@ -45,7 +45,7 @@ resource "megaport_mcr" "mcr" {
 
 ### Required
 
-- `contract_term_months` (Number) Contract term in months.
+- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
 - `location_id` (Number) Location ID of the product.
 - `port_speed` (Number) Bandwidth speed of the product. The MCR can scale from 1 Gbps to 10 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports four speeds: 1000, 2500, 5000, and 10000 MBPS
 - `product_name` (String) Name of the product. Specify a name for the MCR that is easily identifiable as yours, particularly if you plan on provisioning more than one MCR.

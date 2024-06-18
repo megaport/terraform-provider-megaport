@@ -46,7 +46,7 @@ resource "megaport_mve" "mve" {
 
 ### Required
 
-- `contract_term_months` (Number) The contract term in months.
+- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
 - `location_id` (Number) The location ID of the MVE.
 - `product_name` (String) The name of the MVE.
 - `vendor_config` (Attributes) The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. (see [below for nested schema](#nestedatt--vendor_config))

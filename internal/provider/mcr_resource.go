@@ -335,7 +335,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "Contract term in months.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
