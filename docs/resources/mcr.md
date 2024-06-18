@@ -3,12 +3,12 @@
 page_title: "megaport_mcr Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
+  Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs.
 ---
 
 # megaport_mcr (Resource)
 
-Megaport Cloud Router (MCR) resource for Megaport Terraform provider.
+Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs.
 
 ## Example Usage
 

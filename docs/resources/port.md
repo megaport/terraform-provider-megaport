@@ -3,12 +3,12 @@
 page_title: "megaport_port Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  
+  Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. A Port is a physical or virtual network connection that allows you to connect to the Megaport network. Ports are used to create Virtual Cross Connects (VXCs) to connect to other services on the Megaport network.
 ---
 
 # megaport_port (Resource)
 
-
+Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. A Port is a physical or virtual network connection that allows you to connect to the Megaport network. Ports are used to create Virtual Cross Connects (VXCs) to connect to other services on the Megaport network.
 
 ## Example Usage
 

@@ -248,7 +248,7 @@ func (r *mcrResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Megaport Cloud Router (MCR) resource for Megaport Terraform provider.",
+		Description: "Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "Last updated by the Terraform provider.",

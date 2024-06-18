@@ -3,12 +3,12 @@
 page_title: "megaport_mve Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
+  Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.
 ---
 
 # megaport_mve (Resource)
 
-Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.
+Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.
 
 ## Example Usage
 
