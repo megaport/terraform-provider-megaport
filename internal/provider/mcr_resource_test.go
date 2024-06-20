@@ -12,7 +12,6 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
-	prefixFilterName3 := RandomTestName()
 	costCentreName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
@@ -31,39 +30,22 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
-					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
-						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 32
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					},
+					prefix_filter_lists = [
 					{
 						description     = "%s"
 						address_family  = "IPv4"
 						entries = [
 						  {
 							action  = "permit"
-							prefix  = "10.0.1.0/25"
+							prefix  = "10.0.1.0/24"
 							ge      = 25
 							le      = 32
 						  },
 						  {
 							action  = "deny"
 							prefix  = "10.0.2.0/24"
-							ge      = 24
-							le      = 24
+							ge      = 25
+							le      = 27
 						  }
 						]
 					  }, 
@@ -73,7 +55,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						entries = [
 						  {
 							action  = "permit"
-							prefix  = "10.0.1.0/26"
+							prefix  = "10.0.1.0/24"
 							ge      = 26
 							le      = 32
 						  },
@@ -81,12 +63,12 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 							action  = "deny"
 							prefix  = "10.0.2.0/24"
 							ge      = 24
-							le      = 24
+							le      = 25
 						  }
 						]
 					  }]
 				  }
-				  `, mcrName, costCentreName, prefixFilterName, prefixFilterName2, prefixFilterName3),
+				  `, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -120,7 +102,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "prefix_filter_lists.0.entries", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -141,14 +123,14 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  {
 							action  = "permit"
 							prefix  = "10.0.1.0/24"
-							ge      = 24
+							ge      = 25
 							le      = 32
 						  },
 						  {
 							action  = "deny"
 							prefix  = "10.0.2.0/24"
-							ge      = 24
-							le      = 24
+							ge      = 25
+							le      = 27
 						  }
 						]
 					  },
@@ -158,25 +140,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  entries = [
 							{
 							  action  = "permit"
-							  prefix  = "10.0.1.0/25"
-							  ge      = 25
-							  le      = 32
-							},
-							{
-							  action  = "deny"
-							  prefix  = "10.0.2.0/24"
-							  ge      = 24
-							  le      = 24
-							}
-						  ]
-						}, 
-						{
-						  description     = "%s"
-						  address_family  = "IPv4"
-						  entries = [
-							{
-							  action  = "permit"
-							  prefix  = "10.0.1.0/26"
+							  prefix  = "10.0.1.0/24"
 							  ge      = 26
 							  le      = 32
 							},
@@ -184,12 +148,12 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 							  action  = "deny"
 							  prefix  = "10.0.2.0/24"
 							  ge      = 24
-							  le      = 24
+							  le      = 25
 							}
 						  ]
 						}]
 				  }
-				  `, mcrNameNew, costCentreNameNew, prefixFilterName, prefixFilterName2, prefixFilterName3),
+				  `, mcrNameNew, costCentreNameNew, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),

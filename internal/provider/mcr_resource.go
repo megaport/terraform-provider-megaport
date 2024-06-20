@@ -239,7 +239,7 @@ func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(ctx context.Cont
 			length, _ := net.Mask.Size()
 			le = length
 			ge = length
-		} else if entry.Le != 0 {
+		} else if entry.Le != 0 && entry.Ge == 0 {
 			_, net, err := net.ParseCIDR(entry.Prefix)
 			if err != nil {
 				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
