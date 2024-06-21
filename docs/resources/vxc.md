@@ -286,7 +286,7 @@ resource "megaport_vxc" "transit_vxc" {
 - `contract_start_date` (String) The date the contract starts.
 - `create_date` (String) The date the product was created.
 - `created_by` (String) The user who created the product.
-- `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
+- `csp_connections` (Attributes List) The Cloud Service Provider (CSP) connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `distance_band` (String) The distance band of the product.
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.

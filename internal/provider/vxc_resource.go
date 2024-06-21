@@ -741,7 +741,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"csp_connections": schema.ListNestedAttribute{
-				Description: "The CSP connections associated with the VXC.",
+				Description: "The Cloud Service Provider (CSP) connections associated with the VXC.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
