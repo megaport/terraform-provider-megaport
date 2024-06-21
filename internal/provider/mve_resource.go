@@ -87,6 +87,7 @@ type mveResourceModel struct {
 	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	PromoCode             types.String `tfsdk:"promo_code"`
+	CostCentre            types.String `tfsdk:"cost_centre"`
 
 	Virtual     types.Bool `tfsdk:"virtual"`
 	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
@@ -201,6 +202,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	orm.Size = types.StringValue(p.Size)
 	orm.LiveDate = types.StringValue("")
 	orm.TerminateDate = types.StringValue("")
+	orm.CostCentre = types.StringValue(p.CostCentre)
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
@@ -429,9 +431,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the MVE was updated by the Terraform Provider.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
@@ -454,9 +453,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the MVE was created.",
@@ -482,9 +478,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "The date the MVE went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the MVE is in.",
@@ -531,9 +524,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_start_date": schema.StringAttribute{
 				Description: "The contract start date of the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The contract end date of the MVE.",
@@ -541,6 +531,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"cost_centre": schema.StringAttribute{
+				Description: "The cost centre of the MVE.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
@@ -652,6 +647,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"location_details": schema.SingleNestedAttribute{
@@ -698,6 +694,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"vendor_config": schema.SingleNestedAttribute{
 				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplace(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
 						Description: "The name of vendor of the MVE.",
@@ -957,6 +956,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Name:       plan.Name.ValueString(),
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
 		PromoCode:  plan.PromoCode.ValueString(),
+		CostCentre: plan.CostCentre.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
@@ -1064,16 +1064,23 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Check on changes
-	var name string
+	var name, costCentre string
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
 		name = state.Name.ValueString()
 	}
 
+	if !plan.CostCentre.Equal(state.CostCentre) {
+		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
+	}
+
 	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
 		MVEID:         state.UID.ValueString(),
 		Name:          name,
+		CostCentre:    costCentre,
 		WaitForUpdate: true,
 		WaitForTime:   waitForTime,
 	})
