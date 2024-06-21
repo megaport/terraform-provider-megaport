@@ -117,7 +117,7 @@ func (d *locationDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Location",
+		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' field to identify a specific data center.",
 		Attributes: map[string]schema.Attribute{
 			"name": &schema.StringAttribute{
 				Description: "The name of the location.",
