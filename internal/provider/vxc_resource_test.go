@@ -703,7 +703,6 @@ func TestFullEcosystem(t *testing.T) {
 	awsVXCName := RandomTestName()
 	gcpVXCName := RandomTestName()
 	azureVXCName := RandomTestName()
-
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
