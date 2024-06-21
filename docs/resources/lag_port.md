@@ -3,12 +3,12 @@
 page_title: "megaport_lag_port Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  LAG Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A Port is a physical or virtual network connection that allows you to connect to the Megaport network. Ports are used to create Virtual Cross Connects (VXCs) to connect to other services on the Megaport network.
+  Link Aggregation Group (LAG) Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A LAG bundles physical ports to create a single data path, where the traffic load is distributed among the ports to increase overall connection reliability.
 ---
 
 # megaport_lag_port (Resource)
 
-LAG Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A Port is a physical or virtual network connection that allows you to connect to the Megaport network. Ports are used to create Virtual Cross Connects (VXCs) to connect to other services on the Megaport network.
+Link Aggregation Group (LAG) Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A LAG bundles physical ports to create a single data path, where the traffic load is distributed among the ports to increase overall connection reliability.
 
 ## Example Usage
 

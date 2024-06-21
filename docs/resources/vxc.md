@@ -3,12 +3,12 @@
 page_title: "megaport_vxc Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. A VXC is a virtual cross-connect that connects two or more locations.
+  Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.
 ---
 
 # megaport_vxc (Resource)
 
-Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. A VXC is a virtual cross-connect that connects two or more locations.
+Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.
 
 ## Example Usage
 
