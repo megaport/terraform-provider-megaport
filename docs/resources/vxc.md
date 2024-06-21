@@ -83,6 +83,33 @@ resource "megaport_mve" "mve" {
   }
 }
 
+resource "megaport_mve" "mve" {
+  product_name         = "Megaport Aruba MVE"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+
+  vnics = [
+    {
+      description = "Data Plane"
+    },
+    {
+      description = "Management Plane"
+    },
+    {
+      description = "Control Plane"
+    }
+  ]
+
+  vendor_config = {
+    vendor       = "aruba"
+    product_size = "MEDIUM"
+    image_id     = 23
+    account_name = "Megaport Aruba MVE"
+    account_key  = "Megaport Aruba MVE"
+    system_tag   = "Preconfiguration-aruba-test-1"
+  }
+}
+
 resource "megaport_vxc" "port_vxc" {
   product_name         = "Megaport Port-to-Port VXC"
   rate_limit           = 1000
@@ -140,7 +167,7 @@ resource "megaport_vxc" "aws_vxc" {
   }
 }
 
-resource "megaport_vxc" "aws_vxc" {
+resource "megaport_vxc" "aws_mve_vxc" {
   product_name         = "Megaport MVE VXC AWS MVE"
   rate_limit           = 100
   contract_term_months = 1
@@ -206,6 +233,25 @@ resource "megaport_vxc" "azure_vxc" {
     azure_config = {
       service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
     }
+  }
+}
+
+resource "megaport_vxc" "transit_vxc" {
+  product_name         = "Transit VXC Example"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = megaport_mve.mve.product_uid
+    vnic_index            = 2
+  }
+
+  b_end = {
+    requested_product_uid = data.megaport_partner.internet_port.product_uid
+  }
+
+  b_end_partner_config = {
+    partner = "transit"
   }
 }
 ```
