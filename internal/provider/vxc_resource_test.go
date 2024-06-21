@@ -498,6 +498,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
                   `, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
 				),
 			},
 		},
@@ -518,11 +519,11 @@ func TestMVE_TransitVXC(t *testing.T) {
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
 				  }
-				  
+
 				  data "megaport_location" "syd_gs" {
 					name = "Global Switch Sydney West"
 				  }
-				  
+
 				  resource "megaport_port" "port" {
 					product_name           = "%s"
 					port_speed             = 1000
@@ -531,19 +532,19 @@ func TestMVE_TransitVXC(t *testing.T) {
 					marketplace_visibility = true
 					cost_centre            = "%s"
 				  }
-				  
+
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
 					company_name  = "Networks"
 					product_name  = "Megaport Internet"
 					location_id   = data.megaport_location.syd_gs.id
 				  }
-				  
+
 				  resource "megaport_mve" "mve" {
 					product_name           = "%s"
 					location_id            = data.megaport_location.bne_nxt1.id
 					contract_term_months   = 1
-				  
+
 					vnics = [
 					  {
 						description = "Data Plane"
@@ -555,7 +556,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 						description = "Control Plane"
 					  }
 					]
-				  
+
 					vendor_config = {
 					  vendor        = "aruba"
 					  product_size  = "MEDIUM"
@@ -565,25 +566,25 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  system_tag    = "Preconfiguration-aruba-test-1"
 					}
 				  }
-				  
+
 				  resource "megaport_vxc" "transit_vxc" {
 					product_name         = "%s"
 					rate_limit           = 100
 					contract_term_months = 1
-					
+
 					a_end = {
 					  requested_product_uid = megaport_mve.mve.product_uid
 					  vnic_index            = 2
 					}
-				  
+
 					b_end = {
 					  requested_product_uid = data.megaport_partner.internet_port.product_uid
 					}
-					
+
 					b_end_partner_config = {
 					  partner = "transit"
 					}
-				  }				  
+				  }
                   `, portName, costCentreName, mveName, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
@@ -687,6 +688,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
                   `, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 				),
 			},
 		},
@@ -854,6 +856,7 @@ func TestFullEcosystem(t *testing.T) {
                   `, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 				),
 			},
 		},

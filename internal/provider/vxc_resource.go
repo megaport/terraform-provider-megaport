@@ -1774,6 +1774,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Prefixes:          awsConfig.Prefixes.ValueString(),
 				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
 				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
+				ConnectionName:    awsConfig.ConnectionName.ValueString(),
 			}
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
 			resp.Diagnostics.Append(awsDiags...)
@@ -2187,6 +2188,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Prefixes:          awsConfig.Prefixes.ValueString(),
 				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
 				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
+				ConnectionName:    awsConfig.ConnectionName.ValueString(),
 			}
 
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
