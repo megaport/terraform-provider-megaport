@@ -12,6 +12,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
+	prefixFilterNameNew := RandomTestName()
 	costCentreName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
@@ -82,6 +83,27 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.description", prefixFilterName2),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.le", "27"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.ge", "26"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.le", "25"),
 				),
 			},
 			// ImportState testing
@@ -123,37 +145,13 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						  {
 							action  = "permit"
 							prefix  = "10.0.1.0/24"
-							ge      = 25
+							ge      = 28
 							le      = 32
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 25
-							le      = 27
 						  }
 						]
-					  },
-					  {
-						  description     = "%s"
-						  address_family  = "IPv4"
-						  entries = [
-							{
-							  action  = "permit"
-							  prefix  = "10.0.1.0/24"
-							  ge      = 26
-							  le      = 32
-							},
-							{
-							  action  = "deny"
-							  prefix  = "10.0.2.0/24"
-							  ge      = 24
-							  le      = 25
-							}
-						  ]
-						}]
+					  }]
 				  }
-				  `, mcrNameNew, costCentreNameNew, prefixFilterName, prefixFilterName2),
+				  `, mcrNameNew, costCentreNameNew, prefixFilterNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -166,6 +164,13 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterNameNew),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "28"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
 				),
 			},
 		},
