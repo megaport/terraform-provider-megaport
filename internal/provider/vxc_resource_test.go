@@ -304,7 +304,6 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                   resource "megaport_mcr" "mcr" {
                     product_name    = "%s"
                     location_id = data.megaport_location.bne_nxt1.id
-                    marketplace_visibility = false
                     contract_term_months = 1
                     port_speed = 5000
                     asn = 64555
@@ -413,7 +412,6 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
 					location_id             = data.megaport_location.bne_nxt1.id
-					marketplace_visibility  = false
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
@@ -705,7 +703,6 @@ func TestFullEcosystem(t *testing.T) {
 	awsVXCName := RandomTestName()
 	gcpVXCName := RandomTestName()
 	azureVXCName := RandomTestName()
-
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -717,6 +714,10 @@ func TestFullEcosystem(t *testing.T) {
 
 				  data "megaport_location" "bne_nxt2" {
 					name = "NextDC B2"
+				  }
+
+				  data "megaport_location" "bne_pol" {
+					name = "Polaris"
 				  }
 
 				  data "megaport_location" "syd_gs" {
@@ -734,7 +735,7 @@ func TestFullEcosystem(t *testing.T) {
 			        product_name  = "%s"
 					cost_centre = "%s"
 			        port_speed  = 10000
-			        location_id = data.megaport_location.bne_nxt2.id
+			        location_id = data.megaport_location.bne_nxt1.id
 			        contract_term_months        = 12
 					marketplace_visibility = false
                     lag_count = 1
@@ -743,7 +744,7 @@ func TestFullEcosystem(t *testing.T) {
 				  resource "megaport_port" "port" {
 					product_name            = "%s"
 					port_speed              = 1000
-					location_id             = data.megaport_location.bne_nxt1.id
+					location_id             = data.megaport_location.bne_pol.id
 					contract_term_months    = 12
 					marketplace_visibility  = true
 					cost_centre = "%s"
