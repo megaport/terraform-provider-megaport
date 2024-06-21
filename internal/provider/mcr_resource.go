@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -309,7 +311,7 @@ func (r *mcrResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Megaport Cloud Router (MCR) resource for Megaport Terraform provider.",
+		Description: "Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs. The MCR is a managed virtual router service that establishes Layer 3 connectivity on the worldwide Megaport software-defined network (SDN). MCR instances are preconfigured in data centers in key global routing zones. An MCR enables data transfer between multi-cloud or hybrid cloud networks, network service providers, and cloud service providers.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "Last updated by the Terraform provider.",
@@ -330,7 +332,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_name": schema.StringAttribute{
-				Description: "Name of the product.",
+				Description: "Name of the product. Specify a name for the MCR that is easily identifiable as yours, particularly if you plan on provisioning more than one MCR.",
 				Required:    true,
 			},
 			"product_type": schema.StringAttribute{
@@ -342,11 +344,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "Diversity zone of the product.",
+				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.",
 				Optional:    true,
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "Promo code of the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"create_date": schema.StringAttribute{
@@ -364,7 +366,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "Bandwidth speed of the product.",
+				Description: "Bandwidth speed of the product. The MCR can scale from 1 Gbps to 10 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports four speeds: 1000, 2500, 5000, and 10000 MBPS",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
@@ -389,14 +391,14 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"location_id": schema.Int64Attribute{
-				Description: "Location ID of the product.",
+				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "Contract term in months.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
@@ -414,7 +416,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "Cost centre of the product.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the MCR is not automatically updated with the MCR service level reference number.",
 				Computed:    true,
 				Optional:    true,
 			},
@@ -436,12 +438,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"lag_id": schema.Int64Attribute{
 				Description: "Numeric ID of the LAG.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"aggregation_id": schema.Int64Attribute{
 				Description: "Numeric ID of the aggregation.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"company_name": schema.StringAttribute{
@@ -450,11 +450,10 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"asn": schema.Int64Attribute{
-				Description: "ASN in the MCR order configuration.",
+				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.",
 				Optional:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
@@ -480,11 +479,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the product is admin locked.",
 				Computed:    true,
-				Optional:    true,
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"attribute_tags": schema.MapAttribute{
@@ -550,28 +547,35 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Required:    true,
 						},
 						"address_family": schema.StringAttribute{
-							Description: "Address family of the prefix filter list.",
+							Description: "The IP address standard of the IP network addresses in the prefix filter list.",
 							Required:    true,
 						},
 						"entries": schema.ListNestedAttribute{
 							Description: "Entries in the prefix filter list.",
 							Optional:    true,
+							Computed:    true,
+							Validators: []validator.List{
+								listvalidator.SizeBetween(1, 200),
+							},
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"action": schema.StringAttribute{
-										Description: "Action of the prefix filter list entry.",
+										Description: "The action to take for the network address in the filter list. Accepted values are permit and deny.",
 										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.OneOf("permit", "deny"),
+										},
 									},
 									"prefix": schema.StringAttribute{
-										Description: "Prefix of the prefix filter list entry.",
+										Description: "The network address of the prefix filter list entry.",
 										Required:    true,
 									},
 									"ge": schema.Int64Attribute{
-										Description: "Greater than or equal to value of the prefix filter list entry.",
+										Description: "The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).",
 										Optional:    true,
 									},
 									"le": schema.Int64Attribute{
-										Description: "Less than or equal to value of the prefix filter list entry.",
+										Description: "The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).",
 										Optional:    true,
 									},
 								},

@@ -3,12 +3,12 @@
 page_title: "megaport_mve_sizes Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  MVE Images
+  MVE Size Data Source. Returns a list of currently available MVE sizes and details for each size.
 ---
 
 # megaport_mve_sizes (Data Source)
 
-MVE Images
+MVE Size Data Source. Returns a list of currently available MVE sizes and details for each size.
 
 
 
@@ -24,7 +24,7 @@ MVE Images
 
 Read-Only:
 
-- `cpu_core_count` (Number) Number of CPU Cores
-- `label` (String) Label of the MVE Size
-- `ram_gb` (String) Amount of RAM in GB
+- `cpu_core_count` (Number) Number of CPU Cores.
+- `label` (String) Label of the MVE Size. The compute sizes are 2/8, 4/16, 8/32, and 12/48, where the first number is the CPU and the second number is the GB of available RAM. Each size has 4 GB of RAM for every vCPU allocated.
+- `ram_gb` (String) Amount of RAM in GB.
 - `size` (String) Size of the MVE
