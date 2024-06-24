@@ -2488,13 +2488,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var name, costCentre, aEndProductUID, bEndProductUID string
-	var aEndVlan, bEndVlan, rateLimit, term int
-	var shutdown bool
-	if !plan.Name.Equal(state.Name) {
-		name = plan.Name.ValueString()
-	}
-
 	var aEndPlan, bEndPlan, aEndState, bEndState vxcEndConfigurationModel
 
 	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
@@ -2519,60 +2512,47 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
-		aEndVlan = int(aEndPlan.VLAN.ValueInt64())
-		aEndState.VLAN = aEndPlan.VLAN
-	} else {
-		aEndVlan = int(aEndState.VLAN.ValueInt64())
-	}
-	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
-		bEndVlan = int(bEndPlan.VLAN.ValueInt64())
-		bEndState.VLAN = bEndPlan.VLAN
-	} else {
-		bEndVlan = int(bEndState.VLAN.ValueInt64())
-	}
-
-	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
-		rateLimit = int(plan.RateLimit.ValueInt64())
-	} else {
-		rateLimit = int(state.RateLimit.ValueInt64())
-	}
-	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.CostCentre.ValueString()
-	} else {
-		costCentre = state.CostCentre.ValueString()
-	}
-	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
-		shutdown = plan.Shutdown.ValueBool()
-	} else {
-		shutdown = state.Shutdown.ValueBool()
-	}
-	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		term = int(plan.ContractTermMonths.ValueInt64())
-	} else {
-		term = int(state.ContractTermMonths.ValueInt64())
-	}
-
 	updateReq := &megaport.UpdateVXCRequest{
-		Name:          &name,
-		AEndVLAN:      &aEndVlan,
-		BEndVLAN:      &bEndVlan,
-		CostCentre:    &costCentre,
-		Shutdown:      &shutdown,
-		RateLimit:     &rateLimit,
-		Term:          &term,
 		WaitForUpdate: true,
 		WaitForTime:   waitForTime,
 	}
 
+	if !plan.Name.Equal(state.Name) {
+		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
+	}
+
+	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
+		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
+		aEndState.VLAN = aEndPlan.VLAN
+	}
+
+	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
+		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
+		bEndState.VLAN = bEndPlan.VLAN
+	}
+
+	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
+		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
+	}
+
+	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
+		updateReq.CostCentre = megaport.PtrTo(plan.CostCentre.ValueString())
+	}
+
+	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
+		updateReq.Shutdown = megaport.PtrTo(plan.Shutdown.ValueBool())
+	}
+
+	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		updateReq.Term = megaport.PtrTo(int(plan.ContractTermMonths.ValueInt64()))
+	}
+
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
-		aEndProductUID = aEndPlan.RequestedProductUID.ValueString()
-		updateReq.AEndProductUID = &aEndProductUID
+		updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
 		aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
 	}
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
-		bEndProductUID = bEndPlan.RequestedProductUID.ValueString()
-		updateReq.BEndProductUID = &bEndProductUID
+		updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
 		bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
 	}
 
