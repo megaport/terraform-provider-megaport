@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/stretchr/testify/suite"
 )
 
 var providerConfig = fmt.Sprintf(`
@@ -27,4 +28,8 @@ provider "megaport" {
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"scaffolding": providerserver.NewProtocol6WithError(New("test")()),
 	"megaport":    providerserver.NewProtocol6WithError(New("test")()),
+}
+
+type ProviderTestSuite struct {
+	suite.Suite
 }

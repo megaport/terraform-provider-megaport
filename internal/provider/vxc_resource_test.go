@@ -6,9 +6,19 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAccMegaportVXC_Basic(t *testing.T) {
+type VXCBasicProviderTestSuite ProviderTestSuite
+type VXCWithCSPsProviderTestSuite ProviderTestSuite
+type VXCWithMVEProviderTestSuite ProviderTestSuite
+
+func TestVXCBasicProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCBasicProviderTestSuite))
+}
+
+func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	portName3 := RandomTestName()
@@ -18,7 +28,7 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 	costCentreName := RandomTestName()
 	costCentreNew := RandomTestName()
 
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -276,12 +286,17 @@ func TestAccMegaportVXC_Basic(t *testing.T) {
 	})
 }
 
-func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
+func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+}
+
+func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
 	vxcName3 := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -385,11 +400,11 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 	})
 }
 
-func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
+func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -503,13 +518,18 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 	})
 }
 
-func TestMVE_TransitVXC(t *testing.T) {
+func TestVXCWithMVEProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithMVEProviderTestSuite))
+}
+
+func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
 	transitVXCName := RandomTestName()
 
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -592,13 +612,13 @@ func TestMVE_TransitVXC(t *testing.T) {
 	})
 }
 
-func TestMVE_AWS_VXC(t *testing.T) {
+func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
 	awsVXCName := RandomTestName()
 
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -693,7 +713,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
 	})
 }
 
-func TestFullEcosystem(t *testing.T) {
+func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
@@ -703,7 +723,8 @@ func TestFullEcosystem(t *testing.T) {
 	awsVXCName := RandomTestName()
 	gcpVXCName := RandomTestName()
 	azureVXCName := RandomTestName()
-	resource.Test(t, resource.TestCase{
+
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
