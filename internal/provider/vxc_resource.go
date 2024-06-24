@@ -615,6 +615,7 @@ func (r *vxcResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the resource was updated.",
@@ -667,7 +668,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code of the product.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"created_by": schema.StringAttribute{
@@ -698,14 +699,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional:    true,
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.",
 				Computed:    true,
 				Optional:    true,
 			},
 			"vll": schema.SingleNestedAttribute{
 				Description: "The VLL associated with the VXC.",
 				Computed:    true,
-				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"a_vlan": schema.Int64Attribute{
 						Description: "The A-End VLAN of the VLL.",
@@ -742,8 +742,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"csp_connections": schema.ListNestedAttribute{
-				Description: "The CSP connections associated with the VXC.",
-				Optional:    true,
+				Description: "The Cloud Service Provider (CSP) connections associated with the VXC.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -899,7 +898,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"port_interfaces": schema.ListNestedAttribute{
 				Description: "The interfaces associated with the VXC.",
 				Computed:    true,
-				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"demarcation": schema.StringAttribute{
@@ -947,7 +945,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"virtual_router": schema.SingleNestedAttribute{
 				Description: "The virtual router associated with the VXC.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"mcr_asn": schema.Int64Attribute{
@@ -974,7 +971,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"vxc_approval": schema.SingleNestedAttribute{
 				Description: "The VXC approval details.",
-				Optional:    true,
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"status": schema.StringAttribute{
@@ -1775,6 +1771,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Prefixes:          awsConfig.Prefixes.ValueString(),
 				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
 				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
+				ConnectionName:    awsConfig.ConnectionName.ValueString(),
 			}
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
 			resp.Diagnostics.Append(awsDiags...)
@@ -1975,7 +1972,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterListRes, err := r.client.MCRService.GetMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2188,6 +2185,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Prefixes:          awsConfig.Prefixes.ValueString(),
 				CustomerIPAddress: awsConfig.CustomerIPAddress.ValueString(),
 				AmazonIPAddress:   awsConfig.AmazonIPAddress.ValueString(),
+				ConnectionName:    awsConfig.ConnectionName.ValueString(),
 			}
 
 			awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)

@@ -3,14 +3,258 @@
 page_title: "megaport_vxc Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  
+  Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.
 ---
 
 # megaport_vxc (Resource)
 
+Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.
+
+## Example Usage
+
+```terraform
+data "megaport_location" "bne_nxt1" {
+  name = "NextDC B1"
+}
+
+data "megaport_location" "bne_nxt2" {
+  name = "NextDC B2"
+}
+
+data "megaport_location" "syd_gs" {
+  name = "Global Switch Sydney West"
+}
+
+data "megaport_partner" "aws_port" {
+  connect_type = "AWS"
+  company_name = "AWS"
+  product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+  location_id  = data.megaport_location.syd_gs.id
+}
+
+resource "megaport_port" "port" {
+  product_name           = "Megaport Port Example"
+  port_speed             = 1000
+  location_id            = data.megaport_location.bne_nxt1.id
+  contract_term_months   = 12
+  marketplace_visibility = false
+  cost_centre            = "Megaport Single Port Example"
+}
+
+resource "megaport_lag_port" "lag_port" {
+  product_name           = "Megaport Lag Port Example"
+  port_speed             = 10000
+  location_id            = data.megaport_location.bne_nxt2.id
+  contract_term_months   = 12
+  marketplace_visibility = false
+  lag_count              = 1
+  cost_centre            = "Lag Port Example"
+}
+
+resource "megaport_mcr" "mcr" {
+  product_name         = "Megaport MCR Example"
+  port_speed           = 2500
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+  asn                  = 64555
+}
+
+resource "megaport_mve" "mve" {
+  product_name         = "Megaport Aruba MVE"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+
+  vnics = [
+    {
+      description = "to_aws"
+    },
+    {
+      description = "to_port"
+    },
+  ]
+
+  vendor_config = {
+    vendor       = "aruba"
+    product_size = "MEDIUM"
+    image_id     = 23
+    account_name = "Megaport Aruba MVE"
+    account_key  = "Megaport Aruba MVE"
+    system_tag   = "Preconfiguration-aruba-test-1"
+  }
+}
+
+resource "megaport_mve" "mve" {
+  product_name         = "Megaport Aruba MVE"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+
+  vnics = [
+    {
+      description = "Data Plane"
+    },
+    {
+      description = "Management Plane"
+    },
+    {
+      description = "Control Plane"
+    }
+  ]
+
+  vendor_config = {
+    vendor       = "aruba"
+    product_size = "MEDIUM"
+    image_id     = 23
+    account_name = "Megaport Aruba MVE"
+    account_key  = "Megaport Aruba MVE"
+    system_tag   = "Preconfiguration-aruba-test-1"
+  }
+}
+
+resource "megaport_vxc" "port_vxc" {
+  product_name         = "Megaport Port-to-Port VXC"
+  rate_limit           = 1000
+  contract_term_months = 12
+
+  a_end = {
+    requested_product_uid = megaport_port.port.product_uid
+  }
+
+  b_end = {
+    requested_product_uid = megaport_lag_port.lag_port.product_uid
+  }
+}
+
+resource "megaport_vxc" "mcr_vxc" {
+  product_name         = "Megaport Port-to-MCR VXC"
+  rate_limit           = 1000
+  contract_term_months = 12
+
+  a_end = {
+    requested_product_uid = megaport_port.port.product_uid
+    ordered_vlan          = 181
+  }
+
+  b_end = {
+    requested_product_uid = megaport_mcr.mcr.product_uid
+    ordered_vlan          = 181
+  }
+}
+
+resource "megaport_vxc" "aws_vxc" {
+  product_name         = "Megaport VXC Example - AWS"
+  rate_limit           = 1000
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = megaport.mcr.mcr.product_uid
+    ordered_vlan          = 191
+  }
+
+  b_end = {
+    requested_product_uid = data.megaport_partner.aws_port.product_uid
+  }
+
+  b_end_partner_config = {
+    partner = "aws"
+    aws_config = {
+      name          = "Megaport VXC Example - AWS"
+      asn           = 64550
+      type          = "private"
+      connect_type  = "AWS"
+      amazon_asn    = 64551
+      owner_account = "123456789012"
+    }
+  }
+}
+
+resource "megaport_vxc" "aws_mve_vxc" {
+  product_name         = "Megaport MVE VXC AWS MVE"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = megaport_mve.mve.product_uid
+    inner_vlan            = 100
+    vnic_index            = 0
+  }
+
+  b_end = {
+    requested_product_uid = data.megaport_partner.aws_port.product_uid
+  }
+
+  b_end_partner_config = {
+    partner = "aws"
+    aws_config = {
+      name          = "Megaport MVE VXC AWS MVE"
+      asn           = 65121
+      type          = "private"
+      connect_type  = "AWSHC"
+      amazon_asn    = 64512
+      owner_account = "123456789012"
+    }
+  }
+}
 
 
+resource "megaport_vxc" "gcp_vxc" {
+  product_name         = "Megaport VXC Example - Google"
+  rate_limit           = 1000
+  contract_term_months = 12
 
+  a_end = {
+    requested_product_uid = megaport_mcr.mcr.product_uid
+    ordered_vlan          = 182
+  }
+
+  b_end = {}
+
+  b_end_partner_config = {
+    partner = "google"
+    google_config = {
+      pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
+    }
+  }
+}
+
+resource "megaport_vxc" "azure_vxc" {
+  product_name         = "Megaport VXC Example - Azure"
+  rate_limit           = 200
+  contract_term_months = 12
+
+  a_end = {
+    requested_product_uid = megaport_mcr.mcr.product_uid
+    ordered_vlan          = 0
+  }
+
+  b_end = {}
+
+  b_end_partner_config = {
+    partner = "azure"
+    azure_config = {
+      service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+    }
+  }
+}
+
+resource "megaport_vxc" "transit_vxc" {
+  product_name         = "Transit VXC Example"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = megaport_mve.mve.product_uid
+    vnic_index            = 2
+  }
+
+  b_end = {
+    requested_product_uid = data.megaport_partner.internet_port.product_uid
+  }
+
+  b_end_partner_config = {
+    partner = "transit"
+  }
+}
+```
 
 <!-- schema generated by tfplugindocs -->
 ## Schema
@@ -27,14 +271,9 @@ description: |-
 
 - `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. (see [below for nested schema](#nestedatt--a_end_partner_config))
 - `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. (see [below for nested schema](#nestedatt--b_end_partner_config))
-- `cost_centre` (String) A customer reference number to be included in billing information and invoices.
-- `csp_connections` (Attributes List) The CSP connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
-- `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
-- `promo_code` (String) The promo code of the product.
+- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
+- `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `shutdown` (Boolean) Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).
-- `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
-- `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
-- `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
 ### Read-Only
 
@@ -47,10 +286,12 @@ description: |-
 - `contract_start_date` (String) The date the contract starts.
 - `create_date` (String) The date the product was created.
 - `created_by` (String) The user who created the product.
+- `csp_connections` (Attributes List) The Cloud Service Provider (CSP) connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `distance_band` (String) The distance band of the product.
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
 - `locked` (Boolean) Whether the product is locked.
+- `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
@@ -58,6 +299,9 @@ description: |-
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
+- `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
+- `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
+- `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
@@ -470,3 +714,12 @@ Read-Only:
 - `status` (String) The status of the VXC approval.
 - `type` (String) The type of the VXC approval.
 - `uid` (String) The UID of the VXC approval.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Order can be imported by specifying the Product UID.
+terraform import megaport_vxc.example "<PRODUCT_UID>"
+```

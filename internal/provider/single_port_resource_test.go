@@ -6,14 +6,22 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAccMegaportSinglePort_Basic(t *testing.T) {
+type SinglePortProviderTestSuite ProviderTestSuite
+
+func TestSinglePortProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(SinglePortProviderTestSuite))
+}
+
+func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 	portName := RandomTestName()
 	portNameNew := RandomTestName()
 	costCentreName := RandomTestName()
 	costCentreNameNew := RandomTestName()
-	resource.Test(t, resource.TestCase{
+	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{

@@ -88,6 +88,7 @@ type mveResourceModel struct {
 	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	PromoCode             types.String `tfsdk:"promo_code"`
+	CostCentre            types.String `tfsdk:"cost_centre"`
 
 	Virtual     types.Bool `tfsdk:"virtual"`
 	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
@@ -202,6 +203,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	orm.Size = types.StringValue(p.Size)
 	orm.LiveDate = types.StringValue("")
 	orm.TerminateDate = types.StringValue("")
+	orm.CostCentre = types.StringValue(p.CostCentre)
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
@@ -425,14 +427,11 @@ func (r *mveResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Megaport Virtual Edge (MVE) resource for Megaport Terraform provider.",
+		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the MVE was updated by the Terraform Provider.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
@@ -455,9 +454,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the MVE was created.",
@@ -483,9 +479,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "The date the MVE went live.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the MVE is in.",
@@ -495,7 +488,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"location_id": schema.Int64Attribute{
-				Description: "The location ID of the MVE.",
+				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
@@ -509,7 +502,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The contract term in months.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36),
@@ -532,9 +525,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_start_date": schema.StringAttribute{
 				Description: "The contract start date of the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The contract end date of the MVE.",
@@ -542,6 +532,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"cost_centre": schema.StringAttribute{
+				Description: "The cost centre of the MVE.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
@@ -621,7 +616,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "The promo code of the MVE.",
+				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
 			},
 			"mve_size": schema.StringAttribute{
@@ -640,7 +635,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vnics": schema.ListNestedAttribute{
-				Description: "The network interfaces of the MVE.",
+				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
@@ -653,11 +648,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"location_details": schema.SingleNestedAttribute{
 				Description: "The location details of the product.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
@@ -698,25 +693,28 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
-				Description: "The vendor configuration of the MVE.",
+				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplace(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
-						Description: "The vendor of the MVE.",
+						Description: "The name of vendor of the MVE.",
 						Required:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"image_id": schema.Int64Attribute{
-						Description: "The image ID of the MVE.",
+						Description: "The image ID of the MVE. Indicates the software version.",
 						Required:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.RequiresReplace(),
 						},
 					},
 					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config.",
+						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.",
 						Required:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
@@ -730,11 +728,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"account_name": schema.StringAttribute{
-						Description: "The account name for the vendor config. Required for Aruba MVE.",
+						Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"account_key": schema.StringAttribute{
-						Description: "The account key for the vendor config. Required for Aruba MVE.",
+						Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
@@ -742,11 +740,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs.",
+						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config. Required for Cisco MVE.",
+						Description: "The cloud init for the vendor config. The bootstrap configuration file. Download this for your device from vManage. Required for Cisco MVE.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
@@ -758,11 +756,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"director_address": schema.StringAttribute{
-						Description: "The director address for the vendor config. Required for Versa MVE.",
+						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"controller_address": schema.StringAttribute{
-						Description: "The controldler address for the vendor config. Required for Versa MVE.",
+						Description: "The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"manage_locally": schema.BoolAttribute{
@@ -770,27 +768,27 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"local_auth": schema.StringAttribute{
-						Description: "The local auth for the vendor config. Required for Versa MVE.",
+						Description: "The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"remote_auth": schema.StringAttribute{
-						Description: "The remote auth for the vendor config. Required for Versa MVE.",
+						Description: "The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"serial_number": schema.StringAttribute{
-						Description: "The serial number for the vendor config. Required for Versa MVE.",
+						Description: "The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.",
 						Optional:    true,
 					},
 					"system_tag": schema.StringAttribute{
-						Description: "The system tag for the vendor config. Required for Aruba MVE.",
+						Description: "The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.",
 						Optional:    true,
 					},
 					"vco_address": schema.StringAttribute{
-						Description: "The VCO address for the vendor config. Required for VMware MVE.",
+						Description: "The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.",
 						Optional:    true,
 					},
 					"vco_activation_code": schema.StringAttribute{
-						Description: "The VCO activation code for the vendor config. Required for VMware MVE.",
+						Description: "The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.",
 						Optional:    true,
 					},
 					"fmc_ip_address": schema.StringAttribute{
@@ -959,6 +957,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Name:       plan.Name.ValueString(),
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
 		PromoCode:  plan.PromoCode.ValueString(),
+		CostCentre: plan.CostCentre.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
@@ -1078,16 +1077,23 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Check on changes
-	var name string
+	var name, costCentre string
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
 		name = state.Name.ValueString()
 	}
 
+	if !plan.CostCentre.Equal(state.CostCentre) {
+		costCentre = plan.CostCentre.ValueString()
+	} else {
+		costCentre = state.CostCentre.ValueString()
+	}
+
 	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
 		MVEID:         state.UID.ValueString(),
 		Name:          name,
+		CostCentre:    costCentre,
 		WaitForUpdate: true,
 		WaitForTime:   waitForTime,
 	})

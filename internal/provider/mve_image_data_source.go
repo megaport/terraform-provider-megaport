@@ -65,12 +65,12 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 		Description: "MVE Images",
 		Attributes: map[string]schema.Attribute{
 			"mve_images": &schema.ListNestedAttribute{
-				Description: "List of MVE Images",
+				Description: "List of MVE Images. Returns a list of currently supported MVE images and details for each image, including image ID, version, product, and vendor.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Description: "The ID of the MVE Image",
+							Description: "The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.",
 							Computed:    true,
 						},
 						"version": schema.StringAttribute{
@@ -90,7 +90,7 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 							Computed:    true,
 						},
 						"release_image": schema.BoolAttribute{
-							Description: "The release image of the MVE Image",
+							Description: "Indicates whether the MVE image is available for selection when ordering an MVE.",
 							Computed:    true,
 						},
 						"product_code": schema.StringAttribute{
