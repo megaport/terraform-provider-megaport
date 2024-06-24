@@ -136,17 +136,14 @@ Optional:
 <a id="nestedatt--virtual_router"></a>
 ### Nested Schema for `virtual_router`
 
-Optional:
+Read-Only:
 
 - `asn` (Number) ASN of the virtual router.
+- `id` (Number) Numeric ID of the virtual router.
 - `name` (String) Name of the virtual router.
 - `resource_name` (String) Resource name of the virtual router.
 - `resource_type` (String) Resource type of the virtual router.
 - `speed` (Number) Speed of the virtual router.
-
-Read-Only:
-
-- `id` (Number) Numeric ID of the virtual router.
 
 ## Import
 
