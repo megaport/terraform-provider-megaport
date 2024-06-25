@@ -811,9 +811,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"resources": schema.SingleNestedAttribute{
 				Description: "The resources associated with the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.UseStateForUnknown(),
-				},
 				Attributes: map[string]schema.Attribute{
 					"interface": schema.SingleNestedAttribute{
 						Description: "The port interface of the MVE.",
