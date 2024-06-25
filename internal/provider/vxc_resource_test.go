@@ -66,7 +66,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                   }
                   resource "megaport_vxc" "vxc" {
                     product_name   = "%s"
-                    rate_limit = 1000
+                    rate_limit = 500
                     contract_term_months = 12
 					cost_centre = "%s"
 
@@ -101,7 +101,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_port.port_4", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttrSet("megaport_port.port_4", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "1000"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
@@ -126,84 +126,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 				},
 				ImportStateVerifyIgnore: []string{"last_updated", "a_end_partner_config", "b_end_partner_config", "a_end", "b_end", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
-			// Update Tests
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "loc" {
-					name = "NextDC B1"
-				}
-					resource "megaport_port" "port_1" {
-			        product_name  = "%s"
-			        port_speed  = 1000
-			        location_id = data.megaport_location.loc.id
-			        contract_term_months        = 12
-					cost_centre = "test"
-					marketplace_visibility = false
-			      }
-			      resource "megaport_port" "port_2" {
-			        product_name  = "%s"
-			        port_speed  = 1000
-			        location_id = data.megaport_location.loc.id
-			        contract_term_months        = 12
-					cost_centre = "test"
-					marketplace_visibility = false
-			      }
-				  resource "megaport_port" "port_3" {
-                    product_name  = "%s"
-                    port_speed  = 1000
-                    location_id = data.megaport_location.loc.id
-                    contract_term_months        = 12
-					marketplace_visibility = false
-                  }
-                  resource "megaport_port" "port_4" {
-                    product_name  = "%s"
-                    port_speed  = 1000
-                    location_id = data.megaport_location.loc.id
-                    contract_term_months        = 12
-					marketplace_visibility = false
-                  }
-			      resource "megaport_vxc" "vxc" {
-			        product_name   = "%s"
-			        rate_limit = 1000
-					contract_term_months = 12
-
-			        a_end = {
-			            requested_product_uid = megaport_port.port_3.product_uid
-			        }
-
-			        b_end = {
-			            requested_product_uid = megaport_port.port_4.product_uid
-			        }
-			      }
-			      `, portName1, portName2, portName3, portName4, vxcName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
-					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
-					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_port.port_3", "product_name", portName3),
-					resource.TestCheckResourceAttr("megaport_port.port_3", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_port.port_3", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_port.port_3", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttrSet("megaport_port.port_3", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_port.port_4", "product_name", portName4),
-					resource.TestCheckResourceAttr("megaport_port.port_4", "port_speed", "1000"),
-					resource.TestCheckResourceAttr("megaport_port.port_4", "contract_term_months", "12"),
-					resource.TestCheckResourceAttr("megaport_port.port_4", "marketplace_visibility", "false"),
-					resource.TestCheckResourceAttrSet("megaport_port.port_4", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "1000"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
-					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
-				),
-			},
-			// Update Tests
+			// Update Test - Move VXC
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
@@ -253,6 +176,84 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			            requested_product_uid = megaport_port.port_4.product_uid
 			        }
 			      }
+			      `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "product_name", portName3),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_3", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "product_name", portName4),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_4", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					name = "NextDC B1"
+				}
+					resource "megaport_port" "port_1" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+				  resource "megaport_port" "port_3" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+                  resource "megaport_port" "port_4" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
+			        rate_limit = 600
+					contract_term_months = 24
+					cost_centre = "%s"
+
+			        a_end = {
+			            requested_product_uid = megaport_port.port_3.product_uid
+			        }
+
+			        b_end = {
+			            requested_product_uid = megaport_port.port_4.product_uid
+			        }
+			      }
 			      `, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
@@ -277,8 +278,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port_4", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "600"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "24"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
