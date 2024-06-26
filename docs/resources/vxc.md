@@ -412,7 +412,7 @@ Optional:
 
 Required:
 
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+- `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 
 <a id="nestedatt--a_end_partner_config--google_config"></a>
@@ -538,7 +538,7 @@ Optional:
 
 Required:
 
-- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
+- `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 
 <a id="nestedatt--b_end_partner_config--google_config"></a>
@@ -650,7 +650,7 @@ Optional:
 - `peer_asn` (Number) The peer ASN of the CSP connection.
 - `resource_name` (String) The resource name of the CSP connection.
 - `resource_type` (String) The resource type of the CSP connection.
-- `service_key` (String) The Azure service key of the CSP connection.
+- `service_key` (String, Sensitive) The Azure service key of the CSP connection.
 - `type` (String) The type of the AWS Virtual Interface.
 - `vif_id` (String) The ID of the AWS Virtual Interface.
 - `virtual_router_name` (String) The name of the Virtual Router.
