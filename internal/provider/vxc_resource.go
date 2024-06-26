@@ -854,6 +854,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The Azure service key of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							Sensitive:   true,
 						},
 						"csp_name": schema.StringAttribute{
 							Description: "The name of the CSP connection.",
@@ -1295,6 +1296,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"service_key": schema.StringAttribute{
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
+								Sensitive:   true,
 							},
 						},
 					},
@@ -1520,6 +1522,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"service_key": schema.StringAttribute{
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
+								Sensitive:   true,
 							},
 						},
 					},
