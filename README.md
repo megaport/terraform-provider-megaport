@@ -22,9 +22,9 @@ registry.
 
 ## Local Development 
 
-### Set up a go workspace
+### Set up a Go workspace
 
-You don't need to do this if you're not modifying `megaportgo`, but if you need to modify it you can use a go workspace to make this process easier. Take a look at [this tutorial](https://go.dev/doc/tutorial/workspaces) first to get familiar with how go workspaces work, then create a workspace for local development. This will let you edit the megaportgo library while working on the terraform provider without needing to publish changes to Git or modify your go.mod file in the terraform provider with a replace statement.
+You don't need to do this if you're not modifying `megaportgo`, but if you need to modify it you can use a Go workspace to make this process easier. Take a look at [this tutorial](https://go.dev/doc/tutorial/workspaces) first to get familiar with how Go workspaces work, then create a workspace for local development. This will let you edit the megaportgo library while working on the Terraform Provider without needing to publish changes to Git or modify your go.mod file in the Terraform Provider with a replace statement.
 
 ```go.work
 go 1.22.0
@@ -43,9 +43,9 @@ $ go env GOBIN
 /Users/<Username>/go/bin
 ```
 
-If the GOBIN go environment variable is not set, use the default path, `/Users/<Username>/go/bin`
+If the GOBIN Go environment variable is not set, use the default path, `/Users/<Username>/go/bin`
 
-Create a new file called `.terraformrc` in your home directory (~), then add the `dev_overrides` block below. Change the `<PATH>` to the value returned from the go env GOBIN command above.
+Create a new file called `.terraformrc` in your home directory (~), then add the `dev_overrides` block below. Change the `<PATH>` to the value returned from the `go env GOBIN` command above.
 
 ```terraform
 provider_installation {
