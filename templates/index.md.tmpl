@@ -24,12 +24,4 @@ in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptabl
 
 First you'll need to create an API key, docs for which can be found [here](https://docs.megaport.com/api/api-key/
 
-```terraform
-provider "megaport" {
-  environment           = "staging"
-  access_key            = "access_key"
-  secret_key            = "secret_Key"
-  accept_purchase_terms = true
-  wait_time             = 20
-}
-```
+{{ tffile "examples/provider/provider.tf" }}
