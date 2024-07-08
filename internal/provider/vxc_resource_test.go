@@ -709,6 +709,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "100"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
 				),
 			},
 			// Update
@@ -799,6 +800,202 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "99"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+				),
+			},
+		},
+	})
+}
+
+// Make sure AENd VLAN does not change to 0 in update.  Make sure B-End Inner VLAN is Null
+func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC_SameInnerAEndVLAN() {
+	portName := RandomTestName()
+	costCentreName := RandomTestName()
+	mveName := RandomTestName()
+	awsVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "bne_nxt2" {
+					name = "NextDC B2"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.bne_nxt1.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				resource "megaport_mve" "mve" {
+                    product_name  = "%s"
+                    location_id = data.megaport_location.bne_nxt1.id
+                    contract_term_months        = 1
+
+					vnics = [
+						{
+							description = "to_aws"
+						},
+						{
+								description = "to_port"
+						},
+					]
+
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "MEDIUM"
+                        image_id = 23
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+                    }
+                  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 100
+					contract_term_months    = 1
+
+					a_end = {
+						requested_product_uid = megaport_mve.mve.product_uid
+						inner_vlan            = 100
+						vnic_index            = 0
+					}
+
+					b_end = {
+						requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 65121
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64512
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+
+                  `, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "100"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+				),
+			},
+			// Update
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "bne_nxt2" {
+					name = "NextDC B2"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.bne_nxt1.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				resource "megaport_mve" "mve" {
+                    product_name  = "%s"
+                    location_id = data.megaport_location.bne_nxt1.id
+                    contract_term_months        = 1
+
+					vnics = [
+						{
+							description = "to_aws"
+						},
+						{
+								description = "to_port"
+						},
+					]
+
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "MEDIUM"
+                        image_id = 23
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+                    }
+                  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 100
+					contract_term_months    = 1
+
+					a_end = {
+						requested_product_uid = megaport_mve.mve.product_uid
+						inner_vlan            = 100
+						vnic_index            = 0
+					}
+
+					b_end = {
+						requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 65121
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64512
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+
+                  `, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "100"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
 				),
 			},
 		},
