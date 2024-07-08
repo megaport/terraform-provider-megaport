@@ -18,7 +18,7 @@ data "megaport_location" "syd_gs" {
 }
 
 data "megaport_partner" "aws_port" {
-  connect_type = "AWS"
+  connect_type = "AWSHC"
   company_name = "AWS"
   product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
   location_id  = data.megaport_location.syd_gs.id
