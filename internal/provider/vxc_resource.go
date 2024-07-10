@@ -462,9 +462,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Location:              types.StringValue(v.AEndConfiguration.Location),
 		OrderedVLAN:           types.Int64Value(aEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
-		InnerVLAN:             types.Int64Value(int64(v.AEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	}
+	if v.AEndConfiguration.InnerVLAN == 0 {
+		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	} else {
+		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
 	aEndLocationDetailsModel := &productLocationDetailsModel{
 		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
@@ -496,10 +500,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Location:              types.StringValue(v.BEndConfiguration.Location),
 		OrderedVLAN:           types.Int64Value(bEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
-		InnerVLAN:             types.Int64Value(int64(v.BEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
 	}
+	bEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	bEndLocationDetailsModel := &productLocationDetailsModel{
 		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
 		City:    types.StringValue(v.AEndConfiguration.LocationDetails.City),
@@ -1217,7 +1221,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration.",
+						Description: "The inner VLAN of the B-End configuration. Will always be null.",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -1734,11 +1738,15 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = 0
 	}
 
-	if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
-		aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
+		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
+		if !a.InnerVLAN.IsNull() {
+			vxcOrderMVEConfig.InnerVLAN = int(a.InnerVLAN.ValueInt64())
 		}
+		if !a.NetworkInterfaceIndex.IsNull() {
+			vxcOrderMVEConfig.NetworkInterfaceIndex = int(a.NetworkInterfaceIndex.ValueInt64())
+		}
+		aEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
@@ -2491,7 +2499,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var aEndPlan, bEndPlan, aEndState, bEndState vxcEndConfigurationModel
+	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
 
 	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
 	if aEndPlanDiags.HasError() {
@@ -2529,7 +2537,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.VLAN = aEndPlan.VLAN
 	}
 
-	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
+	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 		aEndState.InnerVLAN = aEndPlan.InnerVLAN
 	}

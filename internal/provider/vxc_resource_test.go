@@ -519,6 +519,178 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 	})
 }
 
+func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
+	portName := RandomTestName()
+	lagPortName := RandomTestName()
+	mcrName := RandomTestName()
+	portVXCName := RandomTestName()
+	costCentreName := RandomTestName()
+	mcrVXCName := RandomTestName()
+	awsVXCName := RandomTestName()
+	gcpVXCName := RandomTestName()
+	azureVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "bne_nxt2" {
+					name = "NextDC B2"
+				  }
+
+				  data "megaport_location" "bne_pol" {
+					name = "Polaris"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_lag_port" "lag_port" {
+			        product_name  = "%s"
+					cost_centre = "%s"
+			        port_speed  = 10000
+			        location_id = data.megaport_location.bne_nxt1.id
+			        contract_term_months        = 12
+					marketplace_visibility = false
+                    lag_count = 1
+			      }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.bne_pol.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.bne_nxt1.id
+					contract_term_months    = 1
+					asn                      = 64555
+				  }
+
+				  resource "megaport_vxc" "port_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_lag_port.lag_port.product_uid
+					}
+				  }
+
+				  resource "megaport_vxc" "mcr_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  ordered_vlan = 181
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 181
+					}
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 191
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWS"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc" "gcp_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 182
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "google"
+					  google_config = {
+						pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc" "azure_vxc" {
+					product_name            = "%s"
+					rate_limit              = 200
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 0
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "azure"
+					  azure_config = {
+						service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+					  }
+					}
+				  }
+                  `, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+				),
+			},
+		},
+	})
+}
+
 func TestVXCWithMVEProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(VXCWithMVEProviderTestSuite))
@@ -607,6 +779,310 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXC() {
                   `, portName, costCentreName, mveName, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
+	portName := RandomTestName()
+	portCostCentreName := RandomTestName()
+	portCostCentreNameNew := RandomTestName()
+	mveName := RandomTestName()
+	transitVXCName := RandomTestName()
+	transitVXCCostCentreName := RandomTestName()
+	transitVXCCostCentreNameNew := RandomTestName()
+	portVXCName := RandomTestName()
+	portVXCInnerVLAN := 95
+	portVXCCostCentreName := RandomTestName()
+	portVXCCostCentreNameNew := RandomTestName()
+	awsVXCName := RandomTestName()
+	awsVXCInnerVLAN := 90
+	awsVXCCostCentreName := RandomTestName()
+	awsVXCCostCentreNameNew := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name           = "%s"
+					port_speed             = 1000
+					location_id            = data.megaport_location.bne_nxt1.id
+					contract_term_months   = 12
+					marketplace_visibility = true
+					cost_centre            = "%s"
+				  }
+
+				  data "megaport_partner" "internet_port" {
+					connect_type  = "TRANSIT"
+					company_name  = "Networks"
+					product_name  = "Megaport Internet"
+					location_id   = data.megaport_location.syd_gs.id
+				  }
+
+				   data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_mve" "mve" {
+					product_name           = "%s"
+					location_id            = data.megaport_location.bne_nxt1.id
+					contract_term_months   = 1
+
+					vnics = [
+					  {
+						description = "Data Plane"
+					  },
+					  {
+						description = "Management Plane"
+					  },
+					  {
+						description = "Control Plane"
+					  }
+					]
+
+					vendor_config = {
+					  vendor        = "aruba"
+					  product_size  = "MEDIUM"
+					  image_id      = 23
+					  account_name  = "%s"
+					  account_key   = "%s"
+					  system_tag    = "Preconfiguration-aruba-test-1"
+					}
+				  }
+
+				  resource "megaport_vxc" "transit_vxc" {
+					product_name         = "%s"
+					rate_limit           = 100
+					contract_term_months = 1
+					cost_centre = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mve.mve.product_uid
+					  vnic_index            = 0
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.internet_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "transit"
+					}
+				  }
+
+				  resource "megaport_vxc" "port_vxc" {
+					product_name         = "%s"
+					rate_limit           = 100
+					contract_term_months = 1
+					cost_centre = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mve.mve.product_uid
+					  vnic_index            = 0
+					  inner_vlan = %d
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					}
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 100
+					contract_term_months    = 1
+					cost_centre = "%s"
+
+					a_end = {
+						requested_product_uid = megaport_mve.mve.product_uid
+						inner_vlan            = %d
+						vnic_index            = 0
+					}
+
+					b_end = {
+						requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 65121
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64512
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+                  `, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCInnerVLAN, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "cost_centre", awsVXCCostCentreName),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"), // A-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"),     // B-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan"),    // B-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+				),
+			},
+			// UPDATE
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name           = "%s"
+					port_speed             = 1000
+					location_id            = data.megaport_location.bne_nxt1.id
+					contract_term_months   = 12
+					marketplace_visibility = true
+					cost_centre            = "%s"
+				  }
+
+				  data "megaport_partner" "internet_port" {
+					connect_type  = "TRANSIT"
+					company_name  = "Networks"
+					product_name  = "Megaport Internet"
+					location_id   = data.megaport_location.syd_gs.id
+				  }
+
+				   data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_mve" "mve" {
+					product_name           = "%s"
+					location_id            = data.megaport_location.bne_nxt1.id
+					contract_term_months   = 1
+
+					vnics = [
+					  {
+						description = "Data Plane"
+					  },
+					  {
+						description = "Management Plane"
+					  },
+					  {
+						description = "Control Plane"
+					  }
+					]
+
+					vendor_config = {
+					  vendor        = "aruba"
+					  product_size  = "MEDIUM"
+					  image_id      = 23
+					  account_name  = "%s"
+					  account_key   = "%s"
+					  system_tag    = "Preconfiguration-aruba-test-1"
+					}
+				  }
+
+				  resource "megaport_vxc" "transit_vxc" {
+					product_name         = "%s"
+					rate_limit           = 100
+					contract_term_months = 1
+					cost_centre = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mve.mve.product_uid
+					  vnic_index            = 0
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.internet_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "transit"
+					}
+				  }
+
+				  resource "megaport_vxc" "port_vxc" {
+					product_name         = "%s"
+					rate_limit           = 100
+					contract_term_months = 1
+					cost_centre = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mve.mve.product_uid
+					  vnic_index            = 0
+					  inner_vlan = %d
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					}
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 100
+					contract_term_months    = 1
+					cost_centre = "%s"
+
+					a_end = {
+						requested_product_uid = megaport_mve.mve.product_uid
+						inner_vlan            = %d
+						vnic_index            = 0
+					}
+
+					b_end = {
+						requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 65121
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64512
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+                  `, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCInnerVLAN, awsVXCName, awsVXCCostCentreNameNew, awsVXCInnerVLAN, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCInnerVLAN)),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"), // A-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"),     // B-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan"),    // B-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "cost_centre", awsVXCCostCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "cost_centre", transitVXCCostCentreNameNew),
 				),
 			},
 		},
@@ -799,178 +1275,6 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "99"),
-				),
-			},
-		},
-	})
-}
-
-func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
-	portName := RandomTestName()
-	lagPortName := RandomTestName()
-	mcrName := RandomTestName()
-	portVXCName := RandomTestName()
-	costCentreName := RandomTestName()
-	mcrVXCName := RandomTestName()
-	awsVXCName := RandomTestName()
-	gcpVXCName := RandomTestName()
-	azureVXCName := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
-				  }
-
-				  data "megaport_location" "bne_nxt2" {
-					name = "NextDC B2"
-				  }
-
-				  data "megaport_location" "bne_pol" {
-					name = "Polaris"
-				  }
-
-				  data "megaport_location" "syd_gs" {
-					name = "Global Switch Sydney West"
-				  }
-
-				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-					location_id  = data.megaport_location.syd_gs.id
-				  }
-
-				  resource "megaport_lag_port" "lag_port" {
-			        product_name  = "%s"
-					cost_centre = "%s"
-			        port_speed  = 10000
-			        location_id = data.megaport_location.bne_nxt1.id
-			        contract_term_months        = 12
-					marketplace_visibility = false
-                    lag_count = 1
-			      }
-
-				  resource "megaport_port" "port" {
-					product_name            = "%s"
-					port_speed              = 1000
-					location_id             = data.megaport_location.bne_pol.id
-					contract_term_months    = 12
-					marketplace_visibility  = true
-					cost_centre = "%s"
-				  }
-
-				  resource "megaport_mcr" "mcr" {
-					product_name            = "%s"
-					port_speed              = 2500
-					location_id             = data.megaport_location.bne_nxt1.id
-					contract_term_months    = 1
-					asn                      = 64555
-				  }
-
-				  resource "megaport_vxc" "port_vxc" {
-					product_name           = "%s"
-					rate_limit             = 1000
-					contract_term_months   = 12
-
-					a_end = {
-					  requested_product_uid = megaport_port.port.product_uid
-					}
-
-					b_end = {
-					  requested_product_uid = megaport_lag_port.lag_port.product_uid
-					}
-				  }
-
-				  resource "megaport_vxc" "mcr_vxc" {
-					product_name           = "%s"
-					rate_limit             = 1000
-					contract_term_months   = 12
-
-					a_end = {
-					  requested_product_uid = megaport_port.port.product_uid
-					  ordered_vlan = 181
-					}
-
-					b_end = {
-					  requested_product_uid = megaport_mcr.mcr.product_uid
-					  ordered_vlan = 181
-					}
-				  }
-
-				  resource "megaport_vxc" "aws_vxc" {
-					product_name            = "%s"
-					rate_limit              = 1000
-					contract_term_months    = 1
-
-					a_end = {
-					  requested_product_uid = megaport_mcr.mcr.product_uid
-					  ordered_vlan = 191
-					}
-
-					b_end = {
-					  requested_product_uid = data.megaport_partner.aws_port.product_uid
-					}
-
-					b_end_partner_config = {
-					  partner = "aws"
-					  aws_config = {
-						name          = "%s"
-						asn           = 64550
-						type          = "private"
-						connect_type  = "AWS"
-						amazon_asn    = 64551
-						owner_account = "123456789012"
-					  }
-					}
-				  }
-
-				  resource "megaport_vxc" "gcp_vxc" {
-					product_name            = "%s"
-					rate_limit              = 1000
-					contract_term_months    = 12
-
-					a_end = {
-					  requested_product_uid = megaport_mcr.mcr.product_uid
-					  ordered_vlan = 182
-					}
-
-					b_end = {}
-
-					b_end_partner_config = {
-					  partner = "google"
-					  google_config = {
-						pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
-					  }
-					}
-				  }
-
-				  resource "megaport_vxc" "azure_vxc" {
-					product_name            = "%s"
-					rate_limit              = 200
-					contract_term_months    = 12
-
-					a_end = {
-					  requested_product_uid = megaport_mcr.mcr.product_uid
-					  ordered_vlan = 0
-					}
-
-					b_end = {}
-
-					b_end_partner_config = {
-					  partner = "azure"
-					  azure_config = {
-						service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
-					  }
-					}
-				  }
-                  `, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 				),
 			},
 		},

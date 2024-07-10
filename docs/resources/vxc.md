@@ -345,7 +345,7 @@ Optional:
 Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
-- `inner_vlan` (Number) The inner VLAN of the B-End configuration.
+- `inner_vlan` (Number) The inner VLAN of the B-End configuration. Will always be null.
 - `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--b_end--location_details))
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
