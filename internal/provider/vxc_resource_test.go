@@ -794,11 +794,17 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 	transitVXCCostCentreName := RandomTestName()
 	transitVXCCostCentreNameNew := RandomTestName()
 	portVXCName := RandomTestName()
-	portVXCInnerVLAN := 95
+	portVXCAEndInnerVLAN := 95
+	portVXCBEndInnerVLAN := 96
+	portVXCAEndInnerVLANNew := 97
+	portVXCBEndInnerVLANNew := 98
 	portVXCCostCentreName := RandomTestName()
 	portVXCCostCentreNameNew := RandomTestName()
 	awsVXCName := RandomTestName()
-	awsVXCInnerVLAN := 90
+	awsVXCAEndInnerVLAN := 90
+	awsVXCBEndInnerVLAN := 91
+	awsVXCAEndInnerVLANNew := 92
+	awsVXCBEndInnerVLANNew := 93
 	awsVXCCostCentreName := RandomTestName()
 	awsVXCCostCentreNameNew := RandomTestName()
 
@@ -899,6 +905,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					b_end = {
 					  requested_product_uid = megaport_port.port.product_uid
+					  inner_vlan = %d
 					}
 				  }
 
@@ -916,6 +923,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					b_end = {
 						requested_product_uid = data.megaport_partner.aws_port.product_uid
+						inner_vlan = %d
 					}
 
 					b_end_partner_config = {
@@ -930,18 +938,18 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCInnerVLAN, awsVXCName),
+                  `, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCBEndInnerVLAN, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCInnerVLAN)),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCAEndInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCAEndInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan", fmt.Sprintf("%d", portVXCBEndInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan", fmt.Sprintf("%d", awsVXCBEndInnerVLAN)),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreName),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "cost_centre", awsVXCCostCentreName),
-					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"), // A-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"),     // B-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan"),    // B-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"),
 				),
 			},
 			// UPDATE
@@ -1039,6 +1047,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					b_end = {
 					  requested_product_uid = megaport_port.port.product_uid
+					  inner_vlan = %d
 					}
 				  }
 
@@ -1056,6 +1065,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					b_end = {
 						requested_product_uid = data.megaport_partner.aws_port.product_uid
+						inner_vlan = %d
 					}
 
 					b_end_partner_config = {
@@ -1070,15 +1080,15 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCInnerVLAN, awsVXCName, awsVXCCostCentreNameNew, awsVXCInnerVLAN, awsVXCName),
+                  `, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCBEndInnerVLANNew, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCInnerVLAN)),
-					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCInnerVLAN)),
-					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"), // A-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"),     // B-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan"),    // B-End Inner VLAN should be null
-					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"), // B-End Inner VLAN should be null
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCAEndInnerVLANNew)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCAEndInnerVLANNew)),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCBEndInnerVLANNew)),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCBEndInnerVLANNew)),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "cost_centre", awsVXCCostCentreNameNew),
