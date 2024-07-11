@@ -462,9 +462,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Location:              types.StringValue(v.AEndConfiguration.Location),
 		OrderedVLAN:           types.Int64Value(aEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
-		InnerVLAN:             types.Int64Value(int64(v.AEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	}
+	if v.AEndConfiguration.InnerVLAN == 0 {
+		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	} else {
+		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
 	aEndLocationDetailsModel := &productLocationDetailsModel{
 		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
@@ -496,9 +500,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Location:              types.StringValue(v.BEndConfiguration.Location),
 		OrderedVLAN:           types.Int64Value(bEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
-		InnerVLAN:             types.Int64Value(int64(v.BEndConfiguration.InnerVLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
+	}
+	if v.BEndConfiguration.InnerVLAN == 0 {
+		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	} else {
+		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
 	bEndLocationDetailsModel := &productLocationDetailsModel{
 		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
@@ -1734,11 +1742,15 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = 0
 	}
 
-	if !a.InnerVLAN.IsNull() && !a.NetworkInterfaceIndex.IsNull() {
-		aEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(a.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(a.NetworkInterfaceIndex.ValueInt64()),
+	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
+		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
+		if !a.InnerVLAN.IsNull() {
+			vxcOrderMVEConfig.InnerVLAN = int(a.InnerVLAN.ValueInt64())
 		}
+		if !a.NetworkInterfaceIndex.IsNull() {
+			vxcOrderMVEConfig.NetworkInterfaceIndex = int(a.NetworkInterfaceIndex.ValueInt64())
+		}
+		aEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
 	if !plan.AEndPartnerConfig.IsNull() {
@@ -2152,11 +2164,15 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	} else {
 		bEndConfig.VLAN = 0
 	}
-	if !b.InnerVLAN.IsNull() && !b.NetworkInterfaceIndex.IsNull() {
-		bEndConfig.VXCOrderMVEConfig = &megaport.VXCOrderMVEConfig{
-			InnerVLAN:             int(b.InnerVLAN.ValueInt64()),
-			NetworkInterfaceIndex: int(b.NetworkInterfaceIndex.ValueInt64()),
+	if !b.InnerVLAN.IsNull() || !b.NetworkInterfaceIndex.IsNull() {
+		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
+		if !b.InnerVLAN.IsNull() {
+			vxcOrderMVEConfig.InnerVLAN = int(b.InnerVLAN.ValueInt64())
 		}
+		if !b.NetworkInterfaceIndex.IsNull() {
+			vxcOrderMVEConfig.NetworkInterfaceIndex = int(b.NetworkInterfaceIndex.ValueInt64())
+		}
+		bEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 	if !plan.BEndPartnerConfig.IsNull() {
 		var bPartnerConfig vxcPartnerConfigurationModel
@@ -2491,7 +2507,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var aEndPlan, bEndPlan, aEndState, bEndState vxcEndConfigurationModel
+	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
 
 	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
 	if aEndPlanDiags.HasError() {
@@ -2529,7 +2545,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.VLAN = aEndPlan.VLAN
 	}
 
-	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
+	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 		aEndState.InnerVLAN = aEndPlan.InnerVLAN
 	}
@@ -2537,6 +2553,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
 		bEndState.VLAN = bEndPlan.VLAN
+	}
+
+	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
+		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
+		bEndState.InnerVLAN = bEndPlan.InnerVLAN
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
