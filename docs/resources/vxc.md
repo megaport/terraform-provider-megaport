@@ -414,6 +414,27 @@ Required:
 
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
+Optional:
+
+- `peers` (Attributes List) The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config--peers))
+
+<a id="nestedatt--a_end_partner_config--azure_config--peers"></a>
+### Nested Schema for `a_end_partner_config.azure_config.peers`
+
+Required:
+
+- `peer_asn` (String) The peer ASN of the peer.
+- `primary_subnet` (String) The primary subnet of the peer.
+- `secondary_subnet` (String) The secondary subnet of the peer.
+- `type` (String) The type of the peer.
+
+Optional:
+
+- `prefixes` (String) The prefixes of the peer.
+- `shared_key` (String) The shared key of the peer.
+- `vlan` (Number) The VLAN of the peer.
+
+
 
 <a id="nestedatt--a_end_partner_config--google_config"></a>
 ### Nested Schema for `a_end_partner_config.google_config`
@@ -539,6 +560,27 @@ Optional:
 Required:
 
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
+
+Optional:
+
+- `peers` (Attributes List) The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config--peers))
+
+<a id="nestedatt--b_end_partner_config--azure_config--peers"></a>
+### Nested Schema for `b_end_partner_config.azure_config.peers`
+
+Required:
+
+- `peer_asn` (String) The peer ASN of the peer.
+- `primary_subnet` (String) The primary subnet of the peer.
+- `secondary_subnet` (String) The secondary subnet of the peer.
+- `type` (String) The type of the peer.
+
+Optional:
+
+- `prefixes` (String) The prefixes of the peer.
+- `shared_key` (String) The shared key of the peer.
+- `vlan` (Number) The VLAN of the peer.
+
 
 
 <a id="nestedatt--b_end_partner_config--google_config"></a>

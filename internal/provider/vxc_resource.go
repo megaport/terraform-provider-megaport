@@ -126,6 +126,17 @@ var (
 
 	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
 		"service_key": types.StringType,
+		"peers":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs)),
+	}
+
+	partnerOrderAzurePeeringConfigAttrs = map[string]attr.Type{
+		"type":             types.StringType,
+		"peer_asn":         types.StringType,
+		"primary_subnet":   types.StringType,
+		"secondary_subnet": types.StringType,
+		"prefixes":         types.StringType,
+		"shared_key":       types.StringType,
+		"vlan":             types.Int64Type,
 	}
 
 	vxcPartnerConfigGoogleAttrs = map[string]attr.Type{
@@ -336,6 +347,17 @@ type vxcPartnerConfigAWSModel struct {
 type vxcPartnerConfigAzureModel struct {
 	vxcPartnerConfig
 	ServiceKey types.String `tfsdk:"service_key"`
+	Peers      types.List   `tfsdk:"peers"`
+}
+
+type partnerOrderAzurePeeringConfigModel struct {
+	Type            types.String `tfsdk:"type"`
+	PeerASN         types.String `tfsdk:"peer_asn"`
+	PrimarySubnet   types.String `tfsdk:"primary_subnet"`
+	SecondarySubnet types.String `tfsdk:"secondary_subnet"`
+	Prefixes        types.String `tfsdk:"prefixes"`
+	SharedKey       types.String `tfsdk:"shared_key"`
+	VLAN            types.Int64  `tfsdk:"vlan"`
 }
 
 // vxcPartnerConfigGoogleModel maps the partner configuration schema data for Google.
@@ -1306,6 +1328,42 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Required:    true,
 								Sensitive:   true,
 							},
+							"peers": schema.ListNestedAttribute{
+								Description: "The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC.",
+								Optional:    true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"type": schema.StringAttribute{
+											Description: "The type of the peer.",
+											Required:    true,
+										},
+										"peer_asn": schema.StringAttribute{
+											Description: "The peer ASN of the peer.",
+											Required:    true,
+										},
+										"primary_subnet": schema.StringAttribute{
+											Description: "The primary subnet of the peer.",
+											Required:    true,
+										},
+										"secondary_subnet": schema.StringAttribute{
+											Description: "The secondary subnet of the peer.",
+											Required:    true,
+										},
+										"prefixes": schema.StringAttribute{
+											Description: "The prefixes of the peer.",
+											Optional:    true,
+										},
+										"shared_key": schema.StringAttribute{
+											Description: "The shared key of the peer.",
+											Optional:    true,
+										},
+										"vlan": schema.Int64Attribute{
+											Description: "The VLAN of the peer.",
+											Optional:    true,
+										},
+									},
+								},
+							},
 						},
 					},
 					"google_config": schema.SingleNestedAttribute{
@@ -1531,6 +1589,42 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
 								Sensitive:   true,
+							},
+							"peers": schema.ListNestedAttribute{
+								Description: "The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC.",
+								Optional:    true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"type": schema.StringAttribute{
+											Description: "The type of the peer.",
+											Required:    true,
+										},
+										"peer_asn": schema.StringAttribute{
+											Description: "The peer ASN of the peer.",
+											Required:    true,
+										},
+										"primary_subnet": schema.StringAttribute{
+											Description: "The primary subnet of the peer.",
+											Required:    true,
+										},
+										"secondary_subnet": schema.StringAttribute{
+											Description: "The secondary subnet of the peer.",
+											Required:    true,
+										},
+										"prefixes": schema.StringAttribute{
+											Description: "The prefixes of the peer.",
+											Optional:    true,
+										},
+										"shared_key": schema.StringAttribute{
+											Description: "The shared key of the peer.",
+											Optional:    true,
+										},
+										"vlan": schema.Int64Attribute{
+											Description: "The VLAN of the peer.",
+											Optional:    true,
+										},
+									},
+								},
 							},
 						},
 					},
@@ -1839,6 +1933,29 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aEndPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
+			}
+
+			azurePeerModels := []partnerOrderAzurePeeringConfigModel{}
+			azurePeerDiags := azureConfig.Peers.ElementsAs(ctx, &azurePeerModels, false)
+			resp.Diagnostics.Append(azurePeerDiags...)
+			if len(azurePeerModels) > 0 {
+				aEndPartnerConfig.Peers = []megaport.PartnerOrderAzurePeeringConfig{}
+				for _, peer := range azurePeerModels {
+					peeringConfig := megaport.PartnerOrderAzurePeeringConfig{
+						Type:            peer.Type.ValueString(),
+						PeerASN:         peer.PeerASN.ValueString(),
+						PrimarySubnet:   peer.PrimarySubnet.ValueString(),
+						SecondarySubnet: peer.SecondarySubnet.ValueString(),
+						VLAN:            int(peer.VLAN.ValueInt64()),
+					}
+					if !peer.Prefixes.IsNull() {
+						peeringConfig.Prefixes = peer.Prefixes.ValueString()
+					}
+					if !peer.SharedKey.IsNull() {
+						peeringConfig.SharedKey = peer.SharedKey.ValueString()
+					}
+					aEndPartnerConfig.Peers = append(aEndPartnerConfig.Peers, peeringConfig)
+				}
 			}
 
 			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
@@ -2243,6 +2360,29 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			bEndPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
+			}
+
+			azurePeerModels := []partnerOrderAzurePeeringConfigModel{}
+			azurePeerDiags := azureConfig.Peers.ElementsAs(ctx, &azurePeerModels, false)
+			resp.Diagnostics.Append(azurePeerDiags...)
+			if len(azurePeerModels) > 0 {
+				bEndPartnerConfig.Peers = []megaport.PartnerOrderAzurePeeringConfig{}
+				for _, peer := range azurePeerModels {
+					peeringConfig := megaport.PartnerOrderAzurePeeringConfig{
+						Type:            peer.Type.ValueString(),
+						PeerASN:         peer.PeerASN.ValueString(),
+						PrimarySubnet:   peer.PrimarySubnet.ValueString(),
+						SecondarySubnet: peer.SecondarySubnet.ValueString(),
+						VLAN:            int(peer.VLAN.ValueInt64()),
+					}
+					if !peer.Prefixes.IsNull() {
+						peeringConfig.Prefixes = peer.Prefixes.ValueString()
+					}
+					if !peer.SharedKey.IsNull() {
+						peeringConfig.SharedKey = peer.SharedKey.ValueString()
+					}
+					bEndPartnerConfig.Peers = append(bEndPartnerConfig.Peers, peeringConfig)
+				}
 			}
 
 			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
