@@ -103,12 +103,12 @@ var (
 	}
 
 	vxcPartnerConfigAttrs = map[string]attr.Type{
-		"partner":              types.StringType,
-		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
-		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
-		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
-		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
-		"partner_a_end_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndAttrs),
+		"partner":        types.StringType,
+		"aws_config":     types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
+		"azure_config":   types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
+		"google_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
+		"oracle_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+		"vrouter_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
 	}
 
 	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
@@ -147,7 +147,7 @@ var (
 		"virtual_circuit_id": types.StringType,
 	}
 
-	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
+	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs)),
 	}
 
@@ -172,22 +172,23 @@ var (
 	}
 
 	bgpConnectionConfig = map[string]attr.Type{
-		"peer_asn":         types.Int64Type,
-		"local_ip_address": types.StringType,
-		"peer_ip_address":  types.StringType,
-		"password":         types.StringType,
-		"shutdown":         types.BoolType,
-		"description":      types.StringType,
-		"med_in":           types.Int64Type,
-		"med_out":          types.Int64Type,
-		"bfd_enabled":      types.BoolType,
-		"export_policy":    types.StringType,
-		"permit_export_to": types.ListType{}.WithElementType(types.StringType),
-		"deny_export_to":   types.ListType{}.WithElementType(types.StringType),
-		"import_whitelist": types.StringType,
-		"import_blacklist": types.StringType,
-		"export_whitelist": types.StringType,
-		"export_blacklist": types.StringType,
+		"peer_asn":              types.Int64Type,
+		"local_ip_address":      types.StringType,
+		"peer_ip_address":       types.StringType,
+		"password":              types.StringType,
+		"shutdown":              types.BoolType,
+		"description":           types.StringType,
+		"med_in":                types.Int64Type,
+		"med_out":               types.Int64Type,
+		"bfd_enabled":           types.BoolType,
+		"export_policy":         types.StringType,
+		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
+		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
+		"import_whitelist":      types.StringType,
+		"import_blacklist":      types.StringType,
+		"export_whitelist":      types.StringType,
+		"export_blacklist":      types.StringType,
+		"as_path_prepend_count": types.Int64Type,
 	}
 )
 
@@ -316,12 +317,12 @@ type vxcEndConfigurationModel struct {
 }
 
 type vxcPartnerConfigurationModel struct {
-	Partner             types.String `tfsdk:"partner"`
-	AWSPartnerConfig    types.Object `tfsdk:"aws_config"`
-	AzurePartnerConfig  types.Object `tfsdk:"azure_config"`
-	GooglePartnerConfig types.Object `tfsdk:"google_config"`
-	OraclePartnerConfig types.Object `tfsdk:"oracle_config"`
-	PartnerAEndConfig   types.Object `tfsdk:"partner_a_end_config"`
+	Partner              types.String `tfsdk:"partner"`
+	AWSPartnerConfig     types.Object `tfsdk:"aws_config"`
+	AzurePartnerConfig   types.Object `tfsdk:"azure_config"`
+	GooglePartnerConfig  types.Object `tfsdk:"google_config"`
+	OraclePartnerConfig  types.Object `tfsdk:"oracle_config"`
+	PartnerVrouterConfig types.Object `tfsdk:"vrouter_config"`
 }
 
 type vxcPartnerConfig interface {
@@ -372,8 +373,8 @@ type vxcPartnerConfigOracleModel struct {
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
 }
 
-// vxcPartnerConfigAEndModel maps the partner configuration schema data for an A end.
-type vxcPartnerConfigAEndModel struct {
+// vxcPartnerConfigVrouterModel maps the partner configuration schema data for a vrouter configuration.
+type vxcPartnerConfigVrouterModel struct {
 	vxcPartnerConfig
 	Interfaces types.List `tfsdk:"interfaces"`
 }
@@ -403,22 +404,23 @@ type bfdConfigModel struct {
 
 // BgpConnectionConfig represents the configuration of a BGP connection.
 type bgpConnectionConfigModel struct {
-	PeerAsn         types.Int64  `tfsdk:"peer_asn"`
-	LocalIPAddress  types.String `tfsdk:"local_ip_address"`
-	PeerIPAddress   types.String `tfsdk:"peer_ip_address"`
-	Password        types.String `tfsdk:"password"`
-	Shutdown        types.Bool   `tfsdk:"shutdown"`
-	Description     types.String `tfsdk:"description"`
-	MedIn           types.Int64  `tfsdk:"med_in"`
-	MedOut          types.Int64  `tfsdk:"med_out"`
-	BfdEnabled      types.Bool   `tfsdk:"bfd_enabled"`
-	ExportPolicy    types.String `tfsdk:"export_policy"`
-	PermitExportTo  types.List   `tfsdk:"permit_export_to"`
-	DenyExportTo    types.List   `tfsdk:"deny_export_to"`
-	ImportWhitelist types.String `tfsdk:"import_whitelist"`
-	ImportBlacklist types.String `tfsdk:"import_blacklist"`
-	ExportWhitelist types.String `tfsdk:"export_whitelist"`
-	ExportBlacklist types.String `tfsdk:"export_blacklist"`
+	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
+	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
+	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
+	Password           types.String `tfsdk:"password"`
+	Shutdown           types.Bool   `tfsdk:"shutdown"`
+	Description        types.String `tfsdk:"description"`
+	MedIn              types.Int64  `tfsdk:"med_in"`
+	MedOut             types.Int64  `tfsdk:"med_out"`
+	BfdEnabled         types.Bool   `tfsdk:"bfd_enabled"`
+	ExportPolicy       types.String `tfsdk:"export_policy"`
+	PermitExportTo     types.List   `tfsdk:"permit_export_to"`
+	DenyExportTo       types.List   `tfsdk:"deny_export_to"`
+	ImportWhitelist    types.String `tfsdk:"import_whitelist"`
+	ImportBlacklist    types.String `tfsdk:"import_blacklist"`
+	ExportWhitelist    types.String `tfsdk:"export_whitelist"`
+	ExportBlacklist    types.String `tfsdk:"export_blacklist"`
+	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
 }
 
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
@@ -1270,7 +1272,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "a-end", "transit"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "vrouter", "transit"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1386,8 +1388,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 					},
-					"partner_a_end_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the A-End order configuration. Only exists for A-End Configurations.",
+					"vrouter_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the virtual router configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"interfaces": schema.ListNestedAttribute{
@@ -1514,6 +1516,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
 													},
+													"as_path_prepend_count": schema.Int64Attribute{
+														Description: "The AS path prepend count of the BGP connection.",
+														Optional:    true,
+														Validators:  []validator.Int64{int64validator.Between(0, 10)},
+													},
 												},
 											},
 										},
@@ -1532,7 +1539,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "transit"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "transit", "vrouter"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1648,8 +1655,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 					},
-					"partner_a_end_config": schema.SingleNestedAttribute{
-						Description: "The partner configuration of the A-End order configuration. Only exists for A-End Configurations and does not apply to B-End Partner Configuration.",
+					"vrouter_config": schema.SingleNestedAttribute{
+						Description: "The partner configuration of the virtual router configuration.",
 						Computed:    true,
 						Attributes: map[string]schema.Attribute{
 							"interfaces": schema.ListNestedAttribute{
@@ -1776,6 +1783,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
 													},
+													"as_path_prepend_count": schema.Int64Attribute{
+														Description: "The AS path prepend count of the BGP connection.",
+														Optional:    true,
+														Validators:  []validator.Int64{int64validator.Between(0, 10)},
+													},
 												},
 											},
 										},
@@ -1887,14 +1899,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    awsConfigObj,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     awsConfigObj,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -1964,14 +1976,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azureConfigObj,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azureConfigObj,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -2018,14 +2030,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: googleConfigObj,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  googleConfigObj,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -2075,30 +2087,30 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracleConfigObj,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracleConfigObj,
+				PartnerVrouterConfig: aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = aEndPartnerConfig
-		case "a-end":
-			if aPartnerConfig.PartnerAEndConfig.IsNull() {
+		case "vrouter":
+			if aPartnerConfig.PartnerVrouterConfig.IsNull() {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": A-End Partner configuration is required",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
 				)
 				return
 			}
-			var partnerConfigAEnd vxcPartnerConfigAEndModel
-			aEndDiags := aPartnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			var partnerConfigAEnd vxcPartnerConfigVrouterModel
+			aEndDiags := aPartnerConfig.PartnerVrouterConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
 			if aEndDiags.HasError() {
 				resp.Diagnostics.Append(aEndDiags...)
 				return
@@ -2112,7 +2124,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			aEndMegaportConfig := megaport.VXCOrderAEndPartnerConfig{}
+			aEndMegaportConfig := megaport.VXCOrderVrouterPartnerConfig{}
 			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
 			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, &ifaceModels, false)
 			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
@@ -2158,16 +2170,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
-							PeerAsn:        int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalIpAddress: bgpConnection.LocalIPAddress.ValueString(),
-							PeerIpAddress:  bgpConnection.PeerIPAddress.ValueString(),
-							Password:       bgpConnection.Password.ValueString(),
-							Shutdown:       bgpConnection.Shutdown.ValueBool(),
-							Description:    bgpConnection.Description.ValueString(),
-							MedIn:          int(bgpConnection.MedIn.ValueInt64()),
-							MedOut:         int(bgpConnection.MedOut.ValueInt64()),
-							BfdEnabled:     bgpConnection.BfdEnabled.ValueBool(),
-							ExportPolicy:   bgpConnection.ExportPolicy.ValueString(),
+							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
+							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
+							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
+							Password:           bgpConnection.Password.ValueString(),
+							Shutdown:           bgpConnection.Shutdown.ValueBool(),
+							Description:        bgpConnection.Description.ValueString(),
+							MedIn:              int(bgpConnection.MedIn.ValueInt64()),
+							MedOut:             int(bgpConnection.MedOut.ValueInt64()),
+							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
+							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
+							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -2215,19 +2228,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				aEndMegaportConfig.Interfaces = append(aEndMegaportConfig.Interfaces, toAppend)
 			}
-			aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, partnerConfigAEnd)
+			aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, partnerConfigAEnd)
 			resp.Diagnostics.Append(aEndDiags...)
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndConfigObj,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: aEndConfigObj,
 			}
 			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
@@ -2241,14 +2254,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			aEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             aPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              aPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: aEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -2329,14 +2342,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             bPartnerConfig.Partner,
-				AWSPartnerConfig:    awsConfigObj,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     awsConfigObj,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: bEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -2409,14 +2422,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             bPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azureConfigObj,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azureConfigObj,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: bEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -2465,14 +2478,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             bPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: googleConfigObj,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  googleConfigObj,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: bEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -2522,14 +2535,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             bPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracleConfigObj,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracleConfigObj,
+				PartnerVrouterConfig: bEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
@@ -2544,20 +2557,165 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			bEndPartner := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-				Partner:             bPartnerConfig.Partner,
-				AWSPartnerConfig:    aws,
-				AzurePartnerConfig:  azure,
-				GooglePartnerConfig: google,
-				OraclePartnerConfig: oracle,
-				PartnerAEndConfig:   aEndPartner,
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: bEndPartner,
 			}
 
 			partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = bEndPartnerConfig
+		case "vrouter":
+			if bPartnerConfig.PartnerVrouterConfig.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
+				)
+				return
+			}
+			var partnerConfigBEnd vxcPartnerConfigVrouterModel
+			bEndDiags := bPartnerConfig.PartnerVrouterConfig.As(ctx, &partnerConfigBEnd, basetypes.ObjectAsOptions{})
+			if aEndDiags.HasError() {
+				resp.Diagnostics.Append(bEndDiags...)
+				return
+			}
+			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+
+			bEndMegaportConfig := megaport.VXCOrderVrouterPartnerConfig{}
+			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
+			ifaceDiags := partnerConfigBEnd.Interfaces.ElementsAs(ctx, &ifaceModels, false)
+			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
+			for _, iface := range ifaceModels {
+				toAppend := megaport.PartnerConfigInterface{}
+				if !iface.IPAddresses.IsNull() {
+					ipAddresses := []string{}
+					ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
+					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
+					toAppend.IpAddresses = ipAddresses
+				}
+				if !iface.IPRoutes.IsNull() {
+					ipRoutes := []*ipRouteModel{}
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
+					for _, ipRoute := range ipRoutes {
+						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
+							Prefix:      ipRoute.Prefix.ValueString(),
+							Description: ipRoute.Description.ValueString(),
+							NextHop:     ipRoute.NextHop.ValueString(),
+						})
+					}
+				}
+				if !iface.NatIPAddresses.IsNull() {
+					natIPAddresses := []string{}
+					natDiags := iface.NatIPAddresses.ElementsAs(ctx, &natIPAddresses, true)
+					resp.Diagnostics = append(resp.Diagnostics, natDiags...)
+					toAppend.NatIpAddresses = natIPAddresses
+				}
+				if !iface.Bfd.IsNull() {
+					bfd := &bfdConfigModel{}
+					bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
+					resp.Diagnostics = append(resp.Diagnostics, bfdDiags...)
+					toAppend.Bfd = megaport.BfdConfig{
+						TxInterval: int(bfd.TxInterval.ValueInt64()),
+						RxInterval: int(bfd.RxInterval.ValueInt64()),
+						Multiplier: int(bfd.Multiplier.ValueInt64()),
+					}
+				}
+				if !iface.BgpConnections.IsNull() {
+					bgpConnections := []*bgpConnectionConfigModel{}
+					bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
+					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
+					for _, bgpConnection := range bgpConnections {
+						bgpToAppend := megaport.BgpConnectionConfig{
+							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
+							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
+							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
+							Password:           bgpConnection.Password.ValueString(),
+							Shutdown:           bgpConnection.Shutdown.ValueBool(),
+							Description:        bgpConnection.Description.ValueString(),
+							MedIn:              int(bgpConnection.MedIn.ValueInt64()),
+							MedOut:             int(bgpConnection.MedOut.ValueInt64()),
+							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
+							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
+							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
+						}
+						if !bgpConnection.ImportWhitelist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ImportWhitelist.ValueString() {
+									bgpToAppend.ImportWhitelist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ImportBlacklist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ImportBlacklist.ValueString() {
+									bgpToAppend.ImportBlacklist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ExportWhitelist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ExportWhitelist.ValueString() {
+									bgpToAppend.ExportWhitelist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.ExportBlacklist.IsNull() {
+							for _, prefixFilterList := range prefixFilterListRes {
+								if prefixFilterList.Description == bgpConnection.ExportBlacklist.ValueString() {
+									bgpToAppend.ExportBlacklist = prefixFilterList.Id
+								}
+							}
+						}
+						if !bgpConnection.PermitExportTo.IsNull() {
+							permitExportTo := []string{}
+							permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
+							resp.Diagnostics = append(resp.Diagnostics, permitDiags...)
+							bgpToAppend.PermitExportTo = permitExportTo
+							bgpToAppend.PermitExportTo = permitExportTo
+						}
+						if !bgpConnection.DenyExportTo.IsNull() {
+							denyExportTo := []string{}
+							denyDiags := bgpConnection.DenyExportTo.ElementsAs(ctx, &denyExportTo, true)
+							resp.Diagnostics = append(resp.Diagnostics, denyDiags...)
+							bgpToAppend.DenyExportTo = denyExportTo
+						}
+						toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
+					}
+				}
+				bEndMegaportConfig.Interfaces = append(bEndMegaportConfig.Interfaces, toAppend)
+			}
+			bEndConfigObj, bEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, partnerConfigBEnd)
+			resp.Diagnostics.Append(bEndDiags...)
+			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
+				Partner:              bPartnerConfig.Partner,
+				AWSPartnerConfig:     aws,
+				AzurePartnerConfig:   azure,
+				GooglePartnerConfig:  google,
+				OraclePartnerConfig:  oracle,
+				PartnerVrouterConfig: bEndConfigObj,
+			}
+			bEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
+			resp.Diagnostics.Append(partnerDiags...)
+			plan.AEndPartnerConfig = bEndPartnerConfigObj
+			bEndConfig.PartnerConfig = bEndMegaportConfig
 		default:
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
