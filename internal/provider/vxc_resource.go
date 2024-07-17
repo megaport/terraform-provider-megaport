@@ -103,12 +103,13 @@ var (
 	}
 
 	vxcPartnerConfigAttrs = map[string]attr.Type{
-		"partner":        types.StringType,
-		"aws_config":     types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
-		"azure_config":   types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
-		"google_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
-		"oracle_config":  types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
-		"vrouter_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
+		"partner":              types.StringType,
+		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
+		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
+		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
+		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
+		"partner_a_end_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndAttrs),
 	}
 
 	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
