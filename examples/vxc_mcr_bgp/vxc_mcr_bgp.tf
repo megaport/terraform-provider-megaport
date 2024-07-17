@@ -59,8 +59,8 @@ resource "megaport_vxc" "aws_vxc" {
   }
 
   a_end_partner_config = {
-    partner = "a-end"
-    partner_a_end_config = {
+    partner = "vrouter"
+    vrouter_config = {
       interfaces = [
         {
           ip_addresses     = ["10.0.0.1/30"]

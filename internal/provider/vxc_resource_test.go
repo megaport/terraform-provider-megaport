@@ -287,10 +287,10 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
-// func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
-// }
+func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+}
 
 func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	mcrName := RandomTestName()
@@ -463,8 +463,8 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 					}
 
 					a_end_partner_config = {
-					  partner = "a-end"
-					  partner_a_end_config = {
+					  partner = "vrouter"
+					  vrouter_config = {
 						interfaces = [{
 							ip_addresses     = ["10.0.0.1/30"]
 							nat_ip_addresses = ["10.0.0.1"]
@@ -487,6 +487,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
 							  import_white_list = "%s"
+							  as_path_prepend_count = 4
 							}
 						  ]
 						}]
