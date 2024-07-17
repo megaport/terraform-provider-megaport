@@ -12,8 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -40,7 +42,6 @@ var (
 		"inner_vlan":            types.Int64Type,
 		"vnic_index":            types.Int64Type,
 		"secondary_name":        types.StringType,
-		"location_details":      types.ObjectType{}.WithAttributeTypes(productLocationDetailsAttrs),
 	}
 
 	cspConnectionFullAttrs = map[string]attr.Type{
@@ -73,33 +74,6 @@ var (
 		"ipv6_gateway_address": types.StringType,
 		"ip_addresses":         types.ListType{}.WithElementType(types.StringType),
 		"virtual_router_name":  types.StringType,
-	}
-
-	virtualRouterAttrs = map[string]attr.Type{
-		"mcr_asn":              types.Int64Type,
-		"resource_name":        types.StringType,
-		"resource_type":        types.StringType,
-		"speed":                types.Int64Type,
-		"bgp_shutdown_default": types.BoolType,
-	}
-
-	vllConfigAttrs = map[string]attr.Type{
-		"a_vlan":          types.Int64Type,
-		"b_vlan":          types.Int64Type,
-		"description":     types.StringType,
-		"id":              types.Int64Type,
-		"name":            types.StringType,
-		"rate_limit_mbps": types.Int64Type,
-		"resource_name":   types.StringType,
-		"resource_type":   types.StringType,
-	}
-
-	vxcApprovalAttrs = map[string]attr.Type{
-		"status":    types.StringType,
-		"message":   types.StringType,
-		"uid":       types.StringType,
-		"type":      types.StringType,
-		"new_speed": types.Int64Type,
 	}
 
 	vxcPartnerConfigAttrs = map[string]attr.Type{
@@ -236,11 +210,7 @@ type vxcResourceModel struct {
 	AEndPartnerConfig types.Object `tfsdk:"a_end_partner_config"`
 	BEndPartnerConfig types.Object `tfsdk:"b_end_partner_config"`
 
-	VLL            types.Object `tfsdk:"vll"`
-	VirtualRouter  types.Object `tfsdk:"virtual_router"`
-	CSPConnections types.List   `tfsdk:"csp_connections"`
-	PortInterfaces types.List   `tfsdk:"port_interfaces"`
-	VXCApproval    types.Object `tfsdk:"vxc_approval"`
+	CSPConnections types.List `tfsdk:"csp_connections"`
 }
 
 type cspConnectionModel struct {
@@ -275,36 +245,6 @@ type cspConnectionModel struct {
 	IPv6GatewayAddress types.String `tfsdk:"ipv6_gateway_address"`
 }
 
-// virtualRouterModel maps the virtual router schema data.
-type virtualRouterModel struct {
-	MCRAsn             types.Int64  `tfsdk:"mcr_asn"`
-	ResourceName       types.String `tfsdk:"resource_name"`
-	ResourceType       types.String `tfsdk:"resource_type"`
-	Speed              types.Int64  `tfsdk:"speed"`
-	BGPShutdownDefault types.Bool   `tfsdk:"bgp_shutdown_default"`
-}
-
-// vllConfigModel maps the VLL configuration schema data.
-type vllConfigModel struct {
-	AEndVLAN      types.Int64  `tfsdk:"a_vlan"`
-	BEndVLAN      types.Int64  `tfsdk:"b_vlan"`
-	Description   types.String `tfsdk:"description"`
-	ID            types.Int64  `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	RateLimitMBPS types.Int64  `tfsdk:"rate_limit_mbps"`
-	ResourceName  types.String `tfsdk:"resource_name"`
-	ResourceType  types.String `tfsdk:"resource_type"`
-}
-
-// vxcApprovalModel maps the approval schema data.
-type vxcApprovalModel struct {
-	Status   types.String `tfsdk:"status"`
-	Message  types.String `tfsdk:"message"`
-	UID      types.String `tfsdk:"uid"`
-	Type     types.String `tfsdk:"type"`
-	NewSpeed types.Int64  `tfsdk:"new_speed"`
-}
-
 // vxcEndConfigurationModel maps the end configuration schema data.
 type vxcEndConfigurationModel struct {
 	OwnerUID              types.String `tfsdk:"owner_uid"`
@@ -318,7 +258,6 @@ type vxcEndConfigurationModel struct {
 	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
 	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
-	LocationDetails       types.Object `tfsdk:"location_details"`
 }
 
 type vxcPartnerConfigurationModel struct {
@@ -506,15 +445,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
-	aEndLocationDetailsModel := &productLocationDetailsModel{
-		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
-		City:    types.StringValue(v.AEndConfiguration.LocationDetails.City),
-		Metro:   types.StringValue(v.AEndConfiguration.LocationDetails.Metro),
-		Country: types.StringValue(v.AEndConfiguration.LocationDetails.Country),
-	}
-	aEndLocationDetails, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, aEndLocationDetailsModel)
-	apiDiags = append(apiDiags, locationDetailsDiags...)
-	aEndModel.LocationDetails = aEndLocationDetails
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
 	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
@@ -544,77 +474,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
-	bEndLocationDetailsModel := &productLocationDetailsModel{
-		Name:    types.StringValue(v.AEndConfiguration.LocationDetails.Name),
-		City:    types.StringValue(v.AEndConfiguration.LocationDetails.City),
-		Metro:   types.StringValue(v.AEndConfiguration.LocationDetails.Metro),
-		Country: types.StringValue(v.AEndConfiguration.LocationDetails.Country),
-	}
-	bEndLocationDetails, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, bEndLocationDetailsModel)
-	apiDiags = append(apiDiags, locationDetailsDiags...)
-	bEndModel.LocationDetails = bEndLocationDetails
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
 	apiDiags = append(apiDiags, bEndDiags...)
 	orm.BEndConfiguration = bEnd
 
-	vxcApprovalModel := &vxcApprovalModel{
-		Status:   types.StringValue(v.VXCApproval.Status),
-		Message:  types.StringValue(v.VXCApproval.Message),
-		UID:      types.StringValue(v.VXCApproval.UID),
-		Type:     types.StringValue(v.VXCApproval.Type),
-		NewSpeed: types.Int64Value(int64(v.VXCApproval.NewSpeed)),
-	}
-	vxcApproval, vxcApprovalDiags := types.ObjectValueFrom(ctx, vxcApprovalAttrs, vxcApprovalModel)
-	apiDiags = append(apiDiags, vxcApprovalDiags...)
-	orm.VXCApproval = vxcApproval
-
-	if v.Resources != nil {
-		if v.Resources.Interface != nil {
-			interfaceObjects := []types.Object{}
-			for _, i := range v.Resources.Interface {
-				interfaceObject, interfaceDiags := fromAPIPortInterface(ctx, i)
-				apiDiags = append(apiDiags, interfaceDiags...)
-				interfaceObjects = append(interfaceObjects, interfaceObject)
-			}
-			portInterfaceList, interfaceListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs), interfaceObjects)
-			apiDiags = append(apiDiags, interfaceListDiags...)
-			orm.PortInterfaces = portInterfaceList
-		} else {
-			interfaceList := types.ListNull(types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs))
-			orm.PortInterfaces = interfaceList
-		}
-	}
-
-	if v.Resources.VLL != nil {
-		vllModel := &vllConfigModel{
-			AEndVLAN:      types.Int64Value(int64(v.Resources.VLL.AEndVLAN)),
-			BEndVLAN:      types.Int64Value(int64(v.Resources.VLL.BEndVLAN)),
-			Description:   types.StringValue(v.Resources.VLL.Description),
-			ID:            types.Int64Value(int64(v.Resources.VLL.ID)),
-			Name:          types.StringValue(v.Resources.VLL.Name),
-			RateLimitMBPS: types.Int64Value(int64(v.Resources.VLL.RateLimitMBPS)),
-			ResourceName:  types.StringValue(v.Resources.VLL.ResourceName),
-			ResourceType:  types.StringValue(v.Resources.VLL.ResourceType),
-		}
-		vll, vllDiags := types.ObjectValueFrom(ctx, vllConfigAttrs, vllModel)
-		apiDiags = append(apiDiags, vllDiags...)
-		orm.VLL = vll
-	}
-
-	if v.Resources.VirtualRouter != nil {
-		virtualRouterModel := &virtualRouterModel{
-			MCRAsn:             types.Int64Value(int64(v.Resources.VirtualRouter.MCRAsn)),
-			ResourceName:       types.StringValue(v.Resources.VirtualRouter.ResourceName),
-			ResourceType:       types.StringValue(v.Resources.VirtualRouter.ResourceType),
-			Speed:              types.Int64Value(int64(v.Resources.VirtualRouter.Speed)),
-			BGPShutdownDefault: types.BoolValue(v.Resources.VirtualRouter.BGPShutdownDefault),
-		}
-		virtualRouter, virtualRouterDiags := types.ObjectValueFrom(ctx, virtualRouterAttrs, virtualRouterModel)
-		apiDiags = append(apiDiags, virtualRouterDiags...)
-		orm.VirtualRouter = virtualRouter
-	} else {
-		orm.VirtualRouter = types.ObjectNull(virtualRouterAttrs)
-	}
 	if v.Resources != nil && v.Resources.CSPConnection != nil {
 		cspConnections := []types.Object{}
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
@@ -685,6 +548,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"service_id": schema.Int64Attribute{
 				Description: "The service ID of the VXC.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"rate_limit": schema.Int64Attribute{
 				Description: "The rate limit of the product.",
@@ -693,10 +559,16 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"product_type": schema.StringAttribute{
 				Description: "The type of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"distance_band": schema.StringAttribute{
 				Description: "The distance band of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the product.",
@@ -705,14 +577,23 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"secondary_name": schema.StringAttribute{
 				Description: "The secondary name of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"usage_algorithm": schema.StringAttribute{
 				Description: "The usage algorithm of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"promo_code": schema.StringAttribute{
 				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
@@ -740,302 +621,260 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).",
 				Computed:    true,
 				Optional:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.",
 				Computed:    true,
 				Optional:    true,
-			},
-			"vll": schema.SingleNestedAttribute{
-				Description: "The VLL associated with the VXC.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"a_vlan": schema.Int64Attribute{
-						Description: "The A-End VLAN of the VLL.",
-						Computed:    true,
-					},
-					"b_vlan": schema.Int64Attribute{
-						Description: "The B-End VLAN of the VLL.",
-						Computed:    true,
-					},
-					"description": schema.StringAttribute{
-						Description: "The description of the VLL.",
-						Computed:    true,
-					},
-					"id": schema.Int64Attribute{
-						Description: "The ID of the VLL.",
-						Computed:    true,
-					},
-					"name": schema.StringAttribute{
-						Description: "The name of the VLL.",
-						Computed:    true,
-					},
-					"rate_limit_mbps": schema.Int64Attribute{
-						Description: "The rate limit in Mbps of the VLL.",
-						Computed:    true,
-					},
-					"resource_name": schema.StringAttribute{
-						Description: "The resource name of the VLL.",
-						Computed:    true,
-					},
-					"resource_type": schema.StringAttribute{
-						Description: "The resource type of the VLL.",
-						Computed:    true,
-					},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"csp_connections": schema.ListNestedAttribute{
 				Description: "The Cloud Service Provider (CSP) connections associated with the VXC.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"connect_type": schema.StringAttribute{
 							Description: "The connection type of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"resource_name": schema.StringAttribute{
 							Description: "The resource name of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"resource_type": schema.StringAttribute{
 							Description: "The resource type of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the CSP connection.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"owner_account": schema.StringAttribute{
 							Description: "The owner's AWS account of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"bandwidth": schema.Int64Attribute{
 							Description: "The bandwidth of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 						"bandwidths": schema.ListAttribute{
 							Description: "The bandwidths of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							ElementType: types.Int64Type,
+							PlanModifiers: []planmodifier.List{
+								listplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"customer_ip_address": schema.StringAttribute{
 							Description: "The customer IP address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"customer_ip4_address": schema.StringAttribute{
 							Description: "The customer IPv4 address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"account": schema.StringAttribute{
 							Description: "The account of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"amazon_address": schema.StringAttribute{
 							Description: "The Amazon address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"asn": schema.Int64Attribute{
 							Description: "The ASN of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 						"auth_key": schema.StringAttribute{
 							Description: "The authentication key of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"customer_address": schema.StringAttribute{
 							Description: "The customer address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"id": schema.Int64Attribute{
 							Description: "The ID of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 						"peer_asn": schema.Int64Attribute{
 							Description: "The peer ASN of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 						"type": schema.StringAttribute{
 							Description: "The type of the AWS Virtual Interface.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"vif_id": schema.StringAttribute{
 							Description: "The ID of the AWS Virtual Interface.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"connection_id": schema.StringAttribute{
 							Description: "The hosted connection ID of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"managed": schema.BoolAttribute{
 							Description: "Whether the CSP connection is managed.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Bool{
+								boolplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"service_key": schema.StringAttribute{
 							Description: "The Azure service key of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							Sensitive:   true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"csp_name": schema.StringAttribute{
 							Description: "The name of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"pairing_key": schema.StringAttribute{
 							Description: "The pairing key of the Google Cloud connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"ip_addresses": schema.ListAttribute{
 							Description: "The IP addresses of the Virtual Router.",
 							Optional:    true,
 							Computed:    true,
 							ElementType: types.StringType,
+							PlanModifiers: []planmodifier.List{
+								listplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"virtual_router_name": schema.StringAttribute{
 							Description: "The name of the Virtual Router.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"customer_ip6_network": schema.StringAttribute{
 							Description: "The customer IPv6 network of the Transit VXC connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"ipv4_gateway_address": schema.StringAttribute{
 							Description: "The IPv4 gateway address of the Transit VXC connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"ipv6_gateway_address": schema.StringAttribute{
 							Description: "The IPv6 gateway address of the Transit VXC connection.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
-					},
-				},
-			},
-			"port_interfaces": schema.ListNestedAttribute{
-				Description: "The interfaces associated with the VXC.",
-				Computed:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"demarcation": schema.StringAttribute{
-							Description: "The demarcation of the interface.",
-							Computed:    true,
-						},
-						"description": schema.StringAttribute{
-							Description: "The description of the interface.",
-							Computed:    true,
-						},
-						"id": schema.Int64Attribute{
-							Description: "The ID of the interface.",
-							Computed:    true,
-						},
-						"loa_template": schema.StringAttribute{
-							Description: "The LOA template of the interface.",
-							Computed:    true,
-						},
-						"media": schema.StringAttribute{
-							Description: "The media of the interface.",
-							Computed:    true,
-						},
-						"name": schema.StringAttribute{
-							Description: "The name of the interface.",
-							Computed:    true,
-						},
-						"port_speed": schema.Int64Attribute{
-							Description: "The port speed of the interface.",
-							Computed:    true,
-						},
-						"resource_name": schema.StringAttribute{
-							Description: "The resource name of the interface.",
-							Computed:    true,
-						},
-						"resource_type": schema.StringAttribute{
-							Description: "The resource type of the interface.",
-							Computed:    true,
-						},
-						"up": schema.Int64Attribute{
-							Description: "The up status of the interface.",
-							Computed:    true,
-						},
-					},
-				},
-			},
-			"virtual_router": schema.SingleNestedAttribute{
-				Description: "The virtual router associated with the VXC.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"mcr_asn": schema.Int64Attribute{
-						Description: "The MCR ASN of the virtual router.",
-						Computed:    true,
-					},
-					"resource_name": schema.StringAttribute{
-						Description: "The resource name of the virtual router.",
-						Computed:    true,
-					},
-					"resource_type": schema.StringAttribute{
-						Description: "The resource type of the virtual router.",
-						Computed:    true,
-					},
-					"speed": schema.Int64Attribute{
-						Description: "The speed of the virtual router.",
-						Computed:    true,
-					},
-					"bgp_shutdown_default": schema.BoolAttribute{
-						Description: "Whether BGP Shutdown is enabled by default on the virtual router.",
-						Computed:    true,
-					},
-				},
-			},
-			"vxc_approval": schema.SingleNestedAttribute{
-				Description: "The VXC approval details.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"status": schema.StringAttribute{
-						Description: "The status of the VXC approval.",
-						Computed:    true,
-					},
-					"message": schema.StringAttribute{
-						Description: "The message of the VXC approval.",
-						Computed:    true,
-					},
-					"uid": schema.StringAttribute{
-						Description: "The UID of the VXC approval.",
-						Computed:    true,
-					},
-					"type": schema.StringAttribute{
-						Description: "The type of the VXC approval.",
-						Computed:    true,
-					},
-					"new_speed": schema.Int64Attribute{
-						Description: "The new speed of the VXC approval.",
-						Computed:    true,
 					},
 				},
 			},
@@ -1057,23 +896,38 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"company_name": schema.StringAttribute{
 				Description: "The name of the company the product is associated with.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the product is locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"admin_locked": schema.BoolAttribute{
 				Description: "Whether the product is admin locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"attribute_tags": schema.MapAttribute{
 				Description: "The attribute tags associated with the product.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cancelable": schema.BoolAttribute{
 				Description: "Whether the product is cancelable.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"a_end": schema.SingleNestedAttribute{
 				Description: "The current A-End configuration of the VXC.",
@@ -1082,6 +936,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the A-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"requested_product_uid": schema.StringAttribute{
 						Description: "The Product UID requested by the user for the A-End configuration.",
@@ -1104,53 +961,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the A-End configuration.",
 						Computed:    true,
 					},
-					"location_details": schema.SingleNestedAttribute{
-						Description: "The location details of the product.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Object{
-							objectplanmodifier.UseStateForUnknown(),
-						},
-						Attributes: map[string]schema.Attribute{
-							"name": schema.StringAttribute{
-								Description: "The name of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"city": schema.StringAttribute{
-								Description: "The city of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"metro": schema.StringAttribute{
-								Description: "The metro of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"country": schema.StringAttribute{
-								Description: "The country of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-						},
-					},
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
@@ -1163,15 +981,24 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The inner VLAN of the A-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
 						Computed:    true,
 						Optional:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the A-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 			},
@@ -1182,6 +1009,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"owner_uid": schema.StringAttribute{
 						Description: "The owner UID of the B-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"requested_product_uid": schema.StringAttribute{
 						Description: "The Product UID requested by the user for the B-End configuration.",
@@ -1205,53 +1035,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The location of the B-End configuration.",
 						Computed:    true,
 					},
-					"location_details": schema.SingleNestedAttribute{
-						Description: "The location details of the product.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Object{
-							objectplanmodifier.UseStateForUnknown(),
-						},
-						Attributes: map[string]schema.Attribute{
-							"name": schema.StringAttribute{
-								Description: "The name of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"city": schema.StringAttribute{
-								Description: "The city of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"metro": schema.StringAttribute{
-								Description: "The metro of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"country": schema.StringAttribute{
-								Description: "The country of the location.",
-								Optional:    true,
-								Computed:    true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-						},
-					},
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
@@ -1264,15 +1055,24 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The inner VLAN of the B-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the B-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"secondary_name": schema.StringAttribute{
 						Description: "The secondary name of the B-End configuration.",
 						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 			},

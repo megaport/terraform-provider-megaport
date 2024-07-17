@@ -291,7 +291,6 @@ resource "megaport_vxc" "transit_vxc" {
 - `last_updated` (String) The last time the resource was updated.
 - `live_date` (String) The date the product went live.
 - `locked` (Boolean) Whether the product is locked.
-- `port_interfaces` (Attributes List) The interfaces associated with the VXC. (see [below for nested schema](#nestedatt--port_interfaces))
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
@@ -299,9 +298,6 @@ resource "megaport_vxc" "transit_vxc" {
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
-- `virtual_router` (Attributes) The virtual router associated with the VXC. (see [below for nested schema](#nestedatt--virtual_router))
-- `vll` (Attributes) The VLL associated with the VXC. (see [below for nested schema](#nestedatt--vll))
-- `vxc_approval` (Attributes) The VXC approval details. (see [below for nested schema](#nestedatt--vxc_approval))
 
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
@@ -314,7 +310,6 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--a_end--location_details))
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
 - `vnic_index` (Number) The network interface index of the A-End configuration.
 
@@ -327,17 +322,6 @@ Read-Only:
 - `secondary_name` (String) The secondary name of the A-End configuration.
 - `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
 
-<a id="nestedatt--a_end--location_details"></a>
-### Nested Schema for `a_end.location_details`
-
-Optional:
-
-- `city` (String) The city of the location.
-- `country` (String) The country of the location.
-- `metro` (String) The metro of the location.
-- `name` (String) The name of the location.
-
-
 
 <a id="nestedatt--b_end"></a>
 ### Nested Schema for `b_end`
@@ -346,7 +330,6 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration.
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--b_end--location_details))
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
 - `vnic_index` (Number) The network interface index of the B-End configuration.
@@ -359,17 +342,6 @@ Read-Only:
 - `product_name` (String) The product name of the B-End configuration.
 - `secondary_name` (String) The secondary name of the B-End configuration.
 - `vlan` (Number) The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
-
-<a id="nestedatt--b_end--location_details"></a>
-### Nested Schema for `b_end.location_details`
-
-Optional:
-
-- `city` (String) The city of the location.
-- `country` (String) The country of the location.
-- `metro` (String) The metro of the location.
-- `name` (String) The name of the location.
-
 
 
 <a id="nestedatt--a_end_partner_config"></a>
@@ -830,62 +802,6 @@ Optional:
 Read-Only:
 
 - `vlan` (Number) The VLAN of the CSP connection.
-
-
-<a id="nestedatt--port_interfaces"></a>
-### Nested Schema for `port_interfaces`
-
-Read-Only:
-
-- `demarcation` (String) The demarcation of the interface.
-- `description` (String) The description of the interface.
-- `id` (Number) The ID of the interface.
-- `loa_template` (String) The LOA template of the interface.
-- `media` (String) The media of the interface.
-- `name` (String) The name of the interface.
-- `port_speed` (Number) The port speed of the interface.
-- `resource_name` (String) The resource name of the interface.
-- `resource_type` (String) The resource type of the interface.
-- `up` (Number) The up status of the interface.
-
-
-<a id="nestedatt--virtual_router"></a>
-### Nested Schema for `virtual_router`
-
-Read-Only:
-
-- `bgp_shutdown_default` (Boolean) Whether BGP Shutdown is enabled by default on the virtual router.
-- `mcr_asn` (Number) The MCR ASN of the virtual router.
-- `resource_name` (String) The resource name of the virtual router.
-- `resource_type` (String) The resource type of the virtual router.
-- `speed` (Number) The speed of the virtual router.
-
-
-<a id="nestedatt--vll"></a>
-### Nested Schema for `vll`
-
-Read-Only:
-
-- `a_vlan` (Number) The A-End VLAN of the VLL.
-- `b_vlan` (Number) The B-End VLAN of the VLL.
-- `description` (String) The description of the VLL.
-- `id` (Number) The ID of the VLL.
-- `name` (String) The name of the VLL.
-- `rate_limit_mbps` (Number) The rate limit in Mbps of the VLL.
-- `resource_name` (String) The resource name of the VLL.
-- `resource_type` (String) The resource type of the VLL.
-
-
-<a id="nestedatt--vxc_approval"></a>
-### Nested Schema for `vxc_approval`
-
-Read-Only:
-
-- `message` (String) The message of the VXC approval.
-- `new_speed` (Number) The new speed of the VXC approval.
-- `status` (String) The status of the VXC approval.
-- `type` (String) The type of the VXC approval.
-- `uid` (String) The UID of the VXC approval.
 
 ## Import
 
