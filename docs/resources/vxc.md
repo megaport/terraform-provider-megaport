@@ -357,7 +357,7 @@ Optional:
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
+- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
 - `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config))
 
 <a id="nestedatt--a_end_partner_config--aws_config"></a>
@@ -567,7 +567,7 @@ Optional:
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. DEPRECATED. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
+- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations, invalid on B-End Partner Config. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
 
 Read-Only:
 

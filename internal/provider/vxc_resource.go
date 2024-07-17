@@ -1342,7 +1342,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"partner_a_end_config": schema.SingleNestedAttribute{
-						Description:        "The partner configuration of the A-End order configuration. Only exists for A-End Configurations.",
+						Description:        "The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead.",
 						Optional:           true,
 						DeprecationMessage: "Deprecated: Use `vrouter_config` instead.",
 						Attributes: map[string]schema.Attribute{
@@ -1751,7 +1751,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"partner_a_end_config": schema.SingleNestedAttribute{
-						Description:        "The partner configuration of the A-End order configuration. DEPRECATED.",
+						Description:        "The partner configuration of the A-End order configuration. Only exists for A-End Configurations, invalid on B-End Partner Config. DEPRECATED: Use vrouter_config instead.",
 						Optional:           true,
 						DeprecationMessage: "Deprecated: Use `vrouter_config` instead.",
 						Attributes: map[string]schema.Attribute{
