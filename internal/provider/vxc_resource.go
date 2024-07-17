@@ -1329,7 +1329,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 													},
 													"as_path_prepend_count": schema.Int64Attribute{
-														Description: "The AS path prepend count of the BGP connection.",
+														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
 														Optional:    true,
 														Validators:  []validator.Int64{int64validator.Between(0, 10)},
 													},
@@ -1469,6 +1469,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"export_blacklist": schema.StringAttribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
+													},
+													"as_path_prepend_count": schema.Int64Attribute{
+														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
+														Optional:    true,
+														Validators:  []validator.Int64{int64validator.Between(0, 10)},
 													},
 												},
 											},
@@ -1733,7 +1738,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 													},
 													"as_path_prepend_count": schema.Int64Attribute{
-														Description: "The AS path prepend count of the BGP connection.",
+														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
 														Optional:    true,
 														Validators:  []validator.Int64{int64validator.Between(0, 10)},
 													},
@@ -1873,6 +1878,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"export_blacklist": schema.StringAttribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
+													},
+													"as_path_prepend_count": schema.Int64Attribute{
+														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
+														Optional:    true,
+														Validators:  []validator.Int64{int64validator.Between(0, 10)},
 													},
 												},
 											},
@@ -2411,16 +2421,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
-							PeerAsn:        int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalIpAddress: bgpConnection.LocalIPAddress.ValueString(),
-							PeerIpAddress:  bgpConnection.PeerIPAddress.ValueString(),
-							Password:       bgpConnection.Password.ValueString(),
-							Shutdown:       bgpConnection.Shutdown.ValueBool(),
-							Description:    bgpConnection.Description.ValueString(),
-							MedIn:          int(bgpConnection.MedIn.ValueInt64()),
-							MedOut:         int(bgpConnection.MedOut.ValueInt64()),
-							BfdEnabled:     bgpConnection.BfdEnabled.ValueBool(),
-							ExportPolicy:   bgpConnection.ExportPolicy.ValueString(),
+							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
+							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
+							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
+							Password:           bgpConnection.Password.ValueString(),
+							Shutdown:           bgpConnection.Shutdown.ValueBool(),
+							Description:        bgpConnection.Description.ValueString(),
+							MedIn:              int(bgpConnection.MedIn.ValueInt64()),
+							MedOut:             int(bgpConnection.MedOut.ValueInt64()),
+							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
+							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
+							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
