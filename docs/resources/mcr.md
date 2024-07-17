@@ -75,7 +75,6 @@ resource "megaport_mcr" "mcr" {
 - `lag_primary` (Boolean) Whether the product is a LAG primary.
 - `last_updated` (String) Last updated by the Terraform provider.
 - `live_date` (String) Date the product went live.
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the product is locked.
 - `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
@@ -87,7 +86,6 @@ resource "megaport_mcr" "mcr" {
 - `terminate_date` (String) Date the product will be terminated.
 - `usage_algorithm` (String) Usage algorithm of the product.
 - `virtual` (Boolean) Whether the product is virtual.
-- `virtual_router` (Attributes) Virtual router associated with the product. (see [below for nested schema](#nestedatt--virtual_router))
 - `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
 - `vxc_permitted` (Boolean) Whether VXC is permitted.
 
@@ -119,31 +117,6 @@ Optional:
 
 - `ge` (Number) The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).
 - `le` (Number) The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).
-
-
-
-<a id="nestedatt--location_details"></a>
-### Nested Schema for `location_details`
-
-Optional:
-
-- `city` (String) The city of the location.
-- `country` (String) The country of the location.
-- `metro` (String) The metro of the location.
-- `name` (String) The name of the location.
-
-
-<a id="nestedatt--virtual_router"></a>
-### Nested Schema for `virtual_router`
-
-Read-Only:
-
-- `asn` (Number) ASN of the virtual router.
-- `id` (Number) Numeric ID of the virtual router.
-- `name` (String) Name of the virtual router.
-- `resource_name` (String) Resource name of the virtual router.
-- `resource_type` (String) Resource type of the virtual router.
-- `speed` (Number) Speed of the virtual router.
 
 ## Import
 

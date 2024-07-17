@@ -103,7 +103,6 @@ type mveResourceModel struct {
 	NetworkInterfaces types.List   `tfsdk:"vnics"`
 	AttributeTags     types.Map    `tfsdk:"attribute_tags"`
 	Resources         types.Object `tfsdk:"resources"`
-	LocationDetails   types.Object `tfsdk:"location_details"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -302,18 +301,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 		orm.Resources = resourcesObj
 	}
 
-	if p.LocationDetails != nil {
-		locationDetailsModel := &productLocationDetailsModel{
-			Name:    types.StringValue(p.LocationDetails.Name),
-			City:    types.StringValue(p.LocationDetails.City),
-			Metro:   types.StringValue(p.LocationDetails.Metro),
-			Country: types.StringValue(p.LocationDetails.Country),
-		}
-		locationDetailsObject, locationDetailsDiags := types.ObjectValueFrom(ctx, productLocationDetailsAttrs, locationDetailsModel)
-		apiDiags = append(apiDiags, locationDetailsDiags...)
-		orm.LocationDetails = locationDetailsObject
-	}
-
 	return apiDiags
 }
 
@@ -471,9 +458,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"terminate_date": schema.StringAttribute{
 				Description: "The date the MVE will be terminated.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the MVE went live.",
@@ -650,47 +634,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					listplanmodifier.RequiresReplace(),
 				},
 			},
-			"location_details": schema.SingleNestedAttribute{
-				Description: "The location details of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.UseStateForUnknown(),
-				},
-				Attributes: map[string]schema.Attribute{
-					"name": schema.StringAttribute{
-						Description: "The name of the location.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"city": schema.StringAttribute{
-						Description: "The city of the location.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"metro": schema.StringAttribute{
-						Description: "The metro of the location.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"country": schema.StringAttribute{
-						Description: "The country of the location.",
-						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-				},
-			},
 			"vendor_config": schema.SingleNestedAttribute{
 				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
 				Required:    true,
@@ -820,41 +763,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Description: "The demarcation of the port interface.",
 								Computed:    true,
 							},
-							"description": schema.StringAttribute{
-								Description: "The description of the port interface.",
-								Computed:    true,
-							},
-							"id": schema.Int64Attribute{
-								Description: "The ID of the port interface.",
-								Computed:    true,
-								PlanModifiers: []planmodifier.Int64{
-									int64planmodifier.UseStateForUnknown(),
-								},
-							},
-							"loa_template": schema.StringAttribute{
-								Description: "The LOA template of the port interface.",
-								Computed:    true,
-							},
-							"media": schema.StringAttribute{
-								Description: "The media of the port interface.",
-								Computed:    true,
-							},
-							"name": schema.StringAttribute{
-								Description: "The name of the port interface.",
-								Computed:    true,
-							},
-							"port_speed": schema.Int64Attribute{
-								Description: "The port speed of the port interface.",
-								Computed:    true,
-							},
-							"resource_name": schema.StringAttribute{
-								Description: "The resource name of the port interface.",
-								Computed:    true,
-							},
-							"resource_type": schema.StringAttribute{
-								Description: "The resource type of the port interface.",
-								Computed:    true,
-							},
 							"up": schema.Int64Attribute{
 								Description: "Whether the port interface is up.",
 								Computed:    true,
@@ -879,6 +787,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								"cpu_count": schema.Int64Attribute{
 									Description: "The CPU count of the virtual machine.",
 									Computed:    true,
+									PlanModifiers: []planmodifier.Int64{
+										int64planmodifier.UseStateForUnknown(),
+									},
 								},
 								"image": schema.SingleNestedAttribute{
 									Description: "The image of the virtual machine.",
@@ -894,20 +805,32 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"vendor": schema.StringAttribute{
 											Description: "The vendor of the image.",
 											Computed:    true,
+											PlanModifiers: []planmodifier.String{
+												stringplanmodifier.UseStateForUnknown(),
+											},
 										},
 										"product": schema.StringAttribute{
 											Description: "The product of the image.",
 											Computed:    true,
+											PlanModifiers: []planmodifier.String{
+												stringplanmodifier.UseStateForUnknown(),
+											},
 										},
 										"version": schema.StringAttribute{
 											Description: "The version of the image.",
 											Computed:    true,
+											PlanModifiers: []planmodifier.String{
+												stringplanmodifier.UseStateForUnknown(),
+											},
 										},
 									},
 								},
 								"resource_type": schema.StringAttribute{
 									Description: "The resource type of the virtual machine.",
 									Computed:    true,
+									PlanModifiers: []planmodifier.String{
+										stringplanmodifier.UseStateForUnknown(),
+									},
 								},
 								"up": schema.BoolAttribute{
 									Description: "Whether the virtual machine is up.",
