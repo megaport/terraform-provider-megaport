@@ -458,6 +458,7 @@ Optional:
 
 Optional:
 
+- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
@@ -521,7 +522,7 @@ Optional:
 
 Optional:
 
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection.
+- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
@@ -670,6 +671,7 @@ Optional:
 
 Optional:
 
+- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
@@ -733,7 +735,7 @@ Optional:
 
 Optional:
 
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection.
+- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
