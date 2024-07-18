@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -957,9 +958,12 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	mve, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
 	if err != nil {
 		// MVE has been deleted or is not found
-		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
 		}
 
 		resp.Diagnostics.AddError(
