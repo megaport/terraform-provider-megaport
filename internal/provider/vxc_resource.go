@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -3044,10 +3046,25 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Get refreshed vxc value from API
 	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())
 	if err != nil {
+		// VXC has been deleted or is not found
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
+
 		resp.Diagnostics.AddError(
 			"Error Reading VXC",
 			"Could not read VXC with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
+		return
+	}
+
+	// If the vxc has been deleted
+	if vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

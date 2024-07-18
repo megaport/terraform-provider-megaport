@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -429,10 +431,25 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Get refreshed port value from API
 	port, err := r.client.PortService.GetPort(ctx, state.UID.ValueString())
 	if err != nil {
+		// Port has been deleted or is not found
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
+
 		resp.Diagnostics.AddError(
 			"Error Reading port",
 			"Could not read port with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
+		return
+	}
+
+	// If the port has been deleted
+	if port.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
