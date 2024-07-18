@@ -71,7 +71,6 @@ resource "megaport_mve" "mve" {
 - `created_by` (String) The user who created the MVE.
 - `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
 - `live_date` (String) The date the MVE went live.
-- `location_details` (Attributes) The location details of the product. (see [below for nested schema](#nestedatt--location_details))
 - `locked` (Boolean) Whether the MVE is locked.
 - `market` (String) The market the MVE is in.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
@@ -131,17 +130,6 @@ Required:
 - `description` (String) The description of the network interface.
 
 
-<a id="nestedatt--location_details"></a>
-### Nested Schema for `location_details`
-
-Optional:
-
-- `city` (String) The city of the location.
-- `country` (String) The country of the location.
-- `metro` (String) The metro of the location.
-- `name` (String) The name of the location.
-
-
 <a id="nestedatt--resources"></a>
 ### Nested Schema for `resources`
 
@@ -156,14 +144,6 @@ Read-Only:
 Read-Only:
 
 - `demarcation` (String) The demarcation of the port interface.
-- `description` (String) The description of the port interface.
-- `id` (Number) The ID of the port interface.
-- `loa_template` (String) The LOA template of the port interface.
-- `media` (String) The media of the port interface.
-- `name` (String) The name of the port interface.
-- `port_speed` (Number) The port speed of the port interface.
-- `resource_name` (String) The resource name of the port interface.
-- `resource_type` (String) The resource type of the port interface.
 - `up` (Number) Whether the port interface is up.
 
 
