@@ -79,7 +79,6 @@ resource "megaport_mve" "mve" {
 - `product_type` (String) The type of product (MVE).
 - `product_uid` (String) The unique identifier of the MVE.
 - `provisioning_status` (String) The provisioning status of the MVE.
-- `resources` (Attributes) The resources associated with the MVE. (see [below for nested schema](#nestedatt--resources))
 - `secondary_name` (String) The secondary name of the MVE.
 - `terminate_date` (String) The date the MVE will be terminated.
 - `usage_algorithm` (String) The usage algorithm of the MVE.
@@ -128,55 +127,6 @@ Optional:
 Required:
 
 - `description` (String) The description of the network interface.
-
-
-<a id="nestedatt--resources"></a>
-### Nested Schema for `resources`
-
-Read-Only:
-
-- `interface` (Attributes) The port interface of the MVE. (see [below for nested schema](#nestedatt--resources--interface))
-- `virtual_machine` (Attributes List) The virtual machines associated with the MVE. (see [below for nested schema](#nestedatt--resources--virtual_machine))
-
-<a id="nestedatt--resources--interface"></a>
-### Nested Schema for `resources.interface`
-
-Read-Only:
-
-- `demarcation` (String) The demarcation of the port interface.
-- `up` (Number) Whether the port interface is up.
-
-
-<a id="nestedatt--resources--virtual_machine"></a>
-### Nested Schema for `resources.virtual_machine`
-
-Read-Only:
-
-- `cpu_count` (Number) The CPU count of the virtual machine.
-- `id` (Number) The ID of the virtual machine.
-- `image` (Attributes) The image of the virtual machine. (see [below for nested schema](#nestedatt--resources--virtual_machine--image))
-- `resource_type` (String) The resource type of the virtual machine.
-- `up` (Boolean) Whether the virtual machine is up.
-- `vnics` (Attributes List) The network interfaces of the virtual machine. (see [below for nested schema](#nestedatt--resources--virtual_machine--vnics))
-
-<a id="nestedatt--resources--virtual_machine--image"></a>
-### Nested Schema for `resources.virtual_machine.image`
-
-Read-Only:
-
-- `id` (Number) The ID of the image.
-- `product` (String) The product of the image.
-- `vendor` (String) The vendor of the image.
-- `version` (String) The version of the image.
-
-
-<a id="nestedatt--resources--virtual_machine--vnics"></a>
-### Nested Schema for `resources.virtual_machine.vnics`
-
-Read-Only:
-
-- `description` (String) The description of the network interface.
-- `vlan` (Number) The VLAN of the network interface.
 
 ## Import
 

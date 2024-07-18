@@ -30,34 +30,8 @@ var (
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
 
-	resourcesAttrs = map[string]attr.Type{
-		"interface":       types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),
-		"virtual_machine": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(virtualMachineAttrs)),
-	}
-
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
-	}
-
-	vmVnicAttrs = map[string]attr.Type{
-		"description": types.StringType,
-		"vlan":        types.Int64Type,
-	}
-
-	virtualMachineAttrs = map[string]attr.Type{
-		"id":            types.Int64Type,
-		"cpu_count":     types.Int64Type,
-		"image":         types.ObjectType{}.WithAttributeTypes(virtualMachineImageAttrs),
-		"resource_type": types.StringType,
-		"up":            types.BoolType,
-		"vnics":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vmVnicAttrs)),
-	}
-
-	virtualMachineImageAttrs = map[string]attr.Type{
-		"id":      types.Int64Type,
-		"vendor":  types.StringType,
-		"product": types.StringType,
-		"version": types.StringType,
 	}
 )
 
@@ -100,9 +74,8 @@ type mveResourceModel struct {
 
 	VendorConfig types.Object `tfsdk:"vendor_config"`
 
-	NetworkInterfaces types.List   `tfsdk:"vnics"`
-	AttributeTags     types.Map    `tfsdk:"attribute_tags"`
-	Resources         types.Object `tfsdk:"resources"`
+	NetworkInterfaces types.List `tfsdk:"vnics"`
+	AttributeTags     types.Map  `tfsdk:"attribute_tags"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -110,40 +83,10 @@ type mveNetworkInterfaceModel struct {
 	Description types.String `tfsdk:"description"`
 }
 
-// mveVMNetworkInterfaceModel represents a vNIC from the API with VLAN.
-type mveVMNetworkInterfaceModel struct {
-	Description types.String `tfsdk:"description"`
-	VLAN        types.Int64  `tfsdk:"vlan"`
-}
-
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
 	return &megaport.MVENetworkInterface{
 		Description: orm.Description.ValueString(),
 	}
-}
-
-// mveResourcesModel represents the resources associated with an MVE.
-type mveResourcesModel struct {
-	Interface       types.Object `tfsdk:"interface"`
-	VirtualMachines types.List   `tfsdk:"virtual_machine"`
-}
-
-// mveVirtualMachineModel represents a virtual machine associated with an MVE.
-type mveVirtualMachineModel struct {
-	ID           types.Int64  `tfsdk:"id"`
-	CpuCount     types.Int64  `tfsdk:"cpu_count"`
-	Image        types.Object `tfsdk:"image"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Up           types.Bool   `tfsdk:"up"`
-	Vnics        types.List   `tfsdk:"vnics"`
-}
-
-// MVVEVirtualMachineImage represents the image associated with an MVE virtual machine.
-type mveVirtualMachineImageModel struct {
-	ID      types.Int64  `tfsdk:"id"`
-	Vendor  types.String `tfsdk:"vendor"`
-	Product types.String `tfsdk:"product"`
-	Version types.String `tfsdk:"version"`
 }
 
 // vendorConfigModel represents the vendor configuration for an MVE.
@@ -245,61 +188,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	networkInterfaceList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vnicAttrs), vnics)
 	apiDiags = append(apiDiags, listDiags...)
 	orm.NetworkInterfaces = networkInterfaceList
-
-	if p.Resources != nil {
-		resourcesModel := &mveResourcesModel{}
-		if p.Resources.Interface != nil {
-			interfaceObject, interfaceDiags := fromAPIPortInterface(ctx, p.Resources.Interface)
-			apiDiags = append(apiDiags, interfaceDiags...)
-			resourcesModel.Interface = interfaceObject
-		} else {
-			resourcesModel.Interface = types.ObjectNull(portInterfaceAttrs)
-		}
-		virtualMachineObjects := []types.Object{}
-		for _, vm := range p.Resources.VirtualMachines {
-			vmModel := &mveVirtualMachineModel{
-				ID:           types.Int64Value(int64(vm.ID)),
-				CpuCount:     types.Int64Value(int64(vm.CpuCount)),
-				ResourceType: types.StringValue(vm.ResourceType),
-				Up:           types.BoolValue(vm.Up),
-			}
-			if vm.Image != nil {
-				imageModel := &mveVirtualMachineImageModel{
-					ID:      types.Int64Value(int64(vm.Image.ID)),
-					Vendor:  types.StringValue(vm.Image.Vendor),
-					Product: types.StringValue(vm.Image.Product),
-					Version: types.StringValue(vm.Image.Version),
-				}
-				image, imageDiags := types.ObjectValueFrom(ctx, virtualMachineImageAttrs, imageModel)
-				apiDiags = append(apiDiags, imageDiags...)
-				vmModel.Image = image
-			} else {
-				vmModel.Image = types.ObjectNull(virtualMachineImageAttrs)
-			}
-			vnics := []types.Object{}
-			for _, vnic := range vm.Vnics {
-				model := &mveVMNetworkInterfaceModel{
-					Description: types.StringValue(vnic.Description),
-					VLAN:        types.Int64Value(int64(vnic.VLAN)),
-				}
-				vnic, vnicDiags := types.ObjectValueFrom(ctx, vmVnicAttrs, model)
-				apiDiags = append(apiDiags, vnicDiags...)
-				vnics = append(vnics, vnic)
-			}
-			vnicList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vmVnicAttrs), vnics)
-			apiDiags = append(apiDiags, listDiags...)
-			vmModel.Vnics = vnicList
-			vmObject, vmDiags := types.ObjectValueFrom(ctx, virtualMachineAttrs, vmModel)
-			apiDiags = append(apiDiags, vmDiags...)
-			virtualMachineObjects = append(virtualMachineObjects, vmObject)
-		}
-		virtualMachinesList, vmListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(virtualMachineAttrs), virtualMachineObjects)
-		apiDiags = append(apiDiags, vmListDiags...)
-		resourcesModel.VirtualMachines = virtualMachinesList
-		resourcesObj, resourcesDiags := types.ObjectValueFrom(ctx, resourcesAttrs, resourcesModel)
-		apiDiags = append(apiDiags, resourcesDiags...)
-		orm.Resources = resourcesObj
-	}
 
 	return apiDiags
 }
@@ -748,112 +636,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"token": schema.StringAttribute{
 						Description: "The token for the vendor config. Required for Meraki MVE.",
 						Optional:    true,
-					},
-				},
-			},
-			"resources": schema.SingleNestedAttribute{
-				Description: "The resources associated with the MVE.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"interface": schema.SingleNestedAttribute{
-						Description: "The port interface of the MVE.",
-						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"demarcation": schema.StringAttribute{
-								Description: "The demarcation of the port interface.",
-								Computed:    true,
-							},
-							"up": schema.Int64Attribute{
-								Description: "Whether the port interface is up.",
-								Computed:    true,
-							},
-						},
-						PlanModifiers: []planmodifier.Object{
-							objectplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"virtual_machine": schema.ListNestedAttribute{
-						Description: "The virtual machines associated with the MVE.",
-						Computed:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.Int64Attribute{
-									Description: "The ID of the virtual machine.",
-									Computed:    true,
-									PlanModifiers: []planmodifier.Int64{
-										int64planmodifier.UseStateForUnknown(),
-									},
-								},
-								"cpu_count": schema.Int64Attribute{
-									Description: "The CPU count of the virtual machine.",
-									Computed:    true,
-									PlanModifiers: []planmodifier.Int64{
-										int64planmodifier.UseStateForUnknown(),
-									},
-								},
-								"image": schema.SingleNestedAttribute{
-									Description: "The image of the virtual machine.",
-									Computed:    true,
-									Attributes: map[string]schema.Attribute{
-										"id": schema.Int64Attribute{
-											Description: "The ID of the image.",
-											Computed:    true,
-											PlanModifiers: []planmodifier.Int64{
-												int64planmodifier.UseStateForUnknown(),
-											},
-										},
-										"vendor": schema.StringAttribute{
-											Description: "The vendor of the image.",
-											Computed:    true,
-											PlanModifiers: []planmodifier.String{
-												stringplanmodifier.UseStateForUnknown(),
-											},
-										},
-										"product": schema.StringAttribute{
-											Description: "The product of the image.",
-											Computed:    true,
-											PlanModifiers: []planmodifier.String{
-												stringplanmodifier.UseStateForUnknown(),
-											},
-										},
-										"version": schema.StringAttribute{
-											Description: "The version of the image.",
-											Computed:    true,
-											PlanModifiers: []planmodifier.String{
-												stringplanmodifier.UseStateForUnknown(),
-											},
-										},
-									},
-								},
-								"resource_type": schema.StringAttribute{
-									Description: "The resource type of the virtual machine.",
-									Computed:    true,
-									PlanModifiers: []planmodifier.String{
-										stringplanmodifier.UseStateForUnknown(),
-									},
-								},
-								"up": schema.BoolAttribute{
-									Description: "Whether the virtual machine is up.",
-									Computed:    true,
-								},
-								"vnics": schema.ListNestedAttribute{
-									Description: "The network interfaces of the virtual machine.",
-									Computed:    true,
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"description": schema.StringAttribute{
-												Description: "The description of the network interface.",
-												Computed:    true,
-											},
-											"vlan": schema.Int64Attribute{
-												Description: "The VLAN of the network interface.",
-												Computed:    true,
-											},
-										},
-									},
-								},
-							},
-						},
 					},
 				},
 			},
