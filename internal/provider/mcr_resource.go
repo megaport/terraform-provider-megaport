@@ -111,6 +111,11 @@ type mcrPrefixListEntryModel struct {
 func (orm *mcrResourceModel) fromAPIMCR(_ context.Context, m *megaport.MCR) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
+	asn := m.Resources.VirtualRouter.ASN
+	if asn != 0 {
+		orm.ASN = types.Int64Value(int64(asn))
+	}
+
 	orm.ID = types.Int64Value(int64(m.ID))
 	orm.UID = types.StringValue(m.UID)
 	orm.Name = types.StringValue(m.Name)
@@ -409,6 +414,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"asn": schema.Int64Attribute{
 				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.",
 				Optional:    true,
+				Computed:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
 				Description: "Whether VXC is permitted.",
