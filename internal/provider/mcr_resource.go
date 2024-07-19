@@ -111,11 +111,9 @@ type mcrPrefixListEntryModel struct {
 func (orm *mcrResourceModel) fromAPIMCR(_ context.Context, m *megaport.MCR) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
-	if orm.ASN.IsNull() {
-		asn := m.Resources.VirtualRouter.ASN
-		if asn != 0 {
-			orm.ASN = types.Int64Value(int64(asn))
-		}
+	asn := m.Resources.VirtualRouter.ASN
+	if asn != 0 {
+		orm.ASN = types.Int64Value(int64(asn))
 	}
 
 	orm.ID = types.Int64Value(int64(m.ID))
