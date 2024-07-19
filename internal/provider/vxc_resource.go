@@ -1613,7 +1613,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vrouter_config": schema.SingleNestedAttribute{
 						Description: "The partner configuration of the virtual router configuration.",
-						Computed:    true,
+						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"interfaces": schema.ListNestedAttribute{
 								Description: "The interfaces of the partner configuration.",
