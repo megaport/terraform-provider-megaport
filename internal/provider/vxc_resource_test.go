@@ -387,6 +387,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic()
                     b_end_partner_config = {
                         partner = "azure"
                         azure_config = {
+							port_choice = "primary"
                             service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
                         }
                     }
@@ -678,6 +679,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 					b_end_partner_config = {
 					  partner = "azure"
 					  azure_config = {
+					    port_choice = "primary"
 						service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 					  }
 					}
