@@ -14,7 +14,7 @@ This guide provides an example configuration for creating a Megaport Internet VX
 provider "megaport" {
   environment           = "staging"
   access_key            = "access_key"
-  secret_key            = "secret_key"
+  secret_key            = "secret_Key"
   accept_purchase_terms = true
 }
 
@@ -26,68 +26,100 @@ data "megaport_location" "syd_gs" {
   name = "Global Switch Sydney West"
 }
 
-data "megaport_partner" "internet_port" {
-  connect_type = "TRANSIT"
-  company_name = "Networks"
-  product_name = "Megaport Internet"
+data "megaport_partner" "aws_port" {
+  connect_type = "AWSHC"
+  company_name = "AWS"
+  product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
   location_id  = data.megaport_location.syd_gs.id
 }
 
-resource "megaport_port" "port" {
-  product_name           = "Megaport Example Port"
-  port_speed             = 1000
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 12
-  marketplace_visibility = true
-  cost_centre            = "Megaport Example Port"
-}
-
-resource "megaport_mve" "mve" {
-  product_name         = "Megaport Aruba MVE"
+resource "megaport_mcr" "mcr" {
+  product_name         = "Megaport Example MCR"
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 1
+  port_speed           = 5000
+  asn                  = 64555
+  cost_centre          = "MCR Example"
 
-  vnics = [
-    {
-      description = "Data Plane"
-    },
-    {
-      description = "Management Plane"
-    },
-    {
-      description = "Control Plane"
-    }
-  ]
-
-  vendor_config = {
-    vendor       = "aruba"
-    product_size = "MEDIUM"
-    image_id     = 23
-    account_name = "Megaport Aruba MVE"
-    account_key  = "Megaport Aruba MVE"
-    system_tag   = "Preconfiguration-aruba-test-1"
-  }
+  prefix_filter_lists = [{
+    description    = "Megaport Example Prefix Filter List"
+    address_family = "IPv4"
+    entries = [
+      {
+        action = "permit"
+        prefix = "10.0.1.0/24"
+        ge     = 24
+        le     = 24
+      },
+      {
+        action = "deny"
+        prefix = "10.0.2.0/24"
+        ge     = 24
+        le     = 24
+      }
+    ]
+  }]
 }
 
-resource "megaport_vxc" "transit_vxc" {
-  product_name         = "Transit VXC Example"
-  rate_limit           = 100
+resource "megaport_vxc" "aws_vxc" {
+  product_name         = "Megaport Example VXC - AWS"
+  rate_limit           = 1000
   contract_term_months = 1
 
   a_end = {
-    requested_product_uid = megaport_mve.mve.product_uid
-    vnic_index            = 2
+    requested_product_uid = megaport_mcr.mcr.product_uid
+    ordered_vlan          = 0
+  }
+
+  a_end_partner_config = {
+    partner = "vrouter"
+    vrouter_config = {
+      interfaces = [
+        {
+          ip_addresses     = ["10.0.0.1/30"]
+          nat_ip_addresses = ["10.0.0.1"]
+          bfd = {
+            tx_interval = 500
+            rx_interval = 400
+            multiplier  = 5
+          }
+          bgp_connections = [
+            {
+              peer_asn          = 64512
+              local_ip_address  = "10.0.0.1"
+              peer_ip_address   = "10.0.0.2"
+              password          = "notARealPassword"
+              shutdown          = false
+              description       = "BGP Connection 1"
+              med_in            = 100
+              med_out           = 100
+              bfd_enabled       = true
+              export_policy     = "deny"
+              permit_export_to  = ["10.0.1.2"]
+              import_white_list = "Megaport Example Prefix Filter List"
+            }
+          ]
+        }
+      ]
+    }
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.internet_port.product_uid
+    requested_product_uid = data.megaport_partner.aws_port.product_uid
   }
 
   b_end_partner_config = {
-    partner = "transit"
+    partner = "aws"
+    aws_config = {
+      name          = "Megaport Example VXC - AWS"
+      asn           = 64550
+      type          = "private"
+      connect_type  = "AWSHC"
+      amazon_asn    = 64551
+      owner_account = "123456789012"
+    }
   }
 }
-
 ```
 
 
