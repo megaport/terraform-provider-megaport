@@ -12,7 +12,7 @@ This guide provides an example configuration for creating a Megaport VXC with BG
 
 This example configuration creates a Megaport Cloud Router (MCR) and a VXC with BGP for MCR to an AWS Hosted Connection.
 
-```
+```terraform
 provider "megaport" {
   environment           = "staging"
   access_key            = "access_key"

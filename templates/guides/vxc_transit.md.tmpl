@@ -12,7 +12,7 @@ This guide provides an example configuration for creating a Megaport Internet VX
 
 This example configuration creates a Megaport Virtual Edge (MVE) and an Internet VXC.
 
-```
+```terraform
 provider "megaport" {
   environment           = "staging"
   access_key            = "access_key"

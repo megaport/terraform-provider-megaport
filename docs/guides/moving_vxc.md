@@ -17,7 +17,7 @@ This guide provides an example configuration for moving a VXC to a different end
 ## Initial Configuration
 
 In this example, we create four Ports and a VXC connecting the first two Ports.
-```
+```terraform
 provider "megaport" {
   environment           = "staging"
   access_key            = "access_key"
@@ -82,7 +82,7 @@ resource "megaport_vxc" "vxc" {
 
 In this example, we move the VXC to connect the third and fourth Ports by re-assigning the `product_uid` field of the A-End and B-End configuration of the VXC.
 
-```
+```terraform
 provider "megaport" {
   environment           = "staging"
   access_key            = "access_key"
