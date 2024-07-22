@@ -36,6 +36,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        location_id = data.megaport_location.bne_nxt1.id
 			        contract_term_months        = 12
 					marketplace_visibility = true
+					diversity_zone = "red"
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
@@ -43,6 +44,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_port.port", "marketplace_visibility", "true"),
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_port.port", "diversity_zone", "red"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
@@ -84,6 +86,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        location_id = data.megaport_location.bne_nxt1.id
 			        contract_term_months        = 12
 					marketplace_visibility = false
+					diversity_zone = "red"
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
@@ -91,6 +94,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_port.port", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", costCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_port.port", "diversity_zone", "red"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
