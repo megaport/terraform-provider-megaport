@@ -1,5 +1,5 @@
 ---
-page_title: "Moving VXC End Configuration"
+page_title: "Moving VXC End Configurations"
 description: |-
   How to move a VXC to a different end configuration
 ---
