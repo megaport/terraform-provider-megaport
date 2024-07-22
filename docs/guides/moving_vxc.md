@@ -8,8 +8,8 @@ description: |-
 
 This guide provides an example configuration for moving a VXC to a different end configuration.
 
-- The new Port can be in a different location but must be in the same metro area.
-- The new Port must be of the same type. For example, MEGAPORT to MEGAPORT, MCR to MCR, or MVE to MVE.
+- The new endpoint can be in a different location but must be in the same metro area.
+- The new endpoint must be of the same type. For example, MEGAPORT to MEGAPORT, MCR to MCR, or MVE to MVE.
 - The configured speed of each VXC must be no greater than the speed of the destination Port. If downgrading, it might be necessary for you to lower the speed of the VXC before requesting the move.
 - There must not be an IP address or VLAN conflict. The updated services are checked as if a new service is being ordered. For example, an untagged VLAN can't be moved to a - service that already has an untagged VLAN.
 - The services being moved must have different VLAN IDs from any services already on the destination.
