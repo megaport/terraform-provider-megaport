@@ -231,6 +231,7 @@ resource "megaport_vxc" "azure_vxc" {
   b_end_partner_config = {
     partner = "azure"
     azure_config = {
+      port_choice = "primary"
       service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
     }
   }
@@ -385,6 +386,7 @@ Optional:
 
 Required:
 
+- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:
@@ -595,6 +597,7 @@ Optional:
 
 Required:
 
+- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:

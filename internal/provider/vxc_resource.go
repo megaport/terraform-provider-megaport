@@ -103,6 +103,7 @@ var (
 
 	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
 		"service_key": types.StringType,
+		"port_choice": types.StringType,
 		"peers":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs)),
 	}
 
@@ -295,6 +296,7 @@ type vxcPartnerConfigAWSModel struct {
 type vxcPartnerConfigAzureModel struct {
 	vxcPartnerConfig
 	ServiceKey types.String `tfsdk:"service_key"`
+	PortChoice types.String `tfsdk:"port_choice"`
 	Peers      types.List   `tfsdk:"peers"`
 }
 
@@ -1144,6 +1146,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Required:    true,
 								Sensitive:   true,
 							},
+							"port_choice": schema.StringAttribute{
+								Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf("primary", "secondary"),
+								},
+							},
 							"peers": schema.ListNestedAttribute{
 								Description: "The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC.",
 								Optional:    true,
@@ -1552,6 +1561,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Description: "The service key of the partner configuration. Required for Azure partner configurations.",
 								Required:    true,
 								Sensitive:   true,
+							},
+							"port_choice": schema.StringAttribute{
+								Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf("primary", "secondary"),
+								},
 							},
 							"peers": schema.ListNestedAttribute{
 								Description: "The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC.",
@@ -2027,13 +2043,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(azureDiags...)
 				return
 			}
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       azureConfig.ServiceKey.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "AZURE",
+			partnerPortReq := &megaport.ListPartnerPortsRequest{
+				Key:     azureConfig.ServiceKey.ValueString(),
+				Partner: "AZURE",
 			}
-			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2041,7 +2055,20 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				)
 				return
 			}
-			aEndConfig.ProductUID = partnerPortRes.ProductUID
+			// find primary or secondary port
+			for _, port := range partnerPortRes.Data.Megaports {
+				if port.Type == azureConfig.PortChoice.ValueString() {
+					aEndConfig.ProductUID = port.ProductUID
+				}
+			}
+			if aEndConfig.ProductUID == "" {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
+				)
+				return
+			}
+
 			aEndPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
@@ -2660,15 +2687,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
 			resp.Diagnostics.Append(azureDiags...)
 
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       azureConfig.ServiceKey.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "AZURE",
+			partnerPortReq := &megaport.ListPartnerPortsRequest{
+				Key:     azureConfig.ServiceKey.ValueString(),
+				Partner: "AZURE",
 			}
-			if !b.RequestedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
-			}
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2676,7 +2699,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				)
 				return
 			}
-			bEndConfig.ProductUID = partnerPortRes.ProductUID
+			// find primary or secondary port
+			for _, port := range partnerPortRes.Data.Megaports {
+				if port.Type == azureConfig.PortChoice.ValueString() {
+					bEndConfig.ProductUID = port.ProductUID
+				}
+			}
+			if bEndConfig.ProductUID == "" {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
+				)
+				return
+			}
 
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
