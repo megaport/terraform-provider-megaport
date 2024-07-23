@@ -317,6 +317,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"resources": schema.SingleNestedAttribute{
