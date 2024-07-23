@@ -89,7 +89,6 @@ resource "megaport_vxc" "transit_vxc" {
     partner = "transit"
   }
 }
-
 ```
 
 ## Megaport Internet Documentation

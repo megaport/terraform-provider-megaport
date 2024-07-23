@@ -55,7 +55,6 @@ resource "megaport_vxc" "vxc" {
     requested_product_uid = megaport_port.port_2.product_uid
   }
 }
-
 ```
 
 ## VXC Documentation

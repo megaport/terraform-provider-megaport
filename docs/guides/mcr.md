@@ -49,7 +49,6 @@ resource "megaport_mcr" "mcr" {
     ]
   }]
 }
-
 ```
 
 ## Megaport Cloud Router Documentation

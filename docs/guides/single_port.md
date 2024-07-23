@@ -41,3 +41,7 @@ resource "megaport_port" "port" {
   cost_centre            = "Megaport Single Port Example"
 }
 ```
+
+## Additional documentation on Ports
+
+For additional documentation on creating a port, please visit [this page](https://docs.megaport.com/connections/creating-port/).

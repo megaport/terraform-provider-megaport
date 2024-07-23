@@ -163,5 +163,4 @@ resource "megaport_vxc" "azure_vxc" {
     }
   }
 }
-
 ```

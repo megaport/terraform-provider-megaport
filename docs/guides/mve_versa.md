@@ -40,7 +40,6 @@ resource "megaport_mve" "mve" {
     serial_number      = "Megaport-Hub1"
   }
 }
-
 ```
 
 ## MVE Documentation

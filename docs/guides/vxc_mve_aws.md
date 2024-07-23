@@ -99,5 +99,4 @@ resource "megaport_vxc" "aws_vxc" {
     }
   }
 }
-
 ```

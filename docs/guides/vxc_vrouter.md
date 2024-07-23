@@ -118,7 +118,7 @@ resource "megaport_vxc" "aws_vxc" {
       type          = "private"
       connect_type  = "AWSHC"
       amazon_asn    = 64551
-      owner_account = "123456789012"
+      owner_account = "684021030471"
     }
   }
 }
