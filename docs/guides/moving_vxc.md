@@ -144,11 +144,11 @@ resource "megaport_vxc" "vxc" {
 
 Once the VXCs are moved, the VXC will be connected to the third and fourth Ports.  The user can then delete the first and second Ports if they are no longer required.
 
-## Example with AWS Virtual Interface, MCR, and Port
+## Example with AWS Virtual Interface and two MCRs.
 
-In this example, we move a VXC connecting an AWS Virtual Interface and an MCR to a Port and MCR.
+In this example, we move a VXC connecting an AWS Virtual Interface and an MCR to connect to a different MCR.
 
-First provision the resources for the Port, MCR, and AWS Virtual Interface VXC.
+First provision the resources for the two MCRs and the AWS Virtual Interface VXC.
 ```terraform
 provider "megaport" {
   environment           = "staging"
@@ -172,15 +172,6 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
-resource "megaport_port" "port" {
-  product_name           = "Megaport Port Example"
-  port_speed             = 1000
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 1
-  marketplace_visibility = false
-  cost_centre            = "Megaport Single Port Example"
-}
-
 resource "megaport_mcr" "mcr" {
   product_name         = "Megaport Example MCR A-End"
   location_id          = data.megaport_location.bne_nxt1.id
@@ -188,6 +179,15 @@ resource "megaport_mcr" "mcr" {
   port_speed           = 5000
   asn                  = 64555
   cost_centre          = "MCR Example"
+}
+
+resource "megaport_mcr" "mcr_2" {
+  product_name         = "Megaport Example MCR A-End 2"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+  port_speed           = 10000
+  asn                  = 64555
+  cost_centre          = "MCR Example 2"
 }
 
 resource "megaport_vxc" "aws_vxc" {
@@ -218,7 +218,7 @@ resource "megaport_vxc" "aws_vxc" {
 }
 ```
 
-Then, move the VXC to connect the Port and MCR.
+Then, move the VXC to a different MCR.
 
 ```terraform
 provider "megaport" {
@@ -243,15 +243,6 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
-resource "megaport_port" "port" {
-  product_name           = "Megaport Port Example"
-  port_speed             = 1000
-  location_id            = data.megaport_location.bne_nxt1.id
-  contract_term_months   = 1
-  marketplace_visibility = false
-  cost_centre            = "Megaport Single Port Example"
-}
-
 resource "megaport_mcr" "mcr" {
   product_name         = "Megaport Example MCR A-End"
   location_id          = data.megaport_location.bne_nxt1.id
@@ -261,20 +252,41 @@ resource "megaport_mcr" "mcr" {
   cost_centre          = "MCR Example"
 }
 
+resource "megaport_mcr" "mcr_2" {
+  product_name         = "Megaport Example MCR A-End 2"
+  location_id          = data.megaport_location.bne_nxt1.id
+  contract_term_months = 1
+  port_speed           = 10000
+  asn                  = 64555
+  cost_centre          = "MCR Example 2"
+}
+
 resource "megaport_vxc" "aws_vxc" {
   product_name         = "Megaport VXC Example - AWS"
   rate_limit           = 1000
   contract_term_months = 1
 
   a_end = {
-    requested_product_uid = megaport.mcr.mcr.product_uid
+    requested_product_uid = megaport.mcr.mcr_2.product_uid
     ordered_vlan          = 2191
   }
 
   b_end = {
-    requested_product_uid = megaport.port.port.product_uid
+    requested_product_uid = data.megaport_partner.aws_port.product_uid
+  }
+
+  b_end_partner_config = {
+    partner = "aws"
+    aws_config = {
+      name          = "Megaport VXC Example - AWS"
+      asn           = 64550
+      type          = "private"
+      connect_type  = "AWS"
+      amazon_asn    = 64551
+      owner_account = "123456789012"
+    }
   }
 }
 ```
 
-Delete the AWS Virtual Interface on AWS if it is no longer required.
+Once the VXC is successfully moved to the second MCR, the user can delete the first MCR if it is no longer required.
