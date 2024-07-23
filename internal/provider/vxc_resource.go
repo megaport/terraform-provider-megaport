@@ -947,6 +947,16 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"requested_product_uid": schema.StringAttribute{
 						Description: "The Product UID requested by the user for the A-End configuration.",
 						Required:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplaceIf(
+								func(ctx context.Context, sr planmodifier.StringRequest, rrifr *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+									if sr.PlanValue.IsUnknown() {
+										rrifr.RequiresReplace = true
+									}
+								},
+								"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
+								""),
+						},
 					},
 					"current_product_uid": schema.StringAttribute{
 						Description: "The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.",
@@ -1021,6 +1031,17 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Product UID requested by the user for the B-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplaceIf(
+								func(ctx context.Context, sr planmodifier.StringRequest, rrifr *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+									if sr.PlanValue.IsUnknown() {
+										rrifr.RequiresReplace = true
+									}
+								},
+								"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
+								"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
+							),
+						},
 					},
 					"current_product_uid": schema.StringAttribute{
 						Description: "The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.",
