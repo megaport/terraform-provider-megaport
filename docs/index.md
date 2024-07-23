@@ -22,7 +22,7 @@ in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptabl
 
 ## Configuring the provider
 
-First you'll need to create an API key, docs for which can be found [here](https://docs.megaport.com/api/api-key/
+First you'll need to create an API key, docs for which can be found [here](https://docs.megaport.com/api/api-key/).
 
 ```terraform
 provider "megaport" {
