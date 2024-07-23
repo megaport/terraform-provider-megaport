@@ -57,3 +57,7 @@ resource "megaport_vxc" "vxc" {
 }
 
 ```
+
+## VXC Documentation
+
+For additional documentation on VXCs, please visit [this page](https://docs.megaport.com/connections/).

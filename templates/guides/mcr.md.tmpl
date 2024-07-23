@@ -51,3 +51,7 @@ resource "megaport_mcr" "mcr" {
 }
 
 ```
+
+## Megaport Cloud Router Documentation
+
+For more information on creating and using a Megaport Cloud Router, additional documentation is available [here](https://docs.megaport.com/mcr/). 

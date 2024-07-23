@@ -51,3 +51,7 @@ resource "megaport_mve" "mve" {
   }
 }
 ```
+
+## MVE Documentation
+
+For more information on creating and using an Aruba Megaport Virtual Edge, additional documentation is available [here](https://docs.megaport.com/mve/).

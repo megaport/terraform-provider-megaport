@@ -91,3 +91,7 @@ resource "megaport_vxc" "transit_vxc" {
 }
 
 ```
+
+## Megaport Internet Documentation
+
+For additional documentation on Megaport Internet, please visit [this page](https://docs.megaport.com/megaport-internet/).

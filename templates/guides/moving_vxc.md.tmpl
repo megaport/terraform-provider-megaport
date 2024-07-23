@@ -290,3 +290,7 @@ resource "megaport_vxc" "aws_vxc" {
 ```
 
 Once the VXC is successfully moved to the second MCR, the user can delete the first MCR if it is no longer required.
+
+## Additional Documentation on Moving VXCs
+
+For additional documentation on moving VXCs, please visit [Moving a VXC](https://docs.megaport.com/connections/move-vxc/).

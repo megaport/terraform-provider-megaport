@@ -34,3 +34,7 @@ resource "megaport_lag_port" "lag_port" {
   cost_centre            = "Lag Port Example"
 }
 ```
+
+## LAG Port Documentation
+
+For more information on creating and using LAG ports with Megaport, please see [Creating a Link Aggregation Group (LAG) Port](https://docs.megaport.com/connections/lag/) and [Adding a Port to a LAG](https://docs.megaport.com/connections/lag-adding/).
