@@ -311,6 +311,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"promo_code": schema.StringAttribute{
