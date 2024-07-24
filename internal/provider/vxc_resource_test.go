@@ -18,6 +18,16 @@ func TestVXCBasicProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(VXCBasicProviderTestSuite))
 }
 
+func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+}
+
+func TestVXCWithMVEProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithMVEProviderTestSuite))
+}
+
 func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
@@ -73,11 +83,13 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                     a_end = {
                         requested_product_uid = megaport_port.port_1.product_uid
 						ordered_vlan = 100
+						inner_vlan = 300
                     }
 
                     b_end = {
                         requested_product_uid = megaport_port.port_2.product_uid
 						ordered_vlan = 101
+						inner_vlan = 301
                     }
                   }
                   `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
@@ -110,6 +122,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
@@ -178,11 +192,13 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = 100
+						inner_vlan = 300
 			        }
 
 			        b_end = {
 			            requested_product_uid = megaport_port.port_4.product_uid
 						ordered_vlan = 101
+						inner_vlan = 301
 			        }
 			      }
 			      `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
@@ -215,9 +231,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
 				),
 			},
-			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN
+			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN/Inner VLAN
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
@@ -262,11 +280,13 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = 200
+						inner_vlan = 400
 			        }
 
 			        b_end = {
 			            requested_product_uid = megaport_port.port_4.product_uid
 						ordered_vlan = 201
+						inner_vlan = 401
 			        }
 			      }
 			      `, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
@@ -300,15 +320,12 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "201"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "201"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "400"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
 				),
 			},
 		},
 	})
-}
-
-func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
 }
 
 func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
@@ -844,11 +861,6 @@ func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 			},
 		},
 	})
-}
-
-func TestVXCWithMVEProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCWithMVEProviderTestSuite))
 }
 
 func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXC() {

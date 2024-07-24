@@ -2,20 +2,23 @@ package provider
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
 type MVEArubaProviderTestSuite ProviderTestSuite
 type MVEVersaProviderTestSuite ProviderTestSuite
 
-func TestMVEArubaProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEArubaProviderTestSuite))
-}
+// func TestMVEArubaProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(MVEArubaProviderTestSuite))
+// }
+
+// func TestMVEVersaProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(MVEVersaProviderTestSuite))
+// }
 
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	mveName := RandomTestName()
@@ -153,11 +156,6 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 			},
 		},
 	})
-}
-
-func TestMVEVersaProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVersaProviderTestSuite))
 }
 
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {

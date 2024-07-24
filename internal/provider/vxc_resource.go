@@ -1006,6 +1006,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The inner VLAN of the A-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
