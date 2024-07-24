@@ -72,18 +72,18 @@ resource "megaport_vxc" "aws_vxc" {
           }
           bgp_connections = [
             {
-              peer_asn          = 64512
-              local_ip_address  = "10.0.0.1"
-              peer_ip_address   = "10.0.0.2"
-              password          = "notARealPassword"
-              shutdown          = false
-              description       = "BGP Connection 1"
-              med_in            = 100
-              med_out           = 100
-              bfd_enabled       = true
-              export_policy     = "deny"
-              permit_export_to  = ["10.0.1.2"]
-              import_white_list = "Megaport Example Prefix Filter List"
+              peer_asn         = 64512
+              local_ip_address = "10.0.0.1"
+              peer_ip_address  = "10.0.0.2"
+              password         = "notARealPassword"
+              shutdown         = false
+              description      = "BGP Connection 1"
+              med_in           = 100
+              med_out          = 100
+              bfd_enabled      = true
+              export_policy    = "deny"
+              permit_export_to = ["10.0.1.2"]
+              import_whitelist = "Megaport Example Prefix Filter List"
             }
           ]
         }
