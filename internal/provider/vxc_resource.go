@@ -421,15 +421,17 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		orm.ContractEndDate = types.StringNull()
 	}
-
-	var aEndOrderedVLAN, bEndOrderedVLAN int64
+	var aEndOrderedVLAN, bEndOrderedVLAN *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
 		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, aEndDiags...)
-		aEndOrderedVLAN = existingAEnd.OrderedVLAN.ValueInt64()
 		aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
+			vlan := existingAEnd.OrderedVLAN.ValueInt64()
+			aEndOrderedVLAN = &vlan
+		}
 	}
 
 	aEndModel := &vxcEndConfigurationModel{
@@ -439,10 +441,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.AEndConfiguration.Location),
-		OrderedVLAN:           types.Int64Value(aEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.AEndConfiguration.VLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	}
+	if aEndOrderedVLAN != nil {
+		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
+	} else {
+		aEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
 	if v.AEndConfiguration.InnerVLAN == 0 {
 		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
@@ -457,7 +463,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		existingBEnd := &vxcEndConfigurationModel{}
 		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, bEndDiags...)
-		bEndOrderedVLAN = existingBEnd.OrderedVLAN.ValueInt64()
+		if !existingBEnd.OrderedVLAN.IsNull() && !existingBEnd.OrderedVLAN.IsUnknown() {
+			vlan := existingBEnd.OrderedVLAN.ValueInt64()
+			bEndOrderedVLAN = &vlan
+		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
@@ -468,10 +477,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
 		Location:              types.StringValue(v.BEndConfiguration.Location),
-		OrderedVLAN:           types.Int64Value(bEndOrderedVLAN),
 		VLAN:                  types.Int64Value(int64(v.BEndConfiguration.VLAN)),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
+	}
+	if bEndOrderedVLAN != nil {
+		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
+	} else {
+		bEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
 	if v.BEndConfiguration.InnerVLAN == 0 {
 		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
@@ -986,10 +999,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
+						Optional:    true,
 						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
@@ -1071,10 +1082,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
+						Optional:    true,
 						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
@@ -3178,9 +3187,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	if !aEndPlan.VLAN.IsNull() && !aEndPlan.VLAN.Equal(aEndState.VLAN) {
-		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
-		aEndState.VLAN = aEndPlan.VLAN
+	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() && !aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+		aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 	}
 
 	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
@@ -3188,9 +3198,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.InnerVLAN = aEndPlan.InnerVLAN
 	}
 
-	if !bEndPlan.VLAN.IsNull() && !bEndPlan.VLAN.Equal(bEndState.VLAN) {
-		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
-		bEndState.VLAN = bEndPlan.VLAN
+	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() && !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+		bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 	}
 
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
