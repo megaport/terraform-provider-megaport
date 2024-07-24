@@ -89,5 +89,4 @@ resource "megaport_vxc" "transit_vxc" {
     partner = "transit"
   }
 }
-
 ```

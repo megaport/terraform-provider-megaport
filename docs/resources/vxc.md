@@ -312,6 +312,7 @@ Optional:
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
+- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
 - `vnic_index` (Number) The network interface index of the A-End configuration.
 
 Read-Only:
@@ -321,7 +322,6 @@ Read-Only:
 - `owner_uid` (String) The owner UID of the A-End configuration.
 - `product_name` (String) The product name of the A-End configuration.
 - `secondary_name` (String) The secondary name of the A-End configuration.
-- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
 
 
 <a id="nestedatt--b_end"></a>
@@ -333,6 +333,7 @@ Optional:
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration.
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
+- `vlan` (Number) The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
 - `vnic_index` (Number) The network interface index of the B-End configuration.
 
 Read-Only:
@@ -342,7 +343,6 @@ Read-Only:
 - `owner_uid` (String) The owner UID of the B-End configuration.
 - `product_name` (String) The product name of the B-End configuration.
 - `secondary_name` (String) The secondary name of the B-End configuration.
-- `vlan` (Number) The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
 
 
 <a id="nestedatt--a_end_partner_config"></a>

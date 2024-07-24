@@ -17,6 +17,11 @@ func TestMVEArubaProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(MVEArubaProviderTestSuite))
 }
 
+func TestMVEVersaProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MVEVersaProviderTestSuite))
+}
+
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
@@ -153,11 +158,6 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 			},
 		},
 	})
-}
-
-func TestMVEVersaProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVersaProviderTestSuite))
 }
 
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
