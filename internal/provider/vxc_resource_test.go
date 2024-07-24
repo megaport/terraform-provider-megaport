@@ -72,10 +72,12 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 
                     a_end = {
                         requested_product_uid = megaport_port.port_1.product_uid
+						ordered_vlan = 100
                     }
 
                     b_end = {
                         requested_product_uid = megaport_port.port_2.product_uid
+						ordered_vlan = 101
                     }
                   }
                   `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
@@ -103,6 +105,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
@@ -170,10 +177,12 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
+						ordered_vlan = 100
 			        }
 
 			        b_end = {
 			            requested_product_uid = megaport_port.port_4.product_uid
+						ordered_vlan = 101
 			        }
 			      }
 			      `, portName1, portName2, portName3, portName4, vxcName, costCentreName),
@@ -202,9 +211,13 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 				),
 			},
-			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term
+			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
@@ -248,10 +261,12 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
+						ordered_vlan = 200
 			        }
 
 			        b_end = {
 			            requested_product_uid = megaport_port.port_4.product_uid
+						ordered_vlan = 201
 			        }
 			      }
 			      `, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
@@ -281,6 +296,10 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "600"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "24"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "201"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "201"),
 				),
 			},
 		},
@@ -290,6 +309,139 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+}
+
+func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
+	portName := RandomTestName()
+	costCentreName := RandomTestName()
+	awsVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+				  data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.bne_nxt1.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  ordered_vlan = 191
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+                  `, portName, costCentreName, awsVXCName, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "191"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "191"),
+				),
+			},
+			// Update Test - Change A-End VLAN
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "bne_nxt1" {
+					name = "NextDC B1"
+				  }
+
+ 				data "megaport_location" "syd_gs" {
+					name = "Global Switch Sydney West"
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.syd_gs.id
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.bne_nxt1.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  ordered_vlan = 195
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+                  `, portName, costCentreName, awsVXCName, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "195"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "195"),
+				),
+			},
+		},
+	})
 }
 
 func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
