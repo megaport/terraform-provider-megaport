@@ -639,7 +639,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 							  bfd_enabled       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
-							  import_white_list = "%s"
+							  import_whitelist = "%s"
 							  as_path_prepend_count = 4
 							}
 						  ]
