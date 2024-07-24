@@ -11,7 +11,7 @@ Megaport's product and services using the [Megaport API](https://dev.megaport.co
 
 This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
-Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), Megaport Virtual Edges (MVEs), and Partner VXCs
+Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), Megaport Virtual Edges (MVEs), and Partner VXCs.
 
 The Megaport Terraform Provider is released as a tool for use with the Megaport API. 
 
@@ -22,7 +22,7 @@ in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptabl
 
 ## Configuring the provider
 
-First you'll need to create an API key, docs for which can be found [here](https://docs.megaport.com/api/api-key/
+First you'll need to create an API key, docs for which can be found [here](https://docs.megaport.com/api/api-key/).
 
 ```terraform
 provider "megaport" {
