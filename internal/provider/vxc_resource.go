@@ -3066,6 +3066,15 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.BEndConfiguration = *bEndConfig
 
+	err := r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Validation error while attempting to create VXC",
+			"Validation error while attempting to create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
 	createdVXC, err := r.client.VXCService.BuyVXC(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
