@@ -447,8 +447,12 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	}
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
+	} else {
+		aEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
-	if v.AEndConfiguration.InnerVLAN != 0 {
+	if v.AEndConfiguration.InnerVLAN == 0 {
+		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	} else {
 		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
@@ -479,8 +483,12 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	}
 	if bEndOrderedVLAN != nil {
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
+	} else {
+		bEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
-	if v.BEndConfiguration.InnerVLAN != 0 {
+	if v.BEndConfiguration.InnerVLAN == 0 {
+		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	} else {
 		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
