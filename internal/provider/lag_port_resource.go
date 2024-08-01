@@ -369,6 +369,15 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		WaitForTime:           waitForTime,
 	}
 
+	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Validation error while attempting to create port",
+			"Validation error while attempting to create port with name "+plan.Name.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(

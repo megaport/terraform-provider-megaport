@@ -355,7 +355,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	createdPort, err := r.client.PortService.BuyPort(ctx, &megaport.BuyPortRequest{
+	buyPortReq := &megaport.BuyPortRequest{
 		Name:                  plan.Name.ValueString(),
 		Term:                  int(plan.ContractTermMonths.ValueInt64()),
 		PortSpeed:             int(plan.PortSpeed.ValueInt64()),
@@ -366,7 +366,18 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
 		WaitForTime:           waitForTime,
-	})
+	}
+
+	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Validation error while attempting to create port",
+			"Validation error while attempting to create port with name "+plan.Name.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error buying port",
