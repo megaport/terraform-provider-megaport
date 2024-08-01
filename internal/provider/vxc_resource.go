@@ -3236,7 +3236,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
 		updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
 		bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
-		fmt.Println("new product ID", bEndPlan.RequestedProductUID.ValueString())
 	}
 
 	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
