@@ -54,6 +54,7 @@ resource "megaport_mve" "mve" {
 ### Optional
 
 - `cost_centre` (String) The cost centre of the MVE.
+- `diversity_zone` (String) The diversity zone of the MVE.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
 
