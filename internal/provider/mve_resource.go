@@ -64,6 +64,7 @@ type mveResourceModel struct {
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
+	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
 	Virtual     types.Bool `tfsdk:"virtual"`
 	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
@@ -147,6 +148,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	orm.LiveDate = types.StringValue("")
 	orm.TerminateDate = types.StringValue("")
 	orm.CostCentre = types.StringValue(p.CostCentre)
+	orm.DiversityZone = types.StringValue(p.DiversityZone)
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
@@ -411,6 +413,15 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional:    true,
 				Computed:    true,
 			},
+			"diversity_zone": schema.StringAttribute{
+				Description: "The diversity zone of the MVE.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
 				Computed:    true,
@@ -656,11 +667,12 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	mveReq := &megaport.BuyMVERequest{
-		LocationID: int(plan.LocationID.ValueInt64()),
-		Name:       plan.Name.ValueString(),
-		Term:       int(plan.ContractTermMonths.ValueInt64()),
-		PromoCode:  plan.PromoCode.ValueString(),
-		CostCentre: plan.CostCentre.ValueString(),
+		LocationID:    int(plan.LocationID.ValueInt64()),
+		Name:          plan.Name.ValueString(),
+		Term:          int(plan.ContractTermMonths.ValueInt64()),
+		PromoCode:     plan.PromoCode.ValueString(),
+		CostCentre:    plan.CostCentre.ValueString(),
+		DiversityZone: plan.DiversityZone.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
