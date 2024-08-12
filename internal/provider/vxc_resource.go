@@ -125,20 +125,55 @@ var (
 		"virtual_circuit_id": types.StringType,
 	}
 
+	// the below structs are deprecated, but need to be here and different than the vrouter_partner_config, because we would need
+	// to keep the schema updated for both if they used the same structs.
+
+	// deprecated
 	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs)),
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs)),
 	}
 
-	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs)),
-	}
-
-	vxcPartnerConfigInterfaceAttrs = map[string]attr.Type{
+	// deprecated
+	vxcInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
 		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
 		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
+	}
+
+	// deprecated
+	bgpConnectionConfig = map[string]attr.Type{
+		"peer_asn":              types.Int64Type,
+		"local_ip_address":      types.StringType,
+		"peer_ip_address":       types.StringType,
+		"password":              types.StringType,
+		"shutdown":              types.BoolType,
+		"description":           types.StringType,
+		"med_in":                types.Int64Type,
+		"med_out":               types.Int64Type,
+		"bfd_enabled":           types.BoolType,
+		"export_policy":         types.StringType,
+		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
+		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
+		"import_whitelist":      types.StringType,
+		"import_blacklist":      types.StringType,
+		"export_whitelist":      types.StringType,
+		"export_blacklist":      types.StringType,
+		"as_path_prepend_count": types.Int64Type,
+	}
+
+	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs)),
+	}
+
+	vxcVrouterInterfaceAttrs = map[string]attr.Type{
+		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
+		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":             types.Int64Type,
+		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
 	}
 
 	ipRouteAttrs = map[string]attr.Type{
@@ -153,7 +188,8 @@ var (
 		"multiplier":  types.Int64Type,
 	}
 
-	bgpConnectionConfig = map[string]attr.Type{
+	bgpVrouterConnectionConfig = map[string]attr.Type{
+		"peer_type":             types.StringType,
 		"peer_asn":              types.Int64Type,
 		"local_ip_address":      types.StringType,
 		"peer_ip_address":       types.StringType,
@@ -341,6 +377,7 @@ type vxcPartnerConfigInterfaceModel struct {
 	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
 	Bfd            types.Object `tfsdk:"bfd"`
 	BgpConnections types.List   `tfsdk:"bgp_connections"`
+	VLAN           types.Int64  `tfsdk:"vlan"`
 }
 
 // ipRouteModel maps the IP route schema data.
@@ -360,6 +397,7 @@ type bfdConfigModel struct {
 // BgpConnectionConfig represents the configuration of a BGP connection.
 type bgpConnectionConfigModel struct {
 	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
+	PeerType           types.String `tfsdk:"peer_type"`
 	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
 	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
 	Password           types.String `tfsdk:"password"`
@@ -1301,11 +1339,22 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 												},
 											},
 										},
+										"vlan": schema.Int64Attribute{
+											Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
+											Optional:    true,
+										},
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
+													"peer_type": schema.StringAttribute{
+														Description: "Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.",
+														Optional:    true,
+														Validators: []validator.String{
+															stringvalidator.OneOf("NON_CLOUD", "PRIV_CLOUD", "PUB_CLOUD"),
+														},
+													},
 													"peer_asn": schema.Int64Attribute{
 														Description: "The peer ASN of the BGP connection.",
 														Optional:    true,
@@ -1717,6 +1766,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 												},
 											},
 										},
+										"vlan": schema.Int64Attribute{
+											Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
+											Optional:    true,
+										},
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
@@ -1725,6 +1778,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"peer_asn": schema.Int64Attribute{
 														Description: "The peer ASN of the BGP connection.",
 														Optional:    true,
+													},
+													"peer_type": schema.StringAttribute{
+														Description: "Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.",
+														Optional:    true,
+														Validators: []validator.String{
+															stringvalidator.OneOf("NON_CLOUD", "PRIV_CLOUD", "PUB_CLOUD"),
+														},
 													},
 													"local_ip_address": schema.StringAttribute{
 														Description: "The local IP address of the BGP connection.",
@@ -2330,6 +2390,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 						Multiplier: int(bfd.Multiplier.ValueInt64()),
 					}
 				}
+				if !iface.VLAN.IsNull() {
+					toAppend.VLAN = int(iface.VLAN.ValueInt64())
+				}
 				if !iface.BgpConnections.IsNull() {
 					bgpConnections := []*bgpConnectionConfigModel{}
 					bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
@@ -2347,6 +2410,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
+							PeerType:           bgpConnection.PeerType.ValueString(),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -2969,6 +3033,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 						Multiplier: int(bfd.Multiplier.ValueInt64()),
 					}
 				}
+				if !iface.VLAN.IsNull() {
+					toAppend.VLAN = int(iface.VLAN.ValueInt64())
+				}
 				if !iface.BgpConnections.IsNull() {
 					bgpConnections := []*bgpConnectionConfigModel{}
 					bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
@@ -2986,6 +3053,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
+							PeerType:           bgpConnection.PeerType.ValueString(),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
