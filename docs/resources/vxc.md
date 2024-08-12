@@ -508,9 +508,10 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
@@ -520,7 +521,7 @@ Optional:
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
@@ -539,12 +540,13 @@ Optional:
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
@@ -719,9 +721,10 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
@@ -731,7 +734,7 @@ Optional:
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
@@ -750,12 +753,13 @@ Optional:
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
 
 Optional:
 
