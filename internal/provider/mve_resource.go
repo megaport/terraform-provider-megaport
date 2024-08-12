@@ -691,6 +691,15 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
+	err := r.client.MVEService.ValidateMVEOrder(ctx, mveReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Validation error while attempting to create MVE",
+			"Validation error while attempting to create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
 
 	if err != nil {

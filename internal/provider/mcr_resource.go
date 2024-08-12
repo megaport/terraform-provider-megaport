@@ -577,6 +577,15 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.DiversityZone = plan.DiversityZone.ValueString()
 	}
 
+	err := r.client.MCRService.ValidateMCROrder(ctx, buyReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Validation error while attempting to create MCR",
+			"Validation error while attempting to create MCR with name "+plan.Name.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
 	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
