@@ -177,6 +177,10 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		acceptTerms = config.TermsAccepted.ValueBool()
 	}
 
+	if !config.WaitTime.IsNull() {
+		waitTime = int(config.WaitTime.ValueInt64())
+	}
+
 	ctx = tflog.SetField(ctx, "environment", environment)
 	ctx = tflog.SetField(ctx, "access_key", accessKey)
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
