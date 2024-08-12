@@ -125,7 +125,7 @@ var (
 		"virtual_circuit_id": types.StringType,
 	}
 
-	// the below structs are deprecated, but need to be here and different than the vrouter_partner_config, becuase we would need
+	// the below structs are deprecated, but need to be here and different than the vrouter_partner_config, because we would need
 	// to keep the schema updated for both if they used the same structs.
 
 	// deprecated
