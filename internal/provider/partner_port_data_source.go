@@ -1,11 +1,16 @@
 package provider
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -51,7 +56,7 @@ func (d *partnerPortDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 		Description: "Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.",
 		Attributes: map[string]schema.Attribute{
 			"connect_type": &schema.StringAttribute{
-				Description: "The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX toi display France-IX Ports that you can connect to.",
+				Description: "The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX to display France-IX Ports that you can connect to.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -78,6 +83,9 @@ func (d *partnerPortDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 				Description: "The diversity zone of the partner port.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("red", "blue"),
+				},
 			},
 			"location_id": &schema.Int64Attribute{
 				Description: "The unique identifier of the location of the partner port.",
@@ -127,168 +135,47 @@ func (d *partnerPortDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	var isFound bool
-	var filters = []bool{}
-	filterByProductName := !config.ProductName.IsNull()
-	filterByConnectType := !config.ConnectType.IsNull()
-	filterByLocationID := !config.LocationID.IsNull()
-	filterByCompanyName := !config.CompanyName.IsNull()
-	filterByDiversityZone := !config.DiversityZone.IsNull()
+	// create some filters for partner ports, by default we remove ports where VXCs are not permitted
+	filters := [](func(*megaport.PartnerMegaport) bool){filterByVXCPermitted(true)}
 
-	filteredProductNamePartners := []*megaport.PartnerMegaport{}
-	filterdConnectTypePartners := []*megaport.PartnerMegaport{}
-	filteredLocationIDPartners := []*megaport.PartnerMegaport{}
-	filteredCompanyNamePartners := []*megaport.PartnerMegaport{}
-	filteredDiversityZonePartners := []*megaport.PartnerMegaport{}
-
-	var filteredPartners []*megaport.PartnerMegaport
-
-	if filterByProductName {
-		filters = append(filters, filterByProductName)
+	// add filters for each requested attribute
+	if !config.ProductName.IsNull() {
+		filters = append(filters, filterByProductName(config.ProductName.ValueString()))
 	}
-	if filterByConnectType {
-		filters = append(filters, filterByConnectType)
+	if !config.ConnectType.IsNull() {
+		filters = append(filters, filterByConnectType(config.ConnectType.ValueString()))
 	}
-	if filterByLocationID {
-		filters = append(filters, filterByLocationID)
+	if !config.LocationID.IsNull() {
+		filters = append(filters, filterByLocationID(int(config.LocationID.ValueInt64())))
 	}
-	if filterByCompanyName {
-		filters = append(filters, filterByCompanyName)
+	if !config.CompanyName.IsNull() {
+		filters = append(filters, filterByCompanyName(config.CompanyName.ValueString()))
 	}
-	if filterByDiversityZone {
-		filters = append(filters, filterByDiversityZone)
+	if !config.DiversityZone.IsNull() {
+		filters = append(filters, filterByDiversityZone(config.DiversityZone.ValueString()))
 	}
 
-	if filterByProductName {
-		filtered, err := d.client.PartnerService.FilterPartnerMegaportByProductName(ctx, partnerPorts, config.ProductName.ValueString(), true)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Filtering Partner Port",
-				"Could not filter partner ports by product name: "+err.Error(),
-			)
-		}
-		if len(filtered) == 1 {
-			isFound = true
-			state.fromAPIPartnerPort(filtered[0])
-		}
-		filteredProductNamePartners = append(filteredProductNamePartners, filtered...)
-		filters = filters[1:]
-	}
+	// run the collected filters
+	partnerPorts = runFiltersAndSort(partnerPorts, filters)
 
-	filteredPartners = FilterPartnerMegaports(filteredProductNamePartners, filterByProductName)
-
-	if !isFound && filterByProductName && len(filters) < 1 {
-		apiPartner := filteredPartners[0]
-		state.fromAPIPartnerPort(apiPartner)
-		isFound = true
-	}
-
-	filteredPartners = FilterPartnerMegaports(filteredProductNamePartners, filterByProductName)
-
-	if !isFound && len(filteredPartners) > 1 && filterByConnectType {
-		filtered, err := d.client.PartnerService.FilterPartnerMegaportByConnectType(ctx, filteredPartners, config.ConnectType.ValueString(), true)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Filtering Partner Port",
-				"Could not filter partner ports by connect type: "+err.Error(),
-			)
-		}
-		if len(filtered) == 1 {
-			state.fromAPIPartnerPort(filtered[0])
-			isFound = true
-		}
-		filterdConnectTypePartners = append(filterdConnectTypePartners, filtered...)
-		filters = filters[1:]
-	}
-
-	filteredPartners = FilterPartnerMegaports(filterdConnectTypePartners, filterByConnectType)
-
-	if !isFound && filterByConnectType && len(filters) < 1 {
-		apiPartner := filteredPartners[0]
-		state.fromAPIPartnerPort(apiPartner)
-		isFound = true
-	}
-
-	if !isFound && len(filteredPartners) > 1 && filterByLocationID {
-		filtered, err := d.client.PartnerService.FilterPartnerMegaportByLocationId(ctx, filteredPartners, int(config.LocationID.ValueInt64()))
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Filtering Partner Port",
-				"Could not filter partner ports by location ID: "+err.Error(),
-			)
-			return
-		}
-		if len(filtered) == 1 {
-			state.fromAPIPartnerPort(filtered[0])
-			isFound = true
-		}
-		filteredLocationIDPartners = append(filteredLocationIDPartners, filtered...)
-		filters = filters[1:]
-	}
-
-	filteredPartners = FilterPartnerMegaports(filteredLocationIDPartners, filterByLocationID)
-
-	if !isFound && filterByLocationID && len(filters) < 1 {
-		apiPartner := filteredPartners[0]
-		state.fromAPIPartnerPort(apiPartner)
-		isFound = true
-	}
-
-	if !isFound && len(filteredPartners) > 1 && filterByCompanyName {
-		filtered, err := d.client.PartnerService.FilterPartnerMegaportByCompanyName(ctx, filteredPartners, config.CompanyName.ValueString(), true)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Filtering Partner Port",
-				"Could not filter partner ports by company name: "+err.Error(),
-			)
-			return
-		}
-		if len(filtered) == 1 {
-			state.fromAPIPartnerPort(partnerPorts[0])
-			isFound = true
-		}
-		filteredCompanyNamePartners = append(filteredCompanyNamePartners, filtered...)
-		filters = filters[1:]
-	}
-
-	filteredPartners = FilterPartnerMegaports(filteredCompanyNamePartners, filterByCompanyName)
-
-	if !isFound && filterByCompanyName && len(filters) < 1 {
-		apiPartner := filteredPartners[0]
-		state.fromAPIPartnerPort(apiPartner)
-		isFound = true
-	}
-
-	if !isFound && len(filteredPartners) > 1 && filterByDiversityZone {
-		filtered, err := d.client.PartnerService.FilterPartnerMegaportByDiversityZone(ctx, partnerPorts, config.DiversityZone.ValueString(), true)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Filtering Partner Port",
-				"Could not filter partner ports by diversity zone: "+err.Error(),
-			)
-			return
-		}
-		if len(filtered) == 1 {
-			state.fromAPIPartnerPort(filtered[0])
-			isFound = true
-		}
-		filteredDiversityZonePartners = append(filteredDiversityZonePartners, filtered...)
-	}
-
-	filteredPartners = FilterPartnerMegaports(filteredDiversityZonePartners, filterByDiversityZone)
-
-	if !isFound {
-		apiPartner := filteredPartners[0]
-		state.fromAPIPartnerPort(apiPartner)
-		isFound = true
-	}
-
-	if !isFound {
+	if len(partnerPorts) == 0 {
 		resp.Diagnostics.AddError(
-			"No Partner Port Found",
-			"No partner port was found.",
+			"No Matching Partner Ports Found",
+			"No matching partner ports were found.",
 		)
+		return
 	}
+
+	if len(partnerPorts) > 1 {
+		resp.Diagnostics.AddWarning(
+			"More Than 1 Matching Partner Port Was Found",
+			"There was more than 1 matching partner port for the search criteria, chose highest ranked port. Try narrowing your search criteria.",
+		)
+		return
+	}
+
+	// pick the first matching port
+	state.fromAPIPartnerPort(partnerPorts[0])
 
 	// Set state
 	diags = resp.State.Set(ctx, &state)
@@ -330,10 +217,58 @@ func (orm *partnerPortModel) fromAPIPartnerPort(port *megaport.PartnerMegaport) 
 	orm.VXCPermitted = types.BoolValue(port.VXCPermitted)
 }
 
-func FilterPartnerMegaports(parnterPorts []*megaport.PartnerMegaport, toFilter bool) []*megaport.PartnerMegaport {
-	var filtered []*megaport.PartnerMegaport
-	if toFilter {
-		filtered = append(filtered, parnterPorts...)
+func runFiltersAndSort(ports []*megaport.PartnerMegaport, filters [](func(*megaport.PartnerMegaport) bool)) []*megaport.PartnerMegaport {
+	toReturn := slices.Clone(ports)
+	// delete all elements not matching filters, this won't have the closure issues https://go.dev/blog/loopvar-preview because we use 1.22
+	for _, filter := range filters {
+		toReturn = slices.DeleteFunc(toReturn, filter)
 	}
-	return filtered
+
+	// sort remaining ports by rank
+	slices.SortFunc(ports, func(a *megaport.PartnerMegaport, b *megaport.PartnerMegaport) int {
+		if n := cmp.Compare(a.Rank, b.Rank); n != 0 {
+			return n
+		}
+
+		// If ranks are equal, order by name
+		return cmp.Compare(a.ProductName, b.ProductName)
+	})
+
+	return toReturn
+}
+
+func filterByVXCPermitted(permitted bool) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return pm.VXCPermitted != permitted
+	}
+}
+
+func filterByProductName(name string) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return !strings.EqualFold(pm.ProductName, name)
+	}
+}
+
+func filterByConnectType(connectType string) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return !strings.EqualFold(pm.ConnectType, connectType)
+	}
+}
+
+func filterByLocationID(locationID int) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return pm.LocationId != locationID
+	}
+}
+
+func filterByCompanyName(companyName string) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return !strings.EqualFold(pm.CompanyName, companyName)
+	}
+}
+
+func filterByDiversityZone(diversityZone string) func(*megaport.PartnerMegaport) bool {
+	return func(pm *megaport.PartnerMegaport) bool {
+		return !strings.EqualFold(pm.DiversityZone, diversityZone)
+	}
 }

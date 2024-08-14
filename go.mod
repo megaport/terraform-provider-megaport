@@ -1,6 +1,6 @@
 module github.com/megaport/terraform-provider-megaport
 
-go 1.21
+go 1.22
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.16.0
