@@ -28,7 +28,7 @@ data "megaport_partner" "aws_port" {
 
 - `company_name` (String) The name of the company that owns the partner port.
 - `company_uid` (String) The unique identifier of the company that owns the partner port.
-- `connect_type` (String) The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX toi display France-IX Ports that you can connect to.
+- `connect_type` (String) The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX to display France-IX Ports that you can connect to.
 - `diversity_zone` (String) The diversity zone of the partner port.
 - `location_id` (Number) The unique identifier of the location of the partner port.
 - `product_name` (String) The name of the partner port.
