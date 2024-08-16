@@ -1114,6 +1114,8 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "cost_centre", awsVXCCostCentreName),
 					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"),
 					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan"),
 				),
 			},
 			// UPDATE
@@ -1251,6 +1253,8 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "b_end.inner_vlan", fmt.Sprintf("%d", portVXCBEndInnerVLANNew)),
 					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.inner_vlan"),
 					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan"),
 					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "b_end.inner_vlan"),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "cost_centre", portVXCCostCentreNameNew),
