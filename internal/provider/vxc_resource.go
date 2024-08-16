@@ -1119,7 +1119,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration.",
+						Description: "The inner VLAN of the B-End configuration. Will always be null, as this is only used for A-End configurations.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
