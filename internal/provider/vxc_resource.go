@@ -519,7 +519,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
 	}
 	if v.BEndConfiguration.InnerVLAN != 0 {
-		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
 	apiDiags = append(apiDiags, bEndDiags...)
