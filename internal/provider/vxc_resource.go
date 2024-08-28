@@ -460,7 +460,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		orm.ContractEndDate = types.StringNull()
 	}
-	var aEndOrderedVLAN, bEndOrderedVLAN *int64
+	var aEndOrderedVLAN, bEndOrderedVLAN, aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
@@ -470,6 +470,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingAEnd.OrderedVLAN.ValueInt64()
 			aEndOrderedVLAN = &vlan
+		}
+		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
+			vlan := existingAEnd.InnerVLAN.ValueInt64()
+			aEndInnerVLAN = &vlan
 		}
 	}
 
@@ -483,13 +487,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
 	}
+
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
 	}
-	if v.AEndConfiguration.InnerVLAN == 0 {
-		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	if aEndInnerVLAN != nil {
+		aEndModel.InnerVLAN = types.Int64Value(*aEndInnerVLAN)
 	} else {
-		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
+		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	}
 	if v.AEndConfiguration.VLAN == 0 {
 		aEndModel.VLAN = types.Int64PointerValue(nil)
@@ -508,6 +513,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 			vlan := existingBEnd.OrderedVLAN.ValueInt64()
 			bEndOrderedVLAN = &vlan
 		}
+		if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
+			vlan := existingBEnd.InnerVLAN.ValueInt64()
+			bEndInnerVLAN = &vlan
+		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
@@ -524,10 +533,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	if bEndOrderedVLAN != nil {
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
 	}
-	if v.BEndConfiguration.InnerVLAN == 0 {
-		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	if bEndInnerVLAN != nil {
+		bEndModel.InnerVLAN = types.Int64Value(*bEndInnerVLAN)
 	} else {
-		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
+		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	}
 	if v.BEndConfiguration.VLAN == 0 {
 		bEndModel.VLAN = types.Int64PointerValue(nil)
@@ -1044,11 +1053,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
 						Optional:    true,
-						Computed:    true,
-						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
+						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the A-End configuration. May be different from the A-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the A-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the A-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
@@ -1057,10 +1062,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged.",
 						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
@@ -1127,11 +1128,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
 						Optional:    true,
-						Computed:    true,
-						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
+						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the B-End configuration. May be different from the B-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the B-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the B-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
@@ -1140,10 +1137,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged.",
 						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the B-End configuration.",
