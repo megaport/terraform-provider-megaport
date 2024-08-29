@@ -2,19 +2,21 @@ package provider
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/suite"
 )
 
 const MCRTestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
 
 type MCRProviderTestSuite ProviderTestSuite
 
-// func TestMCRProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(MCRProviderTestSuite))
-// }
+func TestMCRProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRProviderTestSuite))
+}
 
 func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 	mcrName := RandomTestName()
