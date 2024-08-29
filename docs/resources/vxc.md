@@ -446,7 +446,7 @@ Optional:
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 
 <a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bfd`
 
 Optional:
 
@@ -456,7 +456,7 @@ Optional:
 
 
 <a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -480,7 +480,7 @@ Optional:
 
 
 <a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.ip_routes`
 
 Optional:
 
@@ -511,7 +511,7 @@ Optional:
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bfd`
 
 Optional:
 
@@ -521,7 +521,7 @@ Optional:
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -546,7 +546,7 @@ Optional:
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.ip_routes`
 
 Optional:
 
@@ -659,7 +659,7 @@ Optional:
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 
 <a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bfd`
 
 Optional:
 
@@ -669,7 +669,7 @@ Optional:
 
 
 <a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -693,7 +693,7 @@ Optional:
 
 
 <a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.nat_ip_addresses`
+### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.ip_routes`
 
 Optional:
 
@@ -724,7 +724,7 @@ Optional:
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bfd`
 
 Optional:
 
@@ -734,7 +734,7 @@ Optional:
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -759,7 +759,7 @@ Optional:
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.vlan`
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.ip_routes`
 
 Optional:
 
