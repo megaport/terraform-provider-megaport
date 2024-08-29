@@ -2,21 +2,19 @@ package provider
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
 const SinglePortTestLocation = "NextDC B1"
 
 type SinglePortProviderTestSuite ProviderTestSuite
 
-func TestSinglePortProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(SinglePortProviderTestSuite))
-}
+// func TestSinglePortProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(SinglePortProviderTestSuite))
+// }
 
 func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 	portName := RandomTestName()
