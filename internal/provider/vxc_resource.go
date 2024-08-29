@@ -487,8 +487,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	}
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
-	} else {
-		aEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
 	if v.AEndConfiguration.InnerVLAN == 0 {
 		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
@@ -523,8 +521,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	}
 	if bEndOrderedVLAN != nil {
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
-	} else {
-		bEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
 	if v.BEndConfiguration.InnerVLAN == 0 {
 		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
@@ -3300,9 +3296,13 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+
+	aEndConfig := &vxcEndConfigurationModel{}
+	bEndConfig := &vxcEndConfigurationModel{}
+	aEndConfigDiags := state.AEndConfiguration.As(ctx, aEndConfig, basetypes.ObjectAsOptions{})
+	bEndConfigDiags := state.BEndConfiguration.As(ctx, bEndConfig, basetypes.ObjectAsOptions{})
+	resp.Diagnostics.Append(aEndConfigDiags...)
+	resp.Diagnostics.Append(bEndConfigDiags...)
 }
 
 func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -3371,24 +3371,32 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() && !aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
-		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() {
+		if !aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+			updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+		}
 		aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 	}
 
-	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
-		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
+	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() {
+		if !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
+			updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
+		}
 		aEndState.InnerVLAN = aEndPlan.InnerVLAN
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() && !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
-		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() {
+		if !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+			updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+		}
 		bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 	}
 
-	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
-		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
+	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() {
+		if !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
+			updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
+		}
 		bEndState.InnerVLAN = bEndPlan.InnerVLAN
 	}
 
@@ -4655,4 +4663,54 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+}
+
+func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Get current state
+	var plan, state vxcResourceModel
+	diags := diag.Diagnostics{}
+	stateDiags := req.State.Get(ctx, &state)
+	diags.Append(stateDiags...)
+	planDiags := req.Plan.Get(ctx, &plan)
+	diags.Append(planDiags...)
+
+	// If VXC is not yet created, return
+	if !state.UID.IsNull() {
+		aEndStateObj := state.AEndConfiguration
+		bEndStateObj := state.BEndConfiguration
+		aEndStateConfig := &vxcEndConfigurationModel{}
+		bEndStateConfig := &vxcEndConfigurationModel{}
+		aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
+		bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
+		diags = append(diags, aEndDiags...)
+		diags = append(diags, bEndDiags...)
+		aEndPlanObj := plan.AEndConfiguration
+		bEndPlanObj := plan.BEndConfiguration
+		aEndPlanConfig := &vxcEndConfigurationModel{}
+		bEndPlanConfig := &vxcEndConfigurationModel{}
+		aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
+		bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
+		diags = append(diags, aEndDiags...)
+		diags = append(diags, bEndDiags...)
+		if aEndStateConfig.OrderedVLAN.IsNull() {
+			aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
+		}
+		if bEndStateConfig.OrderedVLAN.IsNull() {
+			bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
+		}
+		newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
+		newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
+		diags = append(diags, aEndDiags...)
+		diags = append(diags, bEndDiags...)
+		plan.AEndConfiguration = newPlanAEndObj
+		plan.BEndConfiguration = newPlanBEndObj
+		req.Plan.Set(ctx, &plan)
+		req.State.Set(ctx, &plan)
+		resp.Plan.Set(ctx, &plan)
+	}
+
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
