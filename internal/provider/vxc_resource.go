@@ -3521,3 +3521,220 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 }
+
+func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionConfig, productID int) (*vxcPartnerConfigurationModel, diag.Diagnostics) {
+	diags := diag.Diagnostics{}
+	switch c := c.(type) {
+	case megaport.CSPConnectionAWS:
+		// AWS VIF Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("aws"),
+			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		awsPartnerConfig := &vxcPartnerConfigAWSModel{
+			ConnectType:       types.StringValue(c.ConnectType),
+			Type:              types.StringValue(c.Type),
+			OwnerAccount:      types.StringValue(c.OwnerAccount),
+			ASN:               types.Int64Value(int64(c.ASN)),
+			AmazonASN:         types.Int64Value(int64(c.AmazonASN)),
+			AuthKey:           types.StringValue(c.AuthKey),
+			Prefixes:          types.StringNull(),
+			CustomerIPAddress: types.StringValue(c.CustomerIPAddress),
+			AmazonIPAddress:   types.StringValue(c.AmazonAddress),
+			ConnectionName:    types.StringValue(c.Name),
+		}
+		awsPartnerConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsPartnerConfig)
+		diags.Append(awsDiags...)
+		p.AWSPartnerConfig = awsPartnerConfigObj
+		return p, diags
+	case megaport.CSPConnectionAWSHC:
+		// AWS HC Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("aws"),
+			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		awsHCPartnerConfig := &vxcPartnerConfigAWSModel{
+			ConnectType:       types.StringValue(c.ConnectType),
+			Type:              types.StringNull(),
+			OwnerAccount:      types.StringValue(c.OwnerAccount),
+			ConnectionName:    types.StringValue(c.Name),
+			ASN:               types.Int64Null(),
+			AmazonASN:         types.Int64Null(),
+			AuthKey:           types.StringNull(),
+			Prefixes:          types.StringNull(),
+			CustomerIPAddress: types.StringNull(),
+			AmazonIPAddress:   types.StringNull(),
+		}
+		awsHCPartnerConfigObj, awsHCDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsHCPartnerConfig)
+		diags.Append(awsHCDiags...)
+		p.AWSPartnerConfig = awsHCPartnerConfigObj
+		return p, diags
+	case megaport.CSPConnectionAzure:
+		// Azure Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("azure"),
+			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
+			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		azurePartnerConfig := &vxcPartnerConfigAzureModel{
+			ServiceKey: types.StringValue(c.ServiceKey),
+		}
+		var portChoice string
+		for _, port := range c.Megaports {
+			if port.VXC == productID {
+				portChoice = port.Type
+			}
+		}
+		azurePartnerConfig.PortChoice = types.StringValue(portChoice)
+		peers := []types.Object{}
+		for _, peer := range c.Peers {
+			peerModel := partnerOrderAzurePeeringConfigModel{
+				Type:            types.StringValue(peer.Type),
+				PeerASN:         types.StringValue(string(peer.PeerASN)),
+				PrimarySubnet:   types.StringValue(peer.PrimarySubnet),
+				SecondarySubnet: types.StringValue(peer.SecondarySubnet),
+				Prefixes:        types.StringValue(peer.Prefixes),
+				SharedKey:       types.StringValue(peer.SharedKey),
+				VLAN:            types.Int64Value(int64(peer.VLAN)),
+			}
+			peerObj, peerDiags := types.ObjectValueFrom(ctx, partnerOrderAzurePeeringConfigAttrs, peerModel)
+			diags.Append(peerDiags...)
+			peers = append(peers, peerObj)
+		}
+		peersList, peersDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs), peers)
+		diags.Append(peersDiags...)
+		azurePartnerConfig.Peers = peersList
+		azurePartnerConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azurePartnerConfig)
+		diags.Append(azureDiags...)
+		p.AzurePartnerConfig = azurePartnerConfigObj
+		return p, diags
+	case megaport.CSPConnectionGoogle:
+		// Google Cloud Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("google"),
+			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
+			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		googlePartnerConfig := &vxcPartnerConfigGoogleModel{
+			PairingKey: types.StringValue(c.PairingKey),
+		}
+		googlePartnerConfigObj, googleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigGoogleAttrs, googlePartnerConfig)
+		diags.Append(googleDiags...)
+		p.GooglePartnerConfig = googlePartnerConfigObj
+		return p, diags
+	case megaport.CSPConnectionVirtualRouter:
+		// Virtual Router Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:             types.StringValue("vrouter"),
+			AWSPartnerConfig:    types.ObjectNull(vxcPartnerConfigAWSAttrs),
+			AzurePartnerConfig:  types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			GooglePartnerConfig: types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			OraclePartnerConfig: types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			PartnerAEndConfig:   types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		vrouterPartnerConfig := &vxcPartnerConfigVrouterModel{}
+		interfacesObjs := []types.Object{}
+		for _, iface := range c.Interfaces {
+			interfaceModel := &vxcPartnerConfigInterfaceModel{
+				VLAN: types.Int64Value(int64(c.VLAN)),
+			}
+			// IP Addresses
+			ipAddresses := []string{}
+			for _, ip := range iface.IPAddresses {
+				ipAddresses = append(ipAddresses, ip)
+			}
+			ipAddressesList, ipAddressesDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
+			diags.Append(ipAddressesDiags...)
+			interfaceModel.IPAddresses = ipAddressesList
+			// IP Routes
+			ipRouteObjs := []types.Object{}
+			for _, ipRoute := range iface.IPRoutes {
+				ipRouteModel := &ipRouteModel{
+					Prefix:      types.StringValue(ipRoute.Prefix),
+					Description: types.StringValue(ipRoute.Description),
+					NextHop:     types.StringValue(ipRoute.NextHop),
+				}
+				ipRouteObj, ipRouteDiags := types.ObjectValueFrom(ctx, ipRouteAttrs, ipRouteModel)
+				diags.Append(ipRouteDiags...)
+				ipRouteObjs = append(ipRouteObjs, ipRouteObj)
+			}
+			ipRouteList, ipRouteDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), ipRouteObjs)
+			diags.Append(ipRouteDiags...)
+			interfaceModel.IPRoutes = ipRouteList
+			// NAT IP Addresses
+			natIPAddressesList, natIPAddressesDiags := types.ListValueFrom(ctx, types.StringType, iface.NatIPAddresses)
+			diags.Append(natIPAddressesDiags...)
+			interfaceModel.NatIPAddresses = natIPAddressesList
+			// BFD
+			bfdModel := &bfdConfigModel{
+				TxInterval: types.Int64Value(int64(iface.BFD.TxInterval)),
+				RxInterval: types.Int64Value(int64(iface.BFD.RxInterval)),
+				Multiplier: types.Int64Value(int64(iface.BFD.Multiplier)),
+			}
+			bfdObj, bfdDiags := types.ObjectValueFrom(ctx, bfdConfigAttrs, bfdModel)
+			diags.Append(bfdDiags...)
+			interfaceModel.Bfd = bfdObj
+			// BGP Connections
+			bgpConnectionObjs := []types.Object{}
+			for _, bgpConnection := range iface.BGPConnections {
+				bgpConnectionModel := &bgpConnectionConfigModel{
+					PeerAsn:            types.Int64Value(int64(bgpConnection.PeerASN)),
+					LocalIPAddress:     types.StringValue(bgpConnection.LocalIPAddress),
+					PeerIPAddress:      types.StringValue(bgpConnection.PeerIPAddress),
+					Password:           types.StringValue(bgpConnection.Password),
+					Shutdown:           types.BoolValue(bgpConnection.Shutdown),
+					Description:        types.StringValue(bgpConnection.Description),
+					MedIn:              types.Int64Value(int64(bgpConnection.MedIn)),
+					MedOut:             types.Int64Value(int64(bgpConnection.MedOut)),
+					BfdEnabled:         types.BoolValue(bgpConnection.BfdEnabled),
+					ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
+					AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
+					PeerType:           types.StringValue(bgpConnection.PeerType),
+					ImportWhitelist:    types.StringValue(bgpConnection.ImportWhitelist),
+					ImportBlacklist:    types.StringValue(bgpConnection.ImportBlacklist),
+					ExportWhitelist:    types.StringValue(bgpConnection.ExportWhitelist),
+					ExportBlacklist:    types.StringValue(bgpConnection.ExportBlacklist),
+				}
+				permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
+				diags.Append(permitExportToDiags...)
+				bgpConnectionModel.PermitExportTo = permitExportToList
+				denyExportToList, denyExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.DenyExportTo)
+				diags.Append(denyExportToDiags...)
+				bgpConnectionModel.DenyExportTo = denyExportToList
+				bgpConnectionObj, bgpConnectionDiags := types.ObjectValueFrom(ctx, bgpConnectionConfigAttrs, bgpConnectionModel)
+				diags.Append(bgpConnectionDiags...)
+				bgpConnectionObjs = append(bgpConnectionObjs, bgpConnectionObj)
+			}
+			bgpConnectionList, bgpConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpConnectionConfigAttrs), bgpConnectionObjs)
+			diags.Append(bgpConnectionDiags...)
+			interfaceModel.BgpConnections = bgpConnectionList
+			interfaceObj, interfaceDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigInterfaceAttrs, interfaceModel)
+			diags.Append(interfaceDiags...)
+			interfacesObjs = append(interfacesObjs, interfaceObj)
+		}
+		interfacesList, interfacesDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs), interfacesObjs)
+		diags.Append(interfacesDiags...)
+		vrouterPartnerConfig.Interfaces = interfacesList
+		vrouterPartnerConfigObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterPartnerConfig)
+		diags.Append(vrouterDiags...)
+		p.VrouterPartnerConfig = vrouterPartnerConfigObj
+		return p, diags
+	case megaport.CSPConnectionTransit:
+		// Transit Logic
+	}
+	return nil, diags
+}
