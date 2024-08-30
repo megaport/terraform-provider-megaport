@@ -536,9 +536,21 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	if v.Resources != nil && v.Resources.CSPConnection != nil {
 		cspConnections := []types.Object{}
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
-			cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
+			cspConnectionModel, cspDiags := fromAPICSPConnection(ctx, c)
 			apiDiags = append(apiDiags, cspDiags...)
-			cspConnections = append(cspConnections, cspConnection)
+			cspConnectionObject, cspConnectionDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, cspConnectionModel)
+			apiDiags = append(apiDiags, cspConnectionDiags...)
+			partnerConfig, partnerConfigDiags := cspConnectionToPartnerConfig(ctx, c, v.ID)
+			apiDiags = append(apiDiags, partnerConfigDiags...)
+			partnerConfigObj, partnerConfigObjDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfig)
+			if cspConnectionModel.ResourceName.ValueString() == "a_csp_connection" {
+				orm.AEndPartnerConfig = partnerConfigObj
+			}
+			if cspConnectionModel.ResourceName.ValueString() == "b_csp_connection" {
+				orm.BEndPartnerConfig = partnerConfigObj
+			}
+			apiDiags = append(apiDiags, partnerConfigObjDiags...)
+			cspConnections = append(cspConnections, cspConnectionObject)
 		}
 		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), cspConnections)
 		apiDiags = append(apiDiags, cspConnectionDiags...)
@@ -3401,7 +3413,7 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
 
-func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
+func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (*cspConnectionModel, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
 	switch provider := c.(type) {
 	case megaport.CSPConnectionAWS:
@@ -3425,9 +3437,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		awsModel.Bandwidths = types.ListNull(types.Int64Type)
 		awsModel.IPAddresses = types.ListNull(types.StringType)
-		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
-		apiDiags = append(apiDiags, awsDiags...)
-		return awsObject, apiDiags
+		return awsModel, apiDiags
 	case megaport.CSPConnectionAWSHC:
 		awsHCModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -3446,9 +3456,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, bandwidthDiags...)
 		awsHCModel.Bandwidths = bandwidthList
 		awsHCModel.IPAddresses = types.ListNull(types.StringType)
-		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
-		apiDiags = append(apiDiags, awsHCDiags...)
-		return awsHCObject, apiDiags
+		return awsHCModel, apiDiags
 	case megaport.CSPConnectionAzure:
 		azureModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -3461,9 +3469,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		azureModel.Bandwidths = types.ListNull(types.Int64Type)
 		azureModel.IPAddresses = types.ListNull(types.StringType)
-		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
-		apiDiags = append(apiDiags, azureObjDiags...)
-		return azureObject, apiDiags
+		return azureModel, apiDiags
 	case megaport.CSPConnectionGoogle:
 		googleModel := &cspConnectionModel{
 			ConnectType:  types.StringValue(provider.ConnectType),
@@ -3482,9 +3488,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bwListDiags...)
 		googleModel.Bandwidths = bandwidthList
-		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
-		apiDiags = append(apiDiags, googleObjDiags...)
-		return googleObject, apiDiags
+		return googleModel, apiDiags
 	case megaport.CSPConnectionVirtualRouter:
 		virtualRouterModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
@@ -3499,9 +3503,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
 		apiDiags = append(apiDiags, ipListDiags...)
 		virtualRouterModel.IPAddresses = ipList
-		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
-		apiDiags = append(apiDiags, vrObjDiags...)
-		return virtualRouterObject, apiDiags
+		return virtualRouterModel, apiDiags
 	case megaport.CSPConnectionTransit:
 		transitModel := &cspConnectionModel{
 			ConnectType:        types.StringValue(provider.ConnectType),
@@ -3514,12 +3516,10 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		transitModel.Bandwidths = types.ListNull(types.Int64Type)
 		transitModel.IPAddresses = types.ListNull(types.StringType)
-		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
-		apiDiags = append(apiDiags, transitObjectDiags...)
-		return transitObject, apiDiags
+		return transitModel, apiDiags
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+	return nil, apiDiags
 }
 
 func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionConfig, productID int) (*vxcPartnerConfigurationModel, diag.Diagnostics) {
@@ -3653,11 +3653,7 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 				VLAN: types.Int64Value(int64(c.VLAN)),
 			}
 			// IP Addresses
-			ipAddresses := []string{}
-			for _, ip := range iface.IPAddresses {
-				ipAddresses = append(ipAddresses, ip)
-			}
-			ipAddressesList, ipAddressesDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
+			ipAddressesList, ipAddressesDiags := types.ListValueFrom(ctx, types.StringType, iface.IPAddresses)
 			diags.Append(ipAddressesDiags...)
 			interfaceModel.IPAddresses = ipAddressesList
 			// IP Routes
@@ -3692,9 +3688,9 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			bgpConnectionObjs := []types.Object{}
 			for _, bgpConnection := range iface.BGPConnections {
 				bgpConnectionModel := &bgpConnectionConfigModel{
-					PeerAsn:            types.Int64Value(int64(bgpConnection.PeerASN)),
-					LocalIPAddress:     types.StringValue(bgpConnection.LocalIPAddress),
-					PeerIPAddress:      types.StringValue(bgpConnection.PeerIPAddress),
+					PeerAsn:            types.Int64Value(int64(bgpConnection.PeerAsn)),
+					LocalIPAddress:     types.StringValue(bgpConnection.LocalIpAddress),
+					PeerIPAddress:      types.StringValue(bgpConnection.PeerIpAddress),
 					Password:           types.StringValue(bgpConnection.Password),
 					Shutdown:           types.BoolValue(bgpConnection.Shutdown),
 					Description:        types.StringValue(bgpConnection.Description),
@@ -3704,10 +3700,10 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 					ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
 					AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
 					PeerType:           types.StringValue(bgpConnection.PeerType),
-					ImportWhitelist:    types.StringValue(bgpConnection.ImportWhitelist),
-					ImportBlacklist:    types.StringValue(bgpConnection.ImportBlacklist),
-					ExportWhitelist:    types.StringValue(bgpConnection.ExportWhitelist),
-					ExportBlacklist:    types.StringValue(bgpConnection.ExportBlacklist),
+					ImportWhitelist:    types.StringValue(string(bgpConnection.ImportWhitelist)),
+					ImportBlacklist:    types.StringValue(string(bgpConnection.ImportBlacklist)),
+					ExportWhitelist:    types.StringValue(string(bgpConnection.ExportWhitelist)),
+					ExportBlacklist:    types.StringValue(string(bgpConnection.ExportBlacklist)),
 				}
 				permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
 				diags.Append(permitExportToDiags...)
@@ -3715,26 +3711,53 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 				denyExportToList, denyExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.DenyExportTo)
 				diags.Append(denyExportToDiags...)
 				bgpConnectionModel.DenyExportTo = denyExportToList
-				bgpConnectionObj, bgpConnectionDiags := types.ObjectValueFrom(ctx, bgpConnectionConfigAttrs, bgpConnectionModel)
+				bgpConnectionObj, bgpConnectionDiags := types.ObjectValueFrom(ctx, bgpVrouterConnectionConfig, bgpConnectionModel)
 				diags.Append(bgpConnectionDiags...)
 				bgpConnectionObjs = append(bgpConnectionObjs, bgpConnectionObj)
 			}
-			bgpConnectionList, bgpConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpConnectionConfigAttrs), bgpConnectionObjs)
+			bgpConnectionList, bgpConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), bgpConnectionObjs)
 			diags.Append(bgpConnectionDiags...)
 			interfaceModel.BgpConnections = bgpConnectionList
-			interfaceObj, interfaceDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigInterfaceAttrs, interfaceModel)
+			interfaceObj, interfaceDiags := types.ObjectValueFrom(ctx, vxcVrouterInterfaceAttrs, interfaceModel)
 			diags.Append(interfaceDiags...)
 			interfacesObjs = append(interfacesObjs, interfaceObj)
 		}
-		interfacesList, interfacesDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigInterfaceAttrs), interfacesObjs)
+		interfacesList, interfacesDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), interfacesObjs)
 		diags.Append(interfacesDiags...)
 		vrouterPartnerConfig.Interfaces = interfacesList
 		vrouterPartnerConfigObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterPartnerConfig)
 		diags.Append(vrouterDiags...)
 		p.VrouterPartnerConfig = vrouterPartnerConfigObj
 		return p, diags
+	case megaport.CSPConnectionOracle:
+		// Oracle Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("oracle"),
+			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
+			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		oraclePartnerConfig := &vxcPartnerConfigOracleModel{
+			VirtualCircuitId: types.StringValue(c.VirtualCircuitId),
+		}
+		oraclePartnerConfigObj, oracleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigOracleAttrs, oraclePartnerConfig)
+		diags.Append(oracleDiags...)
+		p.OraclePartnerConfig = oraclePartnerConfigObj
+		return p, diags
 	case megaport.CSPConnectionTransit:
 		// Transit Logic
+		p := &vxcPartnerConfigurationModel{
+			Partner:              types.StringValue("transit"),
+			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
+			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+		}
+		return p, diags
 	}
 	return nil, diags
 }
