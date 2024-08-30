@@ -830,7 +830,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"id": schema.Int64Attribute{
 							Description: "The ID of the CSP connection.",
-							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.Int64{
 								int64planmodifier.UseStateForUnknown(),
@@ -1193,14 +1192,17 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"asn": schema.Int64Attribute{
 								Description: "The ASN of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"amazon_asn": schema.Int64Attribute{
 								Description: "The Amazon ASN of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"auth_key": schema.StringAttribute{
 								Description: "The authentication key of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"prefixes": schema.StringAttribute{
 								Description: "The prefixes of the partner configuration.",
@@ -1209,10 +1211,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"customer_ip_address": schema.StringAttribute{
 								Description: "The customer IP address of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"amazon_ip_address": schema.StringAttribute{
 								Description: "The Amazon IP address of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"name": schema.StringAttribute{
 								Description: "The name of the partner configuration.",
@@ -1311,6 +1315,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"ip_routes": schema.ListNestedAttribute{
 											Description: "The IP routes of the partner configuration.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"prefix": schema.StringAttribute{
@@ -1354,10 +1359,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"vlan": schema.Int64Attribute{
 											Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
 											Optional:    true,
+											Computed:    true,
 										},
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"peer_type": schema.StringAttribute{
@@ -1464,6 +1471,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"ip_routes": schema.ListNestedAttribute{
 											Description: "The IP routes of the partner configuration.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"prefix": schema.StringAttribute{
@@ -1507,6 +1515,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"peer_asn": schema.Int64Attribute{
@@ -1620,14 +1629,17 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"asn": schema.Int64Attribute{
 								Description: "The ASN of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"amazon_asn": schema.Int64Attribute{
 								Description: "The Amazon ASN of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"auth_key": schema.StringAttribute{
 								Description: "The authentication key of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"prefixes": schema.StringAttribute{
 								Description: "The prefixes of the partner configuration.",
@@ -1636,10 +1648,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							"customer_ip_address": schema.StringAttribute{
 								Description: "The customer IP address of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"amazon_ip_address": schema.StringAttribute{
 								Description: "The Amazon IP address of the partner configuration.",
 								Optional:    true,
+								Computed:    true,
 							},
 							"name": schema.StringAttribute{
 								Description: "The name of the partner configuration.",
@@ -1738,6 +1752,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"ip_routes": schema.ListNestedAttribute{
 											Description: "The IP routes of the partner configuration.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"prefix": schema.StringAttribute{
@@ -1781,10 +1796,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"vlan": schema.Int64Attribute{
 											Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
 											Optional:    true,
+											Computed:    true,
 										},
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"peer_asn": schema.Int64Attribute{
@@ -1891,6 +1908,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"ip_routes": schema.ListNestedAttribute{
 											Description: "The IP routes of the partner configuration.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"prefix": schema.StringAttribute{
@@ -1934,6 +1952,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"bgp_connections": schema.ListNestedAttribute{
 											Description: "The BGP connections of the partner configuration interface.",
 											Optional:    true,
+											Computed:    true,
 											NestedObject: schema.NestedAttributeObject{
 												Attributes: map[string]schema.Attribute{
 													"peer_asn": schema.Int64Attribute{
@@ -3536,7 +3555,7 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
 		}
 		awsPartnerConfig := &vxcPartnerConfigAWSModel{
-			ConnectType:       types.StringValue(c.ConnectType),
+			ConnectType:       types.StringValue("AWS"),
 			Type:              types.StringValue(c.Type),
 			OwnerAccount:      types.StringValue(c.OwnerAccount),
 			ASN:               types.Int64Value(int64(c.ASN)),
@@ -3562,7 +3581,7 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
 		}
 		awsHCPartnerConfig := &vxcPartnerConfigAWSModel{
-			ConnectType:       types.StringValue(c.ConnectType),
+			ConnectType:       types.StringValue("AWSHC"),
 			Type:              types.StringNull(),
 			OwnerAccount:      types.StringValue(c.OwnerAccount),
 			ConnectionName:    types.StringValue(c.Name),
