@@ -573,7 +573,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
+						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type. Required for Palo Alto MVEs.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{

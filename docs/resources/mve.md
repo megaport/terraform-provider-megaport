@@ -114,7 +114,7 @@ Optional:
 - `mve_label` (String) The MVE label for the vendor config.
 - `remote_auth` (String) The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.
 - `serial_number` (String) The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.
-- `ssh_public_key` (String) The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type. Required for Palo Alto MVEs.
 - `system_tag` (String) The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.
 - `token` (String) The token for the vendor config. Required for Meraki MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
