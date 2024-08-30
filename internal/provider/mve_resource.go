@@ -240,7 +240,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			ImageID:           int(v.ImageID.ValueInt64()),
 			ProductSize:       v.ProductSize.ValueString(),
 			MVELabel:          v.MVELabel.ValueString(),
-			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
+			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
 		}
@@ -568,11 +568,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
-						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, Palo Alto, and Vmware MVEs.",
+						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.",
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for VMWare and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
+						Description: "The SSH public key for the vendor config. Required for VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
