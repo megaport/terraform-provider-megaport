@@ -241,7 +241,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			ProductSize:       v.ProductSize.ValueString(),
 			MVELabel:          v.MVELabel.ValueString(),
 			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:      v.AdminSSHPublicKey.ValueString(),
+			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
 		}
