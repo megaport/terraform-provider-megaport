@@ -2546,7 +2546,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.IPRoutes.IsNull() {
 					ipRoutes := []*ipRouteModel{}
-					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, false)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
 					for _, ipRoute := range ipRoutes {
 						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
@@ -2564,7 +2564,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.Bfd.IsNull() {
 					bfd := &bfdConfigModel{}
-					bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
+					bfdDiags := iface.Bfd.As(ctx, &bfd, basetypes.ObjectAsOptions{})
 					resp.Diagnostics = append(resp.Diagnostics, bfdDiags...)
 					toAppend.Bfd = megaport.BfdConfig{
 						TxInterval: int(bfd.TxInterval.ValueInt64()),
