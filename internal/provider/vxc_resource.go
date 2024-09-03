@@ -2393,7 +2393,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
 					toAppend.IpAddresses = ipAddresses
 				}
-				if !iface.IPRoutes.IsNull() {
+				if !iface.IPRoutes.IsNull() && !iface.IPRoutes.IsUnknown() {
 					ipRoutes := []*ipRouteModel{}
 					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, false)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
@@ -2424,7 +2424,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				if !iface.VLAN.IsNull() {
 					toAppend.VLAN = int(iface.VLAN.ValueInt64())
 				}
-				if !iface.BgpConnections.IsNull() {
+				if !iface.BgpConnections.IsNull() && !iface.BgpConnections.IsUnknown() {
 					bgpConnections := []*bgpConnectionConfigModel{}
 					bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 					resp.Diagnostics = append(resp.Diagnostics, bgpDiags...)
@@ -2544,7 +2544,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
 					toAppend.IpAddresses = ipAddresses
 				}
-				if !iface.IPRoutes.IsNull() {
+				if !iface.IPRoutes.IsNull() && !iface.IPRoutes.IsUnknown() {
 					ipRoutes := []*ipRouteModel{}
 					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, false)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
@@ -3036,9 +3036,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, ipDiags...)
 					toAppend.IpAddresses = ipAddresses
 				}
-				if !iface.IPRoutes.IsNull() {
+				if !iface.IPRoutes.IsNull() && !iface.IPRoutes.IsUnknown() {
 					ipRoutes := []*ipRouteModel{}
-					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, false)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
 					for _, ipRoute := range ipRoutes {
 						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
@@ -3054,9 +3054,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					resp.Diagnostics = append(resp.Diagnostics, natDiags...)
 					toAppend.NatIpAddresses = natIPAddresses
 				}
-				if !iface.Bfd.IsNull() {
+				if !iface.Bfd.IsNull() && !iface.Bfd.IsUnknown() {
 					bfd := &bfdConfigModel{}
-					bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
+					bfdDiags := iface.Bfd.As(ctx, &bfd, basetypes.ObjectAsOptions{})
 					resp.Diagnostics = append(resp.Diagnostics, bfdDiags...)
 					toAppend.Bfd = megaport.BfdConfig{
 						TxInterval: int(bfd.TxInterval.ValueInt64()),
@@ -3676,20 +3676,30 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			diags.Append(ipAddressesDiags...)
 			interfaceModel.IPAddresses = ipAddressesList
 			// IP Routes
-			ipRouteObjs := []types.Object{}
-			for _, ipRoute := range iface.IPRoutes {
-				ipRouteModel := &ipRouteModel{
-					Prefix:      types.StringValue(ipRoute.Prefix),
-					Description: types.StringValue(ipRoute.Description),
-					NextHop:     types.StringValue(ipRoute.NextHop),
+			if len(iface.IPRoutes) > 0 {
+				ipRouteObjs := []types.Object{}
+				for _, ipRoute := range iface.IPRoutes {
+					ipRouteModel := &ipRouteModel{
+						Prefix:      types.StringValue(ipRoute.Prefix),
+						Description: types.StringValue(ipRoute.Description),
+						NextHop:     types.StringValue(ipRoute.NextHop),
+					}
+					ipRouteObj, ipRouteDiags := types.ObjectValueFrom(ctx, ipRouteAttrs, ipRouteModel)
+					diags.Append(ipRouteDiags...)
+					if diags.HasError() {
+						fmt.Println("ERRORS!", diags.Errors())
+					}
+					ipRouteObjs = append(ipRouteObjs, ipRouteObj)
 				}
-				ipRouteObj, ipRouteDiags := types.ObjectValueFrom(ctx, ipRouteAttrs, ipRouteModel)
+				ipRouteList, ipRouteDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), ipRouteObjs)
 				diags.Append(ipRouteDiags...)
-				ipRouteObjs = append(ipRouteObjs, ipRouteObj)
+				if diags.HasError() {
+					fmt.Println("ERRORS!", diags.Errors())
+				}
+				interfaceModel.IPRoutes = ipRouteList
+			} else {
+				interfaceModel.IPRoutes = types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs))
 			}
-			ipRouteList, ipRouteDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), ipRouteObjs)
-			diags.Append(ipRouteDiags...)
-			interfaceModel.IPRoutes = ipRouteList
 			// NAT IP Addresses
 			natIPAddressesList, natIPAddressesDiags := types.ListValueFrom(ctx, types.StringType, iface.NatIPAddresses)
 			diags.Append(natIPAddressesDiags...)
@@ -3704,39 +3714,43 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			diags.Append(bfdDiags...)
 			interfaceModel.Bfd = bfdObj
 			// BGP Connections
-			bgpConnectionObjs := []types.Object{}
-			for _, bgpConnection := range iface.BGPConnections {
-				bgpConnectionModel := &bgpConnectionConfigModel{
-					PeerAsn:            types.Int64Value(int64(bgpConnection.PeerAsn)),
-					LocalIPAddress:     types.StringValue(bgpConnection.LocalIpAddress),
-					PeerIPAddress:      types.StringValue(bgpConnection.PeerIpAddress),
-					Password:           types.StringValue(bgpConnection.Password),
-					Shutdown:           types.BoolValue(bgpConnection.Shutdown),
-					Description:        types.StringValue(bgpConnection.Description),
-					MedIn:              types.Int64Value(int64(bgpConnection.MedIn)),
-					MedOut:             types.Int64Value(int64(bgpConnection.MedOut)),
-					BfdEnabled:         types.BoolValue(bgpConnection.BfdEnabled),
-					ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
-					AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
-					PeerType:           types.StringValue(bgpConnection.PeerType),
-					ImportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ImportWhitelist)),
-					ImportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ImportBlacklist)),
-					ExportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ExportWhitelist)),
-					ExportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ExportBlacklist)),
+			if len(iface.BGPConnections) > 0 {
+				bgpConnectionObjs := []types.Object{}
+				for _, bgpConnection := range iface.BGPConnections {
+					bgpConnectionModel := &bgpConnectionConfigModel{
+						PeerAsn:            types.Int64Value(int64(bgpConnection.PeerAsn)),
+						LocalIPAddress:     types.StringValue(bgpConnection.LocalIpAddress),
+						PeerIPAddress:      types.StringValue(bgpConnection.PeerIpAddress),
+						Password:           types.StringValue(bgpConnection.Password),
+						Shutdown:           types.BoolValue(bgpConnection.Shutdown),
+						Description:        types.StringValue(bgpConnection.Description),
+						MedIn:              types.Int64Value(int64(bgpConnection.MedIn)),
+						MedOut:             types.Int64Value(int64(bgpConnection.MedOut)),
+						BfdEnabled:         types.BoolValue(bgpConnection.BfdEnabled),
+						ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
+						AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
+						PeerType:           types.StringValue(bgpConnection.PeerType),
+						ImportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ImportWhitelist)),
+						ImportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ImportBlacklist)),
+						ExportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ExportWhitelist)),
+						ExportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ExportBlacklist)),
+					}
+					permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
+					diags.Append(permitExportToDiags...)
+					bgpConnectionModel.PermitExportTo = permitExportToList
+					denyExportToList, denyExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.DenyExportTo)
+					diags.Append(denyExportToDiags...)
+					bgpConnectionModel.DenyExportTo = denyExportToList
+					bgpConnectionObj, bgpConnectionDiags := types.ObjectValueFrom(ctx, bgpVrouterConnectionConfig, bgpConnectionModel)
+					diags.Append(bgpConnectionDiags...)
+					bgpConnectionObjs = append(bgpConnectionObjs, bgpConnectionObj)
 				}
-				permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
-				diags.Append(permitExportToDiags...)
-				bgpConnectionModel.PermitExportTo = permitExportToList
-				denyExportToList, denyExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.DenyExportTo)
-				diags.Append(denyExportToDiags...)
-				bgpConnectionModel.DenyExportTo = denyExportToList
-				bgpConnectionObj, bgpConnectionDiags := types.ObjectValueFrom(ctx, bgpVrouterConnectionConfig, bgpConnectionModel)
+				bgpConnectionList, bgpConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), bgpConnectionObjs)
 				diags.Append(bgpConnectionDiags...)
-				bgpConnectionObjs = append(bgpConnectionObjs, bgpConnectionObj)
+				interfaceModel.BgpConnections = bgpConnectionList
+			} else {
+				interfaceModel.BgpConnections = types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig))
 			}
-			bgpConnectionList, bgpConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), bgpConnectionObjs)
-			diags.Append(bgpConnectionDiags...)
-			interfaceModel.BgpConnections = bgpConnectionList
 			interfaceObj, interfaceDiags := types.ObjectValueFrom(ctx, vxcVrouterInterfaceAttrs, interfaceModel)
 			diags.Append(interfaceDiags...)
 			interfacesObjs = append(interfacesObjs, interfaceObj)
