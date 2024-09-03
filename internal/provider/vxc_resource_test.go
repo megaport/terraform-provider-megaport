@@ -347,7 +347,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
 				  }
 
 				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
@@ -408,7 +408,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
 				  }
 
 				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
@@ -585,11 +585,11 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 				  }
 
 				  data "megaport_location" "syd_ndc" {
-					name = "NextDC C1"
+					name = "NextDC S1"
 				  }
 
 				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_ndc.id
@@ -1003,7 +1003,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 				  }
 
 				   data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
@@ -1144,7 +1144,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 				  }
 
 				   data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
@@ -1286,7 +1286,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 				  }
 
 				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
@@ -1376,7 +1376,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 				  }
 
 				  data "megaport_partner" "aws_port" {
-					connect_type = "AWS"
+					connect_type = "AWSHC"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
