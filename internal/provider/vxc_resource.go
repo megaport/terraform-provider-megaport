@@ -3719,10 +3719,10 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 					ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
 					AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
 					PeerType:           types.StringValue(bgpConnection.PeerType),
-					ImportWhitelist:    types.StringValue(string(bgpConnection.ImportWhitelist)),
-					ImportBlacklist:    types.StringValue(string(bgpConnection.ImportBlacklist)),
-					ExportWhitelist:    types.StringValue(string(bgpConnection.ExportWhitelist)),
-					ExportBlacklist:    types.StringValue(string(bgpConnection.ExportBlacklist)),
+					ImportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ImportWhitelist)),
+					ImportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ImportBlacklist)),
+					ExportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ExportWhitelist)),
+					ExportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ExportBlacklist)),
 				}
 				permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
 				diags.Append(permitExportToDiags...)
