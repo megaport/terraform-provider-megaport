@@ -156,10 +156,10 @@ var (
 		"export_policy":         types.StringType,
 		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
 		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
-		"import_whitelist":      types.StringType,
-		"import_blacklist":      types.StringType,
-		"export_whitelist":      types.StringType,
-		"export_blacklist":      types.StringType,
+		"import_whitelist":      types.Int64Type,
+		"import_blacklist":      types.Int64Type,
+		"export_whitelist":      types.Int64Type,
+		"export_blacklist":      types.Int64Type,
 		"as_path_prepend_count": types.Int64Type,
 	}
 
@@ -202,10 +202,10 @@ var (
 		"export_policy":         types.StringType,
 		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
 		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
-		"import_whitelist":      types.StringType,
-		"import_blacklist":      types.StringType,
-		"export_whitelist":      types.StringType,
-		"export_blacklist":      types.StringType,
+		"import_whitelist":      types.Int64Type,
+		"import_blacklist":      types.Int64Type,
+		"export_whitelist":      types.Int64Type,
+		"export_blacklist":      types.Int64Type,
 		"as_path_prepend_count": types.Int64Type,
 	}
 )
@@ -250,6 +250,8 @@ type vxcResourceModel struct {
 	BEndPartnerConfig types.Object `tfsdk:"b_end_partner_config"`
 
 	CSPConnections types.List `tfsdk:"csp_connections"`
+
+	IsImported types.Bool `tfsdk:"is_imported"`
 }
 
 type cspConnectionModel struct {
@@ -409,10 +411,10 @@ type bgpConnectionConfigModel struct {
 	ExportPolicy       types.String `tfsdk:"export_policy"`
 	PermitExportTo     types.List   `tfsdk:"permit_export_to"`
 	DenyExportTo       types.List   `tfsdk:"deny_export_to"`
-	ImportWhitelist    types.String `tfsdk:"import_whitelist"`
-	ImportBlacklist    types.String `tfsdk:"import_blacklist"`
-	ExportWhitelist    types.String `tfsdk:"export_whitelist"`
-	ExportBlacklist    types.String `tfsdk:"export_blacklist"`
+	ImportWhitelist    types.Int64  `tfsdk:"import_whitelist"`
+	ImportBlacklist    types.Int64  `tfsdk:"import_blacklist"`
+	ExportWhitelist    types.Int64  `tfsdk:"export_whitelist"`
+	ExportBlacklist    types.Int64  `tfsdk:"export_blacklist"`
 	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
 }
 
@@ -544,10 +546,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 			apiDiags = append(apiDiags, partnerConfigDiags...)
 			partnerConfigObj, partnerConfigObjDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfig)
 			if cspConnectionModel.ResourceName.ValueString() == "a_csp_connection" {
-				orm.AEndPartnerConfig = partnerConfigObj
+				if !orm.AEndPartnerConfig.IsNull() && orm.IsImported.ValueBool() {
+					orm.AEndPartnerConfig = partnerConfigObj
+				}
 			}
 			if cspConnectionModel.ResourceName.ValueString() == "b_csp_connection" {
-				orm.BEndPartnerConfig = partnerConfigObj
+				if !orm.BEndPartnerConfig.IsNull() && orm.IsImported.ValueBool() {
+					orm.BEndPartnerConfig = partnerConfigObj
+				}
 			}
 			apiDiags = append(apiDiags, partnerConfigObjDiags...)
 			cspConnections = append(cspConnections, cspConnectionObject)
@@ -593,6 +599,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the resource was updated.",
 				Computed:    true,
+			},
+			"is_imported": schema.BoolAttribute{
+				Description: "Indicates if the resource was imported.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
@@ -1182,8 +1195,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Required:    true,
 							},
 							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
-								Required:    true,
+								Description: "The type of the partner configuration. Required for AWS Virtual Interfaces.",
+								Optional:    true,
 							},
 							"owner_account": schema.StringAttribute{
 								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
@@ -1268,10 +1281,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										"shared_key": schema.StringAttribute{
 											Description: "The shared key of the peer.",
 											Optional:    true,
+											Computed:    true,
 										},
 										"vlan": schema.Int64Attribute{
 											Description: "The VLAN of the peer.",
 											Optional:    true,
+											Computed:    true,
 										},
 									},
 								},
@@ -1370,6 +1385,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"peer_type": schema.StringAttribute{
 														Description: "Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.",
 														Optional:    true,
+														Computed:    true,
 														Validators: []validator.String{
 															stringvalidator.OneOf("NON_CLOUD", "PRIV_CLOUD", "PUB_CLOUD"),
 														},
@@ -1424,21 +1440,25 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.StringAttribute{
+													"import_whitelist": schema.Int64Attribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"import_blacklist": schema.StringAttribute{
+													"import_blacklist": schema.Int64Attribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_whitelist": schema.StringAttribute{
+													"export_whitelist": schema.Int64Attribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_blacklist": schema.StringAttribute{
+													"export_blacklist": schema.Int64Attribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
 													"as_path_prepend_count": schema.Int64Attribute{
 														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
@@ -1561,28 +1581,34 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"permit_export_to": schema.ListAttribute{
 														Description: "The permitted export to of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 														ElementType: types.StringType,
 													},
 													"deny_export_to": schema.ListAttribute{
 														Description: "The denied export to of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.StringAttribute{
+													"import_whitelist": schema.Int64Attribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"import_blacklist": schema.StringAttribute{
+													"import_blacklist": schema.Int64Attribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_whitelist": schema.StringAttribute{
+													"export_whitelist": schema.Int64Attribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_blacklist": schema.StringAttribute{
+													"export_blacklist": schema.Int64Attribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
 													"as_path_prepend_count": schema.Int64Attribute{
 														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
@@ -1619,8 +1645,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								Required:    true,
 							},
 							"type": schema.StringAttribute{
-								Description: "The type of the partner configuration. Required for AWS partner configurations.",
-								Required:    true,
+								Description: "The type of the partner configuration. Required for AWS Virtual interface.",
+								Optional:    true,
 							},
 							"owner_account": schema.StringAttribute{
 								Description: "The owner AWS account of the partner configuration. Required for AWS partner configurations.",
@@ -1811,6 +1837,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"peer_type": schema.StringAttribute{
 														Description: "Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.",
 														Optional:    true,
+														Computed:    true,
 														Validators: []validator.String{
 															stringvalidator.OneOf("NON_CLOUD", "PRIV_CLOUD", "PUB_CLOUD"),
 														},
@@ -1854,28 +1881,34 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													"permit_export_to": schema.ListAttribute{
 														Description: "The permitted export to of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 														ElementType: types.StringType,
 													},
 													"deny_export_to": schema.ListAttribute{
 														Description: "The denied export to of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.StringAttribute{
+													"import_whitelist": schema.Int64Attribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"import_blacklist": schema.StringAttribute{
+													"import_blacklist": schema.Int64Attribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_whitelist": schema.StringAttribute{
+													"export_whitelist": schema.Int64Attribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_blacklist": schema.StringAttribute{
+													"export_blacklist": schema.Int64Attribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
 													"as_path_prepend_count": schema.Int64Attribute{
 														Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
@@ -2005,19 +2038,21 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 														Optional:    true,
 														ElementType: types.StringType,
 													},
-													"import_whitelist": schema.StringAttribute{
+													"import_whitelist": schema.Int64Attribute{
 														Description: "The import whitelist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"import_blacklist": schema.StringAttribute{
+													"import_blacklist": schema.Int64Attribute{
 														Description: "The import blacklist of the BGP connection.",
 														Optional:    true,
+														Computed:    true,
 													},
-													"export_whitelist": schema.StringAttribute{
+													"export_whitelist": schema.Int64Attribute{
 														Description: "The export whitelist of the BGP connection.",
 														Optional:    true,
 													},
-													"export_blacklist": schema.StringAttribute{
+													"export_blacklist": schema.Int64Attribute{
 														Description: "The export blacklist of the BGP connection.",
 														Optional:    true,
 													},
@@ -2049,6 +2084,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	plan.IsImported = types.BoolValue(false)
 
 	buyReq := &megaport.BuyVXCRequest{
 		VXCName:    plan.Name.ValueString(),
@@ -2097,7 +2134,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
-	if !plan.AEndPartnerConfig.IsNull() {
+	if !plan.AEndPartnerConfig.IsNull() && !plan.AEndPartnerConfig.IsUnknown() {
 		var aPartnerConfig vxcPartnerConfigurationModel
 		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{
 			UnhandledNullAsEmpty:    true,
@@ -2372,14 +2409,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
 
 			aEndMegaportConfig := megaport.VXCOrderVrouterPartnerConfig{}
 			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
@@ -2444,32 +2473,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							PeerType:           bgpConnection.PeerType.ValueString(),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportWhitelist.ValueString() {
-									bgpToAppend.ImportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportWhitelist = int(bgpConnection.ImportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ImportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportBlacklist.ValueString() {
-									bgpToAppend.ImportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportBlacklist = int(bgpConnection.ImportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.ExportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportWhitelist.ValueString() {
-									bgpToAppend.ExportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportWhitelist = int(bgpConnection.ExportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ExportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportBlacklist.ValueString() {
-									bgpToAppend.ExportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportBlacklist = int(bgpConnection.ExportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.PermitExportTo.IsNull() {
 							permitExportTo := []string{}
@@ -2521,14 +2534,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			aEndDiags := aPartnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
 			if aEndDiags.HasError() {
 				resp.Diagnostics.Append(aEndDiags...)
-				return
-			}
-			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
 				return
 			}
 
@@ -2591,32 +2596,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportWhitelist.ValueString() {
-									bgpToAppend.ImportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportWhitelist = int(bgpConnection.ImportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ImportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportBlacklist.ValueString() {
-									bgpToAppend.ImportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportBlacklist = int(bgpConnection.ImportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.ExportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportWhitelist.ValueString() {
-									bgpToAppend.ExportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportWhitelist = int(bgpConnection.ExportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ExportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportBlacklist.ValueString() {
-									bgpToAppend.ExportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportBlacklist = int(bgpConnection.ExportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.PermitExportTo.IsNull() {
 							permitExportTo := []string{}
@@ -3015,14 +3004,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
 
 			bEndMegaportConfig := megaport.VXCOrderVrouterPartnerConfig{}
 			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
@@ -3087,32 +3068,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							PeerType:           bgpConnection.PeerType.ValueString(),
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportWhitelist.ValueString() {
-									bgpToAppend.ImportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportWhitelist = int(bgpConnection.ImportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ImportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ImportBlacklist.ValueString() {
-									bgpToAppend.ImportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ImportBlacklist = int(bgpConnection.ImportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.ExportWhitelist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportWhitelist.ValueString() {
-									bgpToAppend.ExportWhitelist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportWhitelist = int(bgpConnection.ExportWhitelist.ValueInt64())
 						}
 						if !bgpConnection.ExportBlacklist.IsNull() {
-							for _, prefixFilterList := range prefixFilterListRes {
-								if prefixFilterList.Description == bgpConnection.ExportBlacklist.ValueString() {
-									bgpToAppend.ExportBlacklist = prefixFilterList.Id
-								}
-							}
+							bgpToAppend.ExportBlacklist = int(bgpConnection.ExportBlacklist.ValueInt64())
 						}
 						if !bgpConnection.PermitExportTo.IsNull() {
 							permitExportTo := []string{}
@@ -3429,6 +3394,7 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
+	resp.State.SetAttribute(ctx, path.Root("is_imported"), types.BoolValue(true))
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
 
@@ -3616,24 +3582,33 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 			}
 		}
 		azurePartnerConfig.PortChoice = types.StringValue(portChoice)
-		peers := []types.Object{}
-		for _, peer := range c.Peers {
-			peerModel := partnerOrderAzurePeeringConfigModel{
-				Type:            types.StringValue(peer.Type),
-				PeerASN:         types.StringValue(string(peer.PeerASN)),
-				PrimarySubnet:   types.StringValue(peer.PrimarySubnet),
-				SecondarySubnet: types.StringValue(peer.SecondarySubnet),
-				Prefixes:        types.StringValue(peer.Prefixes),
-				SharedKey:       types.StringValue(peer.SharedKey),
-				VLAN:            types.Int64Value(int64(peer.VLAN)),
+		if len(c.Peers) > 0 {
+			peers := []types.Object{}
+			for _, peer := range c.Peers {
+				peerModel := partnerOrderAzurePeeringConfigModel{
+					Type:            types.StringValue(peer.Type),
+					PeerASN:         types.StringValue(fmt.Sprint(peer.PeerASN)),
+					PrimarySubnet:   types.StringValue(peer.PrimarySubnet),
+					SecondarySubnet: types.StringValue(peer.SecondarySubnet),
+					SharedKey:       types.StringValue(peer.SharedKey),
+					VLAN:            types.Int64Value(int64(peer.VLAN)),
+				}
+				if peer.Prefixes != "" {
+					peerModel.Prefixes = types.StringValue(peer.Prefixes)
+				} else {
+					peerModel.Prefixes = types.StringNull()
+				}
+				peerObj, peerDiags := types.ObjectValueFrom(ctx, partnerOrderAzurePeeringConfigAttrs, peerModel)
+				diags.Append(peerDiags...)
+				peers = append(peers, peerObj)
 			}
-			peerObj, peerDiags := types.ObjectValueFrom(ctx, partnerOrderAzurePeeringConfigAttrs, peerModel)
-			diags.Append(peerDiags...)
-			peers = append(peers, peerObj)
+			peersList, peersDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs), peers)
+			diags.Append(peersDiags...)
+			azurePartnerConfig.Peers = peersList
+		} else {
+			peersList := types.ListNull(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs))
+			azurePartnerConfig.Peers = peersList
 		}
-		peersList, peersDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs), peers)
-		diags.Append(peersDiags...)
-		azurePartnerConfig.Peers = peersList
 		azurePartnerConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azurePartnerConfig)
 		diags.Append(azureDiags...)
 		p.AzurePartnerConfig = azurePartnerConfigObj
@@ -3730,10 +3705,27 @@ func cspConnectionToPartnerConfig(ctx context.Context, c megaport.CSPConnectionC
 						ExportPolicy:       types.StringValue(bgpConnection.ExportPolicy),
 						AsPathPrependCount: types.Int64Value(int64(bgpConnection.AsPathPrependCount)),
 						PeerType:           types.StringValue(bgpConnection.PeerType),
-						ImportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ImportWhitelist)),
-						ImportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ImportBlacklist)),
-						ExportWhitelist:    types.StringValue(fmt.Sprint(bgpConnection.ExportWhitelist)),
-						ExportBlacklist:    types.StringValue(fmt.Sprint(bgpConnection.ExportBlacklist)),
+					}
+					if bgpConnection.ImportWhitelist != 0 {
+
+						bgpConnectionModel.ImportWhitelist = types.Int64Value(int64(bgpConnection.ImportWhitelist))
+					} else {
+						bgpConnectionModel.ImportWhitelist = types.Int64Null()
+					}
+					if bgpConnection.ImportBlacklist != 0 {
+						bgpConnectionModel.ImportBlacklist = types.Int64Value(int64(bgpConnection.ImportBlacklist))
+					} else {
+						bgpConnectionModel.ImportBlacklist = types.Int64Null()
+					}
+					if bgpConnection.ExportWhitelist != 0 {
+						bgpConnectionModel.ExportWhitelist = types.Int64Value(int64(bgpConnection.ExportWhitelist))
+					} else {
+						bgpConnectionModel.ExportWhitelist = types.Int64Null()
+					}
+					if bgpConnection.ExportBlacklist != 0 {
+						bgpConnectionModel.ExportBlacklist = types.Int64Value(int64(bgpConnection.ExportBlacklist))
+					} else {
+						bgpConnectionModel.ExportBlacklist = types.Int64Null()
 					}
 					permitExportToList, permitExportToDiags := types.ListValueFrom(ctx, types.StringType, bgpConnection.PermitExportTo)
 					diags.Append(permitExportToDiags...)
