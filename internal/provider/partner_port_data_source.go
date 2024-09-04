@@ -171,7 +171,6 @@ func (d *partnerPortDataSource) Read(ctx context.Context, req datasource.ReadReq
 			"More Than 1 Matching Partner Port Was Found",
 			"There was more than 1 matching partner port for the search criteria, chose highest ranked port. Try narrowing your search criteria.",
 		)
-		return
 	}
 
 	// pick the first matching port
