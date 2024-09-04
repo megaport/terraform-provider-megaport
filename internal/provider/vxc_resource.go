@@ -223,6 +223,7 @@ type vxcResourceModel struct {
 	DistanceBand       types.String `tfsdk:"distance_band"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
 	PromoCode          types.String `tfsdk:"promo_code"`
+	ServiceKey         types.String `tfsdk:"service_key"`
 
 	SecondaryName  types.String `tfsdk:"secondary_name"`
 	UsageAlgorithm types.String `tfsdk:"usage_algorithm"`
@@ -594,6 +595,13 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
+				},
+			},
+			"service_key": schema.StringAttribute{
+				Description: "The service key of the VXC.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"product_name": schema.StringAttribute{
@@ -2025,6 +2033,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		RateLimit:  int(plan.RateLimit.ValueInt64()),
 		PromoCode:  plan.PromoCode.ValueString(),
 		CostCentre: plan.CostCentre.ValueString(),
+		ServiceKey: plan.ServiceKey.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
