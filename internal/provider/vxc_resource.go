@@ -600,6 +600,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"service_key": schema.StringAttribute{
 				Description: "The service key of the VXC.",
 				Optional:    true,
+				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
