@@ -37,6 +37,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = true
 					diversity_zone = "red"
+					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
@@ -87,6 +88,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = false
 					diversity_zone = "red"
+					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),

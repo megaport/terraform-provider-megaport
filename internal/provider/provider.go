@@ -36,8 +36,8 @@ type megaportProviderModel struct {
 }
 
 type resourceTagModel struct {
-	Key   types.String `json:"key"`
-	Value types.String `json:"value"`
+	Key   types.String `tfsdk:"key"`
+	Value types.String `tfsdk:"value"`
 }
 
 var resourceTagSchemaAttrs = map[string]resourceSchema.Attribute{

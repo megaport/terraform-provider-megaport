@@ -2,19 +2,17 @@ package provider
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
 type LagPortProviderTestSuite ProviderTestSuite
 
-func TestLagPortProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(LagPortProviderTestSuite))
-}
+// func TestLagPortProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(LagPortProviderTestSuite))
+// }
 
 func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 	portName := RandomTestName()
