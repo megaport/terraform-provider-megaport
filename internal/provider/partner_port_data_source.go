@@ -167,9 +167,14 @@ func (d *partnerPortDataSource) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	if len(partnerPorts) > 1 {
+		var portDetails []string
+		for idx, port := range partnerPorts {
+			portDetails = append(portDetails, fmt.Sprintf(`#%d: {"product_name": "%s", "product_uid": "%s", "connect_type": "%s", "company_uid": "%s", "company_name": "%s", "diversity_zone": "%s", "location_id": %d, "speed": %d, "rank": %d, "vxc_permitted", %t}`, idx+1, port.ProductName, port.ProductUID, port.ConnectType, port.CompanyUID, port.CompanyName, port.DiversityZone, port.LocationId, port.Speed, port.Rank, port.VXCPermitted))
+		}
+		ports := strings.Join(portDetails, "\n")
 		resp.Diagnostics.AddWarning(
 			"More Than 1 Matching Partner Port Was Found",
-			"There was more than 1 matching partner port for the search criteria, chose highest ranked port. Try narrowing your search criteria.",
+			"There was more than 1 matching partner port for the search criteria, chose highest ranked port. Try narrowing your search criteria.\n\nMatching partner ports: \n\n"+ports,
 		)
 	}
 
