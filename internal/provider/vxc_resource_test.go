@@ -2,29 +2,31 @@ package provider
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/suite"
 )
 
 type VXCBasicProviderTestSuite ProviderTestSuite
 type VXCWithCSPsProviderTestSuite ProviderTestSuite
 type VXCWithMVEProviderTestSuite ProviderTestSuite
 
-// func TestVXCBasicProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCBasicProviderTestSuite))
-// }
+func TestVXCBasicProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCBasicProviderTestSuite))
+}
 
-// func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
-// }
+func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+}
 
-// func TestVXCWithMVEProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCWithMVEProviderTestSuite))
-// }
+func TestVXCWithMVEProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCWithMVEProviderTestSuite))
+}
 
 func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	portName1 := RandomTestName()
