@@ -79,6 +79,7 @@ type mveResourceModel struct {
 
 	NetworkInterfaces types.List `tfsdk:"vnics"`
 	AttributeTags     types.Map  `tfsdk:"attribute_tags"`
+	ResourceTags      types.List `tfsdk:"resource_tags"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -122,7 +123,7 @@ type vendorConfigModel struct {
 	SecretKey          types.String `tfsdk:"secret_key"`
 }
 
-func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
+func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags []megaport.ResourceTag) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
@@ -195,6 +196,23 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	apiDiags = append(apiDiags, listDiags...)
 	orm.NetworkInterfaces = networkInterfaceList
 
+	if len(tags) > 0 {
+		resourceTags := make([]types.Object, 0, len(tags))
+		for _, tag := range tags {
+			resourceTagModel := &resourceTagModel{
+				Key:   types.StringValue(tag.Key),
+				Value: types.StringValue(tag.Value),
+			}
+			resourceTagObject, resourceTagDiags := types.ObjectValueFrom(ctx, resourceTagAttrs, resourceTagModel)
+			apiDiags = append(apiDiags, resourceTagDiags...)
+			resourceTags = append(resourceTags, resourceTagObject)
+		}
+		tagList, tagListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTags)
+		apiDiags = append(apiDiags, tagListDiags...)
+		orm.ResourceTags = tagList
+	} else {
+		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
+	}
 	return apiDiags
 }
 
@@ -565,6 +583,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					listplanmodifier.RequiresReplace(),
 				},
 			},
+			"resource_tags": schema.ListNestedAttribute{
+				Description: "The resource tags of the MVE.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: resourceTagSchemaAttrs,
+				},
+			},
 			"vendor_config": schema.SingleNestedAttribute{
 				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
 				Required:    true,
@@ -731,6 +756,18 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	mveReq.VendorConfig = vendorConfig
 
+	if len(plan.ResourceTags.Elements()) > 0 {
+		resourceTags := []*resourceTagModel{}
+		resourceTagDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTags, false)
+		resp.Diagnostics = append(resp.Diagnostics, resourceTagDiags...)
+		for _, rt := range resourceTags {
+			mveReq.ResourceTags = append(mveReq.ResourceTags, megaport.ResourceTag{
+				Key:   rt.Key.ValueString(),
+				Value: rt.Value.ValueString(),
+			})
+		}
+	}
+
 	if !plan.NetworkInterfaces.IsNull() && len(plan.NetworkInterfaces.Elements()) > 0 {
 		vnicModels := []*mveNetworkInterfaceModel{}
 		vnicDiags := plan.NetworkInterfaces.ElementsAs(ctx, &vnicModels, false)
@@ -772,8 +809,17 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for newly created MVE",
+			"Could not read tags for newly created MVE with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the MVE info
-	apiDiags := plan.fromAPIMVE(ctx, mve)
+	apiDiags := plan.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -820,7 +866,16 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	apiDiags := state.fromAPIMVE(ctx, mve)
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for newly created MVE",
+			"Could not read tags for newly created MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	// Set refreshed state
@@ -880,7 +935,37 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIMVE(ctx, updatedMVE)
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
+		resourceTagModels := []resourceTagModel{}
+		resourceTagDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagModels, false)
+		resp.Diagnostics = append(resp.Diagnostics, resourceTagDiags...)
+		for _, rt := range resourceTagModels {
+			resourceTags = append(resourceTags, megaport.ResourceTag{
+				Key:   rt.Key.ValueString(),
+				Value: rt.Value.ValueString(),
+			})
+		}
+		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), resourceTags)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating tags for MVE",
+				"Could not update tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, updatedMVE.UID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for newly created MVE",
+			"Could not read tags for newly created MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMVE(ctx, updatedMVE, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))

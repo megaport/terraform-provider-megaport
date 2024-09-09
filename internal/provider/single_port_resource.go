@@ -137,19 +137,23 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	diags = append(diags, resourcesDiags...)
 	orm.Resources = resourcesObject
 
-	resourceTags := make([]types.Object, 0, len(tags))
-	for _, tag := range tags {
-		resourceTagModel := &resourceTagModel{
-			Key:   types.StringValue(tag.Key),
-			Value: types.StringValue(tag.Value),
+	if len(tags) > 0 {
+		resourceTags := make([]types.Object, 0, len(tags))
+		for _, tag := range tags {
+			resourceTagModel := &resourceTagModel{
+				Key:   types.StringValue(tag.Key),
+				Value: types.StringValue(tag.Value),
+			}
+			resourceTagObject, resourceTagDiags := types.ObjectValueFrom(ctx, resourceTagAttrs, resourceTagModel)
+			diags = append(diags, resourceTagDiags...)
+			resourceTags = append(resourceTags, resourceTagObject)
 		}
-		resourceTagObject, resourceTagDiags := types.ObjectValueFrom(ctx, resourceTagAttrs, resourceTagModel)
-		diags = append(diags, resourceTagDiags...)
-		resourceTags = append(resourceTags, resourceTagObject)
+		tagList, tagListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTags)
+		diags = append(diags, tagListDiags...)
+		orm.ResourceTags = tagList
+	} else {
+		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
 	}
-	tagList, tagListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTags)
-	diags = append(diags, tagListDiags...)
-	orm.ResourceTags = tagList
 	return diags
 }
 
@@ -389,6 +393,22 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		WaitForTime:           waitForTime,
 	}
 
+	if len(plan.ResourceTags.Elements()) > 0 {
+		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
+		resourceTagList := []*resourceTagModel{}
+		listDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, true)
+		resp.Diagnostics.Append(listDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		for _, tag := range resourceTagList {
+			resourceTags = append(resourceTags, megaport.ResourceTag{
+				Key:   tag.Key.ValueString(),
+				Value: tag.Value.ValueString(),
+			})
+		}
+		buyPortReq.ResourceTags = resourceTags
+	}
 	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -559,7 +579,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// If change in resource tags from state
-	if plan.ResourceTags.Equal(state.ResourceTags) {
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
 		tagList := []*resourceTagModel{}
 		listDiags := plan.ResourceTags.ElementsAs(ctx, &tagList, true)
 		resp.Diagnostics.Append(listDiags...)
