@@ -62,10 +62,11 @@ type lagPortResourceModel struct {
 	LagCount    types.Int64 `tfsdk:"lag_count"`
 	LagPortUIDs types.List  `tfsdk:"lag_port_uids"`
 
-	Resources types.Object `tfsdk:"resources"`
+	Resources    types.Object `tfsdk:"resources"`
+	ResourceTags types.List   `tfsdk:"resource_tags"`
 }
 
-func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
+func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags []megaport.ResourceTag) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(p.UID)
@@ -123,6 +124,24 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	resourcesObject, resourcesDiags := types.ObjectValueFrom(ctx, portResourcesAttrs, resourcesModel)
 	diags = append(diags, resourcesDiags...)
 	orm.Resources = resourcesObject
+
+	if len(tags) > 0 {
+		resourceTagObjs := []types.Object{}
+		for _, tag := range tags {
+			resourceTagModel := &resourceTagModel{
+				Key:   types.StringValue(tag.Key),
+				Value: types.StringValue(tag.Value),
+			}
+			resourceTagObj, resourceTagDiags := types.ObjectValueFrom(context.Background(), resourceTagAttrs, resourceTagModel)
+			diags = append(diags, resourceTagDiags...)
+			resourceTagObjs = append(resourceTagObjs, resourceTagObj)
+		}
+		resourceTagList, resourceTagDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTagObjs)
+		diags = append(diags, resourceTagDiags...)
+		orm.ResourceTags = resourceTagList
+	} else {
+		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
+	}
 
 	return diags
 }
@@ -320,6 +339,13 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"resource_tags": schema.ListNestedAttribute{
+				Description: "Tags to apply to the resource.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: resourceTagSchemaAttrs,
+				},
+			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources attached to port.",
 				Computed:    true,
@@ -369,6 +395,23 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		WaitForTime:           waitForTime,
 	}
 
+	if len(plan.ResourceTags.Elements()) > 0 {
+		resourceTagModels := []*resourceTagModel{}
+		tagModelDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagModels, true)
+		resp.Diagnostics.Append(tagModelDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		resourceTags := []megaport.ResourceTag{}
+		for _, t := range resourceTagModels {
+			resourceTags = append(resourceTags, megaport.ResourceTag{
+				Key:   t.Key.ValueString(),
+				Value: t.Value.ValueString(),
+			})
+		}
+		buyPortReq.ResourceTags = resourceTags
+	}
+
 	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -407,8 +450,17 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading newly created port tags",
+			"Could not read newly created port tags with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the port info
-	apiDiags := plan.fromAPIPort(ctx, port)
+	apiDiags := plan.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
 	lagPortUids := []types.String{}
 	for _, uid := range createdPort.TechnicalServiceUIDs {
@@ -463,7 +515,16 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIPort(ctx, port)
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading port tags",
+			"Could not read port tags with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -529,8 +590,41 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		resourceTagModels := []*resourceTagModel{}
+		tagModelDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagModels, true)
+		resp.Diagnostics.Append(tagModelDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		resourceTags := []megaport.ResourceTag{}
+		for _, t := range resourceTagModels {
+			resourceTags = append(resourceTags, megaport.ResourceTag{
+				Key:   t.Key.ValueString(),
+				Value: t.Value.ValueString(),
+			})
+		}
+		err = r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), resourceTags)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating port tags",
+				"Could not update port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, plan.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading port tags",
+			"Could not read port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
 	// Update the state
-	state.fromAPIPort(ctx, port)
+	state.fromAPIPort(ctx, port, tags)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
