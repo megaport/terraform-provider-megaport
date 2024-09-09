@@ -90,6 +90,7 @@ type mcrResourceModel struct {
 	AttributeTags types.Map  `tfsdk:"attribute_tags"`
 
 	PrefixFilterLists types.List `tfsdk:"prefix_filter_lists"`
+	ResourceTags      types.List `tfsdk:"resource_tags"`
 }
 
 // mcrPrefixFilterListModel represents the prefix filter list associated with the MCR
@@ -109,7 +110,7 @@ type mcrPrefixListEntryModel struct {
 }
 
 // fromAPIMCR maps the API MCR response to the resource schema.
-func (orm *mcrResourceModel) fromAPIMCR(_ context.Context, m *megaport.MCR) diag.Diagnostics {
+func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, tags []megaport.ResourceTag) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
 	asn := m.Resources.VirtualRouter.ASN
@@ -178,6 +179,24 @@ func (orm *mcrResourceModel) fromAPIMCR(_ context.Context, m *megaport.MCR) diag
 		tags, tagDiags := types.MapValue(types.StringType, attributeTags)
 		apiDiags = append(apiDiags, tagDiags...)
 		orm.AttributeTags = tags
+	}
+
+	if len(tags) > 0 {
+		resourceTagObjs := []types.Object{}
+		for _, tag := range tags {
+			resourceTagModel := &resourceTagModel{
+				Key:   types.StringValue(tag.Key),
+				Value: types.StringValue(tag.Value),
+			}
+			resourceTagObj, resourceTagDiags := types.ObjectValueFrom(context.Background(), resourceTagAttrs, resourceTagModel)
+			apiDiags = append(apiDiags, resourceTagDiags...)
+			resourceTagObjs = append(resourceTagObjs, resourceTagObj)
+		}
+		resourceTagList, resourceTagDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTagObjs)
+		apiDiags = append(apiDiags, resourceTagDiags...)
+		orm.ResourceTags = resourceTagList
+	} else {
+		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
 	}
 
 	return apiDiags
@@ -490,6 +509,13 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Attribute tags of the product.",
 				Computed:    true,
 			},
+			"resource_tags": schema.ListNestedAttribute{
+				Description: "Resource tags associated with the product.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: resourceTagSchemaAttrs,
+				},
+			},
 			"prefix_filter_lists": schema.ListNestedAttribute{
 				Description: "Prefix filter list associated with the product.",
 				Optional:    true,
@@ -577,6 +603,20 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.DiversityZone = plan.DiversityZone.ValueString()
 	}
 
+	if len(plan.ResourceTags.Elements()) > 0 {
+		resourceTags := make([]megaport.ResourceTag, len(plan.ResourceTags.Elements()))
+		resourceTagList := []*resourceTagModel{}
+		resourceTagsDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, false)
+		resp.Diagnostics.Append(resourceTagsDiags...)
+		for _, tag := range resourceTagList {
+			resourceTags = append(resourceTags, megaport.ResourceTag{
+				Key:   tag.Key.ValueString(),
+				Value: tag.Value.ValueString(),
+			})
+		}
+		buyReq.ResourceTags = resourceTags
+	}
+
 	err := r.client.MCRService.ValidateMCROrder(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -607,8 +647,17 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading resource tags",
+			"Could not read resource tags for MCR with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the MCR info
-	apiDiags := plan.fromAPIMCR(ctx, mcr)
+	apiDiags := plan.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	pfFilterLists := []*mcrPrefixFilterListModel{}
@@ -694,7 +743,16 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	apiDiags := state.fromAPIMCR(ctx, mcr)
+	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading resource tags",
+			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	pfFilterListModels := []*mcrPrefixFilterListModel{}
@@ -840,7 +898,15 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIMCR(ctx, mcr)
+	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading resource tags",
+			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+	}
+
+	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	statePrefixFilterListMap := map[int64]*mcrPrefixFilterListModel{}
@@ -1013,6 +1079,31 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		state.PrefixFilterLists = plan.PrefixFilterLists
 	} else { // If list is empty and null
 		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+	}
+
+	// If change in resource tags from state
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		tagList := []*resourceTagModel{}
+		listDiags := plan.ResourceTags.ElementsAs(ctx, &tagList, true)
+		resp.Diagnostics.Append(listDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		updateTags := make([]megaport.ResourceTag, 0, len(tagList))
+		for _, tag := range tagList {
+			updateTags = append(updateTags, megaport.ResourceTag{
+				Key:   tag.Key.ValueString(),
+				Value: tag.Value.ValueString(),
+			})
+		}
+		err := r.client.MCRService.UpdateMCRResourceTags(ctx, plan.UID.ValueString(), updateTags)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating mcr resource tags",
+				"Could not update mcr resource tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Update the state with the new values
