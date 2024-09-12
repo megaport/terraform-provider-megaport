@@ -71,7 +71,6 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			},
 			"vendor_description": schema.StringAttribute{
 				Description: "The vendor description of the MVE Image",
-				Optional:    true,
 				Computed:    true,
 			},
 			"release_image": schema.BoolAttribute{

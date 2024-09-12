@@ -22,5 +22,8 @@ MVE Images
 - `product_code` (String) The product code of the MVE Image
 - `release_image` (Boolean) Indicates whether the MVE image is available for selection when ordering an MVE.
 - `vendor` (String) The vendor of the MVE Image
-- `vendor_description` (String) The vendor description of the MVE Image
 - `version` (String) The version of the MVE Image
+
+### Read-Only
+
+- `vendor_description` (String) The vendor description of the MVE Image
