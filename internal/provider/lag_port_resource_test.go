@@ -37,6 +37,11 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = true
                     lag_count = 1
+
+					resource_tags = {
+						"k1" = "v1"
+						"k2" = "v2"
+					}
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
@@ -45,6 +50,8 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "true"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.k1", "v1"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.k2", "v2"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
@@ -88,6 +95,11 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = false
                     lag_count = 1
+
+					resource_tags = {
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+					}
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
@@ -96,6 +108,8 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.k1updated", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.k2updated", "v2updated"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),

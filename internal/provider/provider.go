@@ -10,13 +10,12 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -33,27 +32,6 @@ type megaportProviderModel struct {
 	SecretKey     types.String `tfsdk:"secret_key"`
 	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
 	WaitTime      types.Int64  `tfsdk:"wait_time"`
-}
-
-type resourceTagModel struct {
-	Key   types.String `tfsdk:"key"`
-	Value types.String `tfsdk:"value"`
-}
-
-var resourceTagSchemaAttrs = map[string]resourceSchema.Attribute{
-	"key": schema.StringAttribute{
-		Description: "The key of the tag.",
-		Required:    true,
-	},
-	"value": schema.StringAttribute{
-		Description: "The value of the tag.",
-		Required:    true,
-	},
-}
-
-var resourceTagAttrs = map[string]attr.Type{
-	"key":   types.StringType,
-	"value": types.StringType,
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -325,4 +303,10 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 		NewMVEResource,
 		NewVXCResource,
 	}
+}
+
+func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, diag.Diagnostics) {
+	tags := map[string]string{}
+	diags := in.ElementsAs(ctx, &tags, false)
+	return tags, diags
 }

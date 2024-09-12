@@ -64,7 +64,6 @@ type mveResourceModel struct {
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
-	DiversityZone         types.String `tfsdk:"diversity_zone"`
 
 	Virtual     types.Bool `tfsdk:"virtual"`
 	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
@@ -79,7 +78,7 @@ type mveResourceModel struct {
 
 	NetworkInterfaces types.List `tfsdk:"vnics"`
 	AttributeTags     types.Map  `tfsdk:"attribute_tags"`
-	ResourceTags      types.List `tfsdk:"resource_tags"`
+	ResourceTags      types.Map  `tfsdk:"resource_tags"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -119,11 +118,9 @@ type vendorConfigModel struct {
 	FMCIPAddress       types.String `tfsdk:"fmc_ip_address"`
 	FMCRegistrationKey types.String `tfsdk:"fmc_registration_key"`
 	FMCNatID           types.String `tfsdk:"fmc_nat_id"`
-	IONKey             types.String `tfsdk:"ion_key"`
-	SecretKey          types.String `tfsdk:"secret_key"`
 }
 
-func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags []megaport.ResourceTag) diag.Diagnostics {
+func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
@@ -151,7 +148,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	orm.LiveDate = types.StringValue("")
 	orm.TerminateDate = types.StringValue("")
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.DiversityZone = types.StringValue(p.DiversityZone)
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
@@ -197,21 +193,11 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	orm.NetworkInterfaces = networkInterfaceList
 
 	if len(tags) > 0 {
-		resourceTags := make([]types.Object, 0, len(tags))
-		for _, tag := range tags {
-			resourceTagModel := &resourceTagModel{
-				Key:   types.StringValue(tag.Key),
-				Value: types.StringValue(tag.Value),
-			}
-			resourceTagObject, resourceTagDiags := types.ObjectValueFrom(ctx, resourceTagAttrs, resourceTagModel)
-			apiDiags = append(apiDiags, resourceTagDiags...)
-			resourceTags = append(resourceTags, resourceTagObject)
-		}
-		tagList, tagListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTags)
-		apiDiags = append(apiDiags, tagListDiags...)
-		orm.ResourceTags = tagList
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		apiDiags = append(apiDiags, tagDiags...)
+		orm.ResourceTags = resourceTags
 	} else {
-		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
+		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 	return apiDiags
 }
@@ -219,15 +205,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
 	switch v.Vendor.ValueString() {
-	case "6wind":
-		vsrConfig := &megaport.SixwindVSRConfig{
-			Vendor:       v.Vendor.ValueString(),
-			ImageID:      int(v.ImageID.ValueInt64()),
-			ProductSize:  v.ProductSize.ValueString(),
-			MVELabel:     v.MVELabel.ValueString(),
-			SSHPublicKey: v.SSHPublicKey.ValueString(),
-		}
-		return vsrConfig, apiDiags
 	case "aruba":
 		arubaConfig := &megaport.ArubaConfig{
 			Vendor:      v.Vendor.ValueString(),
@@ -239,15 +216,6 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			SystemTag:   v.SystemTag.ValueString(),
 		}
 		return arubaConfig, apiDiags
-	case "aviatrix":
-		aviatrixConfig := &megaport.AviatrixConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			CloudInit:   v.CloudInit.ValueString(),
-		}
-		return aviatrixConfig, apiDiags
 	case "cisco":
 		ciscoConfig := &megaport.CiscoConfig{
 			Vendor:             v.Vendor.ValueString(),
@@ -285,16 +253,6 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return paloAltoConfig, apiDiags
-	case "prisma":
-		prismaConfig := &megaport.PrismaConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			IONKey:      v.IONKey.ValueString(),
-			SecretKey:   v.SecretKey.ValueString(),
-		}
-		return prismaConfig, apiDiags
 	case "versa":
 		versaConfig := &megaport.VersaConfig{
 			Vendor:            v.Vendor.ValueString(),
@@ -402,15 +360,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "The date the MVE went live.",
 				Computed:    true,
-			},
-			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the MVE.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the MVE is in.",
@@ -583,11 +532,12 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					listplanmodifier.RequiresReplace(),
 				},
 			},
-			"resource_tags": schema.ListNestedAttribute{
-				Description: "The resource tags of the MVE.",
+			"resource_tags": schema.MapAttribute{
+				Description: "The resource tags associated with the product.",
 				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: resourceTagSchemaAttrs,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
@@ -638,11 +588,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
+						Description: "The SSH public key for the vendor config. Required for VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
+						Description: "The cloud init for the vendor config. The bootstrap configuration file. Download this for your device from vManage. Required for Cisco MVE.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
@@ -705,14 +655,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The token for the vendor config. Required for Meraki MVE.",
 						Optional:    true,
 					},
-					"ion_key": schema.StringAttribute{
-						Description: "The vION key for the vendor config. Required for Prisma MVE.",
-						Optional:    true,
-					},
-					"secret_key": schema.StringAttribute{
-						Description: "The secret key for the vendor config. Required for Prisma MVE.",
-						Optional:    true,
-					},
 				},
 			},
 		},
@@ -730,12 +672,11 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	mveReq := &megaport.BuyMVERequest{
-		LocationID:    int(plan.LocationID.ValueInt64()),
-		Name:          plan.Name.ValueString(),
-		Term:          int(plan.ContractTermMonths.ValueInt64()),
-		PromoCode:     plan.PromoCode.ValueString(),
-		CostCentre:    plan.CostCentre.ValueString(),
-		DiversityZone: plan.DiversityZone.ValueString(),
+		LocationID: int(plan.LocationID.ValueInt64()),
+		Name:       plan.Name.ValueString(),
+		Term:       int(plan.ContractTermMonths.ValueInt64()),
+		PromoCode:  plan.PromoCode.ValueString(),
+		CostCentre: plan.CostCentre.ValueString(),
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
@@ -756,16 +697,13 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	mveReq.VendorConfig = vendorConfig
 
-	if len(plan.ResourceTags.Elements()) > 0 {
-		resourceTags := []*resourceTagModel{}
-		resourceTagDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTags, false)
-		resp.Diagnostics = append(resp.Diagnostics, resourceTagDiags...)
-		for _, rt := range resourceTags {
-			mveReq.ResourceTags = append(mveReq.ResourceTags, megaport.ResourceTag{
-				Key:   rt.Key.ValueString(),
-				Value: rt.Value.ValueString(),
-			})
+	if !plan.ResourceTags.IsNull() {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
+		mveReq.ResourceTags = tagMap
 	}
 
 	if !plan.NetworkInterfaces.IsNull() && len(plan.NetworkInterfaces.Elements()) > 0 {
@@ -936,17 +874,12 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if !plan.ResourceTags.Equal(state.ResourceTags) {
-		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
-		resourceTagModels := []resourceTagModel{}
-		resourceTagDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagModels, false)
-		resp.Diagnostics = append(resp.Diagnostics, resourceTagDiags...)
-		for _, rt := range resourceTagModels {
-			resourceTags = append(resourceTags, megaport.ResourceTag{
-				Key:   rt.Key.ValueString(),
-				Value: rt.Value.ValueString(),
-			})
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
-		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), resourceTags)
+		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), tagMap)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating tags for MVE",

@@ -29,6 +29,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
 				}
+				
 					resource "megaport_port" "port" {
 			        product_name  = "%s"
 			        port_speed  = 1000
@@ -37,7 +38,10 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = true
 					diversity_zone = "red"
-					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
+					resource_tags = {
+						"k1" = "v1"
+						"k2" = "v2"
+					}
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
@@ -53,6 +57,8 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k1", "v1"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k2", "v2"),
 				),
 			},
 			// ImportState testing
@@ -88,7 +94,10 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = false
 					diversity_zone = "red"
-					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
+					resource_tags = {
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+					}
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
@@ -104,6 +113,8 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k1updated", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k2updated", "v2updated"),
 				),
 			},
 		},

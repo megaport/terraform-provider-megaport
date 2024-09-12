@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -69,7 +70,7 @@ type singlePortResourceModel struct {
 	PromoCode             types.String `tfsdk:"promo_code"`
 
 	Resources    types.Object `tfsdk:"resources"`
-	ResourceTags types.List   `tfsdk:"resource_tags"`
+	ResourceTags types.Map    `tfsdk:"resource_tags"`
 }
 
 type portResourcesModel struct {
@@ -82,7 +83,7 @@ type portInterfaceModel struct {
 	Up          types.Int64  `tfsdk:"up"`
 }
 
-func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags []megaport.ResourceTag) diag.Diagnostics {
+func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags map[string]string) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))
@@ -138,21 +139,11 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	orm.Resources = resourcesObject
 
 	if len(tags) > 0 {
-		resourceTags := make([]types.Object, 0, len(tags))
-		for _, tag := range tags {
-			resourceTagModel := &resourceTagModel{
-				Key:   types.StringValue(tag.Key),
-				Value: types.StringValue(tag.Value),
-			}
-			resourceTagObject, resourceTagDiags := types.ObjectValueFrom(ctx, resourceTagAttrs, resourceTagModel)
-			diags = append(diags, resourceTagDiags...)
-			resourceTags = append(resourceTags, resourceTagObject)
-		}
-		tagList, tagListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(resourceTagAttrs), resourceTags)
-		diags = append(diags, tagListDiags...)
-		orm.ResourceTags = tagList
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		diags = append(diags, tagDiags...)
+		orm.ResourceTags = resourceTags
 	} else {
-		orm.ResourceTags = types.ListNull(types.ObjectType{}.WithAttributeTypes(resourceTagAttrs))
+		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 	return diags
 }
@@ -338,11 +329,12 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"resource_tags": schema.ListNestedAttribute{
-				Description: "Resource tags attached to port.",
+			"resource_tags": schema.MapAttribute{
+				Description: "The resource tags associated with the product.",
 				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: resourceTagSchemaAttrs,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"resources": schema.SingleNestedAttribute{
@@ -393,22 +385,15 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		WaitForTime:           waitForTime,
 	}
 
-	if len(plan.ResourceTags.Elements()) > 0 {
-		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
-		resourceTagList := []*resourceTagModel{}
-		listDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, true)
-		resp.Diagnostics.Append(listDiags...)
+	if !plan.ResourceTags.IsNull() {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		for _, tag := range resourceTagList {
-			resourceTags = append(resourceTags, megaport.ResourceTag{
-				Key:   tag.Key.ValueString(),
-				Value: tag.Value.ValueString(),
-			})
-		}
-		buyPortReq.ResourceTags = resourceTags
+		buyPortReq.ResourceTags = tagMap
 	}
+
 	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -580,20 +565,12 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// If change in resource tags from state
 	if !plan.ResourceTags.Equal(state.ResourceTags) {
-		tagList := []*resourceTagModel{}
-		listDiags := plan.ResourceTags.ElementsAs(ctx, &tagList, true)
-		resp.Diagnostics.Append(listDiags...)
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		updateTags := make([]megaport.ResourceTag, 0, len(tagList))
-		for _, tag := range tagList {
-			updateTags = append(updateTags, megaport.ResourceTag{
-				Key:   tag.Key.ValueString(),
-				Value: tag.Value.ValueString(),
-			})
-		}
-		err := r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), updateTags)
+		err := r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Updating port resource tags",
