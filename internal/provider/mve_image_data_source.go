@@ -3,8 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -15,17 +16,6 @@ import (
 var (
 	_ datasource.DataSource              = &partnerPortDataSource{}
 	_ datasource.DataSourceWithConfigure = &partnerPortDataSource{}
-
-	// mveImageDetailsAttrs is a map of the attributes for the MVE Image data source.
-	mveImageDetailsAttrs = map[string]attr.Type{
-		"id":                 types.StringType,
-		"version":            types.StringType,
-		"product":            types.StringType,
-		"vendor":             types.StringType,
-		"vendor_description": types.StringType,
-		"release_image":      types.BoolType,
-		"product_code":       types.StringType,
-	}
 )
 
 // mveImageDataSource is the data source implementation.
@@ -33,13 +23,8 @@ type mveImageDataSource struct {
 	client *megaport.Client
 }
 
-// mveImageModel is the model for the data source.
-type mveImageModel struct {
-	MVEImages types.List `tfsdk:"mve_images"`
-}
-
 // mveImageDetailsModel is the model for the data source.
-type mveImageDetailsModel struct {
+type mveImageModel struct {
 	ID                types.Int64  `tfsdk:"id"`
 	Version           types.String `tfsdk:"version"`
 	Product           types.String `tfsdk:"product"`
@@ -56,7 +41,7 @@ func NewMVEImageDataSource() datasource.DataSource {
 
 // Metadata returns the data source type name.
 func (d *mveImageDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_mve_images"
+	resp.TypeName = req.ProviderTypeName + "_mve_image"
 }
 
 // Schema defines the schema for the data source.
@@ -64,44 +49,44 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 	resp.Schema = schema.Schema{
 		Description: "MVE Images",
 		Attributes: map[string]schema.Attribute{
-			"mve_images": &schema.ListNestedAttribute{
-				Description: "List of MVE Images. Returns a list of currently supported MVE images and details for each image, including image ID, version, product, and vendor.",
+			"id": schema.StringAttribute{
+				Description: "The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.",
+				Optional:    true,
 				Computed:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Description: "The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.",
-							Computed:    true,
-						},
-						"version": schema.StringAttribute{
-							Description: "The version of the MVE Image",
-							Computed:    true,
-						},
-						"product": schema.StringAttribute{
-							Description: "The product of the MVE Image",
-							Computed:    true,
-						},
-						"vendor": schema.StringAttribute{
-							Description: "The vendor of the MVE Image",
-							Computed:    true,
-						},
-						"vendor_description": schema.StringAttribute{
-							Description: "The vendor description of the MVE Image",
-							Computed:    true,
-						},
-						"release_image": schema.BoolAttribute{
-							Description: "Indicates whether the MVE image is available for selection when ordering an MVE.",
-							Computed:    true,
-						},
-						"product_code": schema.StringAttribute{
-							Description: "The product code of the MVE Image",
-							Computed:    true,
-						},
-					},
-				},
+			},
+			"version": schema.StringAttribute{
+				Description: "The version of the MVE Image",
+				Optional:    true,
+				Computed:    true,
+			},
+			"product": schema.StringAttribute{
+				Description: "The product of the MVE Image",
+				Optional:    true,
+				Computed:    true,
+			},
+			"vendor": schema.StringAttribute{
+				Description: "The vendor of the MVE Image",
+				Optional:    true,
+				Computed:    true,
+			},
+			"vendor_description": schema.StringAttribute{
+				Description: "The vendor description of the MVE Image",
+				Optional:    true,
+				Computed:    true,
+			},
+			"release_image": schema.BoolAttribute{
+				Description: "Indicates whether the MVE image is available for selection when ordering an MVE.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"product_code": schema.StringAttribute{
+				Description: "The product code of the MVE Image",
+				Optional:    true,
+				Computed:    true,
 			},
 		},
 	}
+
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -131,18 +116,47 @@ func (d *mveImageDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	imageObjects := []types.Object{}
-
-	for _, image := range mveImages {
-		imageDetailsModel := &mveImageDetailsModel{}
-		imageDetailsModel.fromAPIMVEImage(image)
-		imageDetailsObject, diags := types.ObjectValueFrom(ctx, mveImageDetailsAttrs, &imageDetailsModel)
-		resp.Diagnostics.Append(diags...)
-		imageObjects = append(imageObjects, imageDetailsObject)
+	// create some filters for MVE images
+	filters := [](func(*megaport.MVEImage) bool){}
+	// add filters for each requested attribute
+	if !config.ID.IsNull() {
+		filters = append(filters, filterMVEImageByID(int(config.ID.ValueInt64())))
 	}
-	imageList, imageListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mveImageDetailsAttrs), imageObjects)
-	resp.Diagnostics.Append(imageListDiags...)
-	state.MVEImages = imageList
+	if !config.Product.IsNull() {
+		filters = append(filters, filterMVEImageByProduct(config.Product.ValueString()))
+	}
+	if !config.Version.IsNull() {
+		filters = append(filters, filterMVEImageByVersion(config.Version.ValueString()))
+	}
+	if !config.Vendor.IsNull() {
+		filters = append(filters, filterMVEImageByVendor(config.Vendor.ValueString()))
+	}
+	if !config.ProductCode.IsNull() {
+		filters = append(filters, filterMVEImageByProductCode(config.ProductCode.ValueString()))
+	}
+	if !config.ReleaseImage.IsNull() {
+		filters = append(filters, filterMVEImageByIsReleaseImage(config.ReleaseImage.ValueBool()))
+	}
+
+	mveImages = runImageFiltersAndSort(mveImages, filters)
+
+	if len(mveImages) == 0 {
+		resp.Diagnostics.AddError(
+			"No Matching MVE Images Found",
+			"No matching MVE images were found.",
+		)
+		return
+	}
+
+	if len(mveImages) > 1 {
+		resp.Diagnostics.AddError(
+			"Multiple Matching MVE Images Found",
+			"Multiple matching MVE images were found.",
+		)
+		return
+	}
+
+	state.fromAPIMVEImage(mveImages[0])
 
 	// Set state
 	diags = resp.State.Set(ctx, &state)
@@ -171,7 +185,7 @@ func (d *mveImageDataSource) Configure(_ context.Context, req datasource.Configu
 	d.client = client
 }
 
-func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
+func (orm *mveImageModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.ID = types.Int64Value(int64(image.ID))
 	orm.Version = types.StringValue(image.Version)
 	orm.Product = types.StringValue(image.Product)
@@ -179,4 +193,50 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.VendorDescription = types.StringValue(image.VendorDescription)
 	orm.ReleaseImage = types.BoolValue(image.ReleaseImage)
 	orm.ProductCode = types.StringValue(image.ProductCode)
+}
+
+func runImageFiltersAndSort(images []*megaport.MVEImage, filters [](func(*megaport.MVEImage) bool)) []*megaport.MVEImage {
+	toReturn := slices.Clone(images)
+	// delete all elements not matching filters, this won't have the closure issues https://go.dev/blog/loopvar-preview because we use 1.22
+	for _, filter := range filters {
+		toReturn = slices.DeleteFunc(toReturn, filter)
+	}
+
+	return toReturn
+}
+
+func filterMVEImageByID(id int) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return i.ID != id
+	}
+}
+
+func filterMVEImageByProduct(product string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Product, product)
+	}
+}
+
+func filterMVEImageByVersion(version string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Version, version)
+	}
+}
+
+func filterMVEImageByVendor(vendor string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Vendor, vendor)
+	}
+}
+
+func filterMVEImageByProductCode(productCode string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.ProductCode, productCode)
+	}
+}
+
+func filterMVEImageByIsReleaseImage(isReleaseImage bool) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return i.ReleaseImage != isReleaseImage
+	}
 }
