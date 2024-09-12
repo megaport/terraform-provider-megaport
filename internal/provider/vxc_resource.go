@@ -2374,7 +2374,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.IPRoutes.IsNull() {
 					ipRoutes := []*ipRouteModel{}
-					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
 					for _, ipRoute := range ipRoutes {
 						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
@@ -2513,7 +2513,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 			aEndMegaportConfig := megaport.VXCOrderVrouterPartnerConfig{}
 			ifaceModels := []*vxcPartnerConfigInterfaceModel{}
-			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, &ifaceModels, false)
+			ifaceDiags := partnerConfigAEnd.Interfaces.ElementsAs(ctx, &ifaceModels, true)
 			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
 			for _, iface := range ifaceModels {
 				toAppend := megaport.PartnerConfigInterface{}
@@ -2525,7 +2525,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.IPRoutes.IsNull() {
 					ipRoutes := []*ipRouteModel{}
-					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
 					for _, ipRoute := range ipRoutes {
 						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
@@ -3017,7 +3017,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				}
 				if !iface.IPRoutes.IsNull() {
 					ipRoutes := []*ipRouteModel{}
-					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, ipRoutes, false)
+					ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
 					resp.Diagnostics = append(resp.Diagnostics, ipRouteDiags...)
 					for _, ipRoute := range ipRoutes {
 						toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
