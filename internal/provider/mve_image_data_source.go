@@ -49,7 +49,7 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 	resp.Schema = schema.Schema{
 		Description: "MVE Images",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
+			"id": schema.Int64Attribute{
 				Description: "The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.",
 				Optional:    true,
 				Computed:    true,
