@@ -3129,7 +3129,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			bEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
-			plan.AEndPartnerConfig = bEndPartnerConfigObj
+			plan.BEndPartnerConfig = bEndPartnerConfigObj
 			bEndConfig.PartnerConfig = bEndMegaportConfig
 		default:
 			resp.Diagnostics.AddError(
