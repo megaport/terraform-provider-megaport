@@ -37,7 +37,16 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = true
 					diversity_zone = "red"
-					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
+					resource_tags = [
+						{
+							key = "k1"
+							value = "v1"
+						},
+						{
+							key = "k2"
+							value = "v2"
+						}
+					]
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
@@ -53,6 +62,11 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.0.key", "k1"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.0.value", "v1"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.1.key", "k2"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.1.value", "v2"),
 				),
 			},
 			// ImportState testing
@@ -88,7 +102,16 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = false
 					diversity_zone = "red"
-					resource_tags = [{"key" = "test-key-1", "value" = "test-value-1"}]
+					resource_tags = [
+						{
+							key = "k1updated"
+							value = "v1updated"
+						},
+						{
+							key = "k2updated"
+							value = "v2updated"
+						}
+					]
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
@@ -104,6 +127,11 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.0.key", "k1updated"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.0.value", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.1.key", "k2updated"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.1.value", "v2updated"),
 				),
 			},
 		},

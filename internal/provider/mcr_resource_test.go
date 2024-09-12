@@ -44,6 +44,17 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
+					resource_tags = [
+						{
+							key = "k1"
+							value = "v1"
+						},
+						{
+							key = "k2"
+							value = "v2"
+						}
+					]
+
 					prefix_filter_lists = [
 					{
 						description     = "%s"
@@ -117,6 +128,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.prefix", "10.0.2.0/24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.le", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.key", "k1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.value", "v1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.key", "k2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.value", "v2"),
 				),
 			},
 			// ImportState testing
@@ -151,6 +167,17 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					location_id              = data.megaport_location.bne_nxt1.id
 					contract_term_months     = 12
 					cost_centre              = "%s"
+
+					resource_tags = [
+						{
+							key = "k1updated"
+							value = "v1updated"
+						},
+						{
+							key = "k2updated"
+							value = "v2updated"
+						}
+					]
 
 					prefix_filter_lists = [
 					{
@@ -252,6 +279,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.prefix", "10.0.2.0/24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.ge", "27"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.key", "k1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.value", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.key", "k2updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.value", "v2updated"),
 				),
 			},
 			// Update Test 2
@@ -266,6 +298,17 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					location_id              = data.megaport_location.bne_nxt1.id
 					contract_term_months     = 12
 					cost_centre              = "%s"
+
+					resource_tags = [
+						{
+							key = "k1updated"
+							value = "v1updated"
+						},
+						{
+							key = "k2updated"
+							value = "v2updated"
+						}
+					]
 
 					prefix_filter_lists = [{
 						description     = "%s"
@@ -331,6 +374,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "0"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.key", "k1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.0.value", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.key", "k2updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.1.value", "v2updated"),
 				),
 			},
 		},

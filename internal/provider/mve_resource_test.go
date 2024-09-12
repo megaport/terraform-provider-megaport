@@ -42,6 +42,17 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                     contract_term_months        = 1
 					cost_centre = "%s"
 
+					resource_tags = [
+						{
+							key = "k1"
+							value = "v1"
+						},
+						{
+							key = "k2"
+							value = "v2"
+						}
+					]
+
                     vendor_config = {
                         vendor = "aruba"
                         product_size = "MEDIUM"
@@ -72,6 +83,11 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.0.key", "k1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.0.value", "v1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.1.key", "k2"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.1.value", "v2"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
@@ -124,6 +140,17 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						system_tag = "Preconfiguration-aruba-test-1"
                     }
 
+					resource_tags = [
+						{
+							key = "k1updated"
+							value = "v1updated"
+						},
+						{
+							key = "k2updated"
+							value = "v2updated"
+						}
+					]
+
 					vnics = [{
 						description = "Data Plane"
 					},
@@ -145,6 +172,11 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.0.key", "k1updated"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.0.value", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.1.key", "k2updated"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.1.value", "v2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
