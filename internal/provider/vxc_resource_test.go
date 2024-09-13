@@ -203,6 +203,17 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					contract_term_months = 12
 					cost_centre = "%s"
 
+					resource_tags = [
+						{
+							key = "k1"
+							value = "v1"
+						},
+						{
+							key = "k2"
+							value = "v2"
+						}
+					]
+
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = 100

@@ -604,10 +604,13 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	if len(plan.ResourceTags.Elements()) > 0 {
-		resourceTags := make([]megaport.ResourceTag, len(plan.ResourceTags.Elements()))
+		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
 		resourceTagList := []*resourceTagModel{}
-		resourceTagsDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, false)
-		resp.Diagnostics.Append(resourceTagsDiags...)
+		listDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, true)
+		resp.Diagnostics.Append(listDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		for _, tag := range resourceTagList {
 			resourceTags = append(resourceTags, megaport.ResourceTag{
 				Key:   tag.Key.ValueString(),
@@ -898,17 +901,6 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading resource tags",
-			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
-	}
-
-	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
-	resp.Diagnostics.Append(apiDiags...)
-
 	statePrefixFilterListMap := map[int64]*mcrPrefixFilterListModel{}
 	statePrefixFilterLists := []*mcrPrefixFilterListModel{}
 	planPrefixFilterLists := []*mcrPrefixFilterListModel{}
@@ -1105,6 +1097,18 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			return
 		}
 	}
+
+	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading resource tags",
+			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
+	resp.Diagnostics.Append(apiDiags...)
 
 	// Update the state with the new values
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))

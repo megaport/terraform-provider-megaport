@@ -2068,17 +2068,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	if len(plan.ResourceTags.Elements()) > 0 {
-		resourceTagModels := []*resourceTagModel{}
-		modelDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagModels, true)
-		resp.Diagnostics.Append(modelDiags...)
+		resourceTags := make([]megaport.ResourceTag, 0, len(plan.ResourceTags.Elements()))
+		resourceTagList := []*resourceTagModel{}
+		listDiags := plan.ResourceTags.ElementsAs(ctx, &resourceTagList, true)
+		resp.Diagnostics.Append(listDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resourceTags := make([]megaport.ResourceTag, len(resourceTagModels))
-		for _, r := range resourceTagModels {
+		for _, tag := range resourceTagList {
 			resourceTags = append(resourceTags, megaport.ResourceTag{
-				Key:   r.Key.ValueString(),
-				Value: r.Value.ValueString(),
+				Key:   tag.Key.ValueString(),
+				Value: tag.Value.ValueString(),
 			})
 		}
 		buyReq.ResourceTags = resourceTags
