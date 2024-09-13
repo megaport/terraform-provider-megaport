@@ -57,6 +57,7 @@ resource "megaport_mcr" "mcr" {
 - `diversity_zone` (String) Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.
 - `prefix_filter_lists` (Attributes List) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_lists))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
+- `resource_tags` (Attributes List) Resource tags associated with the product. (see [below for nested schema](#nestedatt--resource_tags))
 
 ### Read-Only
 
@@ -117,6 +118,16 @@ Optional:
 
 - `ge` (Number) The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).
 - `le` (Number) The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).
+
+
+
+<a id="nestedatt--resource_tags"></a>
+### Nested Schema for `resource_tags`
+
+Required:
+
+- `key` (String) The key of the tag.
+- `value` (String) The value of the tag.
 
 ## Import
 
