@@ -3497,7 +3497,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			}
 			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
 			resp.Diagnostics.Append(partnerDiags...)
-			plan.AEndPartnerConfig = aEndPartnerConfigObj
+			state.AEndPartnerConfig = aEndPartnerConfigObj
 			updateReq.AEndPartnerConfig = aEndMegaportConfig
 		default:
 			resp.Diagnostics.AddError(
