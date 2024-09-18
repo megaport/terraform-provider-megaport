@@ -117,6 +117,8 @@ type vendorConfigModel struct {
 	FMCIPAddress       types.String `tfsdk:"fmc_ip_address"`
 	FMCRegistrationKey types.String `tfsdk:"fmc_registration_key"`
 	FMCNatID           types.String `tfsdk:"fmc_nat_id"`
+	IONKey             types.String `tfsdk:"ion_key"`
+	SecretKey          types.String `tfsdk:"secret_key"`
 }
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
@@ -197,6 +199,15 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
 	switch v.Vendor.ValueString() {
+	case "6wind":
+		vsrConfig := &megaport.SixwindVSRConfig{
+			Vendor:       v.Vendor.ValueString(),
+			ImageID:      int(v.ImageID.ValueInt64()),
+			ProductSize:  v.ProductSize.ValueString(),
+			MVELabel:     v.MVELabel.ValueString(),
+			SSHPublicKey: v.SSHPublicKey.ValueString(),
+		}
+		return vsrConfig, apiDiags
 	case "aruba":
 		arubaConfig := &megaport.ArubaConfig{
 			Vendor:      v.Vendor.ValueString(),
@@ -208,6 +219,15 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			SystemTag:   v.SystemTag.ValueString(),
 		}
 		return arubaConfig, apiDiags
+	case "aviatrix":
+		aviatrixConfig := &megaport.AviatrixConfig{
+			Vendor:      v.Vendor.ValueString(),
+			ImageID:     int(v.ImageID.ValueInt64()),
+			ProductSize: v.ProductSize.ValueString(),
+			MVELabel:    v.MVELabel.ValueString(),
+			CloudInit:   v.CloudInit.ValueString(),
+		}
+		return aviatrixConfig, apiDiags
 	case "cisco":
 		ciscoConfig := &megaport.CiscoConfig{
 			Vendor:             v.Vendor.ValueString(),
@@ -245,6 +265,16 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return paloAltoConfig, apiDiags
+	case "prisma":
+		prismaConfig := &megaport.PrismaConfig{
+			Vendor:      v.Vendor.ValueString(),
+			ImageID:     int(v.ImageID.ValueInt64()),
+			ProductSize: v.ProductSize.ValueString(),
+			MVELabel:    v.MVELabel.ValueString(),
+			IONKey:      v.IONKey.ValueString(),
+			SecretKey:   v.SecretKey.ValueString(),
+		}
+		return prismaConfig, apiDiags
 	case "versa":
 		versaConfig := &megaport.VersaConfig{
 			Vendor:            v.Vendor.ValueString(),
@@ -572,11 +602,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
+						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config. The bootstrap configuration file. Download this for your device from vManage. Required for Cisco MVE.",
+						Description: "The cloud init for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
@@ -637,6 +667,14 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"token": schema.StringAttribute{
 						Description: "The token for the vendor config. Required for Meraki MVE.",
+						Optional:    true,
+					},
+					"ion_key": schema.StringAttribute{
+						Description: "The vION key for the vendor config. Required for Prisma MVE.",
+						Optional:    true,
+					},
+					"secret_key": schema.StringAttribute{
+						Description: "The secret key for the vendor config. Required for Prisma MVE.",
 						Optional:    true,
 					},
 				},
