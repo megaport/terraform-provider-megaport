@@ -57,8 +57,11 @@ var (
 		"auth_key":             types.StringType,
 		"customer_address":     types.StringType,
 		"customer_ip_address":  types.StringType,
+		"provider_ip_address":  types.StringType,
 		"customer_ip4_address": types.StringType,
 		"id":                   types.Int64Type,
+		"account_id":           types.StringType,
+		"customer_asn":         types.Int64Type,
 		"name":                 types.StringType,
 		"owner_account":        types.StringType,
 		"peer_asn":             types.Int64Type,
@@ -273,7 +276,10 @@ type cspConnectionModel struct {
 	AuthKey            types.String `tfsdk:"auth_key"`
 	CustomerAddress    types.String `tfsdk:"customer_address"`
 	CustomerIPAddress  types.String `tfsdk:"customer_ip_address"`
+	ProviderIPAddress  types.String `tfsdk:"provider_ip_address"`
 	ID                 types.Int64  `tfsdk:"id"`
+	AccountID          types.String `tfsdk:"account_id"`
+	CustomerASN        types.Int64  `tfsdk:"customer_asn"`
 	Name               types.String `tfsdk:"name"`
 	OwnerAccount       types.String `tfsdk:"owner_account"`
 	PeerASN            types.Int64  `tfsdk:"peer_asn"`
@@ -430,11 +436,11 @@ type bgpConnectionConfigModel struct {
 // vxcPartnerConfigIBMModel represents the configuration of an IBM partner.
 type vxcPartnerConfigIBMModel struct {
 	vxcPartnerConfig
-	AccountID         types.String `json:"account_id"`          // Customer's IBM Acount ID.  32 Hexadecimal Characters. REQUIRED
-	CustomerASN       types.Int64  `json:"customer_asn"`        // Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
-	Name              types.String `json:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".
-	CustomerIPAddress types.String `json:"customer_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
-	ProviderIPAddress types.String `json:"provider_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16. Must be in the same subnet as customer_ip_address.
+	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Acount ID.  32 Hexadecimal Characters. REQUIRED
+	CustomerASN       types.Int64  `tfsdk:"customer_asn"`        // Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
+	Name              types.String `tfsdk:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".
+	CustomerIPAddress types.String `tfsdk:"customer_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
+	ProviderIPAddress types.String `tfsdk:"provider_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16. Must be in the same subnet as customer_ip_address.
 }
 
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
@@ -791,6 +797,30 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"customer_ip_address": schema.StringAttribute{
 							Description: "The customer IP address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"provider_ip_address": schema.StringAttribute{
+							Description: "The provider IP address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"customer_asn": schema.Int64Attribute{
+							Description: "The customer ASN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
+						},
+						"account_id": schema.StringAttribute{
+							Description: "The account ID of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
@@ -3715,12 +3745,23 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		return transitObject, apiDiags
 	case megaport.CSPConnectionIBM:
 		ibmModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
+			ConnectType:       types.StringValue(provider.ConnectType),
+			ResourceName:      types.StringValue(provider.ResourceName),
+			ResourceType:      types.StringValue(provider.ResourceType),
+			AccountID:         types.StringValue(provider.AccountID),
+			CustomerASN:       types.Int64Value(int64(provider.CustomerASN)),
+			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
+			ProviderIPAddress: types.StringValue(provider.ProviderIPAddress),
+			Bandwidth:         types.Int64Value(int64(provider.Bandwidth)),
 		}
-		ibmModel.Bandwidths = types.ListNull(types.Int64Type)
+		bandwidths := []int64{}
+		for _, b := range provider.Bandwidths {
+			bandwidths = append(bandwidths, int64(b))
+		}
 		ibmModel.IPAddresses = types.ListNull(types.StringType)
+		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
+		apiDiags = append(apiDiags, bwListDiags...)
+		ibmModel.Bandwidths = bandwidthList
 		ibmObject, ibmDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
 		apiDiags = append(apiDiags, ibmDiags...)
 		return ibmObject, apiDiags
