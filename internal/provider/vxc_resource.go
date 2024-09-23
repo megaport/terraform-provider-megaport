@@ -2624,6 +2624,22 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			ibmConfigObj, ibmDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigIBMAttrs, partnerConfigIBM)
 			resp.Diagnostics.Append(ibmDiags...)
+
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "IBM",
+			}
+			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+				)
+				return
+			}
+			aEndConfig.ProductUID = partnerPortRes.ProductUID
+
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
@@ -3148,6 +3164,22 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			ibmConfigObj, ibmDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigIBMAttrs, partnerConfigIBM)
 			resp.Diagnostics.Append(ibmDiags...)
+
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "IBM",
+			}
+			partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+				)
+				return
+			}
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
+
 			aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 			azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
