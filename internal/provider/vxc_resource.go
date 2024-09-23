@@ -3713,6 +3713,17 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
 		return transitObject, apiDiags
+	case megaport.CSPConnectionIBM:
+		ibmModel := &cspConnectionModel{
+			ConnectType:  types.StringValue(provider.ConnectType),
+			ResourceName: types.StringValue(provider.ResourceName),
+			ResourceType: types.StringValue(provider.ResourceType),
+		}
+		ibmModel.Bandwidths = types.ListNull(types.Int64Type)
+		ibmModel.IPAddresses = types.ListNull(types.StringType)
+		ibmObject, ibmDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
+		apiDiags = append(apiDiags, ibmDiags...)
+		return ibmObject, apiDiags
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
