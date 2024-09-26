@@ -1168,8 +1168,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					objectplanmodifier.RequiresReplaceIf(
 						objectplanmodifier.RequiresReplaceIfFunc(
 							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+								if req.PlanValue.Equal(req.StateValue) {
+									return
+								}
+
 								// Add your condition here
-								var plan, state vxcResourceModel
+								var plan, state vxcPartnerConfigurationModel
 
 								// Decode the current and new configuration
 								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
@@ -1182,28 +1186,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 									resp.Diagnostics.Append(diags...)
 									return
 								}
-
-								if plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-									return
-								}
-
-								var planPartnerConfigModel, statePartnerConfigModel vxcPartnerConfigurationModel
-
-								// Decode the current and new partner configuration
-								diags = plan.AEndPartnerConfig.As(ctx, &planPartnerConfigModel, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								diags = state.AEndPartnerConfig.As(ctx, &statePartnerConfigModel, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								if planPartnerConfigModel.Partner != statePartnerConfigModel.Partner {
+								if plan.Partner != state.Partner {
 									resp.RequiresReplace = true
 								}
-								if planPartnerConfigModel.Partner.ValueString() != "a-end" && planPartnerConfigModel.Partner.ValueString() != "vrouter" {
+								if plan.Partner.ValueString() != "a-end" && plan.Partner.ValueString() != "vrouter" {
 									resp.RequiresReplace = true
 								}
 							},
@@ -1643,8 +1629,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					objectplanmodifier.RequiresReplaceIf(
 						objectplanmodifier.RequiresReplaceIfFunc(
 							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+								if req.PlanValue.Equal(req.StateValue) {
+									return
+								}
+
 								// Add your condition here
-								var plan, state vxcResourceModel
+								var plan, state vxcPartnerConfigurationModel
 
 								// Decode the current and new configuration
 								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
@@ -1657,28 +1647,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 									resp.Diagnostics.Append(diags...)
 									return
 								}
-
-								if plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-									return
-								}
-
-								var planPartnerConfigModel, statePartnerConfigModel vxcPartnerConfigurationModel
-
-								// Decode the current and new partner configuration
-								diags = plan.BEndPartnerConfig.As(ctx, &planPartnerConfigModel, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								diags = state.BEndPartnerConfig.As(ctx, &statePartnerConfigModel, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								if planPartnerConfigModel.Partner != statePartnerConfigModel.Partner {
+								if plan.Partner != state.Partner {
 									resp.RequiresReplace = true
 								}
-								if planPartnerConfigModel.Partner.ValueString() != "vrouter" {
+								if plan.Partner.ValueString() != "vrouter" {
 									resp.RequiresReplace = true
 								}
 							},
