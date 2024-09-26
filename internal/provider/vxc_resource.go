@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -1163,6 +1164,54 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"a_end_partner_config": schema.SingleNestedAttribute{
 				Description: "The partner configuration of the A-End order configuration.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplaceIf(
+						objectplanmodifier.RequiresReplaceIfFunc(
+							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+								// Add your condition here
+								var plan, state vxcResourceModel
+
+								// Decode the current and new configuration
+								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								diags = req.StateValue.As(ctx, &state, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+
+								if plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+									return
+								}
+
+								var planPartnerConfigModel, statePartnerConfigModel vxcPartnerConfigurationModel
+
+								// Decode the current and new partner configuration
+								diags = plan.AEndPartnerConfig.As(ctx, &planPartnerConfigModel, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								diags = state.AEndPartnerConfig.As(ctx, &statePartnerConfigModel, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								if planPartnerConfigModel.Partner != statePartnerConfigModel.Partner {
+									resp.RequiresReplace = true
+								}
+								if planPartnerConfigModel.Partner.ValueString() != "a-end" && planPartnerConfigModel.Partner.ValueString() != "vrouter" {
+									resp.RequiresReplace = true
+								}
+							},
+						),
+						"This modifier will replace the VXC if the plan a_end_partner_config partner is neither 'a-end' nor 'vrouter' and does not equal the a_end_partner_config of the state.",
+						"This modifier will replace the VXC if the plan a_end_partner_config partner is neither 'a-end' nor 'vrouter' and does not equal the a_end_partner_config of the state.",
+					),
+				},
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
 						Description: "The partner of the partner configuration.",
@@ -1590,6 +1639,54 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"b_end_partner_config": schema.SingleNestedAttribute{
 				Description: "The partner configuration of the B-End order configuration.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplaceIf(
+						objectplanmodifier.RequiresReplaceIfFunc(
+							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+								// Add your condition here
+								var plan, state vxcResourceModel
+
+								// Decode the current and new configuration
+								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								diags = req.StateValue.As(ctx, &state, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+
+								if plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+									return
+								}
+
+								var planPartnerConfigModel, statePartnerConfigModel vxcPartnerConfigurationModel
+
+								// Decode the current and new partner configuration
+								diags = plan.BEndPartnerConfig.As(ctx, &planPartnerConfigModel, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								diags = state.BEndPartnerConfig.As(ctx, &statePartnerConfigModel, basetypes.ObjectAsOptions{})
+								if diags.HasError() {
+									resp.Diagnostics.Append(diags...)
+									return
+								}
+								if planPartnerConfigModel.Partner != statePartnerConfigModel.Partner {
+									resp.RequiresReplace = true
+								}
+								if planPartnerConfigModel.Partner.ValueString() != "vrouter" {
+									resp.RequiresReplace = true
+								}
+							},
+						),
+						"This modifier will replace the VXC if the plan b_end_partner_config partner is not 'vrouter' and does not equal the b_end_partner_config of the state.",
+						"This modifier will replace the VXC if the plan b_end_partner_config partner is not 'vrouter' and does not equal the b_end_partner_config of the state.",
+					),
+				},
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
 						Description: "The partner of the partner configuration.",
