@@ -2229,8 +2229,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			// find primary or secondary port
 			for _, port := range partnerPortRes.Data.Megaports {
-				if port.Type == azureConfig.PortChoice.ValueString() {
-					aEndConfig.ProductUID = port.ProductUID
+				p := &port
+				if p.Type == azureConfig.PortChoice.ValueString() {
+					aEndConfig.ProductUID = p.ProductUID
 				}
 			}
 			if aEndConfig.ProductUID == "" {
@@ -2877,8 +2878,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			// find primary or secondary port
 			for _, port := range partnerPortRes.Data.Megaports {
-				if port.Type == azureConfig.PortChoice.ValueString() {
-					bEndConfig.ProductUID = port.ProductUID
+				p := &port
+				if p.Type == azureConfig.PortChoice.ValueString() {
+					bEndConfig.ProductUID = p.ProductUID
 				}
 			}
 			if bEndConfig.ProductUID == "" {
@@ -3493,8 +3495,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			}
 			// find primary or secondary port
 			for _, port := range partnerPortRes.Data.Megaports {
-				if port.Type == azureConfig.PortChoice.ValueString() {
-					updateReq.AEndProductUID = &port.ProductUID
+				p := &port
+				if p.Type == azureConfig.PortChoice.ValueString() {
+					updateReq.AEndProductUID = &p.ProductUID
 				}
 			}
 			if updateReq.AEndProductUID == nil {
@@ -4075,8 +4078,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			}
 			// find primary or secondary port
 			for _, port := range partnerPortRes.Data.Megaports {
-				if port.Type == azureConfig.PortChoice.ValueString() {
-					updateReq.BEndProductUID = &port.ProductUID
+				p := &port
+				if p.Type == azureConfig.PortChoice.ValueString() {
+					updateReq.BEndProductUID = &p.ProductUID
 				}
 			}
 			if updateReq.BEndProductUID == nil {
