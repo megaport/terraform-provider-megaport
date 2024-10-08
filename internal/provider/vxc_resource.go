@@ -460,7 +460,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		orm.ContractEndDate = types.StringNull()
 	}
-	var aEndOrderedVLAN, bEndOrderedVLAN *int64
+	var aEndOrderedVLAN, bEndOrderedVLAN, aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
@@ -470,6 +470,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingAEnd.OrderedVLAN.ValueInt64()
 			aEndOrderedVLAN = &vlan
+		}
+		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
+			vlan := existingAEnd.InnerVLAN.ValueInt64()
+			aEndInnerVLAN = &vlan
 		}
 	}
 
@@ -484,15 +488,16 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
 	}
+
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
 	} else {
 		aEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
-	if v.AEndConfiguration.InnerVLAN == 0 {
-		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	if aEndInnerVLAN != nil {
+		aEndModel.InnerVLAN = types.Int64Value(*aEndInnerVLAN)
 	} else {
-		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
+		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	}
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
 	apiDiags = append(apiDiags, aEndDiags...)
@@ -505,6 +510,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		if !existingBEnd.OrderedVLAN.IsNull() && !existingBEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingBEnd.OrderedVLAN.ValueInt64()
 			bEndOrderedVLAN = &vlan
+		}
+		if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
+			vlan := existingBEnd.InnerVLAN.ValueInt64()
+			bEndInnerVLAN = &vlan
 		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
@@ -525,10 +534,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 	} else {
 		bEndModel.OrderedVLAN = types.Int64PointerValue(nil)
 	}
-	if v.BEndConfiguration.InnerVLAN == 0 {
-		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+	if bEndInnerVLAN != nil {
+		bEndModel.InnerVLAN = types.Int64Value(*bEndInnerVLAN)
 	} else {
-		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
+		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	}
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
 	apiDiags = append(apiDiags, bEndDiags...)
@@ -1040,11 +1049,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
-						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
@@ -1054,10 +1059,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the A-End configuration.",
 						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration.",
@@ -1124,11 +1125,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.",
 						Optional:    true,
-						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.",
@@ -1138,10 +1135,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"inner_vlan": schema.Int64Attribute{
 						Description: "The inner VLAN of the B-End configuration.",
 						Optional:    true,
-						Computed:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.UseStateForUnknown(),
-						},
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the B-End configuration.",
