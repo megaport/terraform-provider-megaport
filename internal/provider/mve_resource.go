@@ -843,6 +843,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// Check on changes
 	var name, costCentre string
+	var contractTermMonths *int
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
@@ -855,12 +856,18 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		costCentre = state.CostCentre.ValueString()
 	}
 
+	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		months := int(plan.ContractTermMonths.ValueInt64())
+		contractTermMonths = &months
+	}
+
 	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
-		MVEID:         state.UID.ValueString(),
-		Name:          name,
-		CostCentre:    costCentre,
-		WaitForUpdate: true,
-		WaitForTime:   waitForTime,
+		MVEID:              state.UID.ValueString(),
+		Name:               name,
+		CostCentre:         costCentre,
+		ContractTermMonths: contractTermMonths,
+		WaitForUpdate:      true,
+		WaitForTime:        waitForTime,
 	})
 
 	if err != nil {

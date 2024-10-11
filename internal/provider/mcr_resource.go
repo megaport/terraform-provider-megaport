@@ -797,6 +797,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Check on changes
 	var name, costCentre string
 	var marketplaceVisibility bool
+	var contractTermMonths *int
 	if !plan.Name.IsNull() && !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
@@ -812,11 +813,16 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	} else {
 		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
+	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		months := int(plan.ContractTermMonths.ValueInt64())
+		contractTermMonths = &months
+	}
 
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
+		ContractTermMonths:    contractTermMonths,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
