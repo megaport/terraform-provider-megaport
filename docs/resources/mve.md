@@ -56,7 +56,7 @@ resource "megaport_mve" "mve" {
 - `cost_centre` (String) The cost centre of the MVE.
 - `diversity_zone` (String) The diversity zone of the MVE.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
-- `resource_tags` (Attributes List) The resource tags of the MVE. (see [below for nested schema](#nestedatt--resource_tags))
+- `resource_tags` (Map of String) The resource tags associated with the product.
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
@@ -123,15 +123,6 @@ Optional:
 - `token` (String) The token for the vendor config. Required for Meraki MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
 - `vco_address` (String) The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.
-
-
-<a id="nestedatt--resource_tags"></a>
-### Nested Schema for `resource_tags`
-
-Required:
-
-- `key` (String) The key of the tag.
-- `value` (String) The value of the tag.
 
 
 <a id="nestedatt--vnics"></a>

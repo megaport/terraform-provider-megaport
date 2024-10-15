@@ -39,8 +39,13 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
                     lag_count = 1
 
 					resource_tags = {
+<<<<<<< HEAD
 						"k1" = "v1"
 						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
