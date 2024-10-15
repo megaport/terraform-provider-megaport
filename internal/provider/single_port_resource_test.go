@@ -39,8 +39,13 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					marketplace_visibility = true
 					diversity_zone = "red"
 					resource_tags = {
+<<<<<<< HEAD
 						"k1" = "v1"
 						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -95,8 +100,13 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					marketplace_visibility = false
 					diversity_zone = "red"
 					resource_tags = {
+<<<<<<< HEAD
 						"k1updated" = "v1updated"
 						"k2updated" = "v2updated"
+=======
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(

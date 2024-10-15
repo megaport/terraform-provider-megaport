@@ -45,8 +45,13 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					cost_centre              = "%s"
 
 					resource_tags = {
+<<<<<<< HEAD
 						"k1" = "v1"
 						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 
 					prefix_filter_lists = [
@@ -160,8 +165,13 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					cost_centre              = "%s"
 
 					resource_tags = {
+<<<<<<< HEAD
 						"k1updated" = "v1updated"
 						"k2updated" = "v2updated"
+=======
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 
 					prefix_filter_lists = [
@@ -282,8 +292,13 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					cost_centre              = "%s"
 
 					resource_tags = {
+<<<<<<< HEAD
 						"k1updated" = "v1updated"
 						"k2updated" = "v2updated"
+=======
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
 					}
 
 					prefix_filter_lists = [{
