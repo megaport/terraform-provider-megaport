@@ -44,12 +44,17 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 
 					resource_tags = {
 <<<<<<< HEAD
+<<<<<<< HEAD
 						"k1" = "v1"
 						"k2" = "v2"
 =======
 						k1 = "v1"
 						k2 = "v2"
 >>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1" = "v1"
+						"k2" = "v2"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
 					}
 
                     vendor_config = {
@@ -138,12 +143,17 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 
 					resource_tags = {
 <<<<<<< HEAD
+<<<<<<< HEAD
 						"k1updated" = "v1updated"
 						"k2updated" = "v2updated"
 =======
 						k1updated = "v1updated"
 						k2updated = "v2updated"
 >>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
 					}
 
 					vnics = [{
