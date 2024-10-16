@@ -29,6 +29,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 				data "megaport_location" "bne_nxt1" {
 					name = "NextDC B1"
 				}
+				
 					resource "megaport_port" "port" {
 			        product_name  = "%s"
 			        port_speed  = 1000
@@ -37,6 +38,20 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = true
 					diversity_zone = "red"
+					resource_tags = {
+<<<<<<< HEAD
+<<<<<<< HEAD
+						"k1" = "v1"
+						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1" = "v1"
+						"k2" = "v2"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
+					}
 			      }`, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
@@ -52,6 +67,8 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k1", "v1"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k2", "v2"),
 				),
 			},
 			// ImportState testing
@@ -87,6 +104,20 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			        contract_term_months        = 12
 					marketplace_visibility = false
 					diversity_zone = "red"
+					resource_tags = {
+<<<<<<< HEAD
+<<<<<<< HEAD
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+=======
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
+					}
 			      }`, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
@@ -102,6 +133,8 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k1updated", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.k2updated", "v2updated"),
 				),
 			},
 		},

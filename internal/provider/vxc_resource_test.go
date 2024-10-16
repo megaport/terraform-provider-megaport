@@ -79,6 +79,20 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                     rate_limit = 500
                     contract_term_months = 12
 					cost_centre = "%s"
+					resource_tags = {
+<<<<<<< HEAD
+<<<<<<< HEAD
+						"k1" = "v1"
+						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1" = "v1"
+						"k2" = "v2"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
+					}
 
                     a_end = {
                         requested_product_uid = megaport_port.port_1.product_uid
@@ -124,6 +138,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k1", "v1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k2", "v2"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
@@ -189,6 +205,21 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					contract_term_months = 12
 					cost_centre = "%s"
 
+					resource_tags = {
+<<<<<<< HEAD
+<<<<<<< HEAD
+						"k1" = "v1"
+						"k2" = "v2"
+=======
+						k1 = "v1"
+						k2 = "v2"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1" = "v1"
+						"k2" = "v2"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
+					}
+
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = 100
@@ -233,6 +264,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k1", "v1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k2", "v2"),
 				),
 			},
 			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN/Inner VLAN
@@ -276,6 +309,20 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			        rate_limit = 600
 					contract_term_months = 24
 					cost_centre = "%s"
+					resource_tags = {
+<<<<<<< HEAD
+<<<<<<< HEAD
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+=======
+						k1updated = "v1updated"
+						k2updated = "v2updated"
+>>>>>>> 4e7c3d1 (cleanup: change resource tag syntax to map and update acceptance tests)
+=======
+						"k1updated" = "v1updated"
+						"k2updated" = "v2updated"
+>>>>>>> 3fd3738 (fix: resolve syntax issues for resource tags and parsing to map)
+					}
 
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
@@ -322,6 +369,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "201"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "400"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k1updated", "v1updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.k2updated", "v2updated"),
 				),
 			},
 		},

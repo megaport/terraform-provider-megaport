@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -68,7 +69,8 @@ type singlePortResourceModel struct {
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 
-	Resources types.Object `tfsdk:"resources"`
+	Resources    types.Object `tfsdk:"resources"`
+	ResourceTags types.Map    `tfsdk:"resource_tags"`
 }
 
 type portResourcesModel struct {
@@ -81,7 +83,7 @@ type portInterfaceModel struct {
 	Up          types.Int64  `tfsdk:"up"`
 }
 
-func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port) diag.Diagnostics {
+func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags map[string]string) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 	orm.UID = types.StringValue(p.UID)
 	orm.ID = types.Int64Value(int64(p.ID))
@@ -136,6 +138,13 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	diags = append(diags, resourcesDiags...)
 	orm.Resources = resourcesObject
 
+	if len(tags) > 0 {
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		diags = append(diags, tagDiags...)
+		orm.ResourceTags = resourceTags
+	} else {
+		orm.ResourceTags = types.MapNull(types.StringType)
+	}
 	return diags
 }
 
@@ -320,6 +329,14 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"resource_tags": schema.MapAttribute{
+				Description: "The resource tags associated with the product.",
+				Optional:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources attached to port.",
 				Computed:    true,
@@ -368,6 +385,15 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		WaitForTime:           waitForTime,
 	}
 
+	if !plan.ResourceTags.IsNull() {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		buyPortReq.ResourceTags = tagMap
+	}
+
 	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -406,8 +432,18 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	// get the tags
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading newly created port resource tags",
+			"Could not read newly created port resource tags with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the port info
-	apiDiags := plan.fromAPIPort(ctx, port)
+	apiDiags := plan.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -454,7 +490,15 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	apiDiags := state.fromAPIPort(ctx, port)
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading port resource tags",
+			"Could not read port resource tags with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+	}
+
+	apiDiags := state.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -519,8 +563,33 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	// If change in resource tags from state
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		err := r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating port resource tags",
+				"Could not update port resource tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	tags, err := r.client.PortService.ListPortResourceTags(ctx, plan.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading port resource tags",
+			"Could not read port resource tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+		)
+	}
+
 	// Update the state
-	state.fromAPIPort(ctx, port)
+	state.fromAPIPort(ctx, port, tags)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data

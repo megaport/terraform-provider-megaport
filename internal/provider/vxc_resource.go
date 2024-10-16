@@ -251,6 +251,8 @@ type vxcResourceModel struct {
 	BEndPartnerConfig types.Object `tfsdk:"b_end_partner_config"`
 
 	CSPConnections types.List `tfsdk:"csp_connections"`
+
+	ResourceTags types.Map `tfsdk:"resource_tags"`
 }
 
 type cspConnectionModel struct {
@@ -417,7 +419,7 @@ type bgpConnectionConfigModel struct {
 	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
 }
 
-func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
+func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(v.UID)
@@ -555,6 +557,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC) di
 		orm.AttributeTags = attributeTags
 	} else {
 		orm.AttributeTags = types.MapNull(types.StringType)
+	}
+
+	if len(tags) > 0 {
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		apiDiags = append(apiDiags, tagDiags...)
+		orm.ResourceTags = resourceTags
+	} else {
+		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 	return apiDiags
 }
@@ -940,6 +950,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 					},
+				},
+			},
+			"resource_tags": schema.MapAttribute{
+				Description: "The resource tags associated with the product.",
+				Optional:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
@@ -2038,6 +2056,15 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
+	}
+
+	if !plan.ResourceTags.IsNull() {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		buyReq.ResourceTags = tagMap
 	}
 
 	if !plan.Shutdown.IsNull() {
@@ -3174,8 +3201,17 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for newly created VXC",
+			"Could not read tags for newly created VXC with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the VXC info
-	apiDiags := plan.fromAPIVXC(ctx, vxc)
+	apiDiags := plan.fromAPIVXC(ctx, vxc, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -3223,7 +3259,16 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc)
+	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for VXC",
+			"Could not read tags for VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -3352,7 +3397,32 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc)
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		err := r.client.VXCService.UpdateVXCResourceTags(ctx, state.UID.ValueString(), tagMap)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating tags for VXC",
+				"Could not update tags for VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for VXC",
+			"Could not read tags for VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 

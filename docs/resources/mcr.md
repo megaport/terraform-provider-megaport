@@ -57,6 +57,7 @@ resource "megaport_mcr" "mcr" {
 - `diversity_zone` (String) Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.
 - `prefix_filter_lists` (Attributes List) Prefix filter list associated with the product. (see [below for nested schema](#nestedatt--prefix_filter_lists))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
+- `resource_tags` (Map of String) The resource tags associated with the product.
 
 ### Read-Only
 
