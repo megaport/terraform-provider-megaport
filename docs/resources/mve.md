@@ -54,7 +54,6 @@ resource "megaport_mve" "mve" {
 ### Optional
 
 - `cost_centre` (String) The cost centre of the MVE.
-- `diversity_zone` (String) The diversity zone of the MVE.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
@@ -104,21 +103,19 @@ Optional:
 - `account_name` (String) The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.
 - `admin_password_hash` (String) The admin password hash for the vendor config. Required for Palo Alto MVE.
 - `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.
-- `cloud_init` (String) The cloud init for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.
+- `cloud_init` (String) The cloud init for the vendor config. The bootstrap configuration file. Download this for your device from vManage. Required for Cisco MVE.
 - `controller_address` (String) The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.
 - `director_address` (String) The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.
 - `fmc_ip_address` (String) The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `fmc_nat_id` (String) The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `fmc_registration_key` (String) The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.
-- `ion_key` (String) The vION key for the vendor config. Required for Prisma MVE.
 - `license_data` (String) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
 - `local_auth` (String) The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.
 - `manage_locally` (Boolean) Whether to manage the MVE locally. Required for Cisco MVE.
 - `mve_label` (String) The MVE label for the vendor config.
 - `remote_auth` (String) The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.
-- `secret_key` (String) The secret key for the vendor config. Required for Prisma MVE.
 - `serial_number` (String) The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.
-- `ssh_public_key` (String) The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Required for VMWare, Palo Alto, and Fortinet MVEs. Megaport supports the 2048-bit RSA key type.
 - `system_tag` (String) The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.
 - `token` (String) The token for the vendor config. Required for Meraki MVE.
 - `vco_activation_code` (String) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
