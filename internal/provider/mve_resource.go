@@ -566,39 +566,27 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
-				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
+				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. This field cannot be changed after the MVE is created and if it is modified, the MVE will be deleted and re-created.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
+					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
 						Description: "The name of vendor of the MVE.",
 						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"image_id": schema.Int64Attribute{
 						Description: "The image ID of the MVE. Indicates the software version.",
 						Required:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.RequiresReplace(),
-						},
 					},
 					"product_size": schema.StringAttribute{
 						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.",
 						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"mve_label": schema.StringAttribute{
 						Description: "The MVE label for the vendor config.",
 						Optional:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"account_name": schema.StringAttribute{
 						Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.",
@@ -837,6 +825,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
+	// If Imported, VendorConfig will be Null. Set VendorConfig in state to existing one in plan.
+	if state.VendorConfig.IsNull() {
+		state.VendorConfig = plan.VendorConfig
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -937,4 +930,31 @@ func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Get the plan and state
+	var plan, state mveResourceModel
+	planDiags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(planDiags...)
+	if !req.State.Raw.IsNull() {
+		stateDiags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(stateDiags...)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !state.UID.IsNull() {
+		// If VendorConfig is null in the state, set it to the value from the plan
+		if state.VendorConfig.IsNull() {
+			state.VendorConfig = plan.VendorConfig
+		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
+			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+		}
+		diags := req.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 }
