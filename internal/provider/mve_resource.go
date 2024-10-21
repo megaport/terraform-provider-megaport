@@ -947,6 +947,22 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	if !state.UID.IsNull() {
 		// If VendorConfig is null in the state, set it to the value from the plan
 		if state.VendorConfig.IsNull() {
+			var planVendorConfig, stateVendorConfig vendorConfigModel
+			planVendorConfigDiags := plan.VendorConfig.As(ctx, &planVendorConfig, basetypes.ObjectAsOptions{})
+			resp.Diagnostics = append(resp.Diagnostics, planVendorConfigDiags...)
+			stateVendorConfigDiags := state.VendorConfig.As(ctx, &stateVendorConfig, basetypes.ObjectAsOptions{})
+			resp.Diagnostics = append(resp.Diagnostics, stateVendorConfigDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			// Check the computed vendor/size values from the API. If the vendor or size changes, require a replace
+			if state.Size.ValueString() != planVendorConfig.ProductSize.ValueString() {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			}
+			vendor := strings.ToLower(planVendorConfig.Vendor.ValueString()) // API returns vendor in uppercase, convert to lowercase
+			if vendor != planVendorConfig.Vendor.ValueString() {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			}
 			state.VendorConfig = plan.VendorConfig
 		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
 			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
