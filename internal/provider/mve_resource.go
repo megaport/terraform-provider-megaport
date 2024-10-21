@@ -200,7 +200,8 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
-	switch v.Vendor.ValueString() {
+	vendor := strings.ToLower(v.Vendor.ValueString()) // Allow for uppercase vendor names for more flexibility.
+	switch vendor {
 	case "6wind":
 		vsrConfig := &megaport.SixwindVSRConfig{
 			Vendor:       v.Vendor.ValueString(),
@@ -573,7 +574,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
-						Description: "The name of vendor of the MVE.",
+						Description: `The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".`,
 						Required:    true,
 					},
 					"image_id": schema.Int64Attribute{
