@@ -95,7 +95,7 @@ Required:
 
 - `image_id` (Number) The image ID of the MVE. Indicates the software version.
 - `product_size` (String) The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.
-- `vendor` (String) The name of vendor of the MVE.
+- `vendor` (String) The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".
 
 Optional:
 
