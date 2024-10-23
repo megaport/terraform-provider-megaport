@@ -1189,7 +1189,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "vrouter", "transit", "a-end"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "vrouter", "transit", "a-end", "ibm"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
@@ -1643,7 +1643,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The partner of the partner configuration.",
 						Required:    true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "transit", "vrouter"),
+							stringvalidator.OneOf("aws", "azure", "google", "oracle", "transit", "vrouter", "ibm"),
 						},
 					},
 					"aws_config": schema.SingleNestedAttribute{
