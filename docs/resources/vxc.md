@@ -810,6 +810,7 @@ Optional:
 Optional:
 
 - `account` (String) The account of the CSP connection.
+- `account_id` (String) The account ID of the CSP connection.
 - `amazon_address` (String) The Amazon address of the CSP connection.
 - `asn` (Number) The ASN of the CSP connection.
 - `auth_key` (String) The authentication key of the CSP connection.
@@ -819,6 +820,7 @@ Optional:
 - `connection_id` (String) The hosted connection ID of the CSP connection.
 - `csp_name` (String) The name of the CSP connection.
 - `customer_address` (String) The customer address of the CSP connection.
+- `customer_asn` (Number) The customer ASN of the CSP connection.
 - `customer_ip4_address` (String) The customer IPv4 address of the CSP connection.
 - `customer_ip6_network` (String) The customer IPv6 network of the Transit VXC connection.
 - `customer_ip_address` (String) The customer IP address of the CSP connection.
@@ -831,6 +833,7 @@ Optional:
 - `owner_account` (String) The owner's AWS account of the CSP connection.
 - `pairing_key` (String) The pairing key of the Google Cloud connection.
 - `peer_asn` (Number) The peer ASN of the CSP connection.
+- `provider_ip_address` (String) The provider IP address of the CSP connection.
 - `resource_name` (String) The resource name of the CSP connection.
 - `resource_type` (String) The resource type of the CSP connection.
 - `service_key` (String, Sensitive) The Azure service key of the CSP connection.
