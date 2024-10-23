@@ -269,10 +269,13 @@ type cspConnectionModel struct {
 	VLAN               types.Int64  `tfsdk:"vlan"`
 	Account            types.String `tfsdk:"account"`
 	AmazonAddress      types.String `tfsdk:"amazon_address"`
+	AccountID          types.String `tfsdk:"account_id"`
+	CustomerASN        types.Int64  `tfsdk:"customer_asn"`
 	ASN                types.Int64  `tfsdk:"asn"`
 	AuthKey            types.String `tfsdk:"auth_key"`
 	CustomerAddress    types.String `tfsdk:"customer_address"`
 	CustomerIPAddress  types.String `tfsdk:"customer_ip_address"`
+	ProviderIPAddress  types.String `tfsdk:"provider_ip_address"`
 	ID                 types.Int64  `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`
 	OwnerAccount       types.String `tfsdk:"owner_account"`
@@ -752,6 +755,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								stringplanmodifier.UseStateForUnknown(),
 							},
 						},
+						"customer_asn": schema.Int64Attribute{
+							Description: "The customer ASN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
+						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the CSP connection.",
 							Computed:    true,
@@ -769,6 +780,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"owner_account": schema.StringAttribute{
 							Description: "The owner's AWS account of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"account_id": schema.StringAttribute{
+							Description: "The account ID of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
@@ -794,6 +813,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"customer_ip_address": schema.StringAttribute{
 							Description: "The customer IP address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"provider_ip_address": schema.StringAttribute{
+							Description: "The provider IP address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
@@ -4830,6 +4857,29 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		oracleObject, oracleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, oracleModel)
 		apiDiags = append(apiDiags, oracleObjDiags...)
 		return oracleObject, apiDiags
+	case megaport.CSPConnectionIBM:
+		ibmModel := &cspConnectionModel{
+			ConnectType:       types.StringValue(provider.ConnectType),
+			ResourceName:      types.StringValue(provider.ResourceName),
+			ResourceType:      types.StringValue(provider.ResourceType),
+			AccountID:         types.StringValue(provider.AccountID),
+			CustomerASN:       types.Int64Value(int64(provider.CustomerASN)),
+			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
+			ProviderIPAddress: types.StringValue(provider.ProviderIPAddress),
+			Bandwidth:         types.Int64Value(int64(provider.Bandwidth)),
+			CSPName:           types.StringValue(provider.CSPName),
+		}
+		bandwidths := []int64{}
+		for _, bandwidth := range provider.Bandwidths {
+			bandwidths = append(bandwidths, int64(bandwidth))
+		}
+		bandwidthList, bandwidthListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
+		apiDiags = append(apiDiags, bandwidthListDiags...)
+		ibmModel.Bandwidths = bandwidthList
+		ibmModel.IPAddresses = types.ListNull(types.StringType)
+		ibmObject, ibmObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
+		apiDiags = append(apiDiags, ibmObjectDiags...)
+		return ibmObject, apiDiags
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
