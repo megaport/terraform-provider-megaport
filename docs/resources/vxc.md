@@ -358,6 +358,7 @@ Optional:
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
+- `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
 - `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config))
@@ -418,6 +419,21 @@ Optional:
 Required:
 
 - `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+
+
+<a id="nestedatt--a_end_partner_config--ibm_config"></a>
+### Nested Schema for `a_end_partner_config.ibm_config`
+
+Required:
+
+- `account_id` (String) Customer's IBM Acount ID. Required for all IBM partner configurations.
+
+Optional:
+
+- `customer_asn` (Number) Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
+- `customer_ip_address` (String) Customer IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
+- `name` (String) Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT"
+- `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
 
 
 <a id="nestedatt--a_end_partner_config--oracle_config"></a>
@@ -571,6 +587,7 @@ Optional:
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
+- `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations, invalid on B-End Partner Config. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
 - `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config))
@@ -631,6 +648,21 @@ Optional:
 Required:
 
 - `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+
+
+<a id="nestedatt--b_end_partner_config--ibm_config"></a>
+### Nested Schema for `b_end_partner_config.ibm_config`
+
+Required:
+
+- `account_id` (String) Customer's IBM Acount ID. Required for all IBM partner configurations.
+
+Optional:
+
+- `customer_asn` (Number) Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
+- `customer_ip_address` (String) Customer IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
+- `name` (String) Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT"
+- `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
 
 
 <a id="nestedatt--b_end_partner_config--oracle_config"></a>
