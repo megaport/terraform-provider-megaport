@@ -75,6 +75,8 @@ resource "megaport_mve" "mve" {
 - `locked` (Boolean) Whether the MVE is locked.
 - `market` (String) The market the MVE is in.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
+- `max_vxc_speed` (Number) The maximum VXC speed for the product.
+- `mve_label` (String) The MVE label, populated by the Megaport API.
 - `mve_size` (String) The size of the MVE.
 - `product_id` (Number) The Numeric ID of the MVE.
 - `product_type` (String) The type of product (MVE).

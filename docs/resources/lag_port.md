@@ -55,6 +55,7 @@ resource "megaport_lag_port" "lag_port" {
 - `live_date` (String) The date the product went live.
 - `locked` (Boolean) Whether the product is locked.
 - `market` (String) The market the product is in.
+- `max_vxc_speed` (Number) The maximum VXC speed for the product.
 - `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
 - `provisioning_status` (String) The provisioning status of the product.

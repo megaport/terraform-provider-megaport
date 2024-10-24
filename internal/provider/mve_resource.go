@@ -56,6 +56,7 @@ type mveResourceModel struct {
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
 	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
+	MaxVXCSpeed           types.Int64  `tfsdk:"max_vxc_speed"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CompanyName           types.String `tfsdk:"company_name"`
@@ -72,8 +73,9 @@ type mveResourceModel struct {
 	AdminLocked types.Bool `tfsdk:"admin_locked"`
 	Cancelable  types.Bool `tfsdk:"cancelable"`
 
-	Vendor types.String `tfsdk:"vendor"`
-	Size   types.String `tfsdk:"mve_size"`
+	Vendor   types.String `tfsdk:"vendor"`
+	Size     types.String `tfsdk:"mve_size"`
+	MVELabel types.String `tfsdk:"mve_label"`
 
 	VendorConfig types.Object `tfsdk:"vendor_config"`
 
@@ -151,6 +153,8 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 	orm.TerminateDate = types.StringValue("")
 	orm.CostCentre = types.StringValue(p.CostCentre)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
+	orm.MaxVXCSpeed = types.Int64Value(int64(p.MaxVXCSpeed))
+	orm.MVELabel = types.StringValue(p.MVELabel)
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
@@ -473,6 +477,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"max_vxc_speed": schema.Int64Attribute{
+				Description: "The maximum VXC speed for the product.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
+			},
 			"secondary_name": schema.StringAttribute{
 				Description: "The secondary name of the MVE.",
 				Computed:    true,
@@ -524,6 +535,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"vendor": schema.StringAttribute{
 				Description: "The vendor of the MVE.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"mve_label": schema.StringAttribute{
+				Description: "The MVE label, populated by the Megaport API.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
