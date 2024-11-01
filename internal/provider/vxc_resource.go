@@ -3315,6 +3315,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
+	if state.AEndPartnerConfig.IsNull() {
+		state.AEndPartnerConfig = plan.AEndPartnerConfig
+	}
+	if state.BEndPartnerConfig.IsNull() {
+		state.BEndPartnerConfig = plan.BEndPartnerConfig
+	}
+
 	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
 	var aEndPartnerPlan, bEndPartnerPlan, aEndPartnerState, bEndPartnerState *vxcPartnerConfigurationModel
 
@@ -4529,6 +4537,7 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+
 }
 
 func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
@@ -4669,10 +4678,16 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// Get current state
 	var plan, state vxcResourceModel
 	diags := diag.Diagnostics{}
-	stateDiags := req.State.Get(ctx, &state)
-	diags.Append(stateDiags...)
+
 	planDiags := req.Plan.Get(ctx, &plan)
-	diags.Append(planDiags...)
+	resp.Diagnostics.Append(planDiags...)
+	if !req.State.Raw.IsNull() {
+		stateDiags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(stateDiags...)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
@@ -4692,11 +4707,31 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
 		diags = append(diags, aEndDiags...)
 		diags = append(diags, bEndDiags...)
-		if aEndStateConfig.OrderedVLAN.IsNull() {
+		if aEndStateConfig.OrderedVLAN.IsUnknown() {
 			aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
 		}
-		if bEndStateConfig.OrderedVLAN.IsNull() {
+		if bEndStateConfig.OrderedVLAN.IsUnknown() {
 			bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
+		}
+		if aEndStateConfig.RequestedProductUID.IsUnknown() {
+			aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+		}
+		if bEndStateConfig.RequestedProductUID.IsUnknown() {
+			bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+		}
+		if state.AEndPartnerConfig.IsNull() {
+			state.AEndPartnerConfig = plan.AEndPartnerConfig
+		} else {
+			if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
+			}
+		}
+		if state.BEndPartnerConfig.IsNull() {
+			state.BEndPartnerConfig = plan.BEndPartnerConfig
+		} else {
+			if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
+			}
 		}
 		newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
 		newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
@@ -4705,8 +4740,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		plan.AEndConfiguration = newPlanAEndObj
 		plan.BEndConfiguration = newPlanBEndObj
 		req.Plan.Set(ctx, &plan)
-		req.State.Set(ctx, &plan)
 		resp.Plan.Set(ctx, &plan)
+		stateDiags := req.State.Set(ctx, &state)
+		diags = append(diags, stateDiags...)
 	}
 
 	resp.Diagnostics.Append(diags...)
