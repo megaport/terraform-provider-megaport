@@ -4713,12 +4713,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		if bEndStateConfig.OrderedVLAN.IsUnknown() {
 			bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
 		}
-		if aEndStateConfig.RequestedProductUID.IsUnknown() {
-			aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-		}
-		if bEndStateConfig.RequestedProductUID.IsUnknown() {
-			bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-		}
 		if state.AEndPartnerConfig.IsNull() {
 			state.AEndPartnerConfig = plan.AEndPartnerConfig
 		} else {
