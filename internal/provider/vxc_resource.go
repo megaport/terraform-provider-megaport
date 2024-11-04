@@ -4713,6 +4713,14 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		if bEndStateConfig.OrderedVLAN.IsUnknown() {
 			bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
 		}
+		if aEndStateConfig.RequestedProductUID.IsNull() {
+			aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+			aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+		}
+		if bEndStateConfig.RequestedProductUID.IsNull() {
+			bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+			bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+		}
 		if state.AEndPartnerConfig.IsNull() {
 			state.AEndPartnerConfig = plan.AEndPartnerConfig
 		} else {
@@ -4733,6 +4741,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		diags = append(diags, bEndDiags...)
 		plan.AEndConfiguration = newPlanAEndObj
 		plan.BEndConfiguration = newPlanBEndObj
+		newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
+		newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
+		diags = append(diags, aEndDiags...)
+		diags = append(diags, bEndDiags...)
+		state.AEndConfiguration = newStateAEndObj
+		state.BEndConfiguration = newStateBEndObj
 		req.Plan.Set(ctx, &plan)
 		resp.Plan.Set(ctx, &plan)
 		stateDiags := req.State.Set(ctx, &state)
