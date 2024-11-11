@@ -20,7 +20,7 @@ var (
 
 	// mveImageDetailsAttrs is a map of the attributes for the MVE Image data source.
 	mveImageDetailsAttrs = map[string]attr.Type{
-		"id":                 types.StringType,
+		"id":                 types.Int64Type,
 		"version":            types.StringType,
 		"product":            types.StringType,
 		"vendor":             types.StringType,
