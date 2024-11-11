@@ -108,6 +108,30 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 					},
 				},
 			},
+			"id_filter": schema.Int64Attribute{
+				Description: "Filter the MVE Images by ID",
+				Optional:    true,
+			},
+			"version_filter": schema.StringAttribute{
+				Description: "Filter the MVE Images by Version",
+				Optional:    true,
+			},
+			"product_filter": schema.StringAttribute{
+				Description: "Filter the MVE Images by Product",
+				Optional:    true,
+			},
+			"vendor_filter": schema.StringAttribute{
+				Description: "Filter the MVE Images by Vendor Name",
+				Optional:    true,
+			},
+			"release_image_filter": schema.BoolAttribute{
+				Description: "Filter the MVE Images by Release Image",
+				Optional:    true,
+			},
+			"product_code_filter": schema.StringAttribute{
+				Description: "Filter the MVE Images by Product Code",
+				Optional:    true,
+			},
 		},
 	}
 }
