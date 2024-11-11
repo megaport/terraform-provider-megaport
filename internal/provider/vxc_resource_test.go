@@ -557,7 +557,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic()
                         partner = "azure"
                         azure_config = {
 							port_choice = "primary"
-                            service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+                            service_key = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
                         }
                     }
                   }
@@ -958,7 +958,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 					  partner = "azure"
 					  azure_config = {
 					    port_choice = "primary"
-						service_key = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+						service_key = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
 					  }
 					}
 				  }
