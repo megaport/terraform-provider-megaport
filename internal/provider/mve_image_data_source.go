@@ -77,7 +77,7 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
+						"id": schema.Int64Attribute{
 							Description: "The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.",
 							Computed:    true,
 						},
