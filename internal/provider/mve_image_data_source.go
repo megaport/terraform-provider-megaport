@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -35,7 +37,13 @@ type mveImageDataSource struct {
 
 // mveImageModel is the model for the data source.
 type mveImageModel struct {
-	MVEImages types.List `tfsdk:"mve_images"`
+	MVEImages          types.List   `tfsdk:"mve_images"`
+	IDFilter           types.Int64  `tfsdk:"id_filter"`
+	VersionFilter      types.String `tfsdk:"version_filter"`
+	ProductFilter      types.String `tfsdk:"product_filter"`
+	VendorFilter       types.String `tfsdk:"vendor_filter"`
+	ReleaseImageFilter types.Bool   `tfsdk:"release_image_filter"`
+	ProductCodeFilter  types.String `tfsdk:"product_code_filter"`
 }
 
 // mveImageDetailsModel is the model for the data source.
@@ -131,6 +139,38 @@ func (d *mveImageDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
+	// create some filters for MVE images
+	filters := [](func(*megaport.MVEImage) bool){}
+	// add filters for each requested attribute
+	if !config.IDFilter.IsNull() {
+		filters = append(filters, filterMVEImageByID(int(config.IDFilter.ValueInt64())))
+	}
+	if !config.ProductFilter.IsNull() {
+		filters = append(filters, filterMVEImageByProduct(config.ProductFilter.ValueString()))
+	}
+	if !config.VersionFilter.IsNull() {
+		filters = append(filters, filterMVEImageByVersion(config.VersionFilter.ValueString()))
+	}
+	if !config.VendorFilter.IsNull() {
+		filters = append(filters, filterMVEImageByVendor(config.VendorFilter.ValueString()))
+	}
+	if !config.ProductCodeFilter.IsNull() {
+		filters = append(filters, filterMVEImageByProductCode(config.ProductCodeFilter.ValueString()))
+	}
+	if !config.ReleaseImageFilter.IsNull() {
+		filters = append(filters, filterMVEImageByIsReleaseImage(config.ReleaseImageFilter.ValueBool()))
+	}
+
+	mveImages = runImageFiltersAndSort(mveImages, filters)
+
+	if len(mveImages) == 0 {
+		resp.Diagnostics.AddError(
+			"No Matching MVE Images Found",
+			"No matching MVE images were found.",
+		)
+		return
+	}
+
 	imageObjects := []types.Object{}
 
 	for _, image := range mveImages {
@@ -179,4 +219,50 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.VendorDescription = types.StringValue(image.VendorDescription)
 	orm.ReleaseImage = types.BoolValue(image.ReleaseImage)
 	orm.ProductCode = types.StringValue(image.ProductCode)
+}
+
+func runImageFiltersAndSort(images []*megaport.MVEImage, filters [](func(*megaport.MVEImage) bool)) []*megaport.MVEImage {
+	toReturn := slices.Clone(images)
+	// delete all elements not matching filters, this won't have the closure issues https://go.dev/blog/loopvar-preview because we use 1.22
+	for _, filter := range filters {
+		toReturn = slices.DeleteFunc(toReturn, filter)
+	}
+
+	return toReturn
+}
+
+func filterMVEImageByID(id int) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return i.ID != id
+	}
+}
+
+func filterMVEImageByProduct(product string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Product, product)
+	}
+}
+
+func filterMVEImageByVersion(version string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Version, version)
+	}
+}
+
+func filterMVEImageByVendor(vendor string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.Vendor, vendor)
+	}
+}
+
+func filterMVEImageByProductCode(productCode string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return !strings.EqualFold(i.ProductCode, productCode)
+	}
+}
+
+func filterMVEImageByIsReleaseImage(isReleaseImage bool) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		return i.ReleaseImage != isReleaseImage
+	}
 }
