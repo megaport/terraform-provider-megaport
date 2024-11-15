@@ -24,6 +24,7 @@ data "megaport_location" "bne_nxt1" {
 ### Optional
 
 - `name` (String) The name of the location.
+- `site_code` (String) The site code of the location.
 
 ### Read-Only
 
@@ -38,7 +39,6 @@ data "megaport_location" "bne_nxt1" {
 - `metro` (String) The metro of the location.
 - `network_region` (String) The network region of the location.
 - `products` (Attributes) The products available in the location. (see [below for nested schema](#nestedatt--products))
-- `site_code` (String) The site code of the location.
 - `status` (String) The status of the location.
 - `v_router_available` (Boolean) The vRouter availability of the location.
 
