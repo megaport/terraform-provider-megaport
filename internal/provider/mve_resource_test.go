@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const MVETestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
+
 type MVEArubaProviderTestSuite ProviderTestSuite
 type MVEVersaProviderTestSuite ProviderTestSuite
 
@@ -33,12 +35,12 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
-                    location_id = data.megaport_location.bne_nxt1.id
+                    location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
 					diversity_zone = "blue"
@@ -65,7 +67,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, mveName, costCentre, mveName, mveKey),
+                  }`, MVETestLocation, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -108,13 +110,13 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 			// Update Testing
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
 					cost_centre = "%s"
-                    location_id = data.megaport_location.bne_nxt1.id
+                    location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					diversity_zone = "blue"
 
@@ -140,7 +142,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, mveNameNew, costCentreNew, mveName, mveKey),
+                  }`, MVETestLocation, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -174,12 +176,12 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
-                    location_id = data.megaport_location.bne_nxt1.id
+                    location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
 					diversity_zone = "blue"
@@ -208,7 +210,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, mveName, costCentre),
+                  }`, MVETestLocation, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -251,12 +253,12 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 			// Update Testing
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
-                    location_id = data.megaport_location.bne_nxt1.id
+                    location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
 					diversity_zone = "blue"
@@ -285,7 +287,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, mveNameNew, costCentreNew),
+                  }`, MVETestLocation, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),

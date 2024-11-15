@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const LagPortTestLocation = "NextDC B1"
+
 type LagPortProviderTestSuite ProviderTestSuite
 
 func TestLagPortProviderTestSuite(t *testing.T) {
@@ -26,18 +28,18 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 					resource "megaport_lag_port" "lag_port" {
 			        product_name  = "%s"
 					cost_centre = "%s"
 			        port_speed  = 10000
-			        location_id = data.megaport_location.bne_nxt1.id
+			        location_id = data.megaport_location.test_location.id
 			        contract_term_months        = 12
 					marketplace_visibility = true
                     lag_count = 1
-			      }`, portName, costCentreName),
+			      }`, LagPortTestLocation, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
@@ -77,18 +79,18 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 			// Update Testing
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 					resource "megaport_lag_port" "lag_port" {
 			        product_name  = "%s"
 					cost_centre = "%s"
 			        port_speed  = 10000
-			        location_id = data.megaport_location.bne_nxt1.id
+			        location_id = data.megaport_location.test_location.id
 			        contract_term_months        = 12
 					marketplace_visibility = false
                     lag_count = 1
-			      }`, portNameNew, costCentreNameNew),
+			      }`, LagPortTestLocation, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
