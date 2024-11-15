@@ -5773,6 +5773,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
 			aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
 		} else if aEndCSP {
+			if !aEndPlanConfig.RequestedProductUID.IsNull() {
+				diags.AddWarning("VXC A-End product UID is from a partner port, therefore it will not be changed.", "VXC A-End product UID is from a CSP partner port, therefore it will not be changed.")
+			}
 			aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 		}
 
@@ -5798,6 +5801,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
 			bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
 		} else if bEndCSP {
+			if !bEndPlanConfig.RequestedProductUID.IsNull() {
+				diags.AddWarning("VXC B-End product UID is from a partner port, therefore it will not be changed.", "VXC B-End product UID is from a CSP partner port, therefore it will not be changed.")
+			}
 			bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
 		}
 
