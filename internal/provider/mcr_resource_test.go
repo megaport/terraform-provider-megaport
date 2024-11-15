@@ -10,6 +10,7 @@ import (
 )
 
 const MCRTestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
+const MCRTestSiteCode = "sjc-tx2"
 
 type MCRProviderTestSuite ProviderTestSuite
 

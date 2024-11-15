@@ -10,6 +10,7 @@ import (
 )
 
 const LagPortTestLocation = "NextDC B1"
+const LagPortTestSiteCode = "bne-nxt1"
 
 type LagPortProviderTestSuite ProviderTestSuite
 
