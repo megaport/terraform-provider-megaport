@@ -134,6 +134,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			},
 			"site_code": &schema.StringAttribute{
 				Description: "The site code of the location.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"network_region": &schema.StringAttribute{
@@ -372,12 +373,47 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	location, err := d.client.LocationService.GetLocationByName(ctx, state.Name.ValueString())
-
-	if err != nil {
+	if state.Name.IsNull() && state.SiteCode.IsNull() {
 		resp.Diagnostics.AddError(
-			"Unable to Read location",
-			err.Error(),
+			"Either 'name' or 'site_code' must be set",
+			"Either 'name' or 'site_code' must be set",
+		)
+		return
+	}
+
+	// Prioritize 'name' over 'site_code'
+	var location *megaport.Location
+	if !state.Name.IsNull() {
+		l, err := d.client.LocationService.GetLocationByName(ctx, state.Name.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to Get location by name",
+				err.Error(),
+			)
+			return
+		}
+		location = l
+	} else {
+		locations, err := d.client.LocationService.ListLocations(ctx)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to List locations",
+				err.Error(),
+			)
+			return
+		}
+		for _, l := range locations {
+			if l.SiteCode == state.SiteCode.ValueString() {
+				location = l
+				break
+			}
+		}
+	}
+
+	if location == nil {
+		resp.Diagnostics.AddError(
+			"Location not found",
+			"Location not found",
 		)
 		return
 	}
