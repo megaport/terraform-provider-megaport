@@ -10,7 +10,6 @@ import (
 )
 
 const MVETestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
-const MVETestSiteCode = "sjc-tx2"
 
 type MVEArubaProviderTestSuite ProviderTestSuite
 type MVEVersaProviderTestSuite ProviderTestSuite

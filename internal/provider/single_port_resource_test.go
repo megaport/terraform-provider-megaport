@@ -10,7 +10,6 @@ import (
 )
 
 const SinglePortTestLocation = "NextDC B1"
-const SinglePortTestSiteCode = "bne-nxt1"
 
 type SinglePortProviderTestSuite ProviderTestSuite
 
