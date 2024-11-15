@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const SinglePortTestLocation = "NextDC B1"
+
 type SinglePortProviderTestSuite ProviderTestSuite
 
 func TestSinglePortProviderTestSuite(t *testing.T) {
@@ -26,18 +28,18 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 					resource "megaport_port" "port" {
 			        product_name  = "%s"
 			        port_speed  = 1000
 					cost_centre = "%s"
-			        location_id = data.megaport_location.bne_nxt1.id
+			        location_id = data.megaport_location.test_location.id
 			        contract_term_months        = 12
 					marketplace_visibility = true
 					diversity_zone = "red"
-			      }`, portName, costCentreName),
+			      }`, SinglePortTestLocation, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -76,18 +78,18 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "bne_nxt1" {
-					name = "NextDC B1"
+				data "megaport_location" "test_location" {
+					name = "%s"
 				}
 					resource "megaport_port" "port" {
 			        product_name  = "%s"
 			        port_speed  = 1000
 					cost_centre = "%s"
-			        location_id = data.megaport_location.bne_nxt1.id
+			        location_id = data.megaport_location.test_location.id
 			        contract_term_months        = 12
 					marketplace_visibility = false
 					diversity_zone = "red"
-			      }`, portNameNew, costCentreNameNew),
+			      }`, SinglePortTestLocation, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
