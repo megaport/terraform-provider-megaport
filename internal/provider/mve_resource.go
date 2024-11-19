@@ -950,11 +950,11 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	if !req.State.Raw.IsNull() {
 		stateDiags := req.State.Get(ctx, &state)
 		resp.Diagnostics.Append(stateDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
-	if resp.Diagnostics.HasError() {
-		fmt.Println("state error!!!")
-		return
-	}
+
 	if !state.UID.IsNull() {
 		// If VendorConfig is null in the state, set it to the value from the plan
 		if state.VendorConfig.IsNull() {
