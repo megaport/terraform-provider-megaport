@@ -888,25 +888,29 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Retrieve values from state
+	// Retrieve the state
 	var state mveResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	stateDiags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(stateDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete existing order
+	// Call the API to delete the resource
+	productUID := state.UID.ValueString()
 	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID: state.UID.ValueString(),
+		MVEID: productUID,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting MVE",
-			"Could not delete MVE, unexpected error: "+err.Error(),
+			"Error deleting MVE",
+			fmt.Sprintf("Could not delete MVE with product UID %s: %s", productUID, err),
 		)
 		return
 	}
+
+	// Remove the resource from the state
+	resp.State.RemoveResource(ctx)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -936,13 +940,19 @@ func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateR
 func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	// Get the plan and state
 	var plan, state mveResourceModel
-	planDiags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(planDiags...)
+	if !req.Plan.Raw.IsNull() {
+		planDiags := req.Plan.Get(ctx, &plan)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 	if !req.State.Raw.IsNull() {
 		stateDiags := req.State.Get(ctx, &state)
 		resp.Diagnostics.Append(stateDiags...)
 	}
 	if resp.Diagnostics.HasError() {
+		fmt.Println("state error!!!")
 		return
 	}
 	if !state.UID.IsNull() {
