@@ -9,6 +9,11 @@ data "megaport_location" "bne_nxt1" {
   name = "NextDC B1"
 }
 
+data "megaport_mve_images" "versa" {
+  vendor_filter = "Versa"
+  id_filter     = 20
+}
+
 resource "megaport_mve" "mve" {
   product_name         = "Megaport Versa MVE Example"
   location_id          = data.megaport_location.bne_nxt1.id
@@ -17,7 +22,7 @@ resource "megaport_mve" "mve" {
   vendor_config = {
     vendor             = "versa"
     product_size       = "LARGE"
-    image_id           = 20
+    image_id           = data.megaport_mve_images.versa.mve_images.0.id
     director_address   = "director1.versa.com"
     controller_address = "controller1.versa.com"
     local_auth         = "SDWAN-Branch@Versa.com"

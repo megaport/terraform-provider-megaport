@@ -38,6 +38,12 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 				data "megaport_location" "test_location" {
 					name = "%s"
 				}
+				
+				data "megaport_mve_images" "aruba" {
+  					vendor_filter = "Aruba"
+  					id_filter = 23
+				}
+
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -48,7 +54,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                     vendor_config = {
                         vendor = "aruba"
                         product_size = "MEDIUM"
-                        image_id = 23
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
 						account_name = "%s"
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
@@ -113,6 +119,10 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 				data "megaport_location" "test_location" {
 					name = "%s"
 				}
+				data "megaport_mve_images" "aruba" {
+  					vendor_filter = "Aruba"
+  					id_filter = 23
+				}
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
 					cost_centre = "%s"
@@ -123,7 +133,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                     vendor_config = {
                         vendor = "aruba"
                         product_size = "MEDIUM"
-                        image_id = 23
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
 						account_name = "%s"
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
@@ -179,6 +189,12 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 				data "megaport_location" "test_location" {
 					name = "%s"
 				}
+
+				data "megaport_mve_images" "versa" {
+  					vendor_filter = "Versa"
+  					id_filter = 20
+				}
+				
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -189,7 +205,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     vendor_config = {
                         vendor = "versa"
                         product_size = "LARGE"
-                        image_id = 20
+                        image_id = data.megaport_mve_images.versa.mve_images.0.id
 						director_address = "director1.versa.com"
 						controller_address = "controller1.versa.com"
 						local_auth = "SDWAN-Branch@Versa.com"
@@ -256,6 +272,12 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 				data "megaport_location" "test_location" {
 					name = "%s"
 				}
+
+				data "megaport_mve_images" "versa" {
+  					vendor_filter = "Versa"
+  					id_filter = 20
+				}
+
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -266,7 +288,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     vendor_config = {
                         vendor = "versa"
                         product_size = "LARGE"
-                        image_id = 20
+                        image_id = data.megaport_mve_images.versa.mve_images.0.id
 						director_address = "director1.versa.com"
 						controller_address = "controller1.versa.com"
 						local_auth = "SDWAN-Branch@Versa.com"
