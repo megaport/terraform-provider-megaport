@@ -39,6 +39,11 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
+data "megaport_mve_images" "aruba" {
+  vendor_filter = "Aruba"
+  id_filter     = 23
+}
+
 resource "megaport_port" "port" {
   product_name           = "Megaport Example Port"
   port_speed             = 1000
@@ -65,7 +70,7 @@ resource "megaport_mve" "mve" {
   vendor_config = {
     vendor       = "aruba"
     product_size = "MEDIUM"
-    image_id     = 23
+    image_id     = data.megaport_mve_images.aruba.mve_images.0.id
     account_name = "Megaport Aruba MVE"
     account_key  = "Megaport Aruba MVE"
     system_tag   = "Preconfiguration-aruba-test-1"
