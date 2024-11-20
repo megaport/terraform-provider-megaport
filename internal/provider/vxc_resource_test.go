@@ -836,7 +836,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 					connect_type = "AWS"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-					location_id  = data.megaport_location.loc3.id
+					location_id  = data.megaport_location.loc2.id
 				  }
 
 				  resource "megaport_lag_port" "lag_port" {
