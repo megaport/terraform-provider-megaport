@@ -487,6 +487,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Check on changes
 	var name, costCentre string
 	var marketplaceVisibility bool
+	var contractTermMonths *int
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
@@ -503,11 +504,17 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
+	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		months := int(plan.ContractTermMonths.ValueInt64())
+		contractTermMonths = &months
+	}
+
 	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
+		ContractTermMonths:    contractTermMonths,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
