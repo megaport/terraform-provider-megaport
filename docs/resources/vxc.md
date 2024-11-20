@@ -399,14 +399,14 @@ Optional:
 
 Required:
 
-- `peer_asn` (String) The peer ASN of the peer.
-- `primary_subnet` (String) The primary subnet of the peer.
-- `secondary_subnet` (String) The secondary subnet of the peer.
 - `type` (String) The type of the peer.
 
 Optional:
 
+- `peer_asn` (String) The peer ASN of the peer.
 - `prefixes` (String) The prefixes of the peer.
+- `primary_subnet` (String) The primary subnet of the peer.
+- `secondary_subnet` (String) The secondary subnet of the peer.
 - `shared_key` (String) The shared key of the peer.
 - `vlan` (Number) The VLAN of the peer.
 
@@ -612,14 +612,14 @@ Optional:
 
 Required:
 
-- `peer_asn` (String) The peer ASN of the peer.
-- `primary_subnet` (String) The primary subnet of the peer.
-- `secondary_subnet` (String) The secondary subnet of the peer.
 - `type` (String) The type of the peer.
 
 Optional:
 
+- `peer_asn` (String) The peer ASN of the peer.
 - `prefixes` (String) The prefixes of the peer.
+- `primary_subnet` (String) The primary subnet of the peer.
+- `secondary_subnet` (String) The secondary subnet of the peer.
 - `shared_key` (String) The shared key of the peer.
 - `vlan` (Number) The VLAN of the peer.
 

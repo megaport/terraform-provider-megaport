@@ -1279,15 +1279,15 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										},
 										"peer_asn": schema.StringAttribute{
 											Description: "The peer ASN of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"primary_subnet": schema.StringAttribute{
 											Description: "The primary subnet of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"secondary_subnet": schema.StringAttribute{
 											Description: "The secondary subnet of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"prefixes": schema.StringAttribute{
 											Description: "The prefixes of the peer.",
@@ -1740,15 +1740,15 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										},
 										"peer_asn": schema.StringAttribute{
 											Description: "The peer ASN of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"primary_subnet": schema.StringAttribute{
 											Description: "The primary subnet of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"secondary_subnet": schema.StringAttribute{
 											Description: "The secondary subnet of the peer.",
-											Required:    true,
+											Optional:    true,
 										},
 										"prefixes": schema.StringAttribute{
 											Description: "The prefixes of the peer.",
