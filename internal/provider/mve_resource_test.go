@@ -43,7 +43,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                     location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
-					diversity_zone = "blue"
+					diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "aruba"
@@ -84,7 +84,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "blue"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
 			// ImportState testing
@@ -118,7 +118,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					cost_centre = "%s"
                     location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
-					diversity_zone = "blue"
+					diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "aruba"
@@ -150,7 +150,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "blue"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
@@ -184,7 +184,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
-					diversity_zone = "blue"
+					diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "versa"
@@ -227,7 +227,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "blue"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
 			// ImportState testing
@@ -261,7 +261,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     location_id = data.megaport_location.test_location.id
                     contract_term_months        = 1
 					cost_centre = "%s"
-					diversity_zone = "blue"
+					diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "versa"
@@ -304,7 +304,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "blue"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
 		},

@@ -200,7 +200,8 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
-	switch v.Vendor.ValueString() {
+	vendor := strings.ToLower(v.Vendor.ValueString()) // Allow for uppercase vendor names for more flexibility.
+	switch vendor {
 	case "6wind":
 		vsrConfig := &megaport.SixwindVSRConfig{
 			Vendor:       v.Vendor.ValueString(),
@@ -566,39 +567,27 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vendor_config": schema.SingleNestedAttribute{
-				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys.",
+				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. This field cannot be changed after the MVE is created and if it is modified, the MVE will be deleted and re-created. Imported MVEs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
+					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
-						Description: "The name of vendor of the MVE.",
+						Description: `The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".`,
 						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"image_id": schema.Int64Attribute{
 						Description: "The image ID of the MVE. Indicates the software version.",
 						Required:    true,
-						PlanModifiers: []planmodifier.Int64{
-							int64planmodifier.RequiresReplace(),
-						},
 					},
 					"product_size": schema.StringAttribute{
 						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.",
 						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"mve_label": schema.StringAttribute{
 						Description: "The MVE label for the vendor config.",
 						Optional:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 					"account_name": schema.StringAttribute{
 						Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.",
@@ -837,6 +826,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
+	// If Imported, VendorConfig will be Null. Set VendorConfig in state to existing one in plan.
+	if state.VendorConfig.IsNull() {
+		state.VendorConfig = plan.VendorConfig
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -894,25 +888,29 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Retrieve values from state
+	// Retrieve the state
 	var state mveResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	stateDiags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(stateDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete existing order
+	// Call the API to delete the resource
+	productUID := state.UID.ValueString()
 	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID: state.UID.ValueString(),
+		MVEID: productUID,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting MVE",
-			"Could not delete MVE, unexpected error: "+err.Error(),
+			"Error deleting MVE",
+			fmt.Sprintf("Could not delete MVE with product UID %s: %s", productUID, err),
 		)
 		return
 	}
+
+	// Remove the resource from the state
+	resp.State.RemoveResource(ctx)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -937,4 +935,51 @@ func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Get the plan and state
+	var plan, state mveResourceModel
+	if !req.Plan.Raw.IsNull() {
+		planDiags := req.Plan.Get(ctx, &plan)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+	if !req.State.Raw.IsNull() {
+		stateDiags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(stateDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if !state.UID.IsNull() {
+		// If VendorConfig is null in the state, set it to the value from the plan
+		if state.VendorConfig.IsNull() {
+			var planVendorConfig vendorConfigModel
+			planVendorConfigDiags := plan.VendorConfig.As(ctx, &planVendorConfig, basetypes.ObjectAsOptions{})
+			resp.Diagnostics = append(resp.Diagnostics, planVendorConfigDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			// Check the computed vendor/size values from the API. If the vendor or size changes, require a replace
+			if state.Size.ValueString() != planVendorConfig.ProductSize.ValueString() {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			}
+			vendor := strings.ToLower(planVendorConfig.Vendor.ValueString()) // API returns vendor in uppercase, convert to lowercase
+			if vendor != planVendorConfig.Vendor.ValueString() {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			}
+			state.VendorConfig = plan.VendorConfig
+		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
+			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+		}
+		diags := req.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 }
