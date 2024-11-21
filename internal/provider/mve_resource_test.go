@@ -131,8 +131,8 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					diversity_zone = "red"
 
                     vendor_config = {
-                        vendor = "aruba"
-                        product_size = "MEDIUM"
+                        vendor = "ArUbA"
+                        product_size = "mEdIuM"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
 						account_name = "%s"
 						account_key = "%s"
@@ -171,6 +171,26 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
+			},
+			// Make sure resource has not been destroyed by change of casing in Vendor Config
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
 			},
 		},
 	})
@@ -286,8 +306,8 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					diversity_zone = "red"
 
                     vendor_config = {
-                        vendor = "versa"
-                        product_size = "LARGE"
+                        vendor = "VeRsA"
+                        product_size = "lArGe"
                         image_id = data.megaport_mve_images.versa.mve_images.0.id
 						director_address = "director1.versa.com"
 						controller_address = "controller1.versa.com"
@@ -328,6 +348,26 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
+			},
+			// Make sure resource has not been destroyed by change of casing in Vendor Config
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
 			},
 		},
 	})
