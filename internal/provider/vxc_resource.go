@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -1160,40 +1159,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"a_end_partner_config": schema.SingleNestedAttribute{
 				Description: "The partner configuration of the A-End order configuration.",
 				Optional:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplaceIf(
-						objectplanmodifier.RequiresReplaceIfFunc(
-							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
-								if req.PlanValue.Equal(req.StateValue) {
-									return
-								}
-
-								// Add your condition here
-								var plan, state vxcPartnerConfigurationModel
-
-								// Decode the current and new configuration
-								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								diags = req.StateValue.As(ctx, &state, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								if plan.Partner != state.Partner {
-									resp.RequiresReplace = true
-								}
-								if plan.Partner.ValueString() != "a-end" && plan.Partner.ValueString() != "vrouter" {
-									resp.RequiresReplace = true
-								}
-							},
-						),
-						"This modifier will replace the VXC if the plan a_end_partner_config partner is neither 'a-end' nor 'vrouter' and does not equal the a_end_partner_config of the state.",
-						"This modifier will replace the VXC if the plan a_end_partner_config partner is neither 'a-end' nor 'vrouter' and does not equal the a_end_partner_config of the state.",
-					),
-				},
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
 						Description: "The partner of the partner configuration.",
@@ -1621,40 +1586,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"b_end_partner_config": schema.SingleNestedAttribute{
 				Description: "The partner configuration of the B-End order configuration.",
 				Optional:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplaceIf(
-						objectplanmodifier.RequiresReplaceIfFunc(
-							func(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
-								if req.PlanValue.Equal(req.StateValue) {
-									return
-								}
-
-								// Add your condition here
-								var plan, state vxcPartnerConfigurationModel
-
-								// Decode the current and new configuration
-								diags := req.PlanValue.As(ctx, &plan, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								diags = req.StateValue.As(ctx, &state, basetypes.ObjectAsOptions{})
-								if diags.HasError() {
-									resp.Diagnostics.Append(diags...)
-									return
-								}
-								if plan.Partner != state.Partner {
-									resp.RequiresReplace = true
-								}
-								if plan.Partner.ValueString() != "vrouter" {
-									resp.RequiresReplace = true
-								}
-							},
-						),
-						"This modifier will replace the VXC if the plan b_end_partner_config partner is not 'vrouter' and does not equal the b_end_partner_config of the state.",
-						"This modifier will replace the VXC if the plan b_end_partner_config partner is not 'vrouter' and does not equal the b_end_partner_config of the state.",
-					),
-				},
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
 						Description: "The partner of the partner configuration.",
@@ -5716,113 +5647,128 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	var plan, state vxcResourceModel
 	diags := diag.Diagnostics{}
 
-	planDiags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(planDiags...)
+	if !req.Plan.Raw.IsNull() {
+		planDiags := req.Plan.Get(ctx, &plan)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 	if !req.State.Raw.IsNull() {
 		stateDiags := req.State.Get(ctx, &state)
 		resp.Diagnostics.Append(stateDiags...)
-	}
-	if resp.Diagnostics.HasError() {
-		return
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
-		var aEndCSP, bEndCSP bool
-		aEndStateObj := state.AEndConfiguration
-		bEndStateObj := state.BEndConfiguration
-		aEndStateConfig := &vxcEndConfigurationModel{}
-		bEndStateConfig := &vxcEndConfigurationModel{}
-		aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
-		bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
-		diags = append(diags, aEndDiags...)
-		diags = append(diags, bEndDiags...)
-		aEndPlanObj := plan.AEndConfiguration
-		bEndPlanObj := plan.BEndConfiguration
-		aEndPlanConfig := &vxcEndConfigurationModel{}
-		bEndPlanConfig := &vxcEndConfigurationModel{}
-		aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-		bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-		aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
-		bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
-		diags = append(diags, aEndDiags...)
-		diags = append(diags, bEndDiags...)
-		if aEndStateConfig.OrderedVLAN.IsUnknown() {
-			aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
-		}
-		if bEndStateConfig.OrderedVLAN.IsUnknown() {
-			bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
-		}
-		if state.AEndPartnerConfig.IsNull() {
-			state.AEndPartnerConfig = plan.AEndPartnerConfig
-		} else {
-			if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
+		if !req.Plan.Raw.IsNull() {
+			var aEndCSP, bEndCSP bool
+			aEndStateObj := state.AEndConfiguration
+			bEndStateObj := state.BEndConfiguration
+			aEndStateConfig := &vxcEndConfigurationModel{}
+			bEndStateConfig := &vxcEndConfigurationModel{}
+			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
+			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			aEndPlanObj := plan.AEndConfiguration
+			bEndPlanObj := plan.BEndConfiguration
+			aEndPlanConfig := &vxcEndConfigurationModel{}
+			bEndPlanConfig := &vxcEndConfigurationModel{}
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
+			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
+			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			if aEndStateConfig.OrderedVLAN.IsUnknown() {
+				aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
 			}
-		}
-		partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-		diags = append(diags, partnerConfigDiags...)
-		if !plan.AEndPartnerConfig.IsNull() {
-			if !aEndPartnerConfigModel.Partner.IsNull() {
-				if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-					aEndCSP = true
+			if bEndStateConfig.OrderedVLAN.IsUnknown() {
+				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
+			}
+			if state.AEndPartnerConfig.IsNull() {
+				if !plan.AEndPartnerConfig.IsNull() {
+					state.AEndPartnerConfig = plan.AEndPartnerConfig
+				} else {
+					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
 				}
 			}
-		}
-		if aEndStateConfig.RequestedProductUID.IsNull() {
-			aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-			aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-		} else if aEndCSP {
-			if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-				diags.AddWarning("VXC A-End product UID is from a partner port, therefore it will not be changed.", "VXC A-End product UID is from a CSP partner port, therefore it will not be changed.")
-			}
-			aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
-		}
-
-		if state.BEndPartnerConfig.IsNull() {
-			state.BEndPartnerConfig = plan.BEndPartnerConfig
-		} else {
-			if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
-			}
-		}
-		partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-		diags = append(diags, partnerConfigDiags...)
-		if !plan.BEndPartnerConfig.IsNull() {
-			if !bEndPartnerConfigModel.Partner.IsNull() {
-				if !bEndPartnerConfigModel.Partner.IsNull() {
-					if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-						bEndCSP = true
+			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+			diags = append(diags, partnerConfigDiags...)
+			if !plan.AEndPartnerConfig.IsNull() {
+				if !aEndPartnerConfigModel.Partner.IsNull() {
+					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
+						aEndCSP = true
 					}
 				}
 			}
-		}
-		if bEndStateConfig.RequestedProductUID.IsNull() {
-			bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-			bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-		} else if bEndCSP {
-			if !bEndPlanConfig.RequestedProductUID.IsNull() && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.CurrentProductUID) {
-				diags.AddWarning("VXC B-End product UID is from a partner port, therefore it will not be changed.", "VXC B-End product UID is from a CSP partner port, therefore it will not be changed.")
+			if aEndStateConfig.RequestedProductUID.IsNull() {
+				aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+				aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+			} else if aEndCSP {
+				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
+					diags.AddWarning("VXC A-End product UID is from a partner port, therefore it will not be changed.", "VXC A-End product UID is from a CSP partner port, therefore it will not be changed.")
+				}
+				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 			}
-			bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
-		}
 
-		newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
-		newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
-		diags = append(diags, aEndDiags...)
-		diags = append(diags, bEndDiags...)
-		plan.AEndConfiguration = newPlanAEndObj
-		plan.BEndConfiguration = newPlanBEndObj
-		newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
-		newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
-		diags = append(diags, aEndDiags...)
-		diags = append(diags, bEndDiags...)
-		state.AEndConfiguration = newStateAEndObj
-		state.BEndConfiguration = newStateBEndObj
-		req.Plan.Set(ctx, &plan)
-		resp.Plan.Set(ctx, &plan)
-		stateDiags := req.State.Set(ctx, &state)
-		diags = append(diags, stateDiags...)
+			if state.BEndPartnerConfig.IsNull() {
+				if !plan.BEndPartnerConfig.IsNull() {
+					state.BEndPartnerConfig = plan.BEndPartnerConfig
+				} else {
+					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
+				}
+			}
+			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+			diags = append(diags, partnerConfigDiags...)
+			if !plan.BEndPartnerConfig.IsNull() {
+				if !bEndPartnerConfigModel.Partner.IsNull() {
+					if !bEndPartnerConfigModel.Partner.IsNull() {
+						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
+							bEndCSP = true
+						}
+					}
+				}
+			}
+			if bEndStateConfig.RequestedProductUID.IsNull() {
+				bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+				bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+			} else if bEndCSP {
+				if !bEndPlanConfig.RequestedProductUID.IsNull() && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.CurrentProductUID) {
+					diags.AddWarning("VXC B-End product UID is from a partner port, therefore it will not be changed.", "VXC B-End product UID is from a CSP partner port, therefore it will not be changed.")
+				}
+				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
+			}
+
+			newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
+			newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			plan.AEndConfiguration = newPlanAEndObj
+			plan.BEndConfiguration = newPlanBEndObj
+			newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
+			newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			state.AEndConfiguration = newStateAEndObj
+			state.BEndConfiguration = newStateBEndObj
+			req.Plan.Set(ctx, &plan)
+			resp.Plan.Set(ctx, &plan)
+			stateDiags := req.State.Set(ctx, &state)
+			diags = append(diags, stateDiags...)
+		}
 	}
 
 	resp.Diagnostics.Append(diags...)
