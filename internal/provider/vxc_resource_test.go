@@ -10,13 +10,8 @@ import (
 )
 
 type VXCBasicProviderTestSuite ProviderTestSuite
-type VXCUpdateVLANProviderTestSuite ProviderTestSuite
-type VXCMegaportMCRVXCWithCSPsProviderTestSuite ProviderTestSuite
-type VXCMegaportMCRVXCWithBGPProviderTestSuite ProviderTestSuite
-type VXCTestFullEcosystemProviderTestSuite ProviderTestSuite
-type VXCMVETransitVXCBasicProviderTestSuite ProviderTestSuite
-type VXCMVETransitVXCAWSProviderTestSuite ProviderTestSuite
-type VXCMVEVXCAWSProviderTestSuite ProviderTestSuite
+type VXCCSPProviderTestSuite ProviderTestSuite
+type VXCMVEProviderTestSuite ProviderTestSuite
 
 const (
 	VXCLocationOne   = "NextDC M1"
@@ -29,39 +24,14 @@ func TestVXCBasicProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(VXCBasicProviderTestSuite))
 }
 
-func TestVXCUpdateVLANProviderTestSuite(t *testing.T) {
+func TestVXCCSPProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCUpdateVLANProviderTestSuite))
+	suite.Run(t, new(VXCCSPProviderTestSuite))
 }
 
-func TestVXCMegaportMCRVXCWithCSPsProviderTestSuite(t *testing.T) {
+func TestVXCMVEProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCMegaportMCRVXCWithCSPsProviderTestSuite))
-}
-
-func TestVXCMegaportMCRVXCWithBGPProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMegaportMCRVXCWithBGPProviderTestSuite))
-}
-
-func TestVXCTestFullEcosystemProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCTestFullEcosystemProviderTestSuite))
-}
-
-func TestVXCMVETransitVXCBasicProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMVETransitVXCBasicProviderTestSuite))
-}
-
-func TestTestVXCMVETransitVXCAWSProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMVETransitVXCAWSProviderTestSuite))
-}
-
-func TestVXCMVEVXCAWSProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMVEVXCAWSProviderTestSuite))
+	suite.Run(t, new(VXCMVEProviderTestSuite))
 }
 
 func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
@@ -364,7 +334,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
-func (suite *VXCUpdateVLANProviderTestSuite) TestUpdateVLAN() {
+func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	awsVXCName := RandomTestName()
@@ -516,7 +486,7 @@ func (suite *VXCUpdateVLANProviderTestSuite) TestUpdateVLAN() {
 	})
 }
 
-func (suite *VXCMegaportMCRVXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
@@ -666,7 +636,7 @@ func (suite *VXCMegaportMCRVXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWi
 	})
 }
 
-func (suite *VXCMegaportMCRVXCWithBGPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
@@ -914,7 +884,7 @@ func (suite *VXCMegaportMCRVXCWithBGPProviderTestSuite) TestAccMegaportMCRVXCWit
 	})
 }
 
-func (suite *VXCTestFullEcosystemProviderTestSuite) TestFullEcosystem() {
+func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
@@ -1143,7 +1113,7 @@ func (suite *VXCTestFullEcosystemProviderTestSuite) TestFullEcosystem() {
 	})
 }
 
-func (suite *VXCMVETransitVXCBasicProviderTestSuite) TestMVE_TransitVXC() {
+func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -1252,7 +1222,7 @@ func (suite *VXCMVETransitVXCBasicProviderTestSuite) TestMVE_TransitVXC() {
 	})
 }
 
-func (suite *VXCMVETransitVXCAWSProviderTestSuite) TestMVE_TransitVXCAWS() {
+func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 	portName := RandomTestName()
 	portCostCentreName := RandomTestName()
 	portCostCentreNameNew := RandomTestName()
@@ -1622,7 +1592,7 @@ func (suite *VXCMVETransitVXCAWSProviderTestSuite) TestMVE_TransitVXCAWS() {
 	})
 }
 
-func (suite *VXCMVEVXCAWSProviderTestSuite) TestMVE_AWS_VXC() {
+func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
