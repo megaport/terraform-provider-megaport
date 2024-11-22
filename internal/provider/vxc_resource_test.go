@@ -10,8 +10,8 @@ import (
 )
 
 type VXCBasicProviderTestSuite ProviderTestSuite
-type VXCWithCSPsProviderTestSuite ProviderTestSuite
-type VXCWithMVEProviderTestSuite ProviderTestSuite
+type VXCCSPProviderTestSuite ProviderTestSuite
+type VXCMVEProviderTestSuite ProviderTestSuite
 
 const (
 	VXCLocationOne   = "NextDC M1"
@@ -24,14 +24,14 @@ func TestVXCBasicProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(VXCBasicProviderTestSuite))
 }
 
-func TestVXCWithCSPsProviderTestSuiteProviderTestSuite(t *testing.T) {
+func TestVXCCSPProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCWithCSPsProviderTestSuite))
+	suite.Run(t, new(VXCCSPProviderTestSuite))
 }
 
-func TestVXCWithMVEProviderTestSuite(t *testing.T) {
+func TestVXCMVEProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCWithMVEProviderTestSuite))
+	suite.Run(t, new(VXCMVEProviderTestSuite))
 }
 
 func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
@@ -334,7 +334,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
-func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
+func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	awsVXCName := RandomTestName()
@@ -402,6 +402,26 @@ func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "191"),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 			// Update Test - Change A-End VLAN
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -466,7 +486,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestUpdateVLAN() {
 	})
 }
 
-func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
@@ -572,11 +592,51 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic()
 					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.azure_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.azure_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 		},
 	})
 }
 
-func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
@@ -691,6 +751,26 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 			// UPDATE Test - Change BGP Connection in Partner Config
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -804,7 +884,7 @@ func (suite *VXCWithCSPsProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() 
 	})
 }
 
-func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
+func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
@@ -969,11 +1049,71 @@ func (suite *VXCWithCSPsProviderTestSuite) TestFullEcosystem() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.gcp_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.gcp_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.azure_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.azure_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 		},
 	})
 }
 
-func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXC() {
+func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -1058,11 +1198,31 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.transit_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.transit_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 		},
 	})
 }
 
-func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
+func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 	portName := RandomTestName()
 	portCostCentreName := RandomTestName()
 	portCostCentreNameNew := RandomTestName()
@@ -1226,6 +1386,66 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 					resource.TestCheckNoResourceAttr("megaport_vxc.transit_vxc", "b_end.inner_vlan"),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.port_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.port_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.transit_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.transit_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
+			},
 			// UPDATE
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -1372,7 +1592,7 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_TransitVXCAWS() {
 	})
 }
 
-func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
+func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -1465,6 +1685,26 @@ func (suite *VXCWithMVEProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "100"),
 				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end", "b_end", "a_end_partner_config", "b_end_partner_config"},
 			},
 			// Update
 			{
