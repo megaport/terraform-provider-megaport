@@ -5690,17 +5690,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			if bEndStateConfig.OrderedVLAN.IsUnknown() {
 				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
 			}
-			if state.AEndPartnerConfig.IsNull() {
-				if !plan.AEndPartnerConfig.IsNull() {
-					state.AEndPartnerConfig = plan.AEndPartnerConfig
-				} else {
-					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
-				}
-			}
 			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
 			diags = append(diags, partnerConfigDiags...)
 			if !plan.AEndPartnerConfig.IsNull() {
@@ -5710,6 +5699,18 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					}
 				}
 			}
+			if state.AEndPartnerConfig.IsNull() {
+				if !plan.AEndPartnerConfig.IsNull() {
+					state.AEndPartnerConfig = plan.AEndPartnerConfig
+				} else {
+					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) && aEndCSP {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
+				}
+			}
+
 			if aEndStateConfig.RequestedProductUID.IsNull() {
 				aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
@@ -5720,17 +5721,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 			}
 
-			if state.BEndPartnerConfig.IsNull() {
-				if !plan.BEndPartnerConfig.IsNull() {
-					state.BEndPartnerConfig = plan.BEndPartnerConfig
-				} else {
-					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
-				}
-			}
 			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
 			diags = append(diags, partnerConfigDiags...)
 			if !plan.BEndPartnerConfig.IsNull() {
@@ -5742,6 +5732,19 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					}
 				}
 			}
+
+			if state.BEndPartnerConfig.IsNull() {
+				if !plan.BEndPartnerConfig.IsNull() {
+					state.BEndPartnerConfig = plan.BEndPartnerConfig
+				} else {
+					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) && bEndCSP {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
+				}
+			}
+
 			if bEndStateConfig.RequestedProductUID.IsNull() {
 				bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
 				bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
