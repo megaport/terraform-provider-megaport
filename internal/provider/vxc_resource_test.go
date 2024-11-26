@@ -330,6 +330,95 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
 				),
 			},
+			// Update Test 3 - Untag VLANs
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					name = "%s"
+				}
+					resource "megaport_port" "port_1" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+				  resource "megaport_port" "port_3" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+                  resource "megaport_port" "port_4" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
+			        rate_limit = 600
+					contract_term_months = 24
+					cost_centre = "%s"
+
+			        a_end = {
+			            requested_product_uid = megaport_port.port_3.product_uid
+						ordered_vlan = -1
+						inner_vlan = 400
+			        }
+
+			        b_end = {
+			            requested_product_uid = megaport_port.port_4.product_uid
+						ordered_vlan = -1
+						inner_vlan = 401
+			        }
+			      }
+			      `, VXCLocationOne, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "product_name", portName3),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_3", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_3", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "product_name", portName4),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_4", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_4", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "600"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "24"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "null"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "null"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "400"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
+				),
+			},
 		},
 	})
 }
@@ -519,7 +608,6 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					}
 
 					b_end = {
-					  ordered_vlan = -1
 					  requested_product_uid = data.megaport_partner.aws_port.product_uid
 					}
 
@@ -541,8 +629,6 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "-1"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "null"),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end.ordered_vlan", "-1"),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end.vlan", "null"),
 				),
 			},
 		},
