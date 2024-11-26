@@ -375,13 +375,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = -1
-						inner_vlan = 400
 			        }
 
 			        b_end = {
 			            requested_product_uid = megaport_port.port_4.product_uid
 						ordered_vlan = -1
-						inner_vlan = 401
 			        }
 			      }
 			      `, VXCLocationOne, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
@@ -415,8 +413,6 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "null"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "-1"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "null"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "400"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
 				),
 			},
 		},
@@ -628,7 +624,7 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "-1"),
-					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "null"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan"),
 				),
 			},
 		},
