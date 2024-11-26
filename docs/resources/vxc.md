@@ -312,8 +312,8 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
-- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
+- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.  To set the VLAN to untagged, set the VLAN value to -1.
+- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the ordered_vlan was set to -1, the Megaport system will set this value to null.
 - `vnic_index` (Number) The network interface index of the A-End configuration.
 
 Read-Only:
@@ -332,9 +332,9 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.
+- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID.  To set the VLAN to untagged, set the VLAN value to -1.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration.
-- `vlan` (Number) The current VLAN of the B-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN.
+- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the ordered_vlan was set to -1, the Megaport system will set this value to null.
 - `vnic_index` (Number) The network interface index of the B-End configuration.
 
 Read-Only:
