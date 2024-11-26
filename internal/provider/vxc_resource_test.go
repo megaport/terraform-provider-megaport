@@ -474,7 +474,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_center", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
