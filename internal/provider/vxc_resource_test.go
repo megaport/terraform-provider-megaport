@@ -334,6 +334,160 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
+func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+	vxcNameNew := RandomTestName()
+	costCentreName := RandomTestName()
+	costCentreNew := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					name = "%s"
+				}
+					resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+                  resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					marketplace_visibility = false
+                  }
+                  resource "megaport_vxc" "vxc" {
+                    product_name   = "%s"
+                    rate_limit = 500
+                    contract_term_months = 12
+					cost_centre = "%s"
+
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+						ordered_vlan = 100
+                    }
+
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+						ordered_vlan = 101
+                    }
+                  }
+                  `, VXCLocationOne, portName1, portName2, vxcName, costCentreName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "a_end_partner_config", "b_end_partner_config", "a_end", "b_end", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+			},
+			// Update Test - Change VXC Name, Untag A-End and B-End VLAN
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					name = "%s"
+				}
+					resource "megaport_port" "port_1" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
+			        rate_limit = 500
+					contract_term_months = 12
+					cost_centre = "%s"
+
+			        a_end = {
+			            requested_product_uid = megaport_port.port_1.product_uid
+						ordered_vlan = -1
+			        }
+
+			        b_end = {
+			            requested_product_uid = megaport_port.port_2.product_uid
+						ordered_vlan = -1
+			        }
+			      }
+			      `, VXCLocationOne, portName1, portName2, vxcNameNew, costCentreNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_1", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port_2", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "-1"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "a_end.vlan"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "-1"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "b_end.vlan"),
+				),
+			},
+		},
+	})
+}
+
 func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -480,6 +634,66 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "195"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "195"),
+				),
+			},
+			// Update Test - Untag VLAN
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					name = "%s"
+				  }
+
+				  data "megaport_location" "loc2" {
+					name = "%s"
+				  }
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.loc1.id
+				  }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.loc2.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_vxc" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  ordered_vlan = -1
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWSHC"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+                  `, VXCLocationOne, VXCLocationTwo, portName, costCentreName, awsVXCName, awsVXCName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "-1"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan"),
 				),
 			},
 		},
