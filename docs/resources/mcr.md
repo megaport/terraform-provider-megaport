@@ -78,6 +78,7 @@ resource "megaport_mcr" "mcr" {
 - `locked` (Boolean) Whether the product is locked.
 - `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
+- `max_vxc_speed` (Number) The maximum VXC speed for the product.
 - `product_id` (Number) Numeric ID of the product.
 - `product_type` (String) Type of the product.
 - `product_uid` (String) UID identifier of the product.

@@ -69,6 +69,7 @@ type mcrResourceModel struct {
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
 	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
+	MaxVXCSpeed           types.Int64  `tfsdk:"max_vxc_speed"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	LAGPrimary            types.Bool   `tfsdk:"lag_primary"`
 	LAGID                 types.Int64  `tfsdk:"lag_id"`
@@ -143,6 +144,7 @@ func (orm *mcrResourceModel) fromAPIMCR(_ context.Context, m *megaport.MCR) diag
 	orm.Locked = types.BoolValue(m.Locked)
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
+	orm.MaxVXCSpeed = types.Int64Value(int64(m.MaxVXCSpeed))
 
 	if m.CreateDate != nil {
 		orm.CreateDate = types.StringValue(m.CreateDate.String())
@@ -451,6 +453,13 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"max_vxc_speed": schema.Int64Attribute{
+				Description: "The maximum VXC speed for the product.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"virtual": schema.BoolAttribute{
