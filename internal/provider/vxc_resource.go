@@ -1053,7 +1053,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
 						Optional:    true,
-						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
+						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the A-End configuration. May be different from the A-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the A-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the A-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
@@ -1128,7 +1128,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"ordered_vlan": schema.Int64Attribute{
 						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
 						Optional:    true,
-						Validators:  []validator.Int64{int64validator.Between(0, 4093), int64validator.NoneOf(1)},
+						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 					},
 					"vlan": schema.Int64Attribute{
 						Description: "The current VLAN of the B-End configuration. May be different from the B-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the B-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the B-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
