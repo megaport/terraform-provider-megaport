@@ -758,6 +758,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 								stringplanmodifier.UseStateForUnknown(),
 							},
 						},
+						"customer_asn": schema.Int64Attribute{
+							Description: "The customer ASN of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
+						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the CSP connection.",
 							Computed:    true,
@@ -775,6 +783,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"owner_account": schema.StringAttribute{
 							Description: "The owner's AWS account of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"account_id": schema.StringAttribute{
+							Description: "The account ID of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
@@ -800,6 +816,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 						"customer_ip_address": schema.StringAttribute{
 							Description: "The customer IP address of the CSP connection.",
+							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"provider_ip_address": schema.StringAttribute{
+							Description: "The provider IP address of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
