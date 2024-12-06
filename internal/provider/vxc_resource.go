@@ -3612,6 +3612,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
@@ -3619,6 +3620,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
 				VrouterPartnerConfig: vrouter,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndPartner,
 			}
 
@@ -3760,12 +3762,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndConfigObj,
 				VrouterPartnerConfig: vrouter,
 			}
@@ -3911,12 +3915,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aEndPartnerPlan.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				VrouterPartnerConfig: vRouterConfigObj,
 				PartnerAEndConfig:    aEndPartner,
 			}
@@ -3946,6 +3952,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              bPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
@@ -3953,6 +3960,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
 				VrouterPartnerConfig: vrouter,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndPartner,
 			}
 
@@ -4098,12 +4106,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              bEndPartnerPlan.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				VrouterPartnerConfig: vrouterConfigObj,
 				PartnerAEndConfig:    aEndPartner,
 			}
@@ -4133,6 +4143,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
@@ -4140,6 +4151,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
 				VrouterPartnerConfig: vrouter,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndPartner,
 			}
 
@@ -4281,12 +4293,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndConfigObj,
 				VrouterPartnerConfig: vrouter,
 			}
@@ -4432,6 +4446,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              aEndPartnerPlan.Partner,
 				AWSPartnerConfig:     aws,
@@ -4439,6 +4454,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
 				VrouterPartnerConfig: vRouterConfigObj,
+				IBMPartnerConfig:     ibmPartner,
 				PartnerAEndConfig:    aEndPartner,
 			}
 			aEndPartnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
@@ -4467,12 +4483,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              bPartnerConfig.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				VrouterPartnerConfig: vrouter,
 				PartnerAEndConfig:    aEndPartner,
 			}
@@ -4619,12 +4637,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
 			oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
 			aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
+			ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
 				Partner:              bEndPartnerPlan.Partner,
 				AWSPartnerConfig:     aws,
 				AzurePartnerConfig:   azure,
 				GooglePartnerConfig:  google,
 				OraclePartnerConfig:  oracle,
+				IBMPartnerConfig:     ibmPartner,
 				VrouterPartnerConfig: vrouterConfigObj,
 				PartnerAEndConfig:    aEndPartner,
 			}
