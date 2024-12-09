@@ -311,6 +311,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Validators: []validator.Int64{
 					int64validator.Between(1, 8),
 				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
 			},
 			"lag_port_uids": schema.ListAttribute{
 				ElementType: types.StringType,
