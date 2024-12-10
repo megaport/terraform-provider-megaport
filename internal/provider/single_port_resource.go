@@ -57,6 +57,7 @@ type singlePortResourceModel struct {
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
 	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
+	MaxVXCSpeed           types.Int64  `tfsdk:"max_vxc_speed"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
 	ContractStartDate     types.String `tfsdk:"contract_start_date"`
@@ -127,6 +128,7 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
 	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
 	orm.Virtual = types.BoolValue(p.Virtual)
+	orm.MaxVXCSpeed = types.Int64Value(int64(p.MaxVXCSpeed))
 
 	resourcesModel := &portResourcesModel{}
 	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
@@ -288,6 +290,13 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"max_vxc_speed": schema.Int64Attribute{
+				Description: "The maximum VXC speed for the product.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"virtual": schema.BoolAttribute{
