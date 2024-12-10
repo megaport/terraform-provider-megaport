@@ -3338,24 +3338,24 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
 	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() && !aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
-		aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 	}
+	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
 	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
-		aEndState.InnerVLAN = aEndPlan.InnerVLAN
 	}
+	aEndState.InnerVLAN = aEndPlan.InnerVLAN
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() && !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
-		bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 	}
+	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
-		bEndState.InnerVLAN = bEndPlan.InnerVLAN
 	}
+	bEndState.InnerVLAN = bEndPlan.InnerVLAN
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
