@@ -43,25 +43,25 @@ resource "megaport_mve" "mve_location_1" {
 }
 
 data "megaport_partner" "internet_zone_red" {
-  connect_type  = "TRANSIT"
-  company_name  = "Networks"
-  product_name  = "Megaport Internet"
-  location_id   = data.megaport_location.location_2.id
+  connect_type = "TRANSIT"
+  company_name = "Networks"
+  product_name = "Megaport Internet"
+  location_id  = data.megaport_location.location_2.id
 }
 
 resource "megaport_vxc" "transit_vxc_sin_1" {
   product_name         = "MVE 1 SIN - Internet VXC"
   rate_limit           = 100
   contract_term_months = 1
-  
+
   a_end = {
     requested_product_uid = megaport_mve.mve_1_sin.product_uid
   }
-  
+
   b_end = {
     requested_product_uid = data.megaport_partner.internet_zone_red.product_uid
   }
-  
+
   b_end_partner_config = {
     partner = "transit"
   }
@@ -82,8 +82,8 @@ resource "megaport_vxc" "aws_vxc_sin_1" {
 
   a_end = {
     requested_product_uid = megaport_mve.mve_1_sin.product_uid
-    inner_vlan = 301
-    vnic_index = 0
+    inner_vlan            = 301
+    vnic_index            = 0
   }
 
   b_end = {
@@ -142,7 +142,7 @@ resource "megaport_vxc" "google_vxc_sin_1" {
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid 
+    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid
   }
 
   b_end_partner_config = {

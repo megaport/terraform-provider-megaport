@@ -255,7 +255,7 @@ resource "megaport_vxc" "oracle_vxc_2_sin" {
 
   a_end = {
     requested_product_uid = megaport_port.port_2_sin.product_uid
-    ordered_vlan = 602
+    ordered_vlan          = 602
   }
 
   b_end = {

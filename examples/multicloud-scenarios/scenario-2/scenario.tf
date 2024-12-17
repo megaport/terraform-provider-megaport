@@ -32,7 +32,7 @@ resource "megaport_lag_port" "lag_port_1_sin" {
   location_id            = data.megaport_location.location_1.id
   contract_term_months   = 1
   marketplace_visibility = false
-  lag_count              = 2 
+  lag_count              = 2
   diversity_zone         = "red"
 }
 

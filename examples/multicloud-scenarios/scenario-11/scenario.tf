@@ -77,15 +77,15 @@ resource "megaport_vxc" "transit_vxc_sin_1" {
   product_name         = "MVE 1 SIN - Internet VXC"
   rate_limit           = 100
   contract_term_months = 1
-  
+
   a_end = {
     requested_product_uid = megaport_mve.mve_1_sin.product_uid
   }
-  
+
   b_end = {
     requested_product_uid = data.megaport_partner.internet_zone_red.product_uid
   }
-  
+
   b_end_partner_config = {
     partner = "transit"
   }
@@ -102,15 +102,15 @@ resource "megaport_vxc" "transit_vxc_sin_2" {
   product_name         = "MVE 2 SIN - Internet VXC"
   rate_limit           = 100
   contract_term_months = 1
-  
+
   a_end = {
     requested_product_uid = megaport_mve.mve_2_sin.product_uid
   }
-  
+
   b_end = {
     requested_product_uid = data.megaport_partner.internet_zone_blue.product_uid
   }
-  
+
   b_end_partner_config = {
     partner = "transit"
   }
@@ -247,7 +247,7 @@ resource "megaport_vxc" "google_vxc_sin_1" {
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid 
+    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid
   }
 
   b_end_partner_config = {
@@ -277,7 +277,7 @@ resource "megaport_vxc" "google_vxc_sin_2" {
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.google_port_2_sin.product_uid 
+    requested_product_uid = data.megaport_partner.google_port_2_sin.product_uid
   }
 
   b_end_partner_config = {

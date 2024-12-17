@@ -206,7 +206,7 @@ resource "megaport_vxc" "aws_vxc_2_sin" {
     requested_product_uid = megaport_mcr.mcr_2_sin.product_uid
   }
 
- a_end_partner_config = {
+  a_end_partner_config = {
     partner = "vrouter"
     vrouter_config = {
       interfaces = [
@@ -256,7 +256,7 @@ resource "megaport_vxc" "azure_vxc_sin_1" {
     azure_config = {
       port_choice = "primary"
       service_key = "<azure expressroute service key>"
-        peers = [{
+      peers = [{
         type             = "private"
         vlan             = 401
         peer_asn         = 65001
@@ -283,7 +283,7 @@ resource "megaport_vxc" "azure_vxc_2_sin" {
     azure_config = {
       port_choice = "secondary"
       service_key = "<azure expressroute service key>"
-        peers = [{
+      peers = [{
         type             = "private"
         vlan             = 401
         peer_asn         = 65001
@@ -311,7 +311,7 @@ resource "megaport_vxc" "google_vxc_sin_1" {
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid 
+    requested_product_uid = data.megaport_partner.google_port_1_sin.product_uid
   }
 
   b_end_partner_config = {
@@ -339,7 +339,7 @@ resource "megaport_vxc" "google_vxc_2_sin" {
   }
 
   b_end = {
-    requested_product_uid = data.megaport_partner.google_port_2_sin.product_uid 
+    requested_product_uid = data.megaport_partner.google_port_2_sin.product_uid
   }
 
   b_end_partner_config = {

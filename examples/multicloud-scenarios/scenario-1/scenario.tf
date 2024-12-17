@@ -46,7 +46,7 @@ resource "megaport_vxc" "aws_vxc_1_sin" {
 
   a_end = {
     requested_product_uid = megaport_port.port_1_sin.product_uid
-    ordered_vlan = 301
+    ordered_vlan          = 301
   }
 
   b_end = {
@@ -71,7 +71,7 @@ resource "megaport_vxc" "azure_vxc_1_sin" {
 
   a_end = {
     requested_product_uid = megaport_port.port_1_sin.product_uid
-    ordered_vlan = 401
+    ordered_vlan          = 401
   }
 
   b_end = {}
