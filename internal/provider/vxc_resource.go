@@ -4892,3 +4892,149 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 }
+
+func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Get current state
+	var plan, state vxcResourceModel
+	diags := diag.Diagnostics{}
+
+	if !req.Plan.Raw.IsNull() {
+		planDiags := req.Plan.Get(ctx, &plan)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+	if !req.State.Raw.IsNull() {
+		stateDiags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(stateDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// If VXC is not yet created, return
+	if !state.UID.IsNull() {
+		if !req.Plan.Raw.IsNull() {
+			var aEndCSP, bEndCSP bool
+			aEndStateObj := state.AEndConfiguration
+			bEndStateObj := state.BEndConfiguration
+			aEndStateConfig := &vxcEndConfigurationModel{}
+			bEndStateConfig := &vxcEndConfigurationModel{}
+			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
+			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			aEndPlanObj := plan.AEndConfiguration
+			bEndPlanObj := plan.BEndConfiguration
+			aEndPlanConfig := &vxcEndConfigurationModel{}
+			bEndPlanConfig := &vxcEndConfigurationModel{}
+			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
+			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
+			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
+			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			if aEndStateConfig.OrderedVLAN.IsUnknown() {
+				aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
+			}
+			if bEndStateConfig.OrderedVLAN.IsUnknown() {
+				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
+			}
+			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+			diags = append(diags, partnerConfigDiags...)
+			if !plan.AEndPartnerConfig.IsNull() {
+				if !aEndPartnerConfigModel.Partner.IsNull() {
+					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
+						aEndCSP = true
+					}
+				}
+			}
+			if state.AEndPartnerConfig.IsNull() {
+				if !plan.AEndPartnerConfig.IsNull() {
+					state.AEndPartnerConfig = plan.AEndPartnerConfig
+				} else {
+					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) && aEndCSP {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
+				}
+			}
+
+			if aEndStateConfig.RequestedProductUID.IsNull() {
+				if aEndPlanConfig.RequestedProductUID.IsNull() {
+					aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+					aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+				} else {
+					aEndStateConfig.RequestedProductUID = aEndPlanConfig.RequestedProductUID
+				}
+			} else if aEndCSP {
+				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
+					diags.AddWarning("VXC A-End product UID is from a partner port, therefore it will not be changed.", "VXC A-End product UID is from a CSP partner port, therefore it will not be changed.")
+				}
+				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
+			}
+
+			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+			diags = append(diags, partnerConfigDiags...)
+			if !plan.BEndPartnerConfig.IsNull() {
+				if !bEndPartnerConfigModel.Partner.IsNull() {
+					if !bEndPartnerConfigModel.Partner.IsNull() {
+						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
+							bEndCSP = true
+						}
+					}
+				}
+			}
+
+			if state.BEndPartnerConfig.IsNull() {
+				if !plan.BEndPartnerConfig.IsNull() {
+					state.BEndPartnerConfig = plan.BEndPartnerConfig
+				} else {
+					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+				}
+			} else {
+				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) && bEndCSP {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
+				}
+			}
+
+			if bEndStateConfig.RequestedProductUID.IsNull() {
+				if bEndPlanConfig.RequestedProductUID.IsNull() {
+					bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+					bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
+				} else {
+					bEndStateConfig.RequestedProductUID = bEndPlanConfig.RequestedProductUID
+				}
+			} else if bEndCSP {
+				if !bEndPlanConfig.RequestedProductUID.IsNull() && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.CurrentProductUID) {
+					diags.AddWarning("VXC B-End product UID is from a partner port, therefore it will not be changed.", "VXC B-End product UID is from a CSP partner port, therefore it will not be changed.")
+				}
+				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
+			}
+
+			newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
+			newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			plan.AEndConfiguration = newPlanAEndObj
+			plan.BEndConfiguration = newPlanBEndObj
+			newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
+			newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
+			diags = append(diags, aEndDiags...)
+			diags = append(diags, bEndDiags...)
+			state.AEndConfiguration = newStateAEndObj
+			state.BEndConfiguration = newStateBEndObj
+			req.Plan.Set(ctx, &plan)
+			resp.Plan.Set(ctx, &plan)
+			stateDiags := req.State.Set(ctx, &state)
+			diags = append(diags, stateDiags...)
+		}
+	}
+
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+}
