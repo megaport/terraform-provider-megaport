@@ -68,7 +68,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			"environment": schema.StringAttribute{
 				Optional: true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("production", "staging"),
+					stringvalidator.OneOf("production", "staging", "development"),
 				},
 			},
 			"access_key": schema.StringAttribute{
@@ -199,6 +199,8 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		megaportGoEnv = megaport.EnvironmentStaging
 	} else if environment == "production" {
 		megaportGoEnv = megaport.EnvironmentProduction
+	} else if environment == "development" {
+		megaportGoEnv = megaport.EnvironmentDevelopment
 	} else {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("environment"),
