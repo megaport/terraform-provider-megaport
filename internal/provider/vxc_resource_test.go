@@ -16,7 +16,7 @@ type VXCMVEProviderTestSuite ProviderTestSuite
 const (
 	VXCLocationOne   = "NextDC M1"
 	VXCLocationTwo   = "Global Switch Sydney West"
-	VXCLocationThree = "5GNetworks Data Center"
+	VXCLocationThree = "5GN Melbourne Data Centre (MDC)"
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
