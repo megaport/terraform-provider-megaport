@@ -3466,16 +3466,16 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	var aEndPartnerChange, bEndPartnerChange bool
 
 	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
+	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+		aEndPartnerChange = true
+	}
 	if state.AEndPartnerConfig.IsNull() {
-		if !plan.AEndPartnerConfig.IsNull() && !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-			aEndPartnerChange = true
-		}
 		state.AEndPartnerConfig = plan.AEndPartnerConfig
 	}
+	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+		bEndPartnerChange = true
+	}
 	if state.BEndPartnerConfig.IsNull() {
-		if !plan.BEndPartnerConfig.IsNull() && !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-			bEndPartnerChange = true
-		}
 		state.BEndPartnerConfig = plan.BEndPartnerConfig
 	}
 
@@ -3607,7 +3607,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerChange {
+	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerChange && !aEndCSP {
 		aPartnerConfig := aEndPartnerPlan
 		switch aEndPartnerPlan.Partner.ValueString() {
 		case "transit":
@@ -3947,7 +3947,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerChange {
+	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerChange && !bEndCSP {
 		bPartnerConfig := bEndPartnerPlan
 		switch bEndPartnerPlan.Partner.ValueString() {
 		case "transit":
