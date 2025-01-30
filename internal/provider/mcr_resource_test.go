@@ -46,6 +46,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+
 					prefix_filter_lists = [
 					{
 						description     = "%s"
@@ -91,6 +96,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
@@ -153,6 +160,10 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					location_id              = data.megaport_location.test_location.id
 					contract_term_months     = 12
 					cost_centre              = "%s"
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
 
 					prefix_filter_lists = [
 					{
@@ -217,6 +228,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
@@ -269,6 +282,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
+
 					prefix_filter_lists = [{
 						description     = "%s"
 						address_family  = "IPv4"
@@ -288,6 +306,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
@@ -359,6 +379,11 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 					asn = 65000
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
 				  }
 				  `, MCRTestLocation, mcrName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -367,6 +392,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
@@ -410,6 +437,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					contract_term_months     = 12
 					cost_centre              = "%s"
 					asn = 65000
+
+					resource_tags = {"key1updated" = "value1updated", "key2updated" = "value2updated"}
 				  }
 				  `, MCRTestLocation, mcrNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -418,6 +447,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),

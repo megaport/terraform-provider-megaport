@@ -86,6 +86,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
                     contract_term_months = 12
 					cost_centre = "%s"
 
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+
                     a_end = {
                         requested_product_uid = megaport_port.port_1.product_uid
 						ordered_vlan = 100
@@ -130,6 +135,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
@@ -195,6 +202,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					contract_term_months = 12
 					cost_centre = "%s"
 
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
 						ordered_vlan = 100
@@ -239,9 +251,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "101"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "301"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key2", "value2"),
 				),
 			},
-			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN/Inner VLAN
+			// Update Test 2 - Change Name/Cost Centre/Rate Limit/Contract Term/VLAN/Inner VLAN/Resource Tags
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
@@ -282,6 +296,11 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			        rate_limit = 600
 					contract_term_months = 24
 					cost_centre = "%s"
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
 
 			        a_end = {
 			            requested_product_uid = megaport_port.port_3.product_uid
@@ -328,6 +347,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vlan", "201"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "400"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "401"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key2updated", "value2updated"),
 				),
 			},
 		},
@@ -801,6 +822,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         requested_product_uid = data.megaport_partner.aws_port.product_uid
                     }
 
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+
                     b_end_partner_config = {
                         partner = "aws"
                         aws_config = {
@@ -839,6 +865,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                     rate_limit = 200
                     contract_term_months = 1
 
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+
                     a_end = {
                       requested_product_uid = megaport_mcr.mcr.product_uid
                       ordered_vlan = 0
@@ -857,7 +888,17 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                   `, VXCLocationOne, VXCLocationTwo, mcrName, vxcName1, vxcName1, vxcName2, vxcName3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "2191"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.vlan", "2191"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "b_end_partner_config.azure_config.service_key", vxcName3),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "a_end.vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "resource_tags.key2", "value2"),
 				),
 			},
 			// ImportState testing
@@ -1012,11 +1053,19 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						owner_account   = "684021030471"
 					  }
 					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
 				  }
                   `, VXCLocationOne, VXCLocationTwo, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key2", "value2"),
 				),
 			},
 			// ImportState testing
@@ -1141,11 +1190,19 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						owner_account   = "684021030471"
 					  }
 					}
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
 				  }
                   `, VXCLocationOne, VXCLocationTwo, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key2updated", "value2updated"),
 				),
 			},
 		},
@@ -1226,6 +1283,11 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					b_end = {
 					  requested_product_uid = megaport_lag_port.lag_port.product_uid
 					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
 				  }
 
 				  resource "megaport_vxc" "mcr_vxc" {
@@ -1241,6 +1303,11 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					b_end = {
 					  requested_product_uid = megaport_mcr.mcr.product_uid
 					  ordered_vlan = 181
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
 					}
 				  }
 
@@ -1315,6 +1382,10 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "resource_tags.key2", "value2"),
+					resource.TestCheckResourceAttr("megaport_vxc.mcr_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mcr_vxc", "resource_tags.key2", "value2"),
 				),
 			},
 			// ImportState testing
@@ -1945,6 +2016,11 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 						owner_account = "123456789012"
 					  }
 					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
 				  }
 
                   `, VXCLocationOne, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
@@ -1952,6 +2028,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key2", "value2"),
 				),
 			},
 			// ImportState testing
@@ -2051,6 +2129,10 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 						owner_account = "123456789012"
 					  }
 					}
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
 				  }
 
                   `, VXCLocationOne, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
@@ -2058,6 +2140,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", "99"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "resource_tags.key2updated", "value2updated"),
 				),
 			},
 		},
