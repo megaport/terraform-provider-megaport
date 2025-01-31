@@ -29,7 +29,7 @@ resource "megaport_lag_port" "lag_port" {
 
 ### Required
 
-- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36.
+- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `lag_count` (Number) The number of LAG ports. Valid values are between 1 and 8.
 - `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace.
