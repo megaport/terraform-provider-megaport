@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -304,4 +305,10 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 		NewMVEResource,
 		NewVXCResource,
 	}
+}
+
+func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, diag.Diagnostics) {
+	tags := map[string]string{}
+	diags := in.ElementsAs(ctx, &tags, false)
+	return tags, diags
 }

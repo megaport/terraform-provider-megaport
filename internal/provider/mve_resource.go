@@ -79,6 +79,8 @@ type mveResourceModel struct {
 
 	NetworkInterfaces types.List `tfsdk:"vnics"`
 	AttributeTags     types.Map  `tfsdk:"attribute_tags"`
+
+	ResourceTags types.Map `tfsdk:"resource_tags"`
 }
 
 // mveNetworkInterfaceModel represents a vNIC.
@@ -122,7 +124,7 @@ type vendorConfigModel struct {
 	SecretKey          types.String `tfsdk:"secret_key"`
 }
 
-func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) diag.Diagnostics {
+func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
@@ -180,6 +182,14 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE) di
 		orm.AttributeTags = tags
 	} else {
 		orm.AttributeTags = types.MapNull(types.StringType)
+	}
+
+	if len(tags) > 0 {
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		apiDiags = append(apiDiags, tagDiags...)
+		orm.ResourceTags = resourceTags
+	} else {
+		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 
 	vnics := []types.Object{}
@@ -566,6 +576,14 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					listplanmodifier.RequiresReplace(),
 				},
 			},
+			"resource_tags": schema.MapAttribute{
+				Description: "The resource tags associated with the product.",
+				Optional:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"vendor_config": schema.SingleNestedAttribute{
 				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. This field cannot be changed after the MVE is created and if it is modified, the MVE will be deleted and re-created. Imported MVEs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.",
 				Required:    true,
@@ -705,6 +723,15 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      waitForTime,
 	}
 
+	if !plan.ResourceTags.IsNull() {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		mveReq.ResourceTags = tagMap
+	}
+
 	if plan.VendorConfig.IsNull() {
 		resp.Diagnostics.AddError(
 			"vendor config required", "vendor config required",
@@ -761,8 +788,17 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, createdID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for newly created MVE",
+			"Could not read tags for newly created MVE with ID "+createdID+": "+err.Error(),
+		)
+		return
+	}
+
 	// update the plan with the MVE info
-	apiDiags := plan.fromAPIMVE(ctx, mve)
+	apiDiags := plan.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -809,7 +845,17 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	apiDiags := state.fromAPIMVE(ctx, mve)
+	// Get tags
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for MVE",
+			"Could not read tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	// Set refreshed state
@@ -881,7 +927,32 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIMVE(ctx, updatedMVE)
+	if !plan.ResourceTags.Equal(state.ResourceTags) {
+		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
+		resp.Diagnostics.Append(tagDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), tagMap)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating tags for MVE",
+				"Could not update tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading tags for updated MVE",
+			"Could not read tags for updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	apiDiags := state.fromAPIMVE(ctx, updatedMVE, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
