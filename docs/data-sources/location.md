@@ -3,18 +3,22 @@
 page_title: "megaport_location Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' field to identify a specific data center.
+  Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' or 'site_code' field to identify a specific data center. Please note that names and site_codes of data centers are subject to change, and the most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations
 ---
 
 # megaport_location (Data Source)
 
-Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' field to identify a specific data center.
+Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' or 'site_code' field to identify a specific data center. Please note that names and site_codes of data centers are subject to change, and the most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations
 
 ## Example Usage
 
 ```terraform
-data "megaport_location" "bne_nxt1" {
+data "megaport_location" "my_location_1" {
   name = "NextDC B1"
+}
+
+data "megaport_location" "my_location_2" {
+  site_code = "bne_nxt1"
 }
 ```
 
