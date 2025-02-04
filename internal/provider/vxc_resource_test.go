@@ -17,6 +17,10 @@ const (
 	VXCLocationOne   = "NextDC M1"
 	VXCLocationTwo   = "Global Switch Sydney West"
 	VXCLocationThree = "5GN Melbourne Data Centre (MDC)"
+
+	VXCLocationID1 = 4  // "NextDC M1"
+	VXCLocationID2 = 3  // "Global Switch Sydney West"
+	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -50,7 +54,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
                     product_name  = "%s"
@@ -103,7 +107,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 301
                     }
                   }
-                  `, VXCLocationOne, portName1, portName2, portName3, portName4, vxcName, costCentreName),
+                  `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -164,7 +168,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
 			        product_name  = "%s"
@@ -219,7 +223,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 301
 			        }
 			      }
-			      `, VXCLocationOne, portName1, portName2, portName3, portName4, vxcName, costCentreName),
+			      `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -259,7 +263,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
 			        product_name  = "%s"
@@ -314,7 +318,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 401
 			        }
 			      }
-			      `, VXCLocationOne, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
+			      `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -369,7 +373,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
                     product_name  = "%s"
@@ -401,7 +405,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 						ordered_vlan = 101
                     }
                   }
-                  `, VXCLocationOne, portName1, portName2, vxcName, costCentreName),
+                  `, VXCLocationID1, portName1, portName2, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -447,7 +451,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
                     product_name  = "%s"
@@ -477,7 +481,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
                         requested_product_uid = megaport_port.port_2.product_uid
                     }
                   }
-                  `, VXCLocationOne, portName1, portName2, vxcName, costCentreName),
+                  `, VXCLocationID1, portName1, portName2, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -502,7 +506,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_port" "port_1" {
 			        product_name  = "%s"
@@ -536,7 +540,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 						ordered_vlan = -1
 			        }
 			      }
-			      `, VXCLocationOne, portName1, portName2, vxcNameNew, costCentreNew),
+			      `, VXCLocationID1, portName1, portName2, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -574,11 +578,11 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
@@ -623,7 +627,7 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, costCentreName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -655,11 +659,11 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
@@ -703,7 +707,7 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, costCentreName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -715,11 +719,11 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
@@ -763,7 +767,7 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, costCentreName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -786,11 +790,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-                    name    = "%s"
+                    id    = %d
                   }
 
                   data "megaport_location" "loc2" {
-                    name = "%s"
+                    id = %d
                   }
 
                   data "megaport_partner" "aws_port" {
@@ -885,7 +889,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         }
                     }
                   }
-                  `, VXCLocationOne, VXCLocationTwo, mcrName, vxcName1, vxcName1, vxcName2, vxcName3),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, vxcName3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -952,11 +956,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
@@ -1056,7 +1060,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						"key2" = "value2"
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1089,11 +1093,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
@@ -1193,7 +1197,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						"key2updated" = "value2updated"
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1223,15 +1227,15 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc3" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
@@ -1375,7 +1379,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, VXCLocationThree, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -1461,11 +1465,11 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  resource "megaport_port" "port" {
@@ -1529,7 +1533,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					  partner = "transit"
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, costCentreName, mveName, mveName, mveName, transitVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
@@ -1585,11 +1589,11 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  resource "megaport_port" "port" {
@@ -1708,7 +1712,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCAEndInnerVLAN)),
@@ -1786,11 +1790,11 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "loc2" {
-					name = "%s"
+					id = %d
 				  }
 
 				  resource "megaport_port" "port" {
@@ -1909,7 +1913,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationOne, VXCLocationTwo, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCAEndInnerVLANNew)),
@@ -1940,7 +1944,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
 				  data "megaport_location" "syd_gs" {
@@ -2020,7 +2024,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationOne, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2053,18 +2057,18 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
-					name = "%s"
+					id = %d
 				  }
 
-				  data "megaport_location" "syd_gs" {
-					name = "Global Switch Sydney West"
+				  data "megaport_location" "loc2" {
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
 					company_name = "AWS"
 					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
-					location_id  = data.megaport_location.syd_gs.id
+					location_id  = data.megaport_location.loc2.id
 				  }
 
 				  resource "megaport_port" "port" {
@@ -2132,7 +2136,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationOne, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),

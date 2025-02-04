@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const LagPortTestLocation = "NextDC B1"
+const (
+	LagPortTestLocation      = "NextDC B1"
+	LagPortTestLocationIDNum = 5 // "NextDC B1"
+)
 
 type LagPortProviderTestSuite ProviderTestSuite
 
@@ -29,7 +32,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_lag_port" "lag_port" {
 			        product_name  = "%s"
@@ -43,7 +46,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 						"key1" = "value1"
 						"key2" = "value2"
 					}
-			      }`, LagPortTestLocation, portName, costCentreName),
+			      }`, LagPortTestLocationIDNum, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
@@ -86,7 +89,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 					resource "megaport_lag_port" "lag_port" {
 			        product_name  = "%s"
@@ -100,7 +103,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 						"key1updated" = "value1updated"
 						"key2updated" = "value2updated"
 			 	  	}
-			      }`, LagPortTestLocation, portNameNew, costCentreNameNew),
+			      }`, LagPortTestLocationIDNum, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),

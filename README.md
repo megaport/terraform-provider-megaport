@@ -87,7 +87,7 @@ Megaport users are also bound by the [Acceptable Use Policy](https://www.megapor
 
 Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider. 
 
-They can be retrieved by searching either by `name` or by `site_code` similar to the examples below:
+They can be retrieved by searching either by `id`, `name`, or by `site_code` similar to the examples below:
 
 ```terraform
 data "megaport_location" "my_location_1" {
@@ -96,6 +96,10 @@ data "megaport_location" "my_location_1" {
 
 data "megaport_location" "my_location_2" {
   site_code = "bne_nxt1"
+}
+
+data "megaport_location" "my_location_3" {
+  id = 5
 }
 ```
 
