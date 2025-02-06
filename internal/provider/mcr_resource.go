@@ -1004,6 +1004,18 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 						return
 					}
 				}
+			} else {
+				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
+				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
+				_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
+					MCRID:            state.UID.ValueString(),
+					PrefixFilterList: *apiPrefixFilterList,
+				})
+				if createErr != nil {
+					mux.Lock()
+					errs = append(errs, createErr)
+					mux.Unlock()
+				}
 			}
 		}(planModel)
 	}
@@ -1078,15 +1090,19 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
 	wg3 := sync.WaitGroup{}
+
 	for _, l := range prefixFilterLists {
 		wg3.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg3.Done()
+			// Get a token from the rate limiter to apply rate limiting
+			rateLimiter.GetToken()
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
 				errs = append(errs, err)
 				mux.Unlock()
+				return
 			}
 			mux.Lock()
 			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
