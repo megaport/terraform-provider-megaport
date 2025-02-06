@@ -764,15 +764,33 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	wg := sync.WaitGroup{}
 	mux := sync.Mutex{}
 	errs := []error{}
+
+	// Create a channel with a size of 10
+	rateLimitCh := make(chan struct{}, 10)
+
+	// Goroutine to push a struct into the channel 10 times per second
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			for i := 0; i < 10; i++ {
+				rateLimitCh <- struct{}{}
+			}
+		}
+	}()
+
 	for _, l := range prefixFilterLists {
 		wg.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg.Done()
+			// Read from the channel to apply rate limiting
+			<-rateLimitCh
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
 				errs = append(errs, err)
 				mux.Unlock()
+				return
 			}
 			mux.Lock()
 			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
@@ -943,10 +961,26 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	wg := sync.WaitGroup{}
 	mux := sync.Mutex{}
 	errs := []error{}
+
+	// Create a channel with a size of 10
+	rateLimitCh := make(chan struct{}, 10)
+	// Goroutine to push a struct into the channel 10 times per second
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			for i := 0; i < 10; i++ {
+				rateLimitCh <- struct{}{}
+			}
+		}
+	}()
+
 	for _, planModel := range planPrefixFilterLists {
 		wg.Add(1)
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
+			// Read from the channel to apply rate limiting
+			<-rateLimitCh
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
 				// Check if there are any changes to the prefix filter list, if so, update.
@@ -958,57 +992,65 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 						mux.Lock()
 						errs = append(errs, modifyErr)
 						mux.Unlock()
+						return
 					}
-				}
-				// If the prefix filter list does not exist in the state, create it.
-			} else {
-				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
-				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
-				_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
-					MCRID:            state.UID.ValueString(),
-					PrefixFilterList: *apiPrefixFilterList,
-				})
-				if createErr != nil {
-					mux.Lock()
-					errs = append(errs, createErr)
-					mux.Unlock()
 				}
 			}
 		}(planModel)
 	}
 	wg.Wait()
+
 	if len(errs) > 0 {
 		var errStr string
 		for _, err := range errs {
 			errStr += err.Error() + ", "
 		}
 		resp.Diagnostics.AddError(
-			"Error Updating Prefix Filter Lists",
-			"Could not update prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
+			"Error Modifying Prefix Filter Lists",
+			"Could not modify prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
 		)
 		return
 	}
 
 	wg2 := sync.WaitGroup{}
+	mux2 := sync.Mutex{}
+	errs2 := []error{}
+
+	// Create a channel with a size of 10 for delete operations
+	deleteRateLimitCh := make(chan struct{}, 10)
+	// Goroutine to push a struct into the channel 10 times per second for delete operations
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			for i := 0; i < 10; i++ {
+				deleteRateLimitCh <- struct{}{}
+			}
+		}
+	}()
+
 	for _, stateModel := range statePrefixFilterLists {
 		wg2.Add(1)
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
+			// Read from the channel to apply rate limiting
+			<-deleteRateLimitCh
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
 				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
 				if deleteErr != nil {
-					mux.Lock()
-					errs = append(errs, deleteErr)
-					mux.Unlock()
+					mux2.Lock()
+					errs2 = append(errs2, deleteErr)
+					mux2.Unlock()
 				}
 			}
 		}(stateModel)
 	}
 	wg2.Wait()
-	if len(errs) > 0 {
+
+	if len(errs2) > 0 {
 		var errStr string
-		for _, err := range errs {
+		for _, err := range errs2 {
 			errStr += err.Error() + ", "
 		}
 		resp.Diagnostics.AddError(
