@@ -111,6 +111,36 @@ type mcrPrefixListEntryModel struct {
 	Le     types.Int64  `tfsdk:"le"`
 }
 
+// RateLimiter is a custom type that contains a channel for rate limiting
+type RateLimiter struct {
+	rateLimitCh chan struct{}
+}
+
+// NewRateLimiter initializes a new RateLimiter with the given burst amount and refill speed
+func NewRateLimiter(burstAmount int, refillSpeed time.Duration) *RateLimiter {
+	rl := &RateLimiter{
+		rateLimitCh: make(chan struct{}, burstAmount),
+	}
+
+	// Start a goroutine to refill the channel at the specified rate
+	go func() {
+		ticker := time.NewTicker(refillSpeed)
+		defer ticker.Stop()
+		for range ticker.C {
+			for i := 0; i < burstAmount; i++ {
+				rl.rateLimitCh <- struct{}{}
+			}
+		}
+	}()
+
+	return rl
+}
+
+// GetToken blocks until a token is available in the rate limiter channel
+func (rl *RateLimiter) GetToken() {
+	<-rl.rateLimitCh
+}
+
 // fromAPIMCR maps the API MCR response to the resource schema.
 func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
@@ -765,26 +795,15 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	mux := sync.Mutex{}
 	errs := []error{}
 
-	// Create a channel with a size of 10
-	rateLimitCh := make(chan struct{}, 10)
-
-	// Goroutine to push a struct into the channel 10 times per second
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for range ticker.C {
-			for i := 0; i < 10; i++ {
-				rateLimitCh <- struct{}{}
-			}
-		}
-	}()
+	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds
+	rateLimiter := NewRateLimiter(10, 100*time.Millisecond)
 
 	for _, l := range prefixFilterLists {
 		wg.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg.Done()
-			// Read from the channel to apply rate limiting
-			<-rateLimitCh
+			// Get a token from the rate limiter to apply rate limiting
+			rateLimiter.GetToken()
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
@@ -797,6 +816,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			mux.Unlock()
 		}(l)
 	}
+
 	wg.Wait()
 	if len(errs) > 0 {
 		var errStr string
@@ -962,25 +982,14 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	mux := sync.Mutex{}
 	errs := []error{}
 
-	// Create a channel with a size of 10
-	rateLimitCh := make(chan struct{}, 10)
-	// Goroutine to push a struct into the channel 10 times per second
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for range ticker.C {
-			for i := 0; i < 10; i++ {
-				rateLimitCh <- struct{}{}
-			}
-		}
-	}()
+	rateLimiter := NewRateLimiter(10, 100*time.Millisecond)
 
 	for _, planModel := range planPrefixFilterLists {
 		wg.Add(1)
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
-			// Read from the channel to apply rate limiting
-			<-rateLimitCh
+			// Get a token from the rate limiter to apply rate limiting
+			rateLimiter.GetToken()
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
 				// Check if there are any changes to the prefix filter list, if so, update.
@@ -1016,25 +1025,15 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	mux2 := sync.Mutex{}
 	errs2 := []error{}
 
-	// Create a channel with a size of 10 for delete operations
-	deleteRateLimitCh := make(chan struct{}, 10)
-	// Goroutine to push a struct into the channel 10 times per second for delete operations
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for range ticker.C {
-			for i := 0; i < 10; i++ {
-				deleteRateLimitCh <- struct{}{}
-			}
-		}
-	}()
+	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
+	deleteRateLimiter := NewRateLimiter(10, 100*time.Millisecond)
 
 	for _, stateModel := range statePrefixFilterLists {
 		wg2.Add(1)
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
-			// Read from the channel to apply rate limiting
-			<-deleteRateLimitCh
+			// Get a token from the rate limiter to apply rate limiting
+			deleteRateLimiter.GetToken()
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
 				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
