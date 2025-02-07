@@ -817,12 +817,14 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		go func(list *megaport.PrefixFilterList) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			if !rateLimiter.GetToken() {
-				mux.Lock()
-				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
-				mux.Unlock()
-				return
+
+			for {
+				if rateLimiter.GetToken() {
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
 			}
+
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
