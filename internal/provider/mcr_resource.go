@@ -1027,6 +1027,18 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 						mux.Unlock()
 					}
 				}
+			} else {
+				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
+				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
+				_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
+					MCRID:            state.UID.ValueString(),
+					PrefixFilterList: *apiPrefixFilterList,
+				})
+				if createErr != nil {
+					mux.Lock()
+					errs = append(errs, createErr)
+					mux.Unlock()
+				}
 			}
 		}(planModel)
 	}
