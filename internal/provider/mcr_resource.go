@@ -809,12 +809,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
 
-			select {
-			case <-rateLimiter.rateLimitCh:
-				break
-			default:
-				time.Sleep(5 * time.Millisecond)
-			}
+			<-rateLimiter.rateLimitCh
 
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
@@ -1001,12 +996,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			select {
-			case <-rateLimiter.rateLimitCh:
-				break
-			default:
-				time.Sleep(5 * time.Millisecond)
-			}
+			<-rateLimiter.rateLimitCh
 
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
@@ -1062,12 +1052,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		wg2.Add(1)
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
-			select {
-			case <-deleteRateLimiter.rateLimitCh:
-				break
-			default:
-				time.Sleep(5 * time.Millisecond)
-			}
+
+			<-deleteRateLimiter.rateLimitCh
 
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
@@ -1118,12 +1104,9 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		wg3.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg3.Done()
-			select {
-			case <-rateLimiter.rateLimitCh:
-				break
-			default:
-				time.Sleep(5 * time.Millisecond)
-			}
+
+			<-rateLimiter.rateLimitCh
+
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
