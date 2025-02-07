@@ -810,7 +810,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	errs := []error{}
 
 	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds
-	rateLimiter := NewRateLimiter(10, 100*time.Millisecond)
+	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, l := range prefixFilterLists {
 		wg.Add(1)
@@ -822,7 +822,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 				if rateLimiter.GetToken() {
 					break
 				}
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
@@ -1003,7 +1003,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	mux := sync.Mutex{}
 	errs := []error{}
 
-	rateLimiter := NewRateLimiter(10, 100*time.Millisecond)
+	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, planModel := range planPrefixFilterLists {
 		wg.Add(1)
@@ -1014,7 +1014,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				if rateLimiter.GetToken() {
 					break
 				}
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
@@ -1064,7 +1064,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	errs2 := []error{}
 
 	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
-	deleteRateLimiter := NewRateLimiter(10, 100*time.Millisecond)
+	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, stateModel := range statePrefixFilterLists {
 		wg2.Add(1)
@@ -1075,7 +1075,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				if deleteRateLimiter.GetToken() {
 					break
 				}
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 
 			// If the prefix filter list does not exist in the plan, delete it.
