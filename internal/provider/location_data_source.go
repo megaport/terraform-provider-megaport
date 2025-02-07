@@ -117,7 +117,7 @@ func (d *locationDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'name' field to identify a specific data center.",
+		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'id', 'name', or 'site_code' field to identify a specific data center. Please note that names and site_codes of data centers are subject to change (while IDs will remain constant), and the most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations",
 		Attributes: map[string]schema.Attribute{
 			"name": &schema.StringAttribute{
 				Description: "The name of the location.",
@@ -270,6 +270,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			},
 			"id": &schema.Int64Attribute{
 				Description: "The ID of the location.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"status": &schema.StringAttribute{
@@ -373,17 +374,27 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	if state.Name.IsNull() && state.SiteCode.IsNull() {
+	if state.ID.IsNull() && state.Name.IsNull() && state.SiteCode.IsNull() {
 		resp.Diagnostics.AddError(
-			"Either 'name' or 'site_code' must be set",
-			"Either 'name' or 'site_code' must be set",
+			"Either 'id', 'name', or 'site_code' must be set",
+			"Either 'id', 'name', or 'site_code' must be set",
 		)
 		return
 	}
 
 	// Prioritize 'name' over 'site_code'
 	var location *megaport.Location
-	if !state.Name.IsNull() {
+	if !state.ID.IsNull() {
+		l, err := d.client.LocationService.GetLocationByID(ctx, int(state.ID.ValueInt64()))
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to Get location by ID",
+				err.Error(),
+			)
+			return
+		}
+		location = l
+	} else if !state.Name.IsNull() {
 		l, err := d.client.LocationService.GetLocationByName(ctx, state.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(

@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const MCRTestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
+const (
+	MCRTestLocation      = "Digital Realty Silicon Valley SJC34 (SCL2)"
+	MCRTestLocationIDNum = 65 // "Digital Realty Silicon Valley SJC34 (SCL2)"
+)
 
 type MCRProviderTestSuite ProviderTestSuite
 
@@ -37,7 +40,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -89,7 +92,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocation, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -152,7 +155,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -221,7 +224,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocation, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -273,7 +276,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -300,7 +303,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocation, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
+				  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -328,7 +331,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -339,7 +342,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 
 					prefix_filter_lists = []
 				  }
-				  `, MCRTestLocation, mcrNameNew2, costCentreNameNew2),
+				  `, MCRTestLocationIDNum, mcrNameNew2, costCentreNameNew2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew2),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -370,7 +373,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -385,7 +388,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 						"key2" = "value2"
 					}
 				  }
-				  `, MCRTestLocation, mcrName, costCentreName),
+				  `, MCRTestLocationIDNum, mcrName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -428,7 +431,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				  resource "megaport_mcr" "mcr" {
 					product_name             = "%s"
@@ -440,7 +443,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 
 					resource_tags = {"key1updated" = "value1updated", "key2updated" = "value2updated"}
 				  }
-				  `, MCRTestLocation, mcrNameNew, costCentreNameNew),
+				  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),

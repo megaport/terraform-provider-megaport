@@ -8,6 +8,14 @@ import (
 )
 
 const (
+	LagPortTestLocationID    = 5
+	MCRTestLocationID        = 65
+	MVETestLocationID        = 65
+	SinglePortTestLocationID = 5
+	VXCLocationIDOne         = 4
+	VXCLocationIDTwo         = 3
+	VXCLocationIDThree       = 23
+
 	LagPortTestSiteCode      = "bne-nxt1"
 	MCRTestSiteCode          = "sjc-tx2"
 	MVETestSiteCode          = "sjc-tx2"
@@ -30,6 +38,17 @@ func TestLagPortLocation(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by Lag Port ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+					id = "%d"
+				}`, LagPortTestLocationID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", LagPortTestLocationID)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", LagPortTestLocationName),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", LagPortTestSiteCode),
+				),
+			},
 			// Search by Lag Port Name
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -59,6 +78,17 @@ func TestMCRLocation(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by MCR ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+					id = "%d"
+				}`, MCRTestLocationID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", MCRTestLocationID)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MCRTestLocationName),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MCRTestSiteCode),
+				),
+			},
 			// Search by MCR Name
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -88,6 +118,17 @@ func TestMVELocation(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by MVE ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+								id = "%d"
+							}`, MVETestLocationID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", MVETestLocationID)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MVETestLocationName),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MVETestSiteCode),
+				),
+			},
 			// Search by MVE Name
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -117,6 +158,17 @@ func TestSinglePortLocation(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by Single Port ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+								id = "%d"
+							}`, SinglePortTestLocationID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", SinglePortTestLocationID)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", SinglePortTestLocationName),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", SinglePortTestSiteCode),
+				),
+			},
 			// Search by Single Port Name
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -146,6 +198,17 @@ func TestVXCLocationOne(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by VXC ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+								id = "%d"
+							}`, VXCLocationIDOne),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDOne)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameOne),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationOneSiteCode),
+				),
+			},
 			// Search by VXC Name One
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -175,6 +238,17 @@ func TestVXCLocationTwo(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by VXC ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+								id = "%d"
+							}`, VXCLocationIDTwo),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDTwo)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameTwo),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationTwoSiteCode),
+				),
+			},
 			// Search by VXC Name Two
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
@@ -204,6 +278,17 @@ func TestVXCLocationThree(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Search by VXC ID
+			{
+				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
+								id = "%d"
+							}`, VXCLocationIDThree),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDThree)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameThree),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationThreeSiteCode),
+				),
+			},
 			// Search by VXC Name Three
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {

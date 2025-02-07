@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const MVETestLocation = "Digital Realty Silicon Valley SJC34 (SCL2)"
+const (
+	MVETestLocation      = "Digital Realty Silicon Valley SJC34 (SCL2)"
+	MVETestLocationIDNum = 65 // "Digital Realty Silicon Valley SJC34 (SCL2)"
+)
 
 type MVEArubaProviderTestSuite ProviderTestSuite
 type MVEVersaProviderTestSuite ProviderTestSuite
@@ -36,7 +39,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				
 				data "megaport_mve_images" "aruba" {
@@ -78,7 +81,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocation, mveName, costCentre, mveName, mveKey),
+                  }`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -124,7 +127,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 				data "megaport_mve_images" "aruba" {
   					vendor_filter = "Aruba"
@@ -164,7 +167,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocation, mveNameNew, costCentreNew, mveName, mveKey),
+                  }`, MVETestLocationIDNum, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -221,7 +224,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 
 				data "megaport_mve_images" "versa" {
@@ -265,7 +268,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocation, mveName, costCentre),
+                  }`, MVETestLocationIDNum, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -311,7 +314,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
-					name = "%s"
+					id = %d
 				}
 
 				data "megaport_mve_images" "versa" {
@@ -355,7 +358,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocation, mveNameNew, costCentreNew),
+                  }`, MVETestLocationIDNum, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),

@@ -81,4 +81,30 @@ The CLA clarifies the terms of the [Mozilla Public Licence 2.0](LICENSE) used to
 When you open a Pull Request, all authors of the contributions are required to comment on the Pull Request confirming
 acceptance of the CLA terms. Pull Requests can not be merged until this is complete.
 
-Megaport users are also bound by the [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy).	
+Megaport users are also bound by the [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy).
+
+## Datacenter Location Data Source
+
+Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider. 
+
+They can be retrieved by searching either by `id`, `name`, or by `site_code` similar to the examples below:
+
+```terraform
+data "megaport_location" "my_location_1" {
+  name = "NextDC B1"
+}
+
+data "megaport_location" "my_location_2" {
+  site_code = "bne_nxt1"
+}
+
+data "megaport_location" "my_location_3" {
+  id = 5
+}
+```
+
+Please note that datacenter locations can sometimes change their name or less frequently their site code in the API. 
+
+However, their numeric ID will always remain the same in the Megaport API. 
+
+The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v2/locations`
