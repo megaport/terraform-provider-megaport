@@ -111,24 +111,34 @@ type mcrPrefixListEntryModel struct {
 	Le     types.Int64  `tfsdk:"le"`
 }
 
-// RateLimiter is a custom type that contains a channel for rate limiting
 type RateLimiter struct {
 	rateLimitCh chan struct{}
+	burstSize   int
+	refillSpeed time.Duration
 }
 
-// NewRateLimiter initializes a new RateLimiter with the given burst amount and refill speed
-func NewRateLimiter(burstAmount int, refillSpeed time.Duration) *RateLimiter {
+func NewRateLimiter(burstSize int, refillSpeed time.Duration) *RateLimiter {
 	rl := &RateLimiter{
-		rateLimitCh: make(chan struct{}, burstAmount),
+		rateLimitCh: make(chan struct{}, burstSize),
+		burstSize:   burstSize,
+		refillSpeed: refillSpeed,
 	}
 
-	// Start a goroutine to refill the channel at the specified rate
+	// Fill initial tokens
+	for i := 0; i < burstSize; i++ {
+		rl.rateLimitCh <- struct{}{}
+	}
+
+	// Refill tokens at a fixed interval
 	go func() {
 		ticker := time.NewTicker(refillSpeed)
 		defer ticker.Stop()
 		for range ticker.C {
-			for i := 0; i < burstAmount; i++ {
-				rl.rateLimitCh <- struct{}{}
+			select {
+			case rl.rateLimitCh <- struct{}{}:
+				// Token added
+			default:
+				// Bucket full, skip
 			}
 		}
 	}()
@@ -136,9 +146,13 @@ func NewRateLimiter(burstAmount int, refillSpeed time.Duration) *RateLimiter {
 	return rl
 }
 
-// GetToken blocks until a token is available in the rate limiter channel
-func (rl *RateLimiter) GetToken() {
-	<-rl.rateLimitCh
+func (rl *RateLimiter) GetToken() bool {
+	select {
+	case <-rl.rateLimitCh:
+		return true
+	default:
+		return false
+	}
 }
 
 // fromAPIMCR maps the API MCR response to the resource schema.
@@ -803,7 +817,12 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		go func(list *megaport.PrefixFilterList) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			rateLimiter.GetToken()
+			if !rateLimiter.GetToken() {
+				mux.Lock()
+				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
+				mux.Unlock()
+				return
+			}
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
@@ -989,7 +1008,12 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			rateLimiter.GetToken()
+			if !rateLimiter.GetToken() {
+				mux.Lock()
+				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
+				mux.Unlock()
+				return
+			}
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
 				// Check if there are any changes to the prefix filter list, if so, update.
@@ -1001,24 +1025,12 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 						mux.Lock()
 						errs = append(errs, modifyErr)
 						mux.Unlock()
-						return
 					}
-				}
-			} else {
-				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
-				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
-				_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
-					MCRID:            state.UID.ValueString(),
-					PrefixFilterList: *apiPrefixFilterList,
-				})
-				if createErr != nil {
-					mux.Lock()
-					errs = append(errs, createErr)
-					mux.Unlock()
 				}
 			}
 		}(planModel)
 	}
+
 	wg.Wait()
 
 	if len(errs) > 0 {
@@ -1045,7 +1057,12 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			deleteRateLimiter.GetToken()
+			if !deleteRateLimiter.GetToken() {
+				mux.Lock()
+				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
+				mux.Unlock()
+				return
+			}
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
 				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
@@ -1096,7 +1113,12 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(list *megaport.PrefixFilterList) {
 			defer wg3.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			rateLimiter.GetToken()
+			if !rateLimiter.GetToken() {
+				mux.Lock()
+				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
+				mux.Unlock()
+				return
+			}
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()

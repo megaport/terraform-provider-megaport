@@ -2,7 +2,10 @@ package provider
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -464,4 +467,88 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 			},
 		},
 	})
+}
+
+func TestRateLimiter_SingleToken(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	if !rl.GetToken() {
+		t.Error("Failed to get first token")
+	}
+}
+
+func TestRateLimiter_BurstLimit(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	// Should get 5 tokens
+	for i := 0; i < 5; i++ {
+		if !rl.GetToken() {
+			t.Errorf("Failed to get token %d within burst limit", i+1)
+		}
+	}
+
+	// Should fail to get 6th token
+	if rl.GetToken() {
+		t.Error("Got token beyond burst limit")
+	}
+}
+
+func TestRateLimiter_Refill(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	// Use all tokens
+	for i := 0; i < 5; i++ {
+		rl.GetToken()
+	}
+
+	// Wait for refill
+	time.Sleep(150 * time.Millisecond)
+
+	// Should get a token after refill
+	if !rl.GetToken() {
+		t.Error("Failed to get token after refill")
+	}
+}
+
+func TestRateLimiter_Concurrent(t *testing.T) {
+	rl := NewRateLimiter(10, 100*time.Millisecond)
+	var wg sync.WaitGroup
+	successCount := int32(0)
+
+	// Launch 20 goroutines
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if rl.GetToken() {
+				atomic.AddInt32(&successCount, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Should have exactly 10 successes (burst limit)
+	if atomic.LoadInt32(&successCount) != 10 {
+		t.Errorf("Expected 10 successful token acquisitions, got %d", successCount)
+	}
+}
+
+func TestRateLimiter_RateOverTime(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+	start := time.Now()
+	count := 0
+
+	// Increase total time from 400ms to 450ms or 500ms
+	for time.Since(start) < 450*time.Millisecond {
+		if rl.GetToken() {
+			count++
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	expected := 9
+	if count != expected {
+		t.Errorf("Expected %d tokens over time period, got %d", expected, count)
+	}
 }
