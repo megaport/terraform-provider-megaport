@@ -472,7 +472,10 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 func TestRateLimiter_SingleToken(t *testing.T) {
 	rl := NewRateLimiter(5, 100*time.Millisecond)
 
-	if !rl.GetToken() {
+	select {
+	case <-rl.rateLimitCh:
+		// Successfully got token
+	default:
 		t.Error("Failed to get first token")
 	}
 }
@@ -482,14 +485,20 @@ func TestRateLimiter_BurstLimit(t *testing.T) {
 
 	// Should get 5 tokens
 	for i := 0; i < 5; i++ {
-		if !rl.GetToken() {
+		select {
+		case <-rl.rateLimitCh:
+			// Successfully got token
+		default:
 			t.Errorf("Failed to get token %d within burst limit", i+1)
 		}
 	}
 
 	// Should fail to get 6th token
-	if rl.GetToken() {
+	select {
+	case <-rl.rateLimitCh:
 		t.Error("Got token beyond burst limit")
+	default:
+		// Expected failure to get token
 	}
 }
 
@@ -498,14 +507,22 @@ func TestRateLimiter_Refill(t *testing.T) {
 
 	// Use all tokens
 	for i := 0; i < 5; i++ {
-		rl.GetToken()
+		select {
+		case <-rl.rateLimitCh:
+			// Token consumed
+		default:
+			t.Errorf("Failed to get token %d from initial burst", i)
+		}
 	}
 
 	// Wait for refill
 	time.Sleep(150 * time.Millisecond)
 
 	// Should get a token after refill
-	if !rl.GetToken() {
+	select {
+	case <-rl.rateLimitCh:
+		// Successfully got token after refill
+	default:
 		t.Error("Failed to get token after refill")
 	}
 }
@@ -520,8 +537,11 @@ func TestRateLimiter_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if rl.GetToken() {
+			select {
+			case <-rl.rateLimitCh:
 				atomic.AddInt32(&successCount, 1)
+			default:
+				// Failed to get token
 			}
 		}()
 	}
@@ -539,10 +559,12 @@ func TestRateLimiter_RateOverTime(t *testing.T) {
 	start := time.Now()
 	count := 0
 
-	// Increase total time from 400ms to 450ms or 500ms
 	for time.Since(start) < 450*time.Millisecond {
-		if rl.GetToken() {
+		select {
+		case <-rl.rateLimitCh:
 			count++
+		default:
+			// No token available
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

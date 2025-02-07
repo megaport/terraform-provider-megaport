@@ -146,15 +146,6 @@ func NewRateLimiter(burstSize int, refillSpeed time.Duration) *RateLimiter {
 	return rl
 }
 
-func (rl *RateLimiter) GetToken() bool {
-	select {
-	case <-rl.rateLimitCh:
-		return true
-	default:
-		return false
-	}
-}
-
 // fromAPIMCR maps the API MCR response to the resource schema.
 func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
@@ -818,10 +809,10 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
 
-			for {
-				if rateLimiter.GetToken() {
-					break
-				}
+			select {
+			case <-rateLimiter.rateLimitCh:
+				break
+			default:
 				time.Sleep(5 * time.Millisecond)
 			}
 
@@ -1010,12 +1001,13 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			for {
-				if rateLimiter.GetToken() {
-					break
-				}
+			select {
+			case <-rateLimiter.rateLimitCh:
+				break
+			default:
 				time.Sleep(5 * time.Millisecond)
 			}
+
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
 				// Check if there are any changes to the prefix filter list, if so, update.
@@ -1070,11 +1062,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		wg2.Add(1)
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
-			// Get a token from the rate limiter to apply rate limiting
-			for {
-				if deleteRateLimiter.GetToken() {
-					break
-				}
+			select {
+			case <-deleteRateLimiter.rateLimitCh:
+				break
+			default:
 				time.Sleep(5 * time.Millisecond)
 			}
 
@@ -1127,12 +1118,11 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		wg3.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg3.Done()
-			// Get a token from the rate limiter to apply rate limiting
-			for {
-				if rateLimiter.GetToken() {
-					break
-				}
-				time.Sleep(50 * time.Millisecond)
+			select {
+			case <-rateLimiter.rateLimitCh:
+				break
+			default:
+				time.Sleep(5 * time.Millisecond)
 			}
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
