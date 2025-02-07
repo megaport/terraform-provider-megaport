@@ -1008,11 +1008,11 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			if !rateLimiter.GetToken() {
-				mux.Lock()
-				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
-				mux.Unlock()
-				return
+			for {
+				if rateLimiter.GetToken() {
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
 			}
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
@@ -1069,12 +1069,13 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(stateModel *mcrPrefixFilterListModel) {
 			defer wg2.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			if !deleteRateLimiter.GetToken() {
-				mux.Lock()
-				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
-				mux.Unlock()
-				return
+			for {
+				if deleteRateLimiter.GetToken() {
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
 			}
+
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
 				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
@@ -1125,11 +1126,11 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		go func(list *megaport.PrefixFilterList) {
 			defer wg3.Done()
 			// Get a token from the rate limiter to apply rate limiting
-			if !rateLimiter.GetToken() {
-				mux.Lock()
-				errs = append(errs, fmt.Errorf("failed to acquire rate limiter token"))
-				mux.Unlock()
-				return
+			for {
+				if rateLimiter.GetToken() {
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
 			}
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
