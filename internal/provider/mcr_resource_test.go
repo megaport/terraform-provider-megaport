@@ -2,7 +2,10 @@ package provider
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -464,4 +467,110 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 			},
 		},
 	})
+}
+
+func TestRateLimiter_SingleToken(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	select {
+	case <-rl.rateLimitCh:
+		// Successfully got token
+	default:
+		t.Error("Failed to get first token")
+	}
+}
+
+func TestRateLimiter_BurstLimit(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	// Should get 5 tokens
+	for i := 0; i < 5; i++ {
+		select {
+		case <-rl.rateLimitCh:
+			// Successfully got token
+		default:
+			t.Errorf("Failed to get token %d within burst limit", i+1)
+		}
+	}
+
+	// Should fail to get 6th token
+	select {
+	case <-rl.rateLimitCh:
+		t.Error("Got token beyond burst limit")
+	default:
+		// Expected failure to get token
+	}
+}
+
+func TestRateLimiter_Refill(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+
+	// Use all tokens
+	for i := 0; i < 5; i++ {
+		select {
+		case <-rl.rateLimitCh:
+			// Token consumed
+		default:
+			t.Errorf("Failed to get token %d from initial burst", i)
+		}
+	}
+
+	// Wait for refill
+	time.Sleep(150 * time.Millisecond)
+
+	// Should get a token after refill
+	select {
+	case <-rl.rateLimitCh:
+		// Successfully got token after refill
+	default:
+		t.Error("Failed to get token after refill")
+	}
+}
+
+func TestRateLimiter_Concurrent(t *testing.T) {
+	rl := NewRateLimiter(10, 100*time.Millisecond)
+	var wg sync.WaitGroup
+	successCount := int32(0)
+
+	// Launch 20 goroutines
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case <-rl.rateLimitCh:
+				atomic.AddInt32(&successCount, 1)
+			default:
+				// Failed to get token
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Should have exactly 10 successes (burst limit)
+	if atomic.LoadInt32(&successCount) != 10 {
+		t.Errorf("Expected 10 successful token acquisitions, got %d", successCount)
+	}
+}
+
+func TestRateLimiter_RateOverTime(t *testing.T) {
+	rl := NewRateLimiter(5, 100*time.Millisecond)
+	start := time.Now()
+	count := 0
+
+	for time.Since(start) < 450*time.Millisecond {
+		select {
+		case <-rl.rateLimitCh:
+			count++
+		default:
+			// No token available
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	expected := 9
+	if count != expected {
+		t.Errorf("Expected %d tokens over time period, got %d", expected, count)
+	}
 }

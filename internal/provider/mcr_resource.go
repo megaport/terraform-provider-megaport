@@ -111,6 +111,41 @@ type mcrPrefixListEntryModel struct {
 	Le     types.Int64  `tfsdk:"le"`
 }
 
+type RateLimiter struct {
+	rateLimitCh chan struct{}
+	burstSize   int
+	refillSpeed time.Duration
+}
+
+func NewRateLimiter(burstSize int, refillSpeed time.Duration) *RateLimiter {
+	rl := &RateLimiter{
+		rateLimitCh: make(chan struct{}, burstSize),
+		burstSize:   burstSize,
+		refillSpeed: refillSpeed,
+	}
+
+	// Fill initial tokens
+	for i := 0; i < burstSize; i++ {
+		rl.rateLimitCh <- struct{}{}
+	}
+
+	// Refill tokens at a fixed interval
+	go func() {
+		ticker := time.NewTicker(refillSpeed)
+		defer ticker.Stop()
+		for range ticker.C {
+			select {
+			case rl.rateLimitCh <- struct{}{}:
+				// Token added
+			default:
+				// Bucket full, skip
+			}
+		}
+	}()
+
+	return rl
+}
+
 // fromAPIMCR maps the API MCR response to the resource schema.
 func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
@@ -764,21 +799,31 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	wg := sync.WaitGroup{}
 	mux := sync.Mutex{}
 	errs := []error{}
+
+	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds
+	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
+
 	for _, l := range prefixFilterLists {
 		wg.Add(1)
 		go func(list *megaport.PrefixFilterList) {
 			defer wg.Done()
+			// Get a token from the rate limiter to apply rate limiting
+
+			<-rateLimiter.rateLimitCh
+
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
 				errs = append(errs, err)
 				mux.Unlock()
+				return
 			}
 			mux.Lock()
 			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 			mux.Unlock()
 		}(l)
 	}
+
 	wg.Wait()
 	if len(errs) > 0 {
 		var errStr string
@@ -943,10 +988,16 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	wg := sync.WaitGroup{}
 	mux := sync.Mutex{}
 	errs := []error{}
+
+	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
+
 	for _, planModel := range planPrefixFilterLists {
 		wg.Add(1)
 		go func(planModel *mcrPrefixFilterListModel) {
 			defer wg.Done()
+			// Get a token from the rate limiter to apply rate limiting
+			<-rateLimiter.rateLimitCh
+
 			// Check if the prefix filter list exists in the state
 			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
 				// Check if there are any changes to the prefix filter list, if so, update.
@@ -960,7 +1011,6 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 						mux.Unlock()
 					}
 				}
-				// If the prefix filter list does not exist in the state, create it.
 			} else {
 				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
 				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
@@ -976,24 +1026,31 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			}
 		}(planModel)
 	}
+
 	wg.Wait()
+
 	if len(errs) > 0 {
 		var errStr string
 		for _, err := range errs {
 			errStr += err.Error() + ", "
 		}
 		resp.Diagnostics.AddError(
-			"Error Updating Prefix Filter Lists",
-			"Could not update prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
+			"Error Modifying Prefix Filter Lists",
+			"Could not modify prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
 		)
 		return
 	}
 
-	wg2 := sync.WaitGroup{}
+	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
+	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
+
 	for _, stateModel := range statePrefixFilterLists {
-		wg2.Add(1)
+		wg.Add(1)
 		go func(stateModel *mcrPrefixFilterListModel) {
-			defer wg2.Done()
+			defer wg.Done()
+
+			<-deleteRateLimiter.rateLimitCh
+
 			// If the prefix filter list does not exist in the plan, delete it.
 			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
 				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
@@ -1005,7 +1062,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			}
 		}(stateModel)
 	}
-	wg2.Wait()
+	wg.Wait()
+
 	if len(errs) > 0 {
 		var errStr string
 		for _, err := range errs {
@@ -1036,23 +1094,27 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 	detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
-	wg3 := sync.WaitGroup{}
+
 	for _, l := range prefixFilterLists {
-		wg3.Add(1)
+		wg.Add(1)
 		go func(list *megaport.PrefixFilterList) {
-			defer wg3.Done()
+			defer wg.Done()
+
+			<-rateLimiter.rateLimitCh
+
 			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
 			if err != nil {
 				mux.Lock()
 				errs = append(errs, err)
 				mux.Unlock()
+				return
 			}
 			mux.Lock()
 			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 			mux.Unlock()
 		}(l)
 	}
-	wg3.Wait()
+	wg.Wait()
 	if len(errs) > 0 {
 		var errStr string
 		for _, err := range errs {
