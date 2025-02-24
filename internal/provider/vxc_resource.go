@@ -2613,7 +2613,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -2625,6 +2624,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 							PeerType:           bgpConnection.PeerType.ValueString(),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -2764,7 +2766,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -2775,6 +2776,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -3315,7 +3319,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -3327,6 +3330,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 							PeerType:           bgpConnection.PeerType.ValueString(),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -3775,7 +3781,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -3786,6 +3791,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 							BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -3928,7 +3936,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -3940,6 +3947,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 							PeerType:           bgpConnection.PeerType.ValueString(),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
@@ -4120,7 +4130,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					for _, bgpConnection := range bgpConnections {
 						bgpToAppend := megaport.BgpConnectionConfig{
 							PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-							LocalAsn:           int(bgpConnection.LocalAsn.ValueInt64()),
 							LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 							PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
 							Password:           bgpConnection.Password.ValueString(),
@@ -4132,6 +4141,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 							ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 							AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 							PeerType:           bgpConnection.PeerType.ValueString(),
+						}
+						if !bgpConnection.LocalAsn.IsNull() {
+							bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 						}
 						if !bgpConnection.ImportWhitelist.IsNull() {
 							for _, prefixFilterList := range prefixFilterListRes {
