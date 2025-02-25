@@ -8,7 +8,6 @@ linters:
   enable:
     - durationcheck
     - errcheck
-    - exportloopref
     - forcetypeassert
     - gofmt
     - gosimple
@@ -18,12 +17,17 @@ linters:
     - nilerr
     - predeclared
     - staticcheck
-    - tenv
     - unconvert
     - unparam
     - unused
     - govet
     - sloglint
+    - copyloopvar
+    - usetesting
+
+output:
+  formats: colored-line-number
+
 linters-settings:
   sloglint:
     # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).

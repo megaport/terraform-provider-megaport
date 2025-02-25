@@ -487,6 +487,7 @@ Optional:
 - `export_whitelist` (String) The export whitelist of the BGP connection.
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection.
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -552,6 +553,7 @@ Optional:
 - `export_whitelist` (String) The export whitelist of the BGP connection.
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection.
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -716,6 +718,7 @@ Optional:
 - `export_whitelist` (String) The export whitelist of the BGP connection.
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection.
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -781,6 +784,7 @@ Optional:
 - `export_whitelist` (String) The export whitelist of the BGP connection.
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection.
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
