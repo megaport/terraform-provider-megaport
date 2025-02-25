@@ -19,6 +19,7 @@ permissions:
   contents: read
 
 jobs:
+  # Ensure project builds before running testing matrix
   build:
     name: Build
     runs-on: ubuntu-latest
