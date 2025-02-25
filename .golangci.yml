@@ -24,6 +24,12 @@ linters:
     - unused
     - govet
     - sloglint
+    - copyloopvar
+    - usetesting
+
+output:
+  format: colored-line-number
+  
 linters-settings:
   sloglint:
     # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
