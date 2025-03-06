@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -321,9 +322,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Validators: []validator.Int64{
 					int64validator.Between(1, 8),
 				},
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 			},
 			"lag_port_uids": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -511,8 +509,27 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// Populate the state with the port details
 	apiDiags := state.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
+
+	// Populate the LAG port UIDs
+	if len(port.LagPortUIDs) > 0 {
+		lagPortUIDsList := []attr.Value{}
+		for _, uid := range port.LagPortUIDs {
+			lagPortUIDsList = append(lagPortUIDsList, types.StringValue(uid))
+		}
+
+		lagPortUIDs, diags := types.ListValue(types.StringType, lagPortUIDsList)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		state.LagPortUIDs = lagPortUIDs
+	} else {
+		state.LagPortUIDs = types.ListNull(types.StringType)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -667,4 +684,40 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+func (r *lagPortResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	var plan, state lagPortResourceModel
+
+	// Get plan and state
+	if !req.Plan.Raw.IsNull() {
+		planDiags := req.Plan.Get(ctx, &plan)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if !req.State.Raw.IsNull() {
+		stateDiags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(stateDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// Only check if we have both state and plan
+	if !state.UID.IsNull() && !plan.LagCount.IsNull() {
+		plannedLagCount := int(plan.LagCount.ValueInt64())
+
+		// We have LagPortUIDs from the API - compare actual count
+		if !state.LagPortUIDs.IsNull() {
+			actualLagCount := len(state.LagPortUIDs.Elements())
+
+			// If counts don't match, we need replacement
+			if actualLagCount != plannedLagCount {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("lag_count"))
+			}
+		}
+	}
 }
