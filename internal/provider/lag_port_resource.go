@@ -91,6 +91,7 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
 	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
 	orm.Virtual = types.BoolValue(p.Virtual)
+	orm.LagCount = types.Int64Value(int64(p.LagCount))
 
 	if p.CreateDate != nil {
 		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
