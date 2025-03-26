@@ -73,6 +73,222 @@ var (
 	}
 )
 
+// ixResourceModel maps the resource schema data.
+type ixResourceModel struct {
+	RequestedProductUID types.String `tfsdk:"requested_product_uid"`
+	ProductUID          types.String `tfsdk:"product_uid"`
+	ProductID           types.Int64  `tfsdk:"product_id"`
+	ProductName         types.String `tfsdk:"product_name"`
+	NetworkServiceType  types.String `tfsdk:"network_service_type"`
+	ASN                 types.Int64  `tfsdk:"asn"`
+	MACAddress          types.String `tfsdk:"mac_address"`
+	RateLimit           types.Int64  `tfsdk:"rate_limit"`
+	VLAN                types.Int64  `tfsdk:"vlan"`
+	Shutdown            types.Bool   `tfsdk:"shutdown"`
+	PromoCode           types.String `tfsdk:"promo_code"`
+	CostCentre          types.String `tfsdk:"cost_centre"`
+	PublicGraph         types.Bool   `tfsdk:"public_graph"`
+	ReverseDNS          types.String `tfsdk:"reverse_dns"`
+	ProvisioningStatus  types.String `tfsdk:"provisioning_status"`
+	CreateDate          types.String `tfsdk:"create_date"`
+	Term                types.Int64  `tfsdk:"term"`
+	LocationID          types.Int64  `tfsdk:"location_id"`
+	AttributeTags       types.Map    `tfsdk:"attribute_tags"`
+	DeployDate          types.String `tfsdk:"deploy_date"`
+	SecondaryName       types.String `tfsdk:"secondary_name"`
+	IXPeerMacro         types.String `tfsdk:"ix_peer_macro"`
+	UsageAlgorithm      types.String `tfsdk:"usage_algorithm"`
+
+	Resources types.Object `tfsdk:"resources"`
+}
+
+type ixResourcesModel struct {
+	Interface      types.Object `tfsdk:"interface"`
+	BGPConnections types.List   `tfsdk:"bgp_connections"`
+	IPAddresses    types.List   `tfsdk:"ip_addresses"`
+	VPLSInterface  types.Object `tfsdk:"vpls_interface"`
+}
+
+type ixInterfaceModel struct {
+	Demarcation  types.String `tfsdk:"demarcation"`
+	LOATemplate  types.String `tfsdk:"loa_template"`
+	Media        types.String `tfsdk:"media"`
+	PortSpeed    types.Int64  `tfsdk:"port_speed"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	Up           types.Int64  `tfsdk:"up"`
+	Shutdown     types.Bool   `tfsdk:"shutdown"`
+}
+
+type ixBGPConnectionModel struct {
+	ASN               types.Int64  `tfsdk:"asn"`
+	CustomerASN       types.Int64  `tfsdk:"customer_asn"`
+	CustomerIPAddress types.String `tfsdk:"customer_ip_address"`
+	ISPASN            types.Int64  `tfsdk:"isp_asn"`
+	ISPIPAddress      types.String `tfsdk:"isp_ip_address"`
+	IXPeerPolicy      types.String `tfsdk:"ix_peer_policy"`
+	MaxPrefixes       types.Int64  `tfsdk:"max_prefixes"`
+	ResourceName      types.String `tfsdk:"resource_name"`
+	ResourceType      types.String `tfsdk:"resource_type"`
+}
+
+type ixIPAddressModel struct {
+	Address      types.String `tfsdk:"address"`
+	ResourceName types.String `tfsdk:"resource_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	Version      types.Int64  `tfsdk:"version"`
+	ReverseDNS   types.String `tfsdk:"reverse_dns"`
+}
+
+type ixVPLSInterfaceModel struct {
+	MACAddress    types.String `tfsdk:"mac_address"`
+	RateLimitMbps types.Int64  `tfsdk:"rate_limit_mbps"`
+	ResourceName  types.String `tfsdk:"resource_name"`
+	ResourceType  types.String `tfsdk:"resource_type"`
+	VLAN          types.Int64  `tfsdk:"vlan"`
+	Shutdown      types.Bool   `tfsdk:"shutdown"`
+}
+
+// fromAPI maps the API IX response to the resource schema.
+func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
+	// Map basic fields
+	orm.ProductUID = types.StringValue(ix.ProductUID)
+	orm.ProductID = types.Int64Value(int64(ix.ProductID))
+	orm.ProductName = types.StringValue(ix.ProductName)
+	orm.NetworkServiceType = types.StringValue(ix.NetworkServiceType)
+	orm.ASN = types.Int64Value(int64(ix.ASN))
+	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
+	orm.VLAN = types.Int64Value(int64(ix.VLAN))
+	orm.PromoCode = types.StringValue(ix.PromoCode)
+	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
+	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
+	orm.Term = types.Int64Value(int64(ix.Term))
+	orm.LocationID = types.Int64Value(int64(ix.LocationID))
+	orm.SecondaryName = types.StringValue(ix.SecondaryName)
+	orm.IXPeerMacro = types.StringValue(ix.IXPeerMacro)
+	orm.UsageAlgorithm = types.StringValue(ix.UsageAlgorithm)
+
+	if ix.PromoCode != "" {
+		orm.PromoCode = types.StringValue(ix.PromoCode)
+	} else {
+		orm.PromoCode = types.StringNull()
+	}
+
+	// Handle dates
+	if ix.CreateDate != nil {
+		orm.CreateDate = types.StringValue(ix.CreateDate.Format(time.RFC3339))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+
+	if ix.DeployDate != nil {
+		orm.DeployDate = types.StringValue(ix.DeployDate.Format(time.RFC3339))
+	} else {
+		orm.DeployDate = types.StringNull()
+	}
+
+	// Build a resources model
+	res := &ixResourcesModel{}
+
+	// Interface
+	if ix.Resources.Interface.ResourceType != "" {
+		iface := &ixInterfaceModel{
+			Demarcation:  types.StringValue(ix.Resources.Interface.Demarcation),
+			LOATemplate:  types.StringValue(ix.Resources.Interface.LOATemplate),
+			Media:        types.StringValue(ix.Resources.Interface.Media),
+			PortSpeed:    types.Int64Value(int64(ix.Resources.Interface.PortSpeed)),
+			ResourceName: types.StringValue(ix.Resources.Interface.ResourceName),
+			ResourceType: types.StringValue(ix.Resources.Interface.ResourceType),
+			Up:           types.Int64Value(int64(ix.Resources.Interface.Up)),
+			Shutdown:     types.BoolValue(ix.Resources.Interface.Shutdown),
+		}
+		ifObj, diags := types.ObjectValueFrom(ctx, interfaceAttrTypes, iface)
+		if diags.HasError() {
+			res.Interface = types.ObjectNull(interfaceAttrTypes)
+		} else {
+			res.Interface = ifObj
+		}
+	} else {
+		res.Interface = types.ObjectNull(interfaceAttrTypes)
+	}
+
+	// BGP Connections
+	if len(ix.Resources.BGPConnections) > 0 {
+		bgpModels := make([]ixBGPConnectionModel, 0, len(ix.Resources.BGPConnections))
+		for _, conn := range ix.Resources.BGPConnections {
+			bgpModels = append(bgpModels, ixBGPConnectionModel{
+				ASN:               types.Int64Value(int64(conn.ASN)),
+				CustomerASN:       types.Int64Value(int64(conn.CustomerASN)),
+				CustomerIPAddress: types.StringValue(conn.CustomerIPAddress),
+				ISPASN:            types.Int64Value(int64(conn.ISPASN)),
+				ISPIPAddress:      types.StringValue(conn.ISPIPAddress),
+				IXPeerPolicy:      types.StringValue(conn.IXPeerPolicy),
+				MaxPrefixes:       types.Int64Value(int64(conn.MaxPrefixes)),
+				ResourceName:      types.StringValue(conn.ResourceName),
+				ResourceType:      types.StringValue(conn.ResourceType),
+			})
+		}
+		bgpList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: bgpConnectionAttrTypes}, bgpModels)
+		if diags.HasError() {
+			res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
+		} else {
+			res.BGPConnections = bgpList
+		}
+	} else {
+		res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
+	}
+
+	// IP Addresses
+	if len(ix.Resources.IPAddresses) > 0 {
+		ipModels := make([]ixIPAddressModel, 0, len(ix.Resources.IPAddresses))
+		for _, addr := range ix.Resources.IPAddresses {
+			ipModels = append(ipModels, ixIPAddressModel{
+				Address:      types.StringValue(addr.Address),
+				ResourceName: types.StringValue(addr.ResourceName),
+				ResourceType: types.StringValue(addr.ResourceType),
+				Version:      types.Int64Value(int64(addr.Version)),
+				ReverseDNS:   types.StringValue(addr.ReverseDNS),
+			})
+		}
+		ipList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ipAddressAttrTypes}, ipModels)
+		if diags.HasError() {
+			res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
+		} else {
+			res.IPAddresses = ipList
+		}
+	} else {
+		res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
+	}
+
+	// VPLS Interface
+	if ix.Resources.VPLSInterface.ResourceType != "" {
+		vpls := &ixVPLSInterfaceModel{
+			MACAddress:    types.StringValue(ix.Resources.VPLSInterface.MACAddress),
+			RateLimitMbps: types.Int64Value(int64(ix.Resources.VPLSInterface.RateLimitMbps)),
+			ResourceName:  types.StringValue(ix.Resources.VPLSInterface.ResourceName),
+			ResourceType:  types.StringValue(ix.Resources.VPLSInterface.ResourceType),
+			VLAN:          types.Int64Value(int64(ix.Resources.VPLSInterface.VLAN)),
+			Shutdown:      types.BoolValue(ix.Resources.VPLSInterface.Shutdown),
+		}
+		vplsObj, diags := types.ObjectValueFrom(ctx, vplsInterfaceAttrTypes, vpls)
+		if diags.HasError() {
+			res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
+		} else {
+			res.VPLSInterface = vplsObj
+		}
+	} else {
+		res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
+	}
+
+	// Convert ixResourcesModel to a Terraform object
+	resObj, diags := types.ObjectValueFrom(ctx, resourcesAttrTypes, res)
+	if diags.HasError() {
+		orm.Resources = types.ObjectNull(resourcesAttrTypes)
+	} else {
+		orm.Resources = resObj
+	}
+}
+
 // NewIXResource is a helper function to simplify the provider implementation.
 func NewIXResource() resource.Resource {
 	return &ixResource{}
@@ -551,220 +767,4 @@ func (r *ixResource) Configure(_ context.Context, req resource.ConfigureRequest,
 	}
 
 	r.client = client
-}
-
-// ixResourceModel maps the resource schema data.
-type ixResourceModel struct {
-	RequestedProductUID types.String `tfsdk:"requested_product_uid"`
-	ProductUID          types.String `tfsdk:"product_uid"`
-	ProductID           types.Int64  `tfsdk:"product_id"`
-	ProductName         types.String `tfsdk:"product_name"`
-	NetworkServiceType  types.String `tfsdk:"network_service_type"`
-	ASN                 types.Int64  `tfsdk:"asn"`
-	MACAddress          types.String `tfsdk:"mac_address"`
-	RateLimit           types.Int64  `tfsdk:"rate_limit"`
-	VLAN                types.Int64  `tfsdk:"vlan"`
-	Shutdown            types.Bool   `tfsdk:"shutdown"`
-	PromoCode           types.String `tfsdk:"promo_code"`
-	CostCentre          types.String `tfsdk:"cost_centre"`
-	PublicGraph         types.Bool   `tfsdk:"public_graph"`
-	ReverseDNS          types.String `tfsdk:"reverse_dns"`
-	ProvisioningStatus  types.String `tfsdk:"provisioning_status"`
-	CreateDate          types.String `tfsdk:"create_date"`
-	Term                types.Int64  `tfsdk:"term"`
-	LocationID          types.Int64  `tfsdk:"location_id"`
-	AttributeTags       types.Map    `tfsdk:"attribute_tags"`
-	DeployDate          types.String `tfsdk:"deploy_date"`
-	SecondaryName       types.String `tfsdk:"secondary_name"`
-	IXPeerMacro         types.String `tfsdk:"ix_peer_macro"`
-	UsageAlgorithm      types.String `tfsdk:"usage_algorithm"`
-
-	Resources types.Object `tfsdk:"resources"`
-}
-
-type ixResourcesModel struct {
-	Interface      types.Object `tfsdk:"interface"`
-	BGPConnections types.List   `tfsdk:"bgp_connections"`
-	IPAddresses    types.List   `tfsdk:"ip_addresses"`
-	VPLSInterface  types.Object `tfsdk:"vpls_interface"`
-}
-
-type ixInterfaceModel struct {
-	Demarcation  types.String `tfsdk:"demarcation"`
-	LOATemplate  types.String `tfsdk:"loa_template"`
-	Media        types.String `tfsdk:"media"`
-	PortSpeed    types.Int64  `tfsdk:"port_speed"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Up           types.Int64  `tfsdk:"up"`
-	Shutdown     types.Bool   `tfsdk:"shutdown"`
-}
-
-type ixBGPConnectionModel struct {
-	ASN               types.Int64  `tfsdk:"asn"`
-	CustomerASN       types.Int64  `tfsdk:"customer_asn"`
-	CustomerIPAddress types.String `tfsdk:"customer_ip_address"`
-	ISPASN            types.Int64  `tfsdk:"isp_asn"`
-	ISPIPAddress      types.String `tfsdk:"isp_ip_address"`
-	IXPeerPolicy      types.String `tfsdk:"ix_peer_policy"`
-	MaxPrefixes       types.Int64  `tfsdk:"max_prefixes"`
-	ResourceName      types.String `tfsdk:"resource_name"`
-	ResourceType      types.String `tfsdk:"resource_type"`
-}
-
-type ixIPAddressModel struct {
-	Address      types.String `tfsdk:"address"`
-	ResourceName types.String `tfsdk:"resource_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	Version      types.Int64  `tfsdk:"version"`
-	ReverseDNS   types.String `tfsdk:"reverse_dns"`
-}
-
-type ixVPLSInterfaceModel struct {
-	MACAddress    types.String `tfsdk:"mac_address"`
-	RateLimitMbps types.Int64  `tfsdk:"rate_limit_mbps"`
-	ResourceName  types.String `tfsdk:"resource_name"`
-	ResourceType  types.String `tfsdk:"resource_type"`
-	VLAN          types.Int64  `tfsdk:"vlan"`
-	Shutdown      types.Bool   `tfsdk:"shutdown"`
-}
-
-// fromAPI maps the API IX response to the resource schema.
-func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
-	// Map basic fields
-	orm.ProductUID = types.StringValue(ix.ProductUID)
-	orm.ProductID = types.Int64Value(int64(ix.ProductID))
-	orm.ProductName = types.StringValue(ix.ProductName)
-	orm.NetworkServiceType = types.StringValue(ix.NetworkServiceType)
-	orm.ASN = types.Int64Value(int64(ix.ASN))
-	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
-	orm.VLAN = types.Int64Value(int64(ix.VLAN))
-	orm.PromoCode = types.StringValue(ix.PromoCode)
-	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
-	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
-	orm.Term = types.Int64Value(int64(ix.Term))
-	orm.LocationID = types.Int64Value(int64(ix.LocationID))
-	orm.SecondaryName = types.StringValue(ix.SecondaryName)
-	orm.IXPeerMacro = types.StringValue(ix.IXPeerMacro)
-	orm.UsageAlgorithm = types.StringValue(ix.UsageAlgorithm)
-
-	if ix.PromoCode != "" {
-		orm.PromoCode = types.StringValue(ix.PromoCode)
-	} else {
-		orm.PromoCode = types.StringNull()
-	}
-
-	// Handle dates
-	if ix.CreateDate != nil {
-		orm.CreateDate = types.StringValue(ix.CreateDate.Format(time.RFC3339))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-
-	if ix.DeployDate != nil {
-		orm.DeployDate = types.StringValue(ix.DeployDate.Format(time.RFC3339))
-	} else {
-		orm.DeployDate = types.StringNull()
-	}
-
-	// Build a resources model
-	res := &ixResourcesModel{}
-
-	// Interface
-	if ix.Resources.Interface.ResourceType != "" {
-		iface := &ixInterfaceModel{
-			Demarcation:  types.StringValue(ix.Resources.Interface.Demarcation),
-			LOATemplate:  types.StringValue(ix.Resources.Interface.LOATemplate),
-			Media:        types.StringValue(ix.Resources.Interface.Media),
-			PortSpeed:    types.Int64Value(int64(ix.Resources.Interface.PortSpeed)),
-			ResourceName: types.StringValue(ix.Resources.Interface.ResourceName),
-			ResourceType: types.StringValue(ix.Resources.Interface.ResourceType),
-			Up:           types.Int64Value(int64(ix.Resources.Interface.Up)),
-			Shutdown:     types.BoolValue(ix.Resources.Interface.Shutdown),
-		}
-		ifObj, diags := types.ObjectValueFrom(ctx, interfaceAttrTypes, iface)
-		if diags.HasError() {
-			res.Interface = types.ObjectNull(interfaceAttrTypes)
-		} else {
-			res.Interface = ifObj
-		}
-	} else {
-		res.Interface = types.ObjectNull(interfaceAttrTypes)
-	}
-
-	// BGP Connections
-	if len(ix.Resources.BGPConnections) > 0 {
-		bgpModels := make([]ixBGPConnectionModel, 0, len(ix.Resources.BGPConnections))
-		for _, conn := range ix.Resources.BGPConnections {
-			bgpModels = append(bgpModels, ixBGPConnectionModel{
-				ASN:               types.Int64Value(int64(conn.ASN)),
-				CustomerASN:       types.Int64Value(int64(conn.CustomerASN)),
-				CustomerIPAddress: types.StringValue(conn.CustomerIPAddress),
-				ISPASN:            types.Int64Value(int64(conn.ISPASN)),
-				ISPIPAddress:      types.StringValue(conn.ISPIPAddress),
-				IXPeerPolicy:      types.StringValue(conn.IXPeerPolicy),
-				MaxPrefixes:       types.Int64Value(int64(conn.MaxPrefixes)),
-				ResourceName:      types.StringValue(conn.ResourceName),
-				ResourceType:      types.StringValue(conn.ResourceType),
-			})
-		}
-		bgpList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: bgpConnectionAttrTypes}, bgpModels)
-		if diags.HasError() {
-			res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
-		} else {
-			res.BGPConnections = bgpList
-		}
-	} else {
-		res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
-	}
-
-	// IP Addresses
-	if len(ix.Resources.IPAddresses) > 0 {
-		ipModels := make([]ixIPAddressModel, 0, len(ix.Resources.IPAddresses))
-		for _, addr := range ix.Resources.IPAddresses {
-			ipModels = append(ipModels, ixIPAddressModel{
-				Address:      types.StringValue(addr.Address),
-				ResourceName: types.StringValue(addr.ResourceName),
-				ResourceType: types.StringValue(addr.ResourceType),
-				Version:      types.Int64Value(int64(addr.Version)),
-				ReverseDNS:   types.StringValue(addr.ReverseDNS),
-			})
-		}
-		ipList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ipAddressAttrTypes}, ipModels)
-		if diags.HasError() {
-			res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
-		} else {
-			res.IPAddresses = ipList
-		}
-	} else {
-		res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
-	}
-
-	// VPLS Interface
-	if ix.Resources.VPLSInterface.ResourceType != "" {
-		vpls := &ixVPLSInterfaceModel{
-			MACAddress:    types.StringValue(ix.Resources.VPLSInterface.MACAddress),
-			RateLimitMbps: types.Int64Value(int64(ix.Resources.VPLSInterface.RateLimitMbps)),
-			ResourceName:  types.StringValue(ix.Resources.VPLSInterface.ResourceName),
-			ResourceType:  types.StringValue(ix.Resources.VPLSInterface.ResourceType),
-			VLAN:          types.Int64Value(int64(ix.Resources.VPLSInterface.VLAN)),
-			Shutdown:      types.BoolValue(ix.Resources.VPLSInterface.Shutdown),
-		}
-		vplsObj, diags := types.ObjectValueFrom(ctx, vplsInterfaceAttrTypes, vpls)
-		if diags.HasError() {
-			res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
-		} else {
-			res.VPLSInterface = vplsObj
-		}
-	} else {
-		res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
-	}
-
-	// Convert ixResourcesModel to a Terraform object
-	resObj, diags := types.ObjectValueFrom(ctx, resourcesAttrTypes, res)
-	if diags.HasError() {
-		orm.Resources = types.ObjectNull(resourcesAttrTypes)
-	} else {
-		orm.Resources = resObj
-	}
 }
