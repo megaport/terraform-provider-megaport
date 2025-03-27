@@ -624,7 +624,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The cloud init for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
+						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
