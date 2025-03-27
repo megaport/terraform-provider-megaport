@@ -1080,7 +1080,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the A-End configuration.",
+						Description: "The Product UID requested by the user for the A-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
 						Required:    true,
 						// PlanModifiers: []planmodifier.String{
 						// 	stringplanmodifier.RequiresReplaceIf(
@@ -1162,7 +1162,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the B-End configuration.",
+						Description: "The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
 						Optional:    true,
 						Computed:    true,
 						// PlanModifiers: []planmodifier.String{
@@ -4558,7 +4558,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				}
 			} else if aEndCSP {
 				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-					diags.AddWarning("VXC A-End product UID is from a partner port, therefore it will not be changed.", "VXC A-End product UID is from a CSP partner port, therefore it will not be changed.")
+					diags.AddWarning(
+						"Cloud provider port mapping detected",
+						fmt.Sprintf("Different A-End Product UIDs detected for cloud provider endpoint: requested=%s, actual=%s. This is normal - Megaport automatically manages cloud connection port assignments. Your configuration remains unchanged while the connection uses the provider-assigned Product UID. No action needed.",
+							aEndPlanConfig.RequestedProductUID.ValueString(),
+							aEndStateConfig.CurrentProductUID.ValueString()),
+					)
 				}
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 			}
@@ -4596,7 +4601,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				}
 			} else if bEndCSP {
 				if !bEndPlanConfig.RequestedProductUID.IsNull() && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.CurrentProductUID) {
-					diags.AddWarning("VXC B-End product UID is from a partner port, therefore it will not be changed.", "VXC B-End product UID is from a CSP partner port, therefore it will not be changed.")
+					diags.AddWarning(
+						"Cloud provider port mapping detected",
+						fmt.Sprintf("Different B-End Product UIDs detected for cloud provider endpoint: requested=%s, actual=%s. This is normal - Megaport automatically manages cloud connection port assignments. Your configuration remains unchanged while the connection uses the provider-assigned Product UID. No action needed.",
+							bEndPlanConfig.RequestedProductUID.ValueString(),
+							bEndStateConfig.CurrentProductUID.ValueString()),
+					)
 				}
 				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
 			}
