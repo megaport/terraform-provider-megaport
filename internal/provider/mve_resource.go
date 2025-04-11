@@ -210,8 +210,14 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 
 func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
-	vendor := strings.ToLower(v.Vendor.ValueString()) // Allow for uppercase vendor names for more flexibility.
-	switch vendor {
+	rawVendorName := v.Vendor.ValueString()
+
+	// Normalize vendor name: lowercase and remove spaces
+	normalizedVendor := strings.ToLower(rawVendorName)
+	normalizedVendor = strings.ReplaceAll(normalizedVendor, " ", "_")
+
+	// Maintain backward compatibility while allowing more flexible vendor names
+	switch normalizedVendor {
 	case "6wind":
 		vsrConfig := &megaport.SixwindVSRConfig{
 			Vendor:       v.Vendor.ValueString(),
@@ -267,7 +273,8 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return fortinetConfig, apiDiags
-	case "palo_alto":
+	// Support for Palo Alto is flexible with various names
+	case "palo_alto", "paloalto", "palo", "palo-alto", "palo alto", "pa":
 		paloAltoConfig := &megaport.PaloAltoConfig{
 			Vendor:            v.Vendor.ValueString(),
 			ImageID:           int(v.ImageID.ValueInt64()),
@@ -324,7 +331,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 		return merakiConfig, apiDiags
 	}
 	apiDiags.AddError("vendor not supported",
-		"vendor not supported")
+		fmt.Sprintf("Vendor '%s' not supported. Please use one of the supported vendors: 6wind, aruba, aviatrix, cisco, fortinet, palo_alto (also accepts palo, palo-alto, pa, pan, or paloalto), prisma, versa, vmware, meraki.", rawVendorName))
 	return nil, apiDiags
 }
 
@@ -592,7 +599,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				Attributes: map[string]schema.Attribute{
 					"vendor": schema.StringAttribute{
-						Description: `The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".`,
+						Description: `The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto" (also accepts a case insensitive "palo alto" or "paloalto"), "prisma", "versa", "vmware", "meraki".`,
 						Required:    true,
 					},
 					"image_id": schema.Int64Attribute{

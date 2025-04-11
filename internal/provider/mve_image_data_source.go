@@ -121,7 +121,7 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Optional:    true,
 			},
 			"vendor_filter": schema.StringAttribute{
-				Description: "Filter the MVE Images by Vendor Name",
+				Description: "Filter the MVE Images by Vendor Name. Note that for Palo Alto Networks, both 'palo_alto' and 'palo alto' formats are accepted.",
 				Optional:    true,
 			},
 			"release_image_filter": schema.BoolAttribute{
@@ -247,12 +247,26 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 
 func runImageFiltersAndSort(images []*megaport.MVEImage, filters [](func(*megaport.MVEImage) bool)) []*megaport.MVEImage {
 	toReturn := slices.Clone(images)
-	// delete all elements not matching filters, this won't have the closure issues https://go.dev/blog/loopvar-preview because we use 1.22
 	for _, filter := range filters {
 		toReturn = slices.DeleteFunc(toReturn, filter)
 	}
 
 	return toReturn
+}
+
+func filterMVEImageByVendor(vendor string) func(*megaport.MVEImage) bool {
+	return func(i *megaport.MVEImage) bool {
+		// Handle empty cases
+		if vendor == "" {
+			return i.Vendor != ""
+		}
+		if i.Vendor == "" {
+			return true
+		}
+
+		// Use case insensitive comparison for all vendors
+		return !strings.EqualFold(i.Vendor, vendor)
+	}
 }
 
 func filterMVEImageByID(id int) func(*megaport.MVEImage) bool {
@@ -270,12 +284,6 @@ func filterMVEImageByProduct(product string) func(*megaport.MVEImage) bool {
 func filterMVEImageByVersion(version string) func(*megaport.MVEImage) bool {
 	return func(i *megaport.MVEImage) bool {
 		return !strings.EqualFold(i.Version, version)
-	}
-}
-
-func filterMVEImageByVendor(vendor string) func(*megaport.MVEImage) bool {
-	return func(i *megaport.MVEImage) bool {
-		return !strings.EqualFold(i.Vendor, vendor)
 	}
 }
 
