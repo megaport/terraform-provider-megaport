@@ -21,7 +21,7 @@ MVE Images
 - `product_code_filter` (String) Filter the MVE Images by Product Code
 - `product_filter` (String) Filter the MVE Images by Product
 - `release_image_filter` (Boolean) Filter the MVE Images by Release Image
-- `vendor_filter` (String) Filter the MVE Images by Vendor Name
+- `vendor_filter` (String) Filter the MVE Images by Vendor Name. Note that for Palo Alto Networks, both 'palo_alto' and 'palo alto' formats are accepted.
 - `version_filter` (String) Filter the MVE Images by Version
 
 ### Read-Only
