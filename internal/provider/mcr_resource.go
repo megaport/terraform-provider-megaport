@@ -382,13 +382,13 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "Bandwidth speed of the product. The MCR can scale from 1 Gbps to 10 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports four speeds: 1000, 2500, 5000, and 10000 MBPS",
+				Description: "Bandwidth speed of the product. The MCR can scale from 1 Gbps to 100 Gbps. The rate limit is an aggregate capacity that determines the speed for all connections through the MCR. MCR bandwidth is shared between all the Cloud Service Provider (CSP) connections added to it. The rate limit is fixed for the life of the service. MCR2 supports seven speeds: 1000, 2500, 5000, 10000, 25000, 50000, and 100000 MBPS",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 				Validators: []validator.Int64{
-					int64validator.OneOf(1000, 2500, 5000, 10000),
+					int64validator.OneOf(1000, 2500, 5000, 10000, 25000, 50000, 100000),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
