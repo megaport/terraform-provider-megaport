@@ -179,6 +179,10 @@ Required:
 
 - `description` (String) The description of the network interface.
 
+Read-Only:
+
+- `vlan` (Number) The VLAN of the network interface.
+
 ## Import
 
 Import is supported using the following syntax:
