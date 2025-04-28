@@ -239,7 +239,11 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.ID = types.Int64Value(int64(image.ID))
 	orm.Version = types.StringValue(image.Version)
 	orm.Product = types.StringValue(image.Product)
-	orm.Vendor = types.StringValue(image.Vendor)
+	vendorStr := image.Vendor
+	if strings.EqualFold(vendorStr, "PALO ALTO") {
+		vendorStr = "PALO_ALTO"
+	}
+	orm.Vendor = types.StringValue(vendorStr)
 	orm.VendorDescription = types.StringValue(image.VendorDescription)
 	orm.ReleaseImage = types.BoolValue(image.ReleaseImage)
 	orm.ProductCode = types.StringValue(image.ProductCode)
@@ -275,6 +279,9 @@ func filterMVEImageByVersion(version string) func(*megaport.MVEImage) bool {
 
 func filterMVEImageByVendor(vendor string) func(*megaport.MVEImage) bool {
 	return func(i *megaport.MVEImage) bool {
+		if strings.EqualFold(vendor, "PALO_ALTO") {
+			vendor = "PALO ALTO"
+		}
 		return !strings.EqualFold(i.Vendor, vendor)
 	}
 }
