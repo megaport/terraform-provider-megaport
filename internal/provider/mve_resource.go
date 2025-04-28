@@ -34,6 +34,7 @@ var (
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
+		"vlan":        types.Int64Type,
 	}
 )
 
@@ -86,6 +87,7 @@ type mveResourceModel struct {
 // mveNetworkInterfaceModel represents a vNIC.
 type mveNetworkInterfaceModel struct {
 	Description types.String `tfsdk:"description"`
+	VLAN        types.Int64  `tfsdk:"vlan"`
 }
 
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
@@ -196,6 +198,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	for _, n := range p.NetworkInterfaces {
 		model := &mveNetworkInterfaceModel{
 			Description: types.StringValue(n.Description),
+			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
 		vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
 		apiDiags = append(apiDiags, vnicDiags...)
@@ -568,6 +571,13 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						"description": schema.StringAttribute{
 							Description: "The description of the network interface.",
 							Required:    true,
+						},
+						"vlan": schema.Int64Attribute{
+							Description: "The VLAN of the network interface.",
+							Computed:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.UseStateForUnknown(),
+							},
 						},
 					},
 				},
