@@ -1336,7 +1336,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Check product type - if MVE, require VNIC Index
 	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
 	if productType == "MVE" {
-		if a.NetworkInterfaceIndex.IsNull() && a.InnerVLAN.IsUnknown() {
+		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
@@ -1638,7 +1638,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Check product type - if MVE, require VNIC Index
 	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
 	if productType == "MVE" {
-		if b.NetworkInterfaceIndex.IsNull() && b.InnerVLAN.IsUnknown() {
+		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
