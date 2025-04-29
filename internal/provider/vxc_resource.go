@@ -1335,7 +1335,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// Check product type - if MVE, require VNIC Index
 	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
-	if productType == "MVE" {
+	if productType == megaport.PRODUCT_MVE {
 		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1637,7 +1637,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// Check product type - if MVE, require VNIC Index
 	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
-	if productType == "MVE" {
+	if productType == megaport.PRODUCT_MVE {
 		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
