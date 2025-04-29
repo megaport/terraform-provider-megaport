@@ -1366,6 +1366,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(awsDiags...)
 				return
 			}
+			if awsConfig.ConnectType.ValueString() == "AWS" {
+				// Only allow type of "public", "private", or "transit" for AWS VIFs
+				if awsConfig.Type.ValueString() != "public" && awsConfig.Type.ValueString() != "private" && awsConfig.Type.ValueString() != "transit" {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						"Could not create VXC with name "+plan.Name.ValueString()+": AWS Connect Type must be public, private, or transit",
+					)
+					return
+				}
+			}
 			awsDiags, partnerConfig, partnerConfigObj := createAWSPartnerConfig(ctx, awsConfig)
 			if awsDiags.HasError() {
 				resp.Diagnostics.Append(awsDiags...)
