@@ -1134,7 +1134,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
-						Description: "The network interface index of the A-End configuration.",
+						Description: "The network interface index of the A-End configuration. Required for MVE connections.",
 						Computed:    true,
 						Optional:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1217,7 +1217,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
-						Description: "The network interface index of the B-End configuration.",
+						Description: "The network interface index of the B-End configuration. Required for MVE connections.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1331,6 +1331,18 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
 	} else {
 		aEndConfig.VLAN = 0
+	}
+
+	// Check product type - if MVE, require VNIC Index
+	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
+	if productType == "MVE" {
+		if a.NetworkInterfaceIndex.IsNull() && a.InnerVLAN.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
+			)
+			return
+		}
 	}
 
 	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
@@ -1622,6 +1634,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	} else {
 		bEndConfig.VLAN = 0
 	}
+
+	// Check product type - if MVE, require VNIC Index
+	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
+	if productType == "MVE" {
+		if b.NetworkInterfaceIndex.IsNull() && b.InnerVLAN.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
+			)
+			return
+		}
+	}
+
 	if !b.InnerVLAN.IsNull() || !b.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
 		if !b.InnerVLAN.IsNull() {
