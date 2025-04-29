@@ -21,6 +21,9 @@ const (
 	VXCLocationID1 = 4  // "NextDC M1"
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
+
+	AzureServiceKey  = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+	GooglePairingKey = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -859,7 +862,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                     b_end_partner_config = {
                         partner = "google"
                         google_config = {
-                            pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
+                            pairing_key = "%s"
                         }
                     }
                   }
@@ -885,11 +888,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         partner = "azure"
                         azure_config = {
 							port_choice = "primary"
-                            service_key = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
+                            service_key = "%s"
                         }
                     }
                   }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, vxcName3),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKey, vxcName3, AzureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1354,7 +1357,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					b_end_partner_config = {
 					  partner = "google"
 					  google_config = {
-						pairing_key = "7e51371e-72a3-40b5-b844-2e3efefaee59/australia-southeast1/2"
+						pairing_key = "%s"
 					  }
 					}
 				  }
@@ -1375,11 +1378,11 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  partner = "azure"
 					  azure_config = {
 					    port_choice = "primary"
-						service_key = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
+						service_key = "%s"
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, azureVXCName),
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKey, azureVXCName, AzureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
