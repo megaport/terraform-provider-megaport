@@ -103,24 +103,19 @@ jobs:
       # Run basic compatibility tests
       - name: OpenTofu Provider Compatibility Check
         run: |
-          # Build provider binary with correct naming convention
+          # Build provider binary with protocol v6 naming convention
           cd $GITHUB_WORKSPACE
-          go build -o terraform-provider-megaport_v0.0.0_x5
+          go build -o terraform-provider-megaport_v0.0.0_x6
+          chmod +x terraform-provider-megaport_v0.0.0_x6
 
           # Create test directory and move there
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
-          # Create explicit development override config for OpenTofu
-          mkdir -p ~/.tofu.d
-          cat > ~/.tofurc << EOL
-          provider_installation {
-            dev_overrides {
-              "megaport/megaport" = "$GITHUB_WORKSPACE"
-            }
-            direct {}
-          }
-          EOL
+          # Place provider binary in OpenTofu's expected dev path
+          mkdir -p ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v0.0.0_x6 ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
+          chmod +x ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/terraform-provider-megaport_v0.0.0_x6
 
           # Create test config with exact version
           cat > main.tf << 'EOL'
@@ -141,10 +136,8 @@ jobs:
           }
           EOL
 
-          # Run tests with debug logging enabled
-          export TF_LOG=DEBUG
-          tofu init
-          tofu providers
+          # Run providers schema to validate local provider without registry lookup
+          tofu providers schema -json
 
           echo "OpenTofu compatibility test completed successfully"
 
