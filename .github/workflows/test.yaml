@@ -74,30 +74,30 @@ jobs:
       - run: go test -v -timeout=30m -cover ./internal/provider/
 
   opentofu-test:
-    name: OpenTofu Compatibility Tests
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        tofu-version:
-          - '1.6.0' # Latest stable OpenTofu version
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
+  name: OpenTofu Compatibility Tests
+  needs: build
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+  strategy:
+    fail-fast: false
+    matrix:
+      tofu-version:
+        - '1.6.0' # Latest stable OpenTofu version
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache: true
 
-      # Install OpenTofu
-      - name: Install OpenTofu
-        run: |
-          curl -SL https://github.com/opentofu/opentofu/releases/download/v${{ matrix.tofu-version }}/tofu_${{ matrix.tofu-version }}_linux_amd64.zip -o tofu.zip
-          unzip tofu.zip
-          chmod +x tofu
-          sudo mv tofu /usr/local/bin/
-          tofu version
+    # Install OpenTofu
+    - name: Install OpenTofu
+      run: |
+        curl -SL https://github.com/opentofu/opentofu/releases/download/v${{ matrix.tofu-version }}/tofu_${{ matrix.tofu-version }}_linux_amd64.zip -o tofu.zip
+        unzip -o tofu.zip  # Use -o flag to overwrite files without prompting
+        chmod +x tofu
+        sudo mv tofu /usr/local/bin/
+        tofu version
 
       # Run basic compatibility tests
       - name: OpenTofu Provider Compatibility Check
