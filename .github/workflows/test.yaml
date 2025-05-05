@@ -105,11 +105,22 @@ jobs:
         run: |
           # Build provider binary in repo root (where go.mod is)
           cd $GITHUB_WORKSPACE
-          go build -o /tmp/provider-binary
+          go build -o terraform-provider-megaport
 
           # Create test directory and move there
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
+
+          # Create development override file
+          mkdir -p ~/.terraform.d/plugins
+          cat > ~/.terraformrc << 'EOL'
+          provider_installation {
+            dev_overrides {
+              "megaport/megaport" = "$GITHUB_WORKSPACE"
+            }
+            direct {}
+          }
+          EOL
 
           # Create test config
           cat > main.tf << 'EOL'
@@ -117,8 +128,7 @@ jobs:
             required_providers {
               megaport = {
                 source = "megaport/megaport"
-                # Use local build
-                version = "0.0.1"
+                version = ">=0.0.0"
               }
             }
           }
@@ -134,10 +144,11 @@ jobs:
 
           # Set up local plugin directory
           mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64
-          cp /tmp/provider-binary .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
           chmod +x .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
 
           # Test OpenTofu with the provider
+          cp ~/.terraformrc ~/.tofurc
           tofu init
           tofu providers
 
