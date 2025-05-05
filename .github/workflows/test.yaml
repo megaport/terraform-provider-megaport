@@ -105,15 +105,16 @@ jobs:
         run: |
           # Build provider binary in repo root (where go.mod is)
           cd $GITHUB_WORKSPACE
-          go build -o terraform-provider-megaport
+          go build -o terraform-provider-megaport_v0.0.0
 
           # Create test directory and move there
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
-          # Place provider binary in OpenTofu's expected dev path
-          mkdir -p ~/.terraform.d/plugins/registry.opentofu.org/megaport/megaport/0.0.0/linux_amd64/
-          cp $GITHUB_WORKSPACE/terraform-provider-megaport ~/.terraform.d/plugins/registry.opentofu.org/megaport/megaport/0.0.0/linux_amd64/terraform-provider-megaport
+          # Place provider binary in OpenTofu's expected dev path (terraform registry path)
+          mkdir -p ~/.terraform.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v0.0.0 ~/.terraform.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
+          chmod +x ~/.terraform.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/terraform-provider-megaport_v0.0.0
 
           # Create test config with exact version
           cat > main.tf << 'EOL'
