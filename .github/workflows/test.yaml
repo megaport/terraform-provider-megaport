@@ -111,44 +111,30 @@ jobs:
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
-          # Create development override file
-          mkdir -p ~/.terraform.d/plugins
-          cat > ~/.terraformrc << 'EOL'
-          provider_installation {
-            dev_overrides {
-              "megaport/megaport" = "$GITHUB_WORKSPACE"
-            }
-            direct {}
-          }
-          EOL
+          # Place provider binary in OpenTofu's expected dev path
+          mkdir -p ~/.terraform.d/plugins/registry.opentofu.org/megaport/megaport/0.0.0/linux_amd64/
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport ~/.terraform.d/plugins/registry.opentofu.org/megaport/megaport/0.0.0/linux_amd64/terraform-provider-megaport
 
-          # Create test config
+          # Create test config with exact version
           cat > main.tf << 'EOL'
           terraform {
             required_providers {
               megaport = {
                 source = "megaport/megaport"
-                version = ">=0.0.0"
+                version = "0.0.0"
               }
             }
           }
 
           provider "megaport" {
             environment = "staging"
-            # For tests, we don't need real credentials
             access_key = "test"
             secret_key = "test"
             accept_purchase_terms = true
           }
           EOL
 
-          # Set up local plugin directory
-          mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64
-          cp $GITHUB_WORKSPACE/terraform-provider-megaport .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
-          chmod +x .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
-
           # Test OpenTofu with the provider
-          cp ~/.terraformrc ~/.tofurc
           tofu init
           tofu providers
 
