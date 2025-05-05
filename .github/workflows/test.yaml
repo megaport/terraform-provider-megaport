@@ -103,27 +103,26 @@ jobs:
       # Run basic compatibility tests
       - name: OpenTofu Provider Compatibility Check
         run: |
-          # Build provider binary with protocol v6 naming convention
+          # Build provider binary with correct naming convention
           cd $GITHUB_WORKSPACE
-          go build -o terraform-provider-megaport_v0.0.0_x6
-          chmod +x terraform-provider-megaport_v0.0.0_x6
+          go build -o terraform-provider-megaport_v1.0.0
+          chmod +x terraform-provider-megaport_v1.0.0
 
-          # Create test directory and move there
-          mkdir -p /tmp/opentofu-test
+          # Create test directory with plugin directory
+          mkdir -p /tmp/opentofu-test/terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
           cd /tmp/opentofu-test
 
-          # Place provider binary in OpenTofu's expected dev path
-          mkdir -p ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
-          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v0.0.0_x6 ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/
-          chmod +x ~/.tofu.d/plugins/registry.terraform.io/megaport/megaport/0.0.0/linux_amd64/terraform-provider-megaport_v0.0.0_x6
+          # Copy provider binary to local plugin directory
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v1.0.0 terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
+          chmod +x terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/terraform-provider-megaport_v1.0.0
 
-          # Create test config with exact version
+          # Create test config
           cat > main.tf << 'EOL'
           terraform {
             required_providers {
               megaport = {
                 source = "megaport/megaport"
-                version = "0.0.0"
+                version = "1.0.0"
               }
             }
           }
@@ -136,8 +135,11 @@ jobs:
           }
           EOL
 
-          # Run providers schema to validate local provider without registry lookup
-          tofu providers schema -json
+          # Initialize with explicit plugin directory
+          tofu init -plugin-dir=./terraform.d/plugins/
+
+          # Verify provider is found
+          tofu providers
 
           echo "OpenTofu compatibility test completed successfully"
 
