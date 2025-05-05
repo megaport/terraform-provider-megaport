@@ -1,4 +1,3 @@
-# Terraform Provider testing workflow.
 name: Tests
 
 on:
@@ -108,20 +107,22 @@ jobs:
           go build -o terraform-provider-megaport_v1.0.0
           chmod +x terraform-provider-megaport_v1.0.0
 
-          # Create test directory with plugin directory
-          mkdir -p /tmp/opentofu-test/terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
+          # Create test directory
+          mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
-          # Copy provider binary to local plugin directory
-          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v1.0.0 terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
-          chmod +x terraform.d/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/terraform-provider-megaport_v1.0.0
+          # Create proper directory structure for the provider
+          # Note: We need to match the source exactly as it appears in the configuration
+          mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v1.0.0 .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
+          chmod +x .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/terraform-provider-megaport_v1.0.0
 
-          # Create test config
+          # Create test config with fully qualified source
           cat > main.tf << 'EOL'
           terraform {
             required_providers {
               megaport = {
-                source = "megaport/megaport"
+                source = "registry.terraform.io/megaport/megaport"
                 version = "1.0.0"
               }
             }
@@ -135,10 +136,9 @@ jobs:
           }
           EOL
 
-          # Initialize with explicit plugin directory
-          tofu init -plugin-dir=./terraform.d/plugins/
-
-          # Verify provider is found
+          # Run OpenTofu commands
+          # Let OpenTofu discover the plugin in the .terraform directory
+          tofu init
           tofu providers
 
           echo "OpenTofu compatibility test completed successfully"
