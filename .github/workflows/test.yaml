@@ -4,12 +4,12 @@ name: Tests
 on:
   push:
     paths-ignore:
-      - 'README.md'  
+      - 'README.md'
     branches:
       - 'main'
   pull_request:
     paths-ignore:
-      - 'README.md'  
+      - 'README.md'
     branches:
       - 'main'
   workflow_dispatch:
@@ -41,8 +41,8 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 
-      - uses: actions/setup-go@v5 
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
@@ -58,7 +58,7 @@ jobs:
           git diff --compact-summary --exit-code || \
             (echo; echo "Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."; exit 1)
 
-  # Run unit tests 
+  # Run unit tests
   unit-test:
     name: Terraform Provider Unit Tests
     needs: build
@@ -66,12 +66,76 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5 
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
       - run: go mod download
       - run: go test -v -timeout=30m -cover ./internal/provider/
+
+  opentofu-test:
+    name: OpenTofu Compatibility Tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        tofu-version:
+          - '1.6.0' # Latest stable OpenTofu version
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      # Install OpenTofu
+      - name: Install OpenTofu
+        run: |
+          curl -SL https://github.com/opentofu/opentofu/releases/download/v${{ matrix.tofu-version }}/tofu_${{ matrix.tofu-version }}_linux_amd64.zip -o tofu.zip
+          unzip tofu.zip
+          chmod +x tofu
+          sudo mv tofu /usr/local/bin/
+          tofu version
+
+      # Run basic compatibility tests
+      - name: OpenTofu Provider Compatibility Check
+        run: |
+          # Create test directory
+          mkdir -p /tmp/opentofu-test
+          cd /tmp/opentofu-test
+
+          # Create test config
+          cat > main.tf << 'EOL'
+          terraform {
+            required_providers {
+              megaport = {
+                source = "megaport/megaport"
+                # Use local build
+                version = "0.0.1"
+              }
+            }
+          }
+
+          provider "megaport" {
+            environment = "staging"
+            # For tests, we don't need real credentials
+            access_key = "test"
+            secret_key = "test"
+            accept_purchase_terms = true
+          }
+          EOL
+
+          # Set up local plugin directory
+          mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64
+          go build -o .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1 $GITHUB_WORKSPACE
+
+          # Test OpenTofu with the provider
+          tofu init
+          tofu providers
+
+          echo "OpenTofu compatibility test completed successfully"
 
   # TODO: reenable these once we get a better public workflow for PRs
   # # Run acceptance tests in a matrix with Terraform CLI versions
@@ -89,7 +153,7 @@ jobs:
   #         - '1.8.*'
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-go@v5 
+  #     - uses: actions/setup-go@v5
   #       with:
   #         go-version-file: 'go.mod'
   #         cache: true
