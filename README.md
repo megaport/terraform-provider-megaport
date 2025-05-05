@@ -5,22 +5,55 @@ Megaport's product and services using the [Megaport API](https://dev.megaport.co
 
 This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
-Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs
+Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs.
 
-The Megaport Terraform Provider is released as a tool for use with the Megaport API. 
+This provider is compatible with both HashiCorp Terraform and OpenTofu.
+
+The Megaport Terraform Provider is released as a tool for use with the Megaport API.
 
 **Important:** The usage of the Megaport Terraform Provider constitutes your acceptance of the terms available
 in the Megaport [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy/) and
 [Global Services Agreement](https://www.megaport.com/legal/global-services-agreement/).
 
 ## Documentation
-Documentation is published on the [Terraform Provider Megaport](https://registry.terraform.io/providers/megaport/megaport/latest/docs) registry.
+
+Documentation is published on the [Terraform Provider Megaport](https://registry.terraform.io/providers/megaport/megaport/latest/docs) registry and the [OpenTofu Provider Megaport](https://search.opentofu.org/provider/megaport/megaport/latest) registry.
 
 ## Installation
+
+### Terraform Installation
+
 The preferred installation method is via the [Terraform Provider Megaport](https://registry.terraform.io/providers/megaport/megaport/latest/docs)
 registry.
 
-## Local Development 
+### OpenTofu Installation
+
+For OpenTofu users, the provider is available via the [OpenTofu Registry](https://search.opentofu.org/provider/megaport/megaport/latest). No configuration changes are needed - use the same provider source as you would with Terraform.
+
+## Configuration
+
+The provider can be configured in the same way whether using HashiCorp Terraform or OpenTofu:
+
+```terraform
+terraform {
+  required_providers {
+    megaport = {
+      source  = "megaport/megaport"
+      version = "~> 1.3"
+    }
+  }
+}
+
+provider "megaport" {
+  # Configuration options
+  environment           = "production"
+  access_key            = "your-access-key"
+  secret_key            = "your-secret-key"
+  accept_purchase_terms = true
+}
+```
+
+## Local Development
 
 ### Set up a Go workspace
 
@@ -34,7 +67,7 @@ use (
 )
 ```
 
-### Allow the provider to be run locally 
+### Allow the provider to be run locally
 
 First, find the GOBIN path where Go installs your binaries. Your path may vary depending on how your Go environment variables are configured.
 
@@ -59,7 +92,7 @@ provider_installation {
 }
 ```
 
-Once you’ve done that you can test out changes to the provider by installing it with 
+Once you’ve done that you can test out changes to the provider by installing it with
 
 ```bash
 go install .
@@ -85,7 +118,7 @@ Megaport users are also bound by the [Acceptable Use Policy](https://www.megapor
 
 ## Datacenter Location Data Source
 
-Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider. 
+Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider.
 
 They can be retrieved by searching either by `id`, `name`, or by `site_code` similar to the examples below:
 
@@ -103,8 +136,8 @@ data "megaport_location" "my_location_3" {
 }
 ```
 
-Please note that datacenter locations can sometimes change their name or less frequently their site code in the API. 
+Please note that datacenter locations can sometimes change their name or less frequently their site code in the API.
 
-However, their numeric ID will always remain the same in the Megaport API. 
+However, their numeric ID will always remain the same in the Megaport API.
 
 The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v2/locations`
