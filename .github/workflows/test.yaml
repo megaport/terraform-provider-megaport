@@ -103,7 +103,11 @@ jobs:
       # Run basic compatibility tests
       - name: OpenTofu Provider Compatibility Check
         run: |
-          # Create test directory
+          # Build provider binary in repo root (where go.mod is)
+          cd $GITHUB_WORKSPACE
+          go build -o /tmp/provider-binary
+
+          # Create test directory and move there
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
@@ -130,7 +134,8 @@ jobs:
 
           # Set up local plugin directory
           mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64
-          go build -o .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1 $GITHUB_WORKSPACE
+          cp /tmp/provider-binary .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
+          chmod +x .terraform/plugins/registry.terraform.io/megaport/megaport/0.0.1/linux_amd64/terraform-provider-megaport_v0.0.1
 
           # Test OpenTofu with the provider
           tofu init
