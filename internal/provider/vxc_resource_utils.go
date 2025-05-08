@@ -627,7 +627,7 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 		}
 		aEndMegaportConfig.Interfaces = append(aEndMegaportConfig.Interfaces, toAppend)
 	}
-	aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, partnerConfigAEndModel)
+	endConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, partnerConfigAEndModel)
 	diags.Append(aEndDiags...)
 	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
 	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -641,7 +641,7 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 		AzurePartnerConfig:   azure,
 		GooglePartnerConfig:  google,
 		OraclePartnerConfig:  oracle,
-		PartnerAEndConfig:    aEndConfigObj,
+		PartnerAEndConfig:    endConfigObj,
 		VrouterPartnerConfig: vrouter,
 		IBMPartnerConfig:     ibmPartner,
 	}
