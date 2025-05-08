@@ -140,7 +140,7 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 				)
 			}
 
-			aEndPartnerConfig := megaport.VXCPartnerConfigAzure{
+			megaportPartnerConfig := megaport.VXCPartnerConfigAzure{
 				ConnectType: "AZURE",
 				ServiceKey:  azureConfig.ServiceKey.ValueString(),
 			}
@@ -149,7 +149,7 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 			azurePeerDiags := azureConfig.Peers.ElementsAs(ctx, &azurePeerModels, false)
 			diags.Append(azurePeerDiags...)
 			if len(azurePeerModels) > 0 {
-				aEndPartnerConfig.Peers = []megaport.PartnerOrderAzurePeeringConfig{}
+				megaportPartnerConfig.Peers = []megaport.PartnerOrderAzurePeeringConfig{}
 				for _, peer := range azurePeerModels {
 					peeringConfig := megaport.PartnerOrderAzurePeeringConfig{
 						Type:            peer.Type.ValueString(),
@@ -164,12 +164,12 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 					if !peer.SharedKey.IsNull() {
 						peeringConfig.SharedKey = peer.SharedKey.ValueString()
 					}
-					aEndPartnerConfig.Peers = append(aEndPartnerConfig.Peers, peeringConfig)
+					megaportPartnerConfig.Peers = append(megaportPartnerConfig.Peers, peeringConfig)
 				}
 			}
 
 			partnerObj = partnerConfigObj
-			endConfig.PartnerConfig = aEndPartnerConfig
+			endConfig.PartnerConfig = megaportPartnerConfig
 		case "google":
 			if partnerConfigModel.GooglePartnerConfig.IsNull() {
 				diags.AddError(
@@ -363,4 +363,145 @@ func modifyPlanBasicEndConfig(ctx context.Context, endPlanObj basetypes.ObjectVa
 	diags.Append(endDiags...)
 
 	return diags, newPlanEndObj, newStateEndObj, statePartner, requiresReplace
+}
+
+func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string, planEndConfig, stateEndConfig, planPartnerConfig, statePartnerConfig basetypes.ObjectValue) (diag.Diagnostics, basetypes.ObjectValue, basetypes.ObjectValue, megaport.VXCPartnerConfiguration, *string, *int, *int) {
+	diags := diag.Diagnostics{}
+
+	var partnerChange bool
+
+	partnerObj := basetypes.NewObjectNull(vxcPartnerConfigAttrs)
+
+	var megaportPartnerConfig megaport.VXCPartnerConfiguration
+
+	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
+	if !planPartnerConfig.Equal(statePartnerConfig) {
+		partnerChange = true
+	}
+	if statePartnerConfig.IsNull() {
+		statePartnerConfig = planPartnerConfig
+	}
+
+	var endPlanModel, endStateModel *vxcBasicEndConfigurationModel
+	var partnerPlan, partnerState *vxcPartnerConfigurationModel
+
+	// Check if partner config is a CSP partner
+	var endCSP bool
+
+	endPlanDiags := planEndConfig.As(ctx, &endPlanModel, basetypes.ObjectAsOptions{})
+	diags.Append(endPlanDiags...)
+
+	stateDiags := stateEndConfig.As(ctx, &endStateModel, basetypes.ObjectAsOptions{})
+	diags.Append(stateDiags...)
+
+	partnerPlanDiags := planPartnerConfig.As(ctx, &partnerPlan, basetypes.ObjectAsOptions{})
+	diags.Append(partnerPlanDiags...)
+
+	if !planPartnerConfig.IsNull() {
+		if !partnerPlan.Partner.IsNull() {
+			if partnerPlan.Partner.ValueString() != "a-end" && partnerPlan.Partner.ValueString() != "vrouter" && partnerPlan.Partner.ValueString() != "transit" {
+				endCSP = true
+			}
+		}
+	}
+
+	partnerStateDiags := statePartnerConfig.As(ctx, &partnerState, basetypes.ObjectAsOptions{})
+	diags.Append(partnerStateDiags...)
+
+	var endVLAN, endInnerVLAN *int
+
+	var requestedProductUID *string
+
+	if !endPlanModel.RequestedProductUID.IsNull() && !endPlanModel.RequestedProductUID.Equal(endStateModel.RequestedProductUID) {
+		// Do not update the product UID if the partner is a CSP
+		if !endCSP {
+			requestedProductUID = megaport.PtrTo(endPlanModel.RequestedProductUID.ValueString())
+			endStateModel.RequestedProductUID = endPlanModel.RequestedProductUID
+		}
+	}
+
+	// Check for attempt to update VLAN for MCR or MVE products
+	if !endPlanModel.VLAN.IsUnknown() && !endPlanModel.VLAN.IsNull() && !endPlanModel.VLAN.Equal(endStateModel.VLAN) {
+		// Check if End Product is MCR of MVE
+		productType, err := r.client.ProductService.GetProductType(ctx, endPlanModel.RequestedProductUID.ValueString())
+		if err == nil && (strings.EqualFold(productType, megaport.PRODUCT_MCR) || strings.EqualFold(productType, megaport.PRODUCT_MVE)) {
+			diags.AddError(
+				"Error updating VXC",
+				fmt.Sprintf("Cannot update VLAN for product type %s (UID: %s). MCR and MVE products don't support VLAN specification.",
+					productType, endPlanModel.RequestedProductUID.ValueString()),
+			)
+		}
+
+		endVLAN = megaport.PtrTo(int(endPlanModel.VLAN.ValueInt64()))
+	}
+	endStateModel.VLAN = endPlanModel.VLAN
+
+	if !endPlanModel.InnerVLAN.IsUnknown() && !endPlanModel.InnerVLAN.IsNull() && !endPlanModel.InnerVLAN.Equal(endStateModel.InnerVLAN) {
+		endInnerVLAN = megaport.PtrTo(int(endPlanModel.InnerVLAN.ValueInt64()))
+	}
+	endStateModel.InnerVLAN = endPlanModel.InnerVLAN
+
+	if !planPartnerConfig.IsNull() && partnerChange && !endCSP {
+		partnerConfig := partnerPlan
+		switch partnerPlan.Partner.ValueString() {
+		case "transit":
+			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
+			diags.Append(transitDiags...)
+			partnerObj = partnerConfigObj
+			megaportPartnerConfig = transitPartnerConfig
+		case "a-end":
+			if partnerConfig.PartnerAEndConfig.IsNull() {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+name+": A-End Partner configuration is required",
+				)
+			}
+			var partnerConfigAEnd vxcPartnerConfigAEndModel
+			endDiags := partnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			diags.Append(endDiags...)
+			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, endPlanModel.RequestedProductUID.ValueString())
+			if err != nil {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+name+": "+err.Error(),
+				)
+			}
+
+			aEndDiags, aEndMegaportConfig, partnerConfigObj := createAEndPartnerConfig(ctx, partnerConfigAEnd, prefixFilterListRes)
+			diags.Append(aEndDiags...)
+			partnerObj = partnerConfigObj
+			megaportPartnerConfig = aEndMegaportConfig
+		case "vrouter":
+			if partnerPlan.VrouterPartnerConfig.IsNull() {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+name+": Virtual router configuration is required",
+				)
+			}
+			var partnerConfigAEnd vxcPartnerConfigVrouterModel
+			endDiags := partnerPlan.VrouterPartnerConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			diags.Append(endDiags...)
+			if diags.HasError() {
+			}
+			prefixFilterListRes, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, endStateModel.RequestedProductUID.ValueString())
+			if err != nil {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+name+": "+err.Error(),
+				)
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterListRes)
+			diags.Append(vrouterDiags...)
+			partnerObj = partnerConfigObj
+			megaportPartnerConfig = vrouterPartnerConfig
+		default:
+			diags.AddError(
+				"Error Updating VXC",
+				"Could not update VXC with name "+name+": Partner configuration not supported",
+			)
+		}
+	}
+	stateObj, stateDiags := types.ObjectValueFrom(ctx, vxcBasicEndConfigurationAttrs, endStateModel)
+	diags.Append(stateDiags...)
+	return diags, stateObj, partnerObj, megaportPartnerConfig, requestedProductUID, endVLAN, endInnerVLAN
 }
