@@ -28,20 +28,20 @@ const (
 	GooglePairingKey = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
 )
 
-// func TestVXCBasicProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCBasicProviderTestSuite))
-// }
+func TestVXCBasicProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCBasicProviderTestSuite))
+}
 
-// func TestVXCCSPProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCCSPProviderTestSuite))
-// }
+func TestVXCCSPProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCCSPProviderTestSuite))
+}
 
-// func TestVXCMVEProviderTestSuite(t *testing.T) {
-// 	t.Parallel()
-// 	suite.Run(t, new(VXCMVEProviderTestSuite))
-// }
+func TestVXCMVEProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCMVEProviderTestSuite))
+}
 
 func TestVXCMixedProviderTestSuite(t *testing.T) {
 	t.Parallel()
