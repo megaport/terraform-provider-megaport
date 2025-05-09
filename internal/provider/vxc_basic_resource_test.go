@@ -27,6 +27,8 @@ type MVEVNICIndexValidationAEndTestSuite ProviderTestSuite
 type MVEVNICIndexValidationBEndTestSuite ProviderTestSuite
 type MCRVLANModificationBEndTestSuite ProviderTestSuite
 type MVEVLANModificationAEndTestSuite ProviderTestSuite
+type MCRVXCBGPCSPTestSuite ProviderTestSuite
+type FullEcosystemTestSuite ProviderTestSuite
 
 func TestBasicVXCProviderTestSuite(t *testing.T) {
 	t.Parallel()
@@ -86,6 +88,16 @@ func TestAccVXCResourceWithMCRBEndVLANModification(t *testing.T) {
 func TestAccVXCResourceWithMVEAEndVLANModification(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(MVEVLANModificationAEndTestSuite))
+}
+
+func TestVXCBGPCSPTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRVXCBGPCSPTestSuite))
+}
+
+func TestFullEcosystemTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(FullEcosystemTestSuite))
 }
 
 func (suite *BasicVXCProviderTestSuite) TestAccMegaportBasicVXC_Basic() {
@@ -1339,6 +1351,507 @@ func (suite *MVEVLANModificationAEndTestSuite) TestAccVXCResourceWithMVEAEndVLAN
 				}
 				`, VXCBasicPortTestLocationID, MVETestLocationIDNum, portName2, mveName, mveName, mveKey, vxcName),
 				ExpectError: regexp.MustCompile("Error running apply"),
+			},
+		},
+	})
+}
+
+func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
+	mcrName := RandomTestName()
+	vxcName1 := RandomTestName()
+	prefixFilterListName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc2" {
+					id = %d
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.loc2.id
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					port_speed              = 5000
+					asn                     = 64555
+
+					prefix_filter_lists = [{
+					  description     = "%s"
+					  address_family  = "IPv4"
+					  entries = [
+						{
+						  action  = "permit"
+						  prefix  = "10.0.1.0/24"
+						  ge      = 24
+						  le      = 24
+						},
+						{
+						  action  = "deny"
+						  prefix  = "10.0.2.0/24"
+						  ge      = 24
+						  le      = 24
+						}
+					  ]
+					}]
+				  }
+
+				  resource "megaport_vxc_basic" "aws_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 1
+
+					a_end = {
+                      requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					a_end_partner_config = {
+					  partner = "vrouter"
+					  vrouter_config = {
+						interfaces = [{
+							ip_addresses     = ["10.0.0.1/30"]
+							nat_ip_addresses = ["10.0.0.1"]
+						  bfd = {
+							tx_interval   = 500
+							rx_interval   = 400
+							multiplier    = 5
+						  }
+						  bgp_connections = [
+							{
+							  peer_asn          = 64512
+							  local_ip_address  = "10.0.0.1"
+							  peer_ip_address   = "10.0.0.2"
+							  password          = "notARealPassword"
+							  shutdown          = false
+							  description       = "BGP Connection 1"
+							  med_in            = 100
+							  med_out           = 100
+							  bfd_enabled       = true
+							  export_policy     = "deny"
+							  permit_export_to = ["10.0.1.2"]
+							  import_whitelist = "%s"
+							  as_path_prepend_count = 4
+							}
+						  ]
+						}]
+					  }
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name            = "%s"
+						asn             = 64550
+						type            = "private"
+						connect_type    = "AWSHC"
+						amazon_asn      = 64551
+						owner_account   = "684021030471"
+					  }
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+				  }
+                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc_basic.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "resource_tags.key2", "value2"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc_basic.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc_basic.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// UPDATE Test - Change BGP Connection in Partner Config
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc2" {
+					id = %d
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.loc2.id
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					port_speed              = 5000
+					asn                     = 64555
+
+					prefix_filter_lists = [{
+					  description     = "%s"
+					  address_family  = "IPv4"
+					  entries = [
+						{
+						  action  = "permit"
+						  prefix  = "10.0.1.0/24"
+						  ge      = 24
+						  le      = 24
+						},
+						{
+						  action  = "deny"
+						  prefix  = "10.0.2.0/24"
+						  ge      = 24
+						  le      = 24
+						}
+					  ]
+					}]
+				  }
+
+				  resource "megaport_vxc_basic" "aws_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 1
+
+					a_end = {
+                      requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					a_end_partner_config = {
+					  partner = "vrouter"
+					  vrouter_config = {
+						interfaces = [{
+							ip_addresses     = ["10.0.0.1/30"]
+							nat_ip_addresses = ["10.0.0.1"]
+						  bfd = {
+							tx_interval   = 500
+							rx_interval   = 400
+							multiplier    = 5
+						  }
+						  bgp_connections = [
+							{
+							  peer_asn          = 64512
+							  local_ip_address  = "10.0.0.1"
+							  peer_ip_address   = "10.0.0.2"
+							  password          = "notARealPassword"
+							  shutdown          = false
+							  description       = "BGP Connection 1 updated"
+							  med_in            = 100
+							  med_out           = 100
+							  bfd_enabled       = true
+							  export_policy     = "deny"
+							  permit_export_to = ["10.0.1.2"]
+							  import_whitelist = "%s"
+							  as_path_prepend_count = 4
+							}
+						  ]
+						}]
+					  }
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name            = "%s"
+						asn             = 64550
+						type            = "private"
+						connect_type    = "AWSHC"
+						amazon_asn      = 64551
+						owner_account   = "684021030471"
+					  }
+					}
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
+				  }
+                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc_basic.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "resource_tags.key2updated", "value2updated"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
+	portName := RandomTestName()
+	lagPortName := RandomTestName()
+	mcrName := RandomTestName()
+	portVXCName := RandomTestName()
+	costCentreName := RandomTestName()
+	mcrVXCName := RandomTestName()
+	awsVXCName := RandomTestName()
+	gcpVXCName := RandomTestName()
+	azureVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc2" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc3" {
+					id = %d
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.loc2.id
+				  }
+
+				  resource "megaport_lag_port" "lag_port" {
+			        product_name  = "%s"
+					cost_centre = "%s"
+			        port_speed  = 10000
+			        location_id = data.megaport_location.loc1.id
+			        contract_term_months        = 12
+					marketplace_visibility = false
+                    lag_count = 1
+			      }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.loc2.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					asn                      = 64555
+				  }
+
+				  resource "megaport_vxc_basic" "port_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  vlan = 101
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_lag_port.lag_port.product_uid
+					  vlan = 102
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "mcr_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  vlan = 181
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWS"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "gcp_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "google"
+					  google_config = {
+						pairing_key = "%s"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "azure_vxc" {
+					product_name            = "%s"
+					rate_limit              = 200
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "azure"
+					  azure_config = {
+					    port_choice = "primary"
+						service_key = "%s"
+					  }
+					}
+				  }
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKey, azureVXCName, AzureServiceKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc_basic.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.port_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.port_vxc", "resource_tags.key2", "value2"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.mcr_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc_basic.mcr_vxc", "resource_tags.key2", "value2"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc_basic.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc_basic.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc_basic.gcp_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc_basic.gcp_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc_basic.azure_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc_basic.azure_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
 			},
 		},
 	})
