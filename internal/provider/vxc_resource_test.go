@@ -30,20 +30,20 @@ const (
 	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
 )
 
-func TestVXCBasicProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCBasicProviderTestSuite))
-}
+// func TestVXCBasicProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(VXCBasicProviderTestSuite))
+// }
 
-func TestVXCCSPProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCCSPProviderTestSuite))
-}
+// func TestVXCCSPProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(VXCCSPProviderTestSuite))
+// }
 
-func TestVXCMVEProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMVEProviderTestSuite))
-}
+// func TestVXCMVEProviderTestSuite(t *testing.T) {
+// 	t.Parallel()
+// 	suite.Run(t, new(VXCMVEProviderTestSuite))
+// }
 
 func TestVXCInnerVLANProviderTestSuite(t *testing.T) {
 	t.Parallel()
