@@ -49,9 +49,15 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 				)
 			}
 			endConfig.VLAN = 0
-			if !c.NetworkInterfaceIndex.IsNull() && !c.NetworkInterfaceIndex.IsUnknown() {
-				vnicIndex := int(c.NetworkInterfaceIndex.ValueInt64())
-				endConfig.NetworkInterfaceIndex = vnicIndex
+			if !c.InnerVLAN.IsNull() || !c.NetworkInterfaceIndex.IsNull() {
+				vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
+				if !c.InnerVLAN.IsNull() {
+					vxcOrderMVEConfig.InnerVLAN = int(c.InnerVLAN.ValueInt64())
+				}
+				if !c.NetworkInterfaceIndex.IsNull() {
+					vxcOrderMVEConfig.NetworkInterfaceIndex = int(c.NetworkInterfaceIndex.ValueInt64())
+				}
+				endConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 			}
 		}
 	} else {
@@ -60,17 +66,6 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 		} else {
 			endConfig.VLAN = int(c.VLAN.ValueInt64())
 		}
-	}
-
-	if !c.InnerVLAN.IsNull() || !c.NetworkInterfaceIndex.IsNull() {
-		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
-		if !c.InnerVLAN.IsNull() {
-			vxcOrderMVEConfig.InnerVLAN = int(c.InnerVLAN.ValueInt64())
-		}
-		if !c.NetworkInterfaceIndex.IsNull() {
-			vxcOrderMVEConfig.NetworkInterfaceIndex = int(c.NetworkInterfaceIndex.ValueInt64())
-		}
-		endConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
 	if !partnerConfig.IsNull() {
