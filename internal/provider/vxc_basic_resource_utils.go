@@ -42,12 +42,16 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 		if strings.EqualFold(productType, megaport.PRODUCT_MCR) {
 			endConfig.VLAN = 0
 		} else if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-			if !c.NetworkInterfaceIndex.IsNull() && c.NetworkInterfaceIndex.ValueInt64() > 0 {
+			if c.NetworkInterfaceIndex.IsNull() && c.NetworkInterfaceIndex.IsUnknown() {
+				diags.AddError(
+					"Error creating VXC",
+					"Could not create VXC with name "+name+": Network Interface Index is required for MVE products",
+				)
+			}
+			endConfig.VLAN = 0
+			if !c.NetworkInterfaceIndex.IsNull() && !c.NetworkInterfaceIndex.IsUnknown() {
 				vnicIndex := int(c.NetworkInterfaceIndex.ValueInt64())
-				endConfig.VLAN = 0
 				endConfig.NetworkInterfaceIndex = vnicIndex
-			} else {
-				endConfig.VLAN = 0
 			}
 		}
 	} else {
