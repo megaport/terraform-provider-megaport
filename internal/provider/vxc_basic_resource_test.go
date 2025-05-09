@@ -1384,7 +1384,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 					product_name            = "%s"
 					location_id             = data.megaport_location.loc1.id
 					contract_term_months    = 1
-					port_speed              = 5000
+					port_speed              = 1000
 					asn                     = 64555
 
 					prefix_filter_lists = [{
@@ -1409,7 +1409,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 
 				  resource "megaport_vxc_basic" "aws_vxc" {
 					product_name           = "%s"
-					rate_limit             = 1000
+					rate_limit             = 100
 					contract_term_months   = 1
 
 					a_end = {
@@ -1440,7 +1440,6 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 							  bfd_enabled       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
-							  import_whitelist = "%s"
 							  as_path_prepend_count = 4
 							}
 						  ]
@@ -1469,7 +1468,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 						"key2" = "value2"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc_basic.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1519,7 +1518,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 					product_name            = "%s"
 					location_id             = data.megaport_location.loc1.id
 					contract_term_months    = 1
-					port_speed              = 5000
+					port_speed              = 1000
 					asn                     = 64555
 
 					prefix_filter_lists = [{
@@ -1544,7 +1543,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 
 				  resource "megaport_vxc_basic" "aws_vxc" {
 					product_name           = "%s"
-					rate_limit             = 1000
+					rate_limit             = 100
 					contract_term_months   = 1
 
 					a_end = {
@@ -1575,7 +1574,6 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 							  bfd_enabled       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
-							  import_whitelist = "%s"
 							  as_path_prepend_count = 4
 							}
 						  ]
@@ -1604,7 +1602,7 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 						"key2updated" = "value2updated"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc_basic.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc_basic.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1672,7 +1670,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
-					port_speed              = 2500
+					port_speed              = 1000
 					location_id             = data.megaport_location.loc1.id
 					contract_term_months    = 1
 					asn                      = 64555
@@ -1680,7 +1678,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_vxc_basic" "port_vxc" {
 					product_name           = "%s"
-					rate_limit             = 1000
+					rate_limit             = 100
 					contract_term_months   = 12
 
 					a_end = {
@@ -1701,7 +1699,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_vxc_basic" "mcr_vxc" {
 					product_name           = "%s"
-					rate_limit             = 1000
+					rate_limit             = 100
 					contract_term_months   = 12
 
 					a_end = {
@@ -1721,7 +1719,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_vxc_basic" "aws_vxc" {
 					product_name            = "%s"
-					rate_limit              = 1000
+					rate_limit              = 100
 					contract_term_months    = 1
 
 					a_end = {
@@ -1747,7 +1745,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_vxc_basic" "gcp_vxc" {
 					product_name            = "%s"
-					rate_limit              = 1000
+					rate_limit              = 100
 					contract_term_months    = 12
 
 					a_end = {
@@ -1766,7 +1764,7 @@ func (suite *FullEcosystemTestSuite) TestFullEcosystem() {
 
 				  resource "megaport_vxc_basic" "azure_vxc" {
 					product_name            = "%s"
-					rate_limit              = 200
+					rate_limit              = 100
 					contract_term_months    = 12
 
 					a_end = {
