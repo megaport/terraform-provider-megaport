@@ -51,10 +51,10 @@ Required:
 
 Optional:
 
-- `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
+- `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged.
-- `vlan` (Number) The VLAN of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0 or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration. To set this VLAN to untagged, set the VLAN value to null. For MCR endpoints, setting this to null will result in the API auto-assigning a VLAN ID. For MVE endpoints, setting this to null will use the VLAN associated with the VNIC specified in vnic_index.
-- `vnic_index` (Number) The network interface index of the A-End configuration.
+- `vlan` (Number) The VLAN of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0 or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration. To set this VLAN to untagged, set the VLAN value to -1. For MCR endpoints, setting this to null will result in the API auto-assigning a VLAN ID. For MVE endpoints, setting this to null will use the VLAN associated with the VNIC specified in vnic_index.
+- `vnic_index` (Number) The network interface index of the A-End configuration. Required for MVE connections.
 
 
 <a id="nestedatt--b_end"></a>
@@ -66,7 +66,7 @@ Optional:
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
 - `vlan` (Number) The VLAN of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0 or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration. To set this VLAN to untagged, set the VLAN value to -1. For MCR endpoints, setting this to null will result in the API auto-assigning a VLAN ID. For MVE endpoints, setting this to null will use the VLAN associated with the VNIC specified in vnic_index.
-- `vnic_index` (Number) The network interface index of the B-End configuration.
+- `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.
 
 
 <a id="nestedatt--a_end_partner_config"></a>
@@ -91,10 +91,9 @@ Optional:
 
 Required:
 
-- `connect_type` (String) The connection type of the partner configuration. Required for AWS partner configurations.
+- `connect_type` (String) The connection type of the partner configuration. Required for AWS partner configurations - valid values are "AWS" for Virtual Interface or AWSHC for AWS Hosted Connections.
 - `name` (String) The name of the partner configuration.
 - `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
 
 Optional:
 
@@ -104,6 +103,7 @@ Optional:
 - `auth_key` (String) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
+- `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
 
 
 <a id="nestedatt--a_end_partner_config--azure_config"></a>
@@ -314,7 +314,7 @@ Optional:
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations, invalid on B-End Partner Config. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
+- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
 - `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config))
 
 <a id="nestedatt--b_end_partner_config--aws_config"></a>
@@ -322,10 +322,9 @@ Optional:
 
 Required:
 
-- `connect_type` (String) The connection type of the partner configuration. Required for AWS partner configurations.
+- `connect_type` (String) The connection type of the partner configuration. Required for AWS partner configurations - valid values are "AWS" for Virtual Interface or AWSHC for AWS Hosted Connections.
 - `name` (String) The name of the partner configuration.
 - `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-- `type` (String) The type of the partner configuration. Required for AWS partner configurations.
 
 Optional:
 
@@ -335,6 +334,7 @@ Optional:
 - `auth_key` (String) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
+- `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
 
 
 <a id="nestedatt--b_end_partner_config--azure_config"></a>
