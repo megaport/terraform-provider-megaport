@@ -9,6 +9,13 @@ import (
 )
 
 var (
+	partnerTypeSchema = schema.StringAttribute{
+		Description: "The partner of the partner configuration.",
+		Required:    true,
+		Validators: []validator.String{
+			stringvalidator.OneOf("aws", "azure", "google", "oracle", "ibm", "vrouter", "transit", "a-end"),
+		},
+	}
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The AWS partner configuration.",
 		Optional:    true,
