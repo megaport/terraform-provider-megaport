@@ -10,6 +10,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
+const (
+	VXC_A_END = "A-End"
+	VXC_B_END = "B-End"
+)
+
 func getEndConfigSchema(end string) schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: fmt.Sprintf("The current %s configuration of the VXC.", end),
@@ -55,9 +60,9 @@ func getEndConfigSchema(end string) schema.SingleNestedAttribute {
 }
 
 func isAEndConfig(end string) bool {
-	return end == "A-End"
+	return end == VXC_A_END
 }
 
 func isBEndConfig(end string) bool {
-	return end == "B-End"
+	return end == VXC_B_END
 }
