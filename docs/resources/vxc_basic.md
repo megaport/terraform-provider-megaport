@@ -81,9 +81,8 @@ Optional:
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--ibm_config))
+- `mcr_config` (Attributes) The partner configuration of the MCR configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--mcr_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
-- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config))
 
 <a id="nestedatt--a_end_partner_config--aws_config"></a>
 ### Nested Schema for `a_end_partner_config.aws_config`
@@ -158,100 +157,27 @@ Optional:
 - `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
 
 
-<a id="nestedatt--a_end_partner_config--oracle_config"></a>
-### Nested Schema for `a_end_partner_config.oracle_config`
+<a id="nestedatt--a_end_partner_config--mcr_config"></a>
+### Nested Schema for `a_end_partner_config.mcr_config`
 
 Required:
 
-- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--mcr_config--interfaces))
 
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces))
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces`
+<a id="nestedatt--a_end_partner_config--mcr_config--interfaces"></a>
+### Nested Schema for `a_end_partner_config.mcr_config.interfaces`
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
+- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--mcr_config--interfaces--bfd))
+- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--mcr_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bfd`
-
-Optional:
-
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
-
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
-
-Optional:
-
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
-- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
-- `deny_export_to` (List of String) The denied export to of the BGP connection.
-- `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
-- `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
-- `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
-- `med_in` (Number) The MED in of the BGP connection.
-- `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
-- `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
-- `permit_export_to` (List of String) The permitted export to of the BGP connection.
-- `shutdown` (Boolean) Whether the BGP connection is shut down.
-
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.ip_routes`
-
-Optional:
-
-- `description` (String) The description of the IP route.
-- `next_hop` (String) The next hop of the IP route.
-- `prefix` (String) The prefix of the IP route.
-
-
-
-
-<a id="nestedatt--a_end_partner_config--vrouter_config"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces))
-
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--mcr_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bfd`
+<a id="nestedatt--a_end_partner_config--mcr_config--interfaces--bfd"></a>
+### Nested Schema for `a_end_partner_config.mcr_config.interfaces.bfd`
 
 Optional:
 
@@ -260,8 +186,8 @@ Optional:
 - `tx_interval` (Number) The transmit interval of the BFD.
 
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bgp_connections`
+<a id="nestedatt--a_end_partner_config--mcr_config--interfaces--bgp_connections"></a>
+### Nested Schema for `a_end_partner_config.mcr_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -286,8 +212,8 @@ Optional:
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.ip_routes`
+<a id="nestedatt--a_end_partner_config--mcr_config--interfaces--ip_routes"></a>
+### Nested Schema for `a_end_partner_config.mcr_config.interfaces.ip_routes`
 
 Optional:
 
@@ -296,6 +222,14 @@ Optional:
 - `prefix` (String) The prefix of the IP route.
 
 
+
+
+<a id="nestedatt--a_end_partner_config--oracle_config"></a>
+### Nested Schema for `a_end_partner_config.oracle_config`
+
+Required:
+
+- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
 
 
 
@@ -312,9 +246,8 @@ Optional:
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
 - `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
+- `mcr_config` (Attributes) The partner configuration of the MCR configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--mcr_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
-- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config))
 
 <a id="nestedatt--b_end_partner_config--aws_config"></a>
 ### Nested Schema for `b_end_partner_config.aws_config`
@@ -389,100 +322,27 @@ Optional:
 - `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
 
 
-<a id="nestedatt--b_end_partner_config--oracle_config"></a>
-### Nested Schema for `b_end_partner_config.oracle_config`
+<a id="nestedatt--b_end_partner_config--mcr_config"></a>
+### Nested Schema for `b_end_partner_config.mcr_config`
 
 Required:
 
-- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
+- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--mcr_config--interfaces))
 
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces))
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces`
+<a id="nestedatt--b_end_partner_config--mcr_config--interfaces"></a>
+### Nested Schema for `b_end_partner_config.mcr_config.interfaces`
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
+- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--mcr_config--interfaces--bfd))
+- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--mcr_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bfd`
-
-Optional:
-
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
-
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
-
-Optional:
-
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
-- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
-- `deny_export_to` (List of String) The denied export to of the BGP connection.
-- `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
-- `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
-- `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
-- `med_in` (Number) The MED in of the BGP connection.
-- `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
-- `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
-- `permit_export_to` (List of String) The permitted export to of the BGP connection.
-- `shutdown` (Boolean) Whether the BGP connection is shut down.
-
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.ip_routes`
-
-Optional:
-
-- `description` (String) The description of the IP route.
-- `next_hop` (String) The next hop of the IP route.
-- `prefix` (String) The prefix of the IP route.
-
-
-
-
-<a id="nestedatt--b_end_partner_config--vrouter_config"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces))
-
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--mcr_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bfd`
+<a id="nestedatt--b_end_partner_config--mcr_config--interfaces--bfd"></a>
+### Nested Schema for `b_end_partner_config.mcr_config.interfaces.bfd`
 
 Optional:
 
@@ -491,8 +351,8 @@ Optional:
 - `tx_interval` (Number) The transmit interval of the BFD.
 
 
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bgp_connections`
+<a id="nestedatt--b_end_partner_config--mcr_config--interfaces--bgp_connections"></a>
+### Nested Schema for `b_end_partner_config.mcr_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -517,11 +377,21 @@ Optional:
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.ip_routes`
+<a id="nestedatt--b_end_partner_config--mcr_config--interfaces--ip_routes"></a>
+### Nested Schema for `b_end_partner_config.mcr_config.interfaces.ip_routes`
 
 Optional:
 
 - `description` (String) The description of the IP route.
 - `next_hop` (String) The next hop of the IP route.
 - `prefix` (String) The prefix of the IP route.
+
+
+
+
+<a id="nestedatt--b_end_partner_config--oracle_config"></a>
+### Nested Schema for `b_end_partner_config.oracle_config`
+
+Required:
+
+- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.

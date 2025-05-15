@@ -1417,8 +1417,8 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 					}
 
 					a_end_partner_config = {
-					  partner = "vrouter"
-					  vrouter_config = {
+					  partner = "mcr"
+					  mcr_config = {
 						interfaces = [{
 							ip_addresses     = ["10.0.0.1/30"]
 							nat_ip_addresses = ["10.0.0.1"]
@@ -1551,8 +1551,8 @@ func (suite *MCRVXCBGPCSPTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 					}
 
 					a_end_partner_config = {
-					  partner = "vrouter"
-					  vrouter_config = {
+					  partner = "mcr"
+					  mcr_config = {
 						interfaces = [{
 							ip_addresses     = ["10.0.0.1/30"]
 							nat_ip_addresses = ["10.0.0.1"]
