@@ -12,6 +12,29 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
+// createVXCBasicEndConfiguration creates an endpoint configuration for a VXC (Virtual Cross Connect).
+//
+// This function processes the endpoint configuration data and constructs a proper VXCOrderEndpointConfiguration
+// that can be used when creating or updating VXC connections. It handles special cases for different product
+// types (MCR, MVE) and processes various partner configurations for cloud service providers.
+//
+// Parameters:
+//   - ctx: The context for the operation
+//   - name: Name of the VXC being created (for error messaging)
+//   - rateLimit: The speed limit for the connection in Mbps
+//   - c: The endpoint configuration model from Terraform
+//   - partnerConfig: Partner configuration object (if connecting to a partner service like AWS, Azure, etc.)
+//
+// Returns:
+//   - diag.Diagnostics: Any validation or processing errors
+//   - megaport.VXCOrderEndpointConfiguration: The configured endpoint ready for the API
+//   - basetypes.ObjectValue: The processed partner configuration
+//
+// The function performs several key operations:
+//  1. Validates product-specific requirements (e.g., MVE requires NetworkInterfaceIndex)
+//  2. Sets VLAN configuration based on product type
+//  3. Processes inner VLAN and network interface settings
+//  4. Handles partner-specific configurations (AWS, Azure, Google, Oracle, IBM, etc.)
 func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, name string, rateLimit int, c vxcBasicEndConfigurationModel, partnerConfig basetypes.ObjectValue) (diag.Diagnostics, megaport.VXCOrderEndpointConfiguration, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	endConfig := megaport.VXCOrderEndpointConfiguration{
@@ -300,6 +323,29 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 	return diags, endConfig, partnerObj
 }
 
+// modifyPlanBasicEndConfig modifies the Terraform plan for an endpoint configuration to handle
+// special cases, particularly for cloud service provider endpoints where Megaport automatically
+// manages port assignments.
+//
+// Parameters:
+//   - ctx: The context for the operation
+//   - endPlanObj: The plan object for the endpoint configuration
+//   - endStateObj: The current state object for the endpoint configuration
+//   - planPartner: The plan object for the partner configuration
+//   - statePartner: The current state object for the partner configuration
+//
+// Returns:
+//   - diag.Diagnostics: Any validation or processing errors
+//   - basetypes.ObjectValue: The modified plan object for the endpoint
+//   - basetypes.ObjectValue: The modified state object for the endpoint
+//   - basetypes.ObjectValue: The modified state object for the partner
+//   - path.Paths: Any attributes that require resource replacement if changed
+//
+// The function handles several important scenarios:
+//  1. Detects cloud service provider (CSP) endpoints and manages port UIDs appropriately
+//  2. Issues warnings when cloud provider port mappings are detected
+//  3. Determines which changes require resource replacement
+//  4. Synchronizes requested and current product UIDs for consistency
 func modifyPlanBasicEndConfig(ctx context.Context, endPlanObj basetypes.ObjectValue, endStateObj basetypes.ObjectValue, planPartner basetypes.ObjectValue, statePartner basetypes.ObjectValue) (diag.Diagnostics, basetypes.ObjectValue, basetypes.ObjectValue, basetypes.ObjectValue, path.Paths) {
 	diags := diag.Diagnostics{}
 	requiresReplace := path.Paths{}
@@ -360,6 +406,33 @@ func modifyPlanBasicEndConfig(ctx context.Context, endPlanObj basetypes.ObjectVa
 	return diags, newPlanEndObj, newStateEndObj, statePartner, requiresReplace
 }
 
+// makeUpdateEndConfig prepares configurations for updating an endpoint, determining which
+// attributes need to be updated and handling partner configuration changes.
+//
+// Parameters:
+//   - ctx: The context for the operation
+//   - name: Name of the VXC (for error messaging)
+//   - planEndConfig: The planned endpoint configuration
+//   - stateEndConfig: The current state endpoint configuration
+//   - planPartnerConfig: The planned partner configuration
+//   - statePartnerConfig: The current state partner configuration
+//
+// Returns:
+//   - diag.Diagnostics: Any validation or processing errors
+//   - basetypes.ObjectValue: The updated state object for the endpoint
+//   - basetypes.ObjectValue: The updated partner configuration object
+//   - megaport.VXCPartnerConfiguration: The partner configuration for the API
+//   - *string: The requested product UID if it needs to be updated (nil if no change)
+//   - *int: The VLAN if it needs to be updated (nil if no change)
+//   - *int: The inner VLAN if it needs to be updated (nil if no change)
+//   - bool: Whether the endpoint is a cloud service provider endpoint
+//
+// This function:
+//  1. Detects changes between plan and state configurations
+//  2. Determines which attributes need updates
+//  3. Handles special cases for cloud service provider endpoints
+//  4. Prepares partner configurations for update operations
+//  5. Returns the necessary parameters for the VXC update operation
 func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string, planEndConfig, stateEndConfig, planPartnerConfig, statePartnerConfig basetypes.ObjectValue) (diag.Diagnostics, basetypes.ObjectValue, basetypes.ObjectValue, megaport.VXCPartnerConfiguration, *string, *int, *int, bool) {
 	diags := diag.Diagnostics{}
 
