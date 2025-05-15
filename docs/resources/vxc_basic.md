@@ -37,7 +37,6 @@ Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This r
 
 - `admin_locked` (Boolean) Whether the product is admin locked.
 - `cancelable` (Boolean) Whether the product is cancelable.
-- `last_updated` (String) The last time the resource was updated.
 - `locked` (Boolean) Whether the product is locked.
 - `product_uid` (String) The unique identifier for the resource.
 - `provisioning_status` (String) The provisioning status of the product.
