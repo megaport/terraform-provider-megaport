@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -40,8 +39,6 @@ var (
 
 // vxcBasicResourceModel maps the resource schema data.
 type vxcBasicResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                types.String `tfsdk:"product_uid"`
 	Name               types.String `tfsdk:"product_name"`
 	RateLimit          types.Int64  `tfsdk:"rate_limit"`
@@ -186,10 +183,6 @@ func (r *vxcBasicResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity. This is a basic resource for VXC management.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
@@ -423,8 +416,6 @@ func (r *vxcBasicResource) Create(ctx context.Context, req resource.CreateReques
 	apiDiags := plan.fromAPIVXC(ctx, vxc, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -571,7 +562,6 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 	// Set updated state
 	state.AEndConfiguration = aEndState
 	state.BEndConfiguration = bEndState
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Get refreshed vxc value from API
 	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())
@@ -614,7 +604,6 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 
 	state.AEndPartnerConfig = savedAEndPartnerConfig
