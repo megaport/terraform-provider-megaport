@@ -181,6 +181,7 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 	orm.Locked = types.BoolValue(m.Locked)
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
+	orm.DiversityZone = types.StringValue(m.DiversityZone)
 
 	if m.CreateDate != nil {
 		orm.CreateDate = types.StringValue(m.CreateDate.String())
@@ -355,6 +356,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"diversity_zone": schema.StringAttribute{
 				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
