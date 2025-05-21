@@ -2246,6 +2246,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	aEndState.InnerVLAN = aEndPlan.InnerVLAN
 
+	// Check VNIC index for A End
+	if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
+		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
+	}
+
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() && !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
@@ -2256,6 +2261,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
+
+	// Check VNIC index for B End
+	if !bEndPlan.NetworkInterfaceIndex.IsUnknown() && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) {
+		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
+	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
