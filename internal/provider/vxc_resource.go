@@ -491,6 +491,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		orm.ContractEndDate = types.StringNull()
 	}
 	var aEndOrderedVLAN, bEndOrderedVLAN *int64
+	var aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
@@ -500,6 +501,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingAEnd.OrderedVLAN.ValueInt64()
 			aEndOrderedVLAN = &vlan
+		}
+		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
+			vlan := existingAEnd.InnerVLAN.ValueInt64()
+			aEndInnerVLAN = &vlan
 		}
 	}
 
@@ -517,8 +522,19 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
 	}
 	if v.AEndConfiguration.InnerVLAN == 0 {
-		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		// Check if existing inner VLAN is null or -1
+		if aEndInnerVLAN != nil && *aEndInnerVLAN == -1 {
+			// Keep it as -1 (untagged)
+			aEndModel.InnerVLAN = types.Int64Value(*aEndInnerVLAN)
+		} else if aEndInnerVLAN != nil && *aEndInnerVLAN == 0 && v.AEndConfiguration.InnerVLAN == 0 {
+			// Only keep as 0 if the API actually returned 0 and user requested 0
+			aEndModel.InnerVLAN = types.Int64Value(0)
+		} else {
+			// API didn't return a value, keep as null
+			aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		}
 	} else {
+		// API returned a non-zero value - use it
 		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
 	if v.AEndConfiguration.VLAN == 0 {
@@ -538,6 +554,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := existingBEnd.OrderedVLAN.ValueInt64()
 			bEndOrderedVLAN = &vlan
 		}
+		if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
+			vlan := existingBEnd.InnerVLAN.ValueInt64()
+			bEndInnerVLAN = &vlan
+		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
@@ -555,7 +575,17 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
 	}
 	if v.BEndConfiguration.InnerVLAN == 0 {
-		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		// Check if existing inner VLAN is null or -1
+		if bEndInnerVLAN != nil && *bEndInnerVLAN == -1 {
+			// Keep it as -1 (untagged)
+			bEndModel.InnerVLAN = types.Int64Value(*bEndInnerVLAN)
+		} else if bEndInnerVLAN != nil && *bEndInnerVLAN == 0 && v.BEndConfiguration.InnerVLAN == 0 {
+			// Only keep as 0 if the API actually returned 0 and user requested 0
+			bEndModel.InnerVLAN = types.Int64Value(0)
+		} else {
+			// Keep it as null, which means un-assigned.
+			bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		}
 	} else {
 		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
@@ -1119,6 +1149,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
+							CustomInnerVLANModifier(),
 						},
 					},
 					"vlan": schema.Int64Attribute{
@@ -1131,6 +1162,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
+							CustomInnerVLANModifier(),
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
