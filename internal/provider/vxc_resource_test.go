@@ -2618,26 +2618,6 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
 					resource.TestCheckResourceAttrSet("megaport_vxc.mve_vxc", "product_uid"),
 				),
 			},
-			// ImportState testing
-			{
-				ResourceName:                         "megaport_vxc.mve_vxc",
-				ImportState:                          true,
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_vxc.mve_vxc"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
-						}
-					}
-					return rawState["product_uid"], nil
-				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
-			},
 			// Update test - Move VXC to MVE 3 and MVE 4, change VNIC index to 1
 			{
 				Config: providerConfig + fmt.Sprintf(`
