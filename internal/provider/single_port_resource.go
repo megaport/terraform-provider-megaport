@@ -622,8 +622,9 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	// Delete existing order
 	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:    state.UID.ValueString(),
-		DeleteNow: true,
+		PortID:     state.UID.ValueString(),
+		DeleteNow:  true,
+		SafeDelete: true,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
