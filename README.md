@@ -7,7 +7,7 @@ This provides an opportunity for true multi-cloud hybrid environments supported 
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
 Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs.
 
-This provider is compatible with both HashiCorp Terraform and OpenTofu.
+This provider is compatible with HashiCorp Terraform, and we have tested compatibility with OpenTofu and haven't seen issues.
 
 The Megaport Terraform Provider is released as a tool for use with the Megaport API.
 
