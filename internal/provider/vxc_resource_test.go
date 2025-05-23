@@ -44,6 +44,110 @@ func TestVXCMVEProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(VXCMVEProviderTestSuite))
 }
 
+func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_InnerVLANAutoAssignUpdate() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with specific inner_vlan values
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 12
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 12
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 500
+                    contract_term_months = 12
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        inner_vlan = 410
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        inner_vlan = 411
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					// Verify initial inner_vlan values
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "410"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan", "411"),
+				),
+			},
+			// Step 2: Update inner_vlan values to 0 (auto-assign)
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 12
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 12
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 500
+                    contract_term_months = 12
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        inner_vlan = 0
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        inner_vlan = 0
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the VXC was updated successfully
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					// We expect either:
+					// 1. inner_vlan will be "0" if the API returns 0
+					// 2. inner_vlan will be some other value if API auto-assigns
+					// Just check that the update succeeded and was accepted by the provider
+				),
+			},
+		},
+	})
+}
+
 func TestVXCMixedProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(VXCMixedProviderTestSuite))
