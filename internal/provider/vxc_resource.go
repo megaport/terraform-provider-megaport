@@ -2656,6 +2656,30 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
 		return transitObject, apiDiags
+	case megaport.CSPConnectionOracle:
+		oracleModel := &cspConnectionModel{
+			ConnectType:  types.StringValue(provider.ConnectType),
+			ResourceName: types.StringValue(provider.ResourceName),
+			ResourceType: types.StringValue(provider.ResourceType),
+			CSPName:      types.StringValue(provider.CSPName),
+			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
+		}
+
+		// Set VirtualCircuitId if available
+		if provider.VirtualCircuitId != "" {
+			oracleModel.ConnectionID = types.StringValue(provider.VirtualCircuitId)
+		} else {
+			oracleModel.ConnectionID = types.StringNull()
+		}
+
+		// Set null values for fields that don't apply to Oracle connections
+		oracleModel.Bandwidths = types.ListNull(types.Int64Type)
+		oracleModel.IPAddresses = types.ListNull(types.StringType)
+
+		// Convert the model to a Terraform Object
+		oracleObj, oracleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, oracleModel)
+		apiDiags = append(apiDiags, oracleObjDiags...)
+		return oracleObj, apiDiags
 	case megaport.CSPConnectionIBM:
 		ibmModel := &cspConnectionModel{
 			ConnectType:       types.StringValue(provider.ConnectType),
