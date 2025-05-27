@@ -1157,7 +1157,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged.",
+						Description: "The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is supported only during initial creation. Updating from a defined value to 0 (auto-assign) is not currently supported and will result in provider errors. This is a known limitation that will be resolved in a future release.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1167,8 +1167,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vnic_index": schema.Int64Attribute{
 						Description: "The network interface index of the A-End configuration. Required for MVE connections.",
-						Computed:    true,
 						Optional:    true,
+						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
 						},
@@ -1241,11 +1241,12 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged.",
+						Description: "The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is supported only during initial creation. Updating from a defined value to 0 (auto-assign) is not currently supported and will result in provider errors. This is a known limitation that will be resolved in a future release.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
 							int64planmodifier.UseStateForUnknown(),
+							CustomInnerVLANModifier(),
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
@@ -2273,11 +2274,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
-	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
-		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
-	}
-	aEndState.InnerVLAN = aEndPlan.InnerVLAN
-
 	// Check VNIC index for A End
 	if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
@@ -2289,7 +2285,32 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
+	// Prevent setting inner_vlan to 0 during updates (auto-assignment only works on creation)
+	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
+		if aEndPlan.InnerVLAN.ValueInt64() == 0 {
+			resp.Diagnostics.AddError(
+				"Invalid inner_vlan update",
+				"Setting inner_vlan to 0 (auto-assign) during updates is not currently supported. "+
+					"You can only set inner_vlan to 0 during initial resource creation. "+
+					"Please use a specific VLAN value or -1 for untagged.",
+			)
+			return
+		}
+		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
+	}
+	aEndState.InnerVLAN = aEndPlan.InnerVLAN
+
+	// Similarly add for B-End
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
+		if bEndPlan.InnerVLAN.ValueInt64() == 0 {
+			resp.Diagnostics.AddError(
+				"Invalid inner_vlan update",
+				"Setting inner_vlan to 0 (auto-assign) during updates is not currently supported. "+
+					"You can only set inner_vlan to 0 during initial resource creation. "+
+					"Please use a specific VLAN value or -1 for untagged.",
+			)
+			return
+		}
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
