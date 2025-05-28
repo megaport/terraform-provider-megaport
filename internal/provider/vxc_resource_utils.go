@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -9,6 +10,185 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
+	apiDiags := diag.Diagnostics{}
+
+	orm.UID = types.StringValue(v.UID)
+	orm.ID = types.Int64Value(int64(v.ID))
+	orm.Name = types.StringValue(v.Name)
+	orm.ServiceID = types.Int64Value(int64(v.ServiceID))
+	orm.Type = types.StringValue(v.Type)
+	orm.RateLimit = types.Int64Value(int64(v.RateLimit))
+	orm.DistanceBand = types.StringValue(v.DistanceBand)
+	orm.ProvisioningStatus = types.StringValue(v.ProvisioningStatus)
+	orm.SecondaryName = types.StringValue(v.SecondaryName)
+	orm.UsageAlgorithm = types.StringValue(v.UsageAlgorithm)
+	orm.CreatedBy = types.StringValue(v.CreatedBy)
+	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
+	orm.CompanyUID = types.StringValue(v.CompanyUID)
+	orm.CompanyName = types.StringValue(v.CompanyName)
+	orm.Shutdown = types.BoolValue(v.Shutdown)
+	orm.CostCentre = types.StringValue(v.CostCentre)
+	orm.Locked = types.BoolValue(v.Locked)
+	orm.AdminLocked = types.BoolValue(v.AdminLocked)
+	orm.Cancelable = types.BoolValue(v.Cancelable)
+
+	if v.CreateDate != nil {
+		orm.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
+	} else {
+		orm.CreateDate = types.StringNull()
+	}
+	if v.LiveDate != nil {
+		orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
+	} else {
+		orm.LiveDate = types.StringNull()
+	}
+	if v.ContractStartDate != nil {
+		orm.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
+	} else {
+		orm.ContractStartDate = types.StringNull()
+	}
+	if v.ContractEndDate != nil {
+		orm.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
+	} else {
+		orm.ContractEndDate = types.StringNull()
+	}
+	var aEndOrderedVLAN, bEndOrderedVLAN *int64
+	var aEndInnerVLAN, bEndInnerVLAN *int64
+	var aEndRequestedProductUID, bEndRequestedProductUID string
+	if !orm.AEndConfiguration.IsNull() {
+		existingAEnd := &vxcEndConfigurationModel{}
+		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, aEndDiags...)
+		aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
+			vlan := existingAEnd.OrderedVLAN.ValueInt64()
+			aEndOrderedVLAN = &vlan
+		}
+		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
+			vlan := existingAEnd.InnerVLAN.ValueInt64()
+			aEndInnerVLAN = &vlan
+		}
+	}
+
+	aEndModel := &vxcEndConfigurationModel{
+		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
+		RequestedProductUID:   types.StringValue(aEndRequestedProductUID),
+		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
+		Name:                  types.StringValue(v.AEndConfiguration.Name),
+		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
+		Location:              types.StringValue(v.AEndConfiguration.Location),
+		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
+		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	}
+	if aEndOrderedVLAN != nil {
+		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
+	}
+	if v.AEndConfiguration.InnerVLAN == 0 {
+		// Check if existing inner VLAN is null or -1
+		if aEndInnerVLAN != nil && *aEndInnerVLAN == -1 {
+			// Keep it as -1 (untagged)
+			aEndModel.InnerVLAN = types.Int64Value(*aEndInnerVLAN)
+		} else {
+			// API didn't return a value, keep as null
+			aEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		}
+	} else {
+		// API returned a non-zero value - use it
+		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
+	}
+	if v.AEndConfiguration.VLAN == 0 {
+		aEndModel.VLAN = types.Int64PointerValue(nil)
+	} else {
+		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
+	}
+	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
+	apiDiags = append(apiDiags, aEndDiags...)
+	orm.AEndConfiguration = aEnd
+
+	if !orm.BEndConfiguration.IsNull() {
+		existingBEnd := &vxcEndConfigurationModel{}
+		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, bEndDiags...)
+		if !existingBEnd.OrderedVLAN.IsNull() && !existingBEnd.OrderedVLAN.IsUnknown() {
+			vlan := existingBEnd.OrderedVLAN.ValueInt64()
+			bEndOrderedVLAN = &vlan
+		}
+		if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
+			vlan := existingBEnd.InnerVLAN.ValueInt64()
+			bEndInnerVLAN = &vlan
+		}
+		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+	}
+
+	bEndModel := &vxcEndConfigurationModel{
+		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
+		RequestedProductUID:   types.StringValue(bEndRequestedProductUID),
+		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
+		Name:                  types.StringValue(v.BEndConfiguration.Name),
+		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
+		Location:              types.StringValue(v.BEndConfiguration.Location),
+		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
+		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
+	}
+	if bEndOrderedVLAN != nil {
+		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
+	}
+	if v.BEndConfiguration.InnerVLAN == 0 {
+		// Check if existing inner VLAN is null or -1
+		if bEndInnerVLAN != nil && *bEndInnerVLAN == -1 {
+			// Keep it as -1 (untagged)
+			bEndModel.InnerVLAN = types.Int64Value(*bEndInnerVLAN)
+		} else {
+			// Keep it as null, which means un-assigned.
+			bEndModel.InnerVLAN = types.Int64PointerValue(nil)
+		}
+	} else {
+		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
+	}
+	if v.BEndConfiguration.VLAN == 0 {
+		bEndModel.VLAN = types.Int64PointerValue(nil)
+	} else {
+		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
+	}
+	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
+	apiDiags = append(apiDiags, bEndDiags...)
+	orm.BEndConfiguration = bEnd
+
+	if v.Resources != nil && v.Resources.CSPConnection != nil {
+		cspConnections := []types.Object{}
+		for _, c := range v.Resources.CSPConnection.CSPConnection {
+			cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
+			apiDiags = append(apiDiags, cspDiags...)
+			cspConnections = append(cspConnections, cspConnection)
+		}
+		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), cspConnections)
+		apiDiags = append(apiDiags, cspConnectionDiags...)
+		orm.CSPConnections = cspConnectionsList
+	} else {
+		cspConnectionsList := types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs))
+		orm.CSPConnections = cspConnectionsList
+	}
+
+	if v.AttributeTags != nil {
+		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
+		apiDiags = append(apiDiags, attributeDiags...)
+		orm.AttributeTags = attributeTags
+	} else {
+		orm.AttributeTags = types.MapNull(types.StringType)
+	}
+
+	if len(tags) > 0 {
+		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
+		apiDiags = append(apiDiags, tagDiags...)
+		orm.ResourceTags = resourceTags
+	} else {
+		orm.ResourceTags = types.MapNull(types.StringType)
+	}
+
+	return apiDiags
+}
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.
 
