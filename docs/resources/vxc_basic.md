@@ -51,7 +51,7 @@ Required:
 Optional:
 
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
-- `inner_vlan` (Number) The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged.
+- `inner_vlan` (Number) The inner VLAN of the A-End configuration. Values can range from 2 to 4093. This field cannot be set if the A-End VLAN is untagged. Setting to 0 for auto-assignment is not supported in Basic VXC. For MCR and MVE endpoints, inner_vlan is not supported.
 - `vlan` (Number) The VLAN of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0 or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration. To set this VLAN to untagged, set the VLAN value to -1. For MCR endpoints, setting this to null will result in the API auto-assigning a VLAN ID. For MVE endpoints, setting this to null will use the VLAN associated with the VNIC specified in vnic_index.
 - `vnic_index` (Number) The network interface index of the A-End configuration. Required for MVE connections.
 
@@ -62,7 +62,7 @@ Optional:
 Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
-- `inner_vlan` (Number) The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged.
+- `inner_vlan` (Number) The inner VLAN of the B-End configuration. Values can range from 2 to 4093. This field cannot be set if the B-End VLAN is untagged. Setting to 0 for auto-assignment is not supported in Basic VXC. For MCR and MVE endpoints, inner_vlan is not supported.
 - `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
 - `vlan` (Number) The VLAN of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0 or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration. To set this VLAN to untagged, set the VLAN value to -1. For MCR endpoints, setting this to null will result in the API auto-assigning a VLAN ID. For MVE endpoints, setting this to null will use the VLAN associated with the VNIC specified in vnic_index.
 - `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.

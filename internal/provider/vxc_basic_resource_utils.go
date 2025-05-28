@@ -83,8 +83,21 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 
 	if !c.InnerVLAN.IsNull() || !c.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
-		if !c.InnerVLAN.IsNull() {
-			vxcOrderMVEConfig.InnerVLAN = int(c.InnerVLAN.ValueInt64())
+		if c.InnerVLAN.IsNull() {
+			// If inner_vlan is explicitly set to null, convert to -1 for the API
+			// This will cause the API to return null, effectively removing the inner_vlan
+			vxcOrderMVEConfig.InnerVLAN = -1
+		} else if !c.InnerVLAN.IsUnknown() {
+			innerVLANValue := c.InnerVLAN.ValueInt64()
+			if innerVLANValue <= 0 {
+				diags.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Invalid inner_vlan value: %d. inner_vlan must be between 2 and 4093. Auto-assignment (0) and untagged (-1) are not supported in Basic VXC.", innerVLANValue),
+				)
+			} else {
+				// Only set inner_vlan for valid values
+				vxcOrderMVEConfig.InnerVLAN = int(innerVLANValue)
+			}
 		}
 		if !c.NetworkInterfaceIndex.IsNull() {
 			vxcOrderMVEConfig.NetworkInterfaceIndex = int(c.NetworkInterfaceIndex.ValueInt64())
@@ -482,8 +495,22 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 	}
 	endStateModel.VLAN = endPlanModel.VLAN
 
-	if !endPlanModel.InnerVLAN.IsUnknown() && !endPlanModel.InnerVLAN.IsNull() && !endPlanModel.InnerVLAN.Equal(endStateModel.InnerVLAN) {
-		endInnerVLAN = megaport.PtrTo(int(endPlanModel.InnerVLAN.ValueInt64()))
+	if !endPlanModel.InnerVLAN.IsUnknown() && !endPlanModel.InnerVLAN.Equal(endStateModel.InnerVLAN) {
+		if endPlanModel.InnerVLAN.IsNull() {
+			// If inner_vlan is explicitly set to null, convert to -1 for the API
+			// This will cause the API to return null, effectively removing the inner_vlan
+			endInnerVLAN = megaport.PtrTo(-1)
+		} else {
+			// Check for invalid values
+			innerVLANValue := endPlanModel.InnerVLAN.ValueInt64()
+			if innerVLANValue <= 0 {
+				diags.AddError(
+					"Error updating VXC",
+					fmt.Sprintf("Invalid inner_vlan value: %d. inner_vlan must be between 2 and 4093. Auto-assignment (0) and untagged (-1) are not supported in Basic VXC.", innerVLANValue),
+				)
+			}
+			endInnerVLAN = megaport.PtrTo(int(innerVLANValue))
+		}
 	}
 	endStateModel.InnerVLAN = endPlanModel.InnerVLAN
 
