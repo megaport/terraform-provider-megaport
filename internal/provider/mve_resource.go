@@ -987,7 +987,8 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	// Call the API to delete the resource
 	productUID := state.UID.ValueString()
 	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID: productUID,
+		MVEID:      productUID,
+		SafeDelete: true,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
