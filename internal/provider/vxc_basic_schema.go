@@ -337,9 +337,12 @@ func getEndConfigSchema(end string) schema.SingleNestedAttribute {
 				},
 			},
 			"inner_vlan": schema.Int64Attribute{
-				Description: fmt.Sprintf("The inner VLAN of the %s configuration. If the %s ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the %s is designated as untagged.", end, end, end),
+				Description: fmt.Sprintf("The inner VLAN of the %s configuration. Values can range from 2 to 4093. This field cannot be set if the %s VLAN is untagged. Setting to 0 for auto-assignment is not supported in Basic VXC. For MCR and MVE endpoints, inner_vlan is not supported.", end, end),
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.Int64{
+					int64validator.Between(2, 4093),
+				},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
