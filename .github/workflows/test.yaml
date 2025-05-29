@@ -34,7 +34,17 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@v5
         with:
-          version: latest
+          version: 'v1.54.2' # Specify a stable version instead of latest
+          args: --timeout=10m
+        # Add retry logic
+        continue-on-error: true
+        id: lint
+      # Retry once if it fails
+      - name: Run linters (retry)
+        if: steps.lint.outcome == 'failure'
+        uses: golangci/golangci-lint-action@v5
+        with:
+          version: 'v1.54.2' # Specify a stable version instead of latest
           args: --timeout=10m
 
   generate:
