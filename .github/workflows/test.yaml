@@ -29,6 +29,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+          cache-dependency-path: 'go.sum' # Be explicit about which file to use for cache key
       - run: go mod download
       - run: go build -v .
       - name: Run linters
