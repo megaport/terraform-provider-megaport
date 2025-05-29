@@ -2244,3 +2244,217 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 		},
 	})
 }
+
+func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANUntagged() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with inner_vlan = -1 (untagged)
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        inner_vlan = -1
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        inner_vlan = -1
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan", "-1"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANNull() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC without specifying inner_vlan (null)
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        // inner_vlan not specified (null)
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        // inner_vlan not specified (null)
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan"),
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagged() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	initialInnerVLAN := 456
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with specific inner_vlan values
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        inner_vlan = %d
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        inner_vlan = %d
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName, initialInnerVLAN, initialInnerVLAN),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", fmt.Sprintf("%d", initialInnerVLAN)),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan", fmt.Sprintf("%d", initialInnerVLAN)),
+				),
+			},
+			// Step 2: Update inner_vlan values to -1 (untagged)
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc" {
+                    id = %d
+                }
+                resource "megaport_port" "port_1" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_port" "port_2" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_vxc" "vxc_test" {
+                    product_name = "%s"
+                    rate_limit = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.port_1.product_uid
+                        ordered_vlan = 310
+                        inner_vlan = -1
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_port.port_2.product_uid
+                        ordered_vlan = 311
+                        inner_vlan = -1
+                    }
+                }
+                `, VXCLocationID1, portName1, portName2, vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan", "-1"),
+				),
+			},
+		},
+	})
+}

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -98,6 +97,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		// API returned a non-zero value - use it
 		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
+
 	if v.AEndConfiguration.VLAN == 0 {
 		aEndModel.VLAN = types.Int64PointerValue(nil)
 	} else {
@@ -152,6 +152,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	} else {
 		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
 	}
+
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
 	apiDiags = append(apiDiags, bEndDiags...)
 	orm.BEndConfiguration = bEnd
@@ -678,60 +679,4 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 	diags.Append(transitDiags...)
 
 	return diags, transitPartnerConfig, transitConfigObj
-}
-
-// InnerVLANAutoAssignModifier implements planmodifier.Int64 to allow auto-assigned VLAN values
-//
-// This custom plan modifier provides special handling for inner_vlan values set to 0,
-// which indicates to the Megaport API that a VLAN should be auto-assigned.
-//
-// Without this modifier, Terraform would produce an inconsistency error when:
-// 1. User configures inner_vlan = 0 (meaning "auto-assign")
-// 2. API assigns an actual VLAN (e.g., 3404) or returns null
-// 3. Terraform compares plan (0) against result (3404 or null) and reports an error
-//
-// The modifier:
-// - Only acts when config value is explicitly set to 0
-// - If API returns a value (in state), we use that value instead of 0
-// - If API returns null/unset, we don't modify the plan and let normal processing continue
-// - Preserves the user-friendly workflow where 0 means "let the API choose a value"
-
-// InnerVLANAutoAssignModifier implements planmodifier.Int64 to allow auto-assigned VLAN values
-type InnerVLANAutoAssignModifier struct {
-	description string
-}
-
-// Description returns the human-readable description of the plan modifier.
-func (m InnerVLANAutoAssignModifier) Description(_ context.Context) string {
-	return m.description
-}
-
-// MarkdownDescription returns the markdown description of the plan modifier.
-func (m InnerVLANAutoAssignModifier) MarkdownDescription(_ context.Context) string {
-	return m.description
-}
-
-// PlanModifyInt64 implements the custom plan modification logic for inner_vlan.
-func (m InnerVLANAutoAssignModifier) PlanModifyInt64(ctx context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
-	// If we have no plan/config, do nothing
-	if req.ConfigValue.IsNull() {
-		return
-	}
-
-	// The key logic: If user configured 0 (auto-assign), accept any value from the API
-	if req.ConfigValue.ValueInt64() == 0 {
-		// If this is a plan after apply (we have state)
-		if !req.StateValue.IsNull() {
-			// Always use the state value (what API returned) when config was 0
-			resp.PlanValue = req.StateValue
-		}
-		// Don't set resp.PlanValue if state is null - let API assignment flow through
-	}
-}
-
-// CustomInnerVLANModifier returns a new instance of our custom plan modifier.
-func CustomInnerVLANModifier() planmodifier.Int64 {
-	return &InnerVLANAutoAssignModifier{
-		description: "Allow auto-assigned value when inner_vlan is set to 0",
-	}
 }
