@@ -30,13 +30,12 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
           cache-dependency-path: 'go.sum'
-          cache-key-prefix: 'go-cache-v1-' # Add a custom prefix to invalidate previous caches
       - run: go mod download
       - run: go build -v .
       - name: Run linters
         uses: golangci/golangci-lint-action@v5
         with:
-          version: 'v1.54.2' # Specify a stable version instead of latest
+          version: 'v1.64.8' # Specify a stable version instead of latest
           args: --timeout=10m
         # Add retry logic
         continue-on-error: true
@@ -46,7 +45,7 @@ jobs:
         if: steps.lint.outcome == 'failure'
         uses: golangci/golangci-lint-action@v5
         with:
-          version: 'v1.54.2' # Specify a stable version instead of latest
+          version: 'v1.64.8' # Specify a stable version instead of latest
           args: --timeout=10m
 
   generate:
