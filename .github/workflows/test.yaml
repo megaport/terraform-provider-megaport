@@ -37,6 +37,7 @@ jobs:
         with:
           version: 'v1.64.8' # Specify a stable version instead of latest
           args: --timeout=10m
+          skip-cache: true # Disable golangci-lint-action's cache
         # Add retry logic
         continue-on-error: true
         id: lint
@@ -47,6 +48,7 @@ jobs:
         with:
           version: 'v1.64.8' # Specify a stable version instead of latest
           args: --timeout=10m
+          skip-cache: true # Also disable cache in the retry step
 
   generate:
     name: Generate
