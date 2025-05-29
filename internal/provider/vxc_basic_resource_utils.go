@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -480,18 +481,22 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 	}
 
 	// Check for attempt to update VLAN for MCR or MVE products
-	if !endPlanModel.VLAN.IsUnknown() && !endPlanModel.VLAN.IsNull() && !endPlanModel.VLAN.Equal(endStateModel.VLAN) {
-		// Check if End Product is MCR of MVE
-		productType, err := r.client.ProductService.GetProductType(ctx, endPlanModel.RequestedProductUID.ValueString())
-		if err == nil && (strings.EqualFold(productType, megaport.PRODUCT_MCR) || strings.EqualFold(productType, megaport.PRODUCT_MVE)) {
-			diags.AddError(
-				"Error updating VXC",
-				fmt.Sprintf("Cannot update VLAN for product type %s (UID: %s). MCR and MVE products don't support VLAN specification.",
-					productType, endPlanModel.RequestedProductUID.ValueString()),
-			)
-		}
+	if !endPlanModel.VLAN.IsUnknown() && !endPlanModel.VLAN.Equal(endStateModel.VLAN) {
+		if endPlanModel.VLAN.IsNull() {
+			endVLAN = megaport.PtrTo(-1) // -1 to untag in the API. This will change the API value to null.
+		} else {
+			// Check if End Product is MCR of MVE
+			productType, err := r.client.ProductService.GetProductType(ctx, endPlanModel.RequestedProductUID.ValueString())
+			if err == nil && (strings.EqualFold(productType, megaport.PRODUCT_MCR) || strings.EqualFold(productType, megaport.PRODUCT_MVE)) {
+				diags.AddError(
+					"Error updating VXC",
+					fmt.Sprintf("Cannot update VLAN for product type %s (UID: %s). MCR and MVE products don't support VLAN specification.",
+						productType, endPlanModel.RequestedProductUID.ValueString()),
+				)
+			}
 
-		endVLAN = megaport.PtrTo(int(endPlanModel.VLAN.ValueInt64()))
+			endVLAN = megaport.PtrTo(int(endPlanModel.VLAN.ValueInt64()))
+		}
 	}
 	endStateModel.VLAN = endPlanModel.VLAN
 
@@ -900,4 +905,31 @@ func createBasicVXCTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, 
 	diags.Append(transitDiags...)
 
 	return diags, transitPartnerConfig, transitConfigObj
+}
+
+// detectNullModifier creates a plan modifier that forces a change when value is explicitly set to null
+func detectNullModifier() planmodifier.Int64 {
+	return &detectNullInt64PlanModifier{}
+}
+
+// detectNullInt64PlanModifier implements the plan modifier
+type detectNullInt64PlanModifier struct{}
+
+// Description returns the description for the plan modifier
+func (m *detectNullInt64PlanModifier) Description(ctx context.Context) string {
+	return "Detects when a value is explicitly set to null"
+}
+
+// MarkdownDescription returns the markdown description for the plan modifier
+func (m *detectNullInt64PlanModifier) MarkdownDescription(ctx context.Context) string {
+	return "Detects when a value is explicitly set to null"
+}
+
+// PlanModifyInt64 implements the actual modification logic
+func (m *detectNullInt64PlanModifier) PlanModifyInt64(ctx context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	// Only continue if there's a plan update
+	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() {
+		// Force modified to true when config is null and state is not null
+		resp.PlanValue = types.Int64Null()
+	}
 }
