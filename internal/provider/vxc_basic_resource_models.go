@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -32,13 +33,18 @@ var (
 	}
 )
 
-func (orm *vxcBasicResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
+func (orm *vxcBasicResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string, aEndProductType, bEndProductType string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
+
+	var aEndIsMVE, bEndIsMVE, aEndIsMCR, bEndIsMCR bool
+	aEndIsMVE = strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE)
+	bEndIsMVE = strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE)
+	aEndIsMCR = strings.EqualFold(aEndProductType, megaport.PRODUCT_MCR)
+	bEndIsMCR = strings.EqualFold(bEndProductType, megaport.PRODUCT_MCR)
 
 	orm.UID = types.StringValue(v.UID)
 	orm.Name = types.StringValue(v.Name)
 	orm.RateLimit = types.Int64Value(int64(v.RateLimit))
-	orm.ProvisioningStatus = types.StringValue(v.ProvisioningStatus)
 	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
 	orm.Shutdown = types.BoolValue(v.Shutdown)
 	orm.CostCentre = types.StringValue(v.CostCentre)
@@ -59,12 +65,15 @@ func (orm *vxcBasicResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VX
 		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 	}
-	if v.AEndConfiguration.InnerVLAN == 0 {
+
+	if v.AEndConfiguration.InnerVLAN == 0 || aEndIsMCR {
 		aEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	} else {
 		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
 	}
-	if v.AEndConfiguration.VLAN == 0 {
+	if aEndIsMVE || aEndIsMCR {
+		aEndModel.VLAN = types.Int64Null()
+	} else if v.AEndConfiguration.VLAN == 0 {
 		aEndModel.VLAN = types.Int64PointerValue(nil)
 	} else {
 		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
@@ -85,12 +94,14 @@ func (orm *vxcBasicResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VX
 		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 	}
-	if v.BEndConfiguration.InnerVLAN == 0 {
+	if v.BEndConfiguration.InnerVLAN == 0 || bEndIsMCR {
 		bEndModel.InnerVLAN = types.Int64PointerValue(nil)
 	} else {
 		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
 	}
-	if v.BEndConfiguration.VLAN == 0 {
+	if bEndIsMVE || bEndIsMCR {
+		bEndModel.VLAN = types.Int64Null()
+	} else if v.BEndConfiguration.VLAN == 0 {
 		bEndModel.VLAN = types.Int64PointerValue(nil)
 	} else {
 		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
@@ -112,12 +123,11 @@ func (orm *vxcBasicResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VX
 
 // vxcBasicResourceModel maps the resource schema data.
 type vxcBasicResourceModel struct {
-	UID                types.String `tfsdk:"product_uid"`
-	Name               types.String `tfsdk:"product_name"`
-	RateLimit          types.Int64  `tfsdk:"rate_limit"`
-	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
-	PromoCode          types.String `tfsdk:"promo_code"`
-	ServiceKey         types.String `tfsdk:"service_key"`
+	UID        types.String `tfsdk:"product_uid"`
+	Name       types.String `tfsdk:"product_name"`
+	RateLimit  types.Int64  `tfsdk:"rate_limit"`
+	PromoCode  types.String `tfsdk:"promo_code"`
+	ServiceKey types.String `tfsdk:"service_key"`
 
 	ContractTermMonths types.Int64  `tfsdk:"contract_term_months"`
 	Locked             types.Bool   `tfsdk:"locked"`

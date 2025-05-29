@@ -212,10 +212,6 @@ func (r *vxcBasicResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "The rate limit of the product.",
 				Required:    true,
 			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the product.",
-				Computed:    true,
-			},
 			"promo_code": schema.StringAttribute{
 				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
 				Optional:    true,

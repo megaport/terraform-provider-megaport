@@ -418,6 +418,7 @@ func modifyPlanBasicEndConfig(ctx context.Context, endPlanObj basetypes.ObjectVa
 //   - *string: The requested product UID if it needs to be updated (nil if no change)
 //   - *int: The VLAN if it needs to be updated (nil if no change)
 //   - *int: The inner VLAN if it needs to be updated (nil if no change)
+//   - *int: The vNIC index if it needs to be updated (nil if no change)
 //   - bool: Whether the endpoint is a cloud service provider endpoint
 //
 // This function:
@@ -426,7 +427,7 @@ func modifyPlanBasicEndConfig(ctx context.Context, endPlanObj basetypes.ObjectVa
 //  3. Handles special cases for cloud service provider endpoints
 //  4. Prepares partner configurations for update operations
 //  5. Returns the necessary parameters for the VXC update operation
-func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string, planEndConfig, stateEndConfig, planPartnerConfig, statePartnerConfig basetypes.ObjectValue) (diag.Diagnostics, basetypes.ObjectValue, basetypes.ObjectValue, megaport.VXCPartnerConfiguration, *string, *int, *int, bool) {
+func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string, planEndConfig, stateEndConfig, planPartnerConfig, statePartnerConfig basetypes.ObjectValue) (diag.Diagnostics, basetypes.ObjectValue, basetypes.ObjectValue, megaport.VXCPartnerConfiguration, *string, *int, *int, *int, bool) {
 	diags := diag.Diagnostics{}
 
 	var partnerChange bool
@@ -447,7 +448,7 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 	var partnerPlan, partnerState *vxcBasicPartnerConfigurationModel
 
 	// Check if partner config is a CSP partner
-	var endCSP bool
+	var endCSP, isMCRPartnerConfig bool
 
 	endPlanDiags := planEndConfig.As(ctx, &endPlanModel, basetypes.ObjectAsOptions{})
 	diags.Append(endPlanDiags...)
@@ -465,10 +466,12 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 		if !partnerPlan.Partner.IsNull() {
 			if partnerPlan.Partner.ValueString() != "a-end" && partnerPlan.Partner.ValueString() != "mcr" && partnerPlan.Partner.ValueString() != "transit" {
 				endCSP = true
+			} else if partnerPlan.Partner.ValueString() == "mcr" {
+				isMCRPartnerConfig = true
 			}
 		}
 	}
-	var endVLAN, endInnerVLAN *int
+	var endVLAN, endInnerVLAN, vNicIndex *int
 
 	var requestedProductUID *string
 
@@ -480,10 +483,29 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 		}
 	}
 
+	if !endPlanModel.NetworkInterfaceIndex.IsUnknown() && !endPlanModel.NetworkInterfaceIndex.Equal(endStateModel.NetworkInterfaceIndex) && !endStateModel.NetworkInterfaceIndex.IsNull() {
+		if endPlanModel.NetworkInterfaceIndex.IsNull() {
+			// Result in an error because it must not be null for MVE VXCs
+			diags.AddError(
+				"Error updating VXC",
+				fmt.Sprintf("Network Interface Index cannot be null for VXC with name %s. It must be specified for MVE products.", name),
+			)
+		} else {
+			vNicIndex = megaport.PtrTo(int(endPlanModel.NetworkInterfaceIndex.ValueInt64()))
+			endStateModel.NetworkInterfaceIndex = endPlanModel.NetworkInterfaceIndex
+		}
+	}
+
 	// Check for attempt to update VLAN for MCR or MVE products
 	if !endPlanModel.VLAN.IsUnknown() && !endPlanModel.VLAN.Equal(endStateModel.VLAN) {
 		if endPlanModel.VLAN.IsNull() {
-			endVLAN = megaport.PtrTo(-1) // -1 to untag in the API. This will change the API value to null.
+			// Only convert to -1 if the prior state value was actually set (not null or unknown)
+			// This prevents sending untag command when the field was simply omitted
+			if !endStateModel.VLAN.IsNull() && !endStateModel.VLAN.IsUnknown() {
+				// If VLAN is explicitly set to null and had a prior value, convert to -1 for the API
+				// This will cause the API to return null, effectively removing the VLAN
+				endVLAN = megaport.PtrTo(-1)
+			}
 		} else {
 			// Check if End Product is MCR of MVE
 			productType, err := r.client.ProductService.GetProductType(ctx, endPlanModel.RequestedProductUID.ValueString())
@@ -502,9 +524,16 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 
 	if !endPlanModel.InnerVLAN.IsUnknown() && !endPlanModel.InnerVLAN.Equal(endStateModel.InnerVLAN) {
 		if endPlanModel.InnerVLAN.IsNull() {
-			// If inner_vlan is explicitly set to null, convert to -1 for the API
-			// This will cause the API to return null, effectively removing the inner_vlan
-			endInnerVLAN = megaport.PtrTo(-1)
+			// Only convert to -1 if the prior state value was actually set (not null or unknown)
+			// This prevents sending untag command when the field was simply omitted
+			if !endStateModel.InnerVLAN.IsNull() && !endStateModel.InnerVLAN.IsUnknown() {
+				// If inner_vlan is explicitly set to null and had a prior value, convert to -1 for the API
+				// This will cause the API to return null, effectively removing the inner_vlan
+				if !isMCRPartnerConfig {
+					endInnerVLAN = megaport.PtrTo(-1)
+				}
+			}
+			// Otherwise, don't send any update for innerVLAN (keep endInnerVLAN as nil)
 		} else {
 			// Check for invalid values
 			innerVLANValue := endPlanModel.InnerVLAN.ValueInt64()
@@ -562,7 +591,7 @@ func (r *vxcBasicResource) makeUpdateEndConfig(ctx context.Context, name string,
 	stateObj, stateDiags := types.ObjectValueFrom(ctx, vxcBasicEndConfigurationAttrs, endStateModel)
 	diags.Append(stateDiags...)
 
-	return diags, stateObj, partnerObj, megaportPartnerConfig, requestedProductUID, endVLAN, endInnerVLAN, endCSP
+	return diags, stateObj, partnerObj, megaportPartnerConfig, requestedProductUID, endVLAN, endInnerVLAN, vNicIndex, endCSP
 }
 
 func createBasicVXCAWSPartnerConfig(ctx context.Context, awsConfig vxcPartnerConfigAWSModel) (diag.Diagnostics, *megaport.VXCPartnerConfigAWS, basetypes.ObjectValue) {
