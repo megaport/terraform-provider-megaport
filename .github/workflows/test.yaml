@@ -29,7 +29,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-          cache-dependency-path: 'go.sum' # Be explicit about which file to use for cache key
+          cache-dependency-path: 'go.sum'
+          cache-key-prefix: 'go-cache-v1-' # Add a custom prefix to invalidate previous caches
       - run: go mod download
       - run: go build -v .
       - name: Run linters
