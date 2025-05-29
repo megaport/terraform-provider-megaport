@@ -158,8 +158,11 @@ func (r *vxcBasicResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.AEndConfiguration.UID)
+	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.BEndConfiguration.UID)
+
 	// update the plan with the VXC info
-	apiDiags := plan.fromAPIVXC(ctx, vxc, tags)
+	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, aEndProductType, bEndProductType)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set state to fully populated data
@@ -215,7 +218,10 @@ func (r *vxcBasicResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
+	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.AEndConfiguration.UID)
+	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.BEndConfiguration.UID)
+
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, aEndProductType, bEndProductType)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -249,7 +255,7 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	aEndDiags, aEndState, aEndPartnerObj, aEndMegaportPartnerConfig, aEndRequestedProductUID, aEndVLAN, aEndInnerVLAN, aEndCSP := r.makeUpdateEndConfig(ctx, plan.Name.ValueString(), plan.AEndConfiguration, state.AEndConfiguration, plan.AEndPartnerConfig, state.AEndPartnerConfig)
+	aEndDiags, aEndState, aEndPartnerObj, aEndMegaportPartnerConfig, aEndRequestedProductUID, aEndVLAN, aEndInnerVLAN, aEndVnicIndex, aEndCSP := r.makeUpdateEndConfig(ctx, plan.Name.ValueString(), plan.AEndConfiguration, state.AEndConfiguration, plan.AEndPartnerConfig, state.AEndPartnerConfig)
 	resp.Diagnostics.Append(aEndDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -264,8 +270,9 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 	updateReq.AEndVLAN = aEndVLAN
 	updateReq.AEndInnerVLAN = aEndInnerVLAN
 	updateReq.AEndProductUID = aEndRequestedProductUID
+	updateReq.AVnicIndex = aEndVnicIndex
 
-	bEndDiags, bEndState, bEndPartnerObj, bEndMegaportPartnerConfig, bEndRequestedProductUID, bEndVLAN, bEndInnerVLAN, bEndCSP := r.makeUpdateEndConfig(ctx, plan.Name.ValueString(), plan.BEndConfiguration, state.BEndConfiguration, plan.BEndPartnerConfig, state.BEndPartnerConfig)
+	bEndDiags, bEndState, bEndPartnerObj, bEndMegaportPartnerConfig, bEndRequestedProductUID, bEndVLAN, bEndInnerVLAN, bEndVnicIndex, bEndCSP := r.makeUpdateEndConfig(ctx, plan.Name.ValueString(), plan.BEndConfiguration, state.BEndConfiguration, plan.BEndPartnerConfig, state.BEndPartnerConfig)
 	resp.Diagnostics.Append(bEndDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -278,6 +285,7 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 	updateReq.BEndVLAN = bEndVLAN
 	updateReq.BEndInnerVLAN = bEndInnerVLAN
 	updateReq.BEndProductUID = bEndRequestedProductUID
+	updateReq.BVnicIndex = bEndVnicIndex
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
@@ -349,7 +357,10 @@ func (r *vxcBasicResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
+	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.AEndConfiguration.UID)
+	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, vxc.BEndConfiguration.UID)
+
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, aEndProductType, bEndProductType)
 	resp.Diagnostics.Append(apiDiags...)
 
 	state.AEndPartnerConfig = savedAEndPartnerConfig
