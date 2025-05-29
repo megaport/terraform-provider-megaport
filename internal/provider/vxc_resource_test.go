@@ -26,7 +26,7 @@ const (
 
 	AzureServiceKey        = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 	GooglePairingKey       = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
-	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.ap-singapore-1.aaaaaaaac7lp5sa5grwskwctrsab27a3tjoum7gpkfhzf6sgtcnko742jvaq"
+	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
