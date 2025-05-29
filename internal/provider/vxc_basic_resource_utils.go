@@ -227,7 +227,9 @@ func (r *vxcBasicResource) createVXCBasicEndConfiguration(ctx context.Context, n
 					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", name, err.Error()),
 				)
 			}
-			endConfig.ProductUID = partnerPortRes.ProductUID
+			if partnerPortRes != nil {
+				endConfig.ProductUID = partnerPortRes.ProductUID
+			}
 
 			partnerObj = partnerConfigObj
 			endConfig.PartnerConfig = googlePartnerConfig
