@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -2454,6 +2455,224 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
 					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "-1"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "b_end.inner_vlan", "-1"),
 				),
+			},
+		},
+	})
+}
+
+func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
+	portName := RandomTestName()
+	mcrName := RandomTestName()
+	mveName := RandomTestName()
+	vxcPortToMCRName := RandomTestName()
+	vxcMCRToMVEName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create port, MCR, MVE and connect them with VXCs
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                // Create a port
+                resource "megaport_port" "test_port" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+
+                // Create an MCR
+                resource "megaport_mcr" "test_mcr" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                }
+
+                // Create an MVE
+                resource "megaport_mve" "test_mve" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+
+                    vnics = [
+                        {
+                            description = "Data Plane"
+                        },
+                        {
+                            description = "Management Plane"
+                        },
+                        {
+                            description = "Control Plane"
+                        }
+                    ]
+
+                    vendor_config = {
+                        vendor       = "aruba"
+                        product_size = "MEDIUM"
+                        image_id     = 23
+                        account_name = "%s-account"
+                        account_key  = "%s-key"
+                        system_tag   = "Preconfiguration-test-1"
+                    }
+                }
+
+                // Connect port to MCR with VXC
+                resource "megaport_vxc" "port_to_mcr" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+
+                    a_end = {
+                        requested_product_uid = megaport_port.test_port.product_uid
+                        ordered_vlan          = 100
+                    }
+
+                    b_end = {
+                        requested_product_uid = megaport_mcr.test_mcr.product_uid
+                        ordered_vlan          = 101
+                    }
+                }
+
+                // Connect MCR to MVE with VXC
+                resource "megaport_vxc" "mcr_to_mve" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+
+                    a_end = {
+                        requested_product_uid = megaport_mcr.test_mcr.product_uid
+                        ordered_vlan          = 200
+                    }
+
+                    b_end = {
+                        requested_product_uid = megaport_mve.test_mve.product_uid
+                        vnic_index            = 0
+                        ordered_vlan          = 201
+                    }
+                }
+                `,
+					portName, VXCLocationID1,
+					mcrName, MCRTestLocationIDNum,
+					mveName, MVETestLocationIDNum,
+					mveName, mveName,
+					vxcPortToMCRName, vxcMCRToMVEName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
+					resource.TestCheckResourceAttr("megaport_mcr.test_mcr", "product_name", mcrName),
+					resource.TestCheckResourceAttr("megaport_mve.test_mve", "product_name", mveName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.port_to_mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.mcr_to_mve", "product_uid"),
+				),
+			},
+			// Step 2: Try to delete the port while keeping the VXC - this should fail
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                // Keep only the VXCs - this should fail because we can't delete 
+                // resources with VXCs still connected
+
+                // Connect port to MCR with VXC - now referring to resources
+                // that we're trying to delete
+                resource "megaport_vxc" "port_to_mcr" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+
+                    a_end = {
+                        requested_product_uid = "%s" // Direct product_uid instead of reference
+                        ordered_vlan          = 100
+                    }
+
+                    b_end = {
+                        requested_product_uid = "%s" // Direct product_uid instead of reference
+                        ordered_vlan          = 101
+                    }
+                }
+
+                // Connect MCR to MVE with VXC
+                resource "megaport_vxc" "mcr_to_mve" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+
+                    a_end = {
+                        requested_product_uid = "%s" // Direct product_uid instead of reference
+                        ordered_vlan          = 200
+                    }
+
+                    b_end = {
+                        requested_product_uid = "%s" // Direct product_uid instead of reference
+                        vnic_index            = 0
+                        ordered_vlan          = 201
+                    }
+                }
+                `,
+					vxcPortToMCRName, "PORT_UID_PLACEHOLDER", "MCR_UID_PLACEHOLDER",
+					vxcMCRToMVEName, "MCR_UID_PLACEHOLDER", "MVE_UID_PLACEHOLDER"),
+				ExpectError: regexp.MustCompile(`has active VXCs associated with it.`),
+			},
+			// Step 3: Delete the VXCs first, then delete the resources
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                // Create a port
+                resource "megaport_port" "test_port" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+
+                // Create an MCR
+                resource "megaport_mcr" "test_mcr" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                }
+
+                // Create an MVE
+                resource "megaport_mve" "test_mve" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+
+                    vnics = [
+                        {
+                            description = "Data Plane"
+                        },
+                        {
+                            description = "Management Plane"
+                        },
+                        {
+                            description = "Control Plane"
+                        }
+                    ]
+
+                    vendor_config = {
+                        vendor       = "aruba"
+                        product_size = "MEDIUM"
+                        image_id     = 23
+                        account_name = "%s-account"
+                        account_key  = "%s-key"
+                        system_tag   = "Preconfiguration-test-1"
+                    }
+                }
+                `,
+					portName, VXCLocationID1,
+					mcrName, MCRTestLocationIDNum,
+					mveName, MVETestLocationIDNum,
+					mveName, mveName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
+					resource.TestCheckResourceAttr("megaport_mcr.test_mcr", "product_name", mcrName),
+					resource.TestCheckResourceAttr("megaport_mve.test_mve", "product_name", mveName),
+				),
+			},
+			// Step 4: Now we can delete the resources safely
+			{
+				Config: providerConfig,
 			},
 		},
 	})
