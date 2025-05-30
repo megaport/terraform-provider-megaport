@@ -295,6 +295,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewMVESizeDataSource,
 		NewPortsDataSource,
 		NewMVEsDataSource,
+		NewMCRsDataSource,
 	}
 }
 
