@@ -24,8 +24,9 @@ const (
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 
-	AzureServiceKey  = "1b2329a5-56dc-45d0-8a0d-87b706297777"
-	GooglePairingKey = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
+	AzureServiceKey        = "1b2329a5-56dc-45d0-8a0d-87b706297777"
+	GooglePairingKey       = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
+	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -1447,6 +1448,85 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 				ImportStateVerifyIdentifierAttribute: "product_uid",
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					resourceName := "megaport_vxc.azure_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+		},
+	})
+}
+
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
+	portName := RandomTestName()
+	oracleVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "loc1" {
+                    id = %d
+                }
+
+                resource "megaport_port" "port" {
+                    product_name           = "%s"
+                    port_speed             = 1000
+                    location_id            = data.megaport_location.loc1.id
+                    contract_term_months   = 12
+                    marketplace_visibility = false
+                }
+
+                resource "megaport_vxc" "oracle_vxc" {
+                    product_name            = "%s"
+                    rate_limit              = 100
+                    contract_term_months    = 1
+
+                    a_end = {
+                        requested_product_uid = megaport_port.port.product_uid
+                        ordered_vlan          = 0
+                    }
+
+                    b_end = {}
+
+                    b_end_partner_config = {
+                        partner = "oracle"
+                        oracle_config = {
+                            virtual_circuit_id = "%s"
+                        }
+                    }
+                }
+                `, VXCLocationID1, portName, oracleVXCName, OracleVirtualCircuitID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
+					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "product_name", oracleVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "rate_limit", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "contract_term_months", "1"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", OracleVirtualCircuitID),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.oracle_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.oracle_vxc"
 					var rawState map[string]string
 					for _, m := range state.Modules {
 						if len(m.Resources) > 0 {
