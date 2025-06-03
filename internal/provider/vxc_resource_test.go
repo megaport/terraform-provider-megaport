@@ -2677,3 +2677,301 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 		},
 	})
 }
+
+func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
+	mveName1 := RandomTestName()
+	mveName2 := RandomTestName()
+	mveName3 := RandomTestName()
+	mveName4 := RandomTestName()
+	vxcName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_mve_images" "aruba" {
+                    vendor_filter = "Aruba"
+                    id_filter = 23
+                }
+                resource "megaport_mve" "mve_1" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-1"
+                      account_key   = "%s-1"
+                      system_tag    = "Preconfiguration-aruba-test-1"
+                    }
+                }
+                resource "megaport_mve" "mve_2" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-2"
+                      account_key   = "%s-2"
+                      system_tag    = "Preconfiguration-aruba-test-2"
+                    }
+                }
+                resource "megaport_mve" "mve_3" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-3"
+                      account_key   = "%s-3"
+                      system_tag    = "Preconfiguration-aruba-test-3"
+                    }
+                }
+                resource "megaport_mve" "mve_4" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-4"
+                      account_key   = "%s-4"
+                      system_tag    = "Preconfiguration-aruba-test-4"
+                    }
+                }
+                resource "megaport_vxc" "mve_vxc" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+                    a_end = {
+                      requested_product_uid = megaport_mve.mve_1.product_uid
+                      vnic_index            = 0
+                    }
+                    b_end = {
+                      requested_product_uid = megaport_mve.mve_2.product_uid
+                      vnic_index            = 0
+                    }
+                }
+                `,
+					mveName1, MVETestLocationIDNum, mveName1, mveName1,
+					mveName2, MVETestLocationIDNum, mveName2, mveName2,
+					mveName3, MVETestLocationIDNum, mveName3, mveName3,
+					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check MVEs
+					resource.TestCheckResourceAttr("megaport_mve.mve_1", "product_name", mveName1),
+					resource.TestCheckResourceAttr("megaport_mve.mve_2", "product_name", mveName2),
+					resource.TestCheckResourceAttr("megaport_mve.mve_3", "product_name", mveName3),
+					resource.TestCheckResourceAttr("megaport_mve.mve_4", "product_name", mveName4),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve_1", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve_2", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve_3", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve_4", "product_uid"),
+
+					// Check VXC connecting MVE 1 and MVE 2 with VNIC index 0
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.vnic_index", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.vnic_index", "0"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.mve_vxc", "product_uid"),
+				),
+			},
+			// Update test - Move VXC to MVE 3 and MVE 4, change VNIC index to 1
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_mve_images" "aruba" {
+                    vendor_filter = "Aruba"
+                    id_filter = 23
+                }
+                resource "megaport_mve" "mve_1" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-1"
+                      account_key   = "%s-1"
+                      system_tag    = "Preconfiguration-aruba-test-1"
+                    }
+                }
+                resource "megaport_mve" "mve_2" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-2"
+                      account_key   = "%s-2"
+                      system_tag    = "Preconfiguration-aruba-test-2"
+                    }
+                }
+                resource "megaport_mve" "mve_3" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-3"
+                      account_key   = "%s-3"
+                      system_tag    = "Preconfiguration-aruba-test-3"
+                    }
+                }
+                resource "megaport_mve" "mve_4" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                      {
+                        description = "Data Plane"
+                      },
+                      {
+                        description = "Management Plane"  
+                      },
+                      {
+                        description = "Control Plane"
+                      }
+                    ]
+                    vendor_config = {
+                      vendor        = "aruba"
+                      product_size  = "MEDIUM"
+                      image_id      = data.megaport_mve_images.aruba.mve_images.0.id
+                      account_name  = "%s-4"
+                      account_key   = "%s-4"
+                      system_tag    = "Preconfiguration-aruba-test-4"
+                    }
+                }
+                resource "megaport_vxc" "mve_vxc" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+                    a_end = {
+                      requested_product_uid = megaport_mve.mve_3.product_uid
+                      vnic_index            = 1
+                    }
+                    b_end = {
+                      requested_product_uid = megaport_mve.mve_4.product_uid
+                      vnic_index            = 1
+                    }
+                }
+                `,
+					mveName1, MVETestLocationIDNum, mveName1, mveName1,
+					mveName2, MVETestLocationIDNum, mveName2, mveName2,
+					mveName3, MVETestLocationIDNum, mveName3, mveName3,
+					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check MVEs still exist
+					resource.TestCheckResourceAttr("megaport_mve.mve_1", "product_name", mveName1),
+					resource.TestCheckResourceAttr("megaport_mve.mve_2", "product_name", mveName2),
+					resource.TestCheckResourceAttr("megaport_mve.mve_3", "product_name", mveName3),
+					resource.TestCheckResourceAttr("megaport_mve.mve_4", "product_name", mveName4),
+
+					// Check VXC has been updated to connect MVE 3 and MVE 4 with VNIC index 1
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.vnic_index", "1"),
+
+					// Verify VXC is now connected to the new MVEs
+					resource.TestCheckResourceAttrPair(
+						"megaport_vxc.mve_vxc", "a_end.requested_product_uid",
+						"megaport_mve.mve_3", "product_uid",
+					),
+					resource.TestCheckResourceAttrPair(
+						"megaport_vxc.mve_vxc", "b_end.requested_product_uid",
+						"megaport_mve.mve_4", "product_uid",
+					),
+				),
+			},
+		},
+	})
+}
