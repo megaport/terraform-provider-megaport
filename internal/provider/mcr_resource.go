@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -552,6 +553,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"prefix_filter_lists": schema.ListNestedAttribute{
 				Description: "Prefix filter list associated with the product.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+					EmptyPrefixFilterListIfNull(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.Int64Attribute{
@@ -723,7 +729,10 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.Append(prefixFilterListsDiags...)
 		plan.PrefixFilterLists = prefixFilterList
 	} else {
-		plan.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+		emptyList := []types.Object{}
+		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
+		resp.Diagnostics.Append(pfFilterListDiags...)
+		plan.PrefixFilterLists = pfFilterLists
 	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -863,13 +872,11 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		parsedLists, parsedDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), parsedListObjs)
 		resp.Diagnostics.Append(parsedDiags...)
 		state.PrefixFilterLists = parsedLists
-	} else if !state.PrefixFilterLists.IsNull() && len(state.PrefixFilterLists.Elements()) == 0 { // If list is empty but not null
+	} else {
 		emptyList := []types.Object{}
 		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
 		resp.Diagnostics.Append(pfFilterListDiags...)
 		state.PrefixFilterLists = pfFilterLists
-	} else { // If list is empty and null
-		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
 	}
 
 	// Set refreshed state
@@ -1154,10 +1161,11 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		resp.Diagnostics.Append(parsedDiags...)
 		state.PrefixFilterLists = parsedLists
 
-	} else if !plan.PrefixFilterLists.IsNull() && len(plan.PrefixFilterLists.Elements()) == 0 { // If list is empty but not null
-		state.PrefixFilterLists = plan.PrefixFilterLists
-	} else { // If list is empty and null
-		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
+	} else {
+		emptyList := []types.Object{}
+		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
+		resp.Diagnostics.Append(pfFilterListDiags...)
+		state.PrefixFilterLists = pfFilterLists
 	}
 
 	// Update the state with the new values
