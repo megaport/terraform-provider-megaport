@@ -356,10 +356,6 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "Promo code to apply to the IX.",
 				Optional:    true,
 			},
-			"cost_centre": schema.StringAttribute{
-				Description: "Cost centre for invoicing purposes.",
-				Optional:    true,
-			},
 			"public_graph": schema.BoolAttribute{
 				Description: "Whether the IX usage statistics are publicly viewable.",
 				Optional:    true,
