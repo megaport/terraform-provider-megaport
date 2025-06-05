@@ -226,11 +226,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 				data "megaport_location" "test_location" {
 					id = %d
 				}
-
-				data "megaport_mve_images" "versa" {
-  					vendor_filter = "Versa"
-  					id_filter = 20
-				}
 				
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
@@ -245,14 +240,15 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					}
 
                     vendor_config = {
-                        vendor = "versa"
-                        product_size = "LARGE"
-                        image_id = data.megaport_mve_images.versa.mve_images.0.id
-						director_address = "director1.versa.com"
-						controller_address = "controller1.versa.com"
-						local_auth = "SDWAN-Branch@Versa.com"
-						remote_auth = "Controller-1-staging@Versa.com"
-						serial_number = "Megaport-Hub1"
+                        vendor             = "versa"
+                        product_size       = "SMALL"
+                        image_id           = 20
+                        mve_label          = "MVE 2/8"
+                        director_address   = "0.0.0.0"
+                        controller_address = "0.0.0.0"
+                        local_auth         = "test"
+                        remote_auth        = "test2"
+                        serial_number      = "test-serial-number"
                     }
 
 					vnics = [{
@@ -275,7 +271,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "LARGE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
@@ -317,11 +313,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					id = %d
 				}
 
-				data "megaport_mve_images" "versa" {
-  					vendor_filter = "Versa"
-  					id_filter = 20
-				}
-
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -335,14 +326,15 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					}
 
                     vendor_config = {
-                        vendor = "VeRsA"
-                        product_size = "lArGe"
-                        image_id = data.megaport_mve_images.versa.mve_images.0.id
-						director_address = "director1.versa.com"
-						controller_address = "controller1.versa.com"
-						local_auth = "SDWAN-Branch@Versa.com"
-						remote_auth = "Controller-1-staging@Versa.com"
-						serial_number = "Megaport-Hub1"
+                        vendor             = "versa"
+                        product_size       = "SMALL"
+                        image_id           = 20
+                        mve_label          = "MVE 2/8"
+                        director_address   = "0.0.0.0"
+                        controller_address = "0.0.0.0"
+                        local_auth         = "test"
+                        remote_auth        = "test2"
+                        serial_number      = "test-serial-number"
                     }
 
 					vnics = [{
@@ -365,7 +357,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "LARGE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
