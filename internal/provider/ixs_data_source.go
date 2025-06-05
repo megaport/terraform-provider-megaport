@@ -23,7 +23,6 @@ type ixsDataSource struct {
 type ixsModel struct {
 	UIDs   types.List    `tfsdk:"uids"`
 	Filter []filterModel `tfsdk:"filter"`
-	Tags   types.Map     `tfsdk:"tags"`
 }
 
 // NewIXsDataSource creates a new IXs data source.
@@ -45,11 +44,6 @@ func (d *ixsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				ElementType: types.StringType,
 				Computed:    true,
 				Description: "List of IX UIDs that match the specified criteria.",
-			},
-			"tags": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Description: "Map of resource tags, each pair of which must exactly match a pair on the desired IXs.",
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -142,46 +136,15 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 func (d *ixsDataSource) filterIXs(ctx context.Context, ixs []*megaport.IX, data ixsModel) ([]*megaport.IX, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	// If no filters or tags are provided, return all IXs
-	if len(data.Filter) == 0 && data.Tags.IsNull() {
+	// If no filters are provided, return all IXs
+	if len(data.Filter) == 0 {
 		return ixs, diags
 	}
 
 	var filteredIXs []*megaport.IX
 
-	// Handle tag filtering
-	var tagFilters map[string]string
-	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
-		diags.Append(data.Tags.ElementsAs(ctx, &tagFilters, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
-	}
-
 	// Process each IX
 	for _, ix := range ixs {
-		// Check tag filters if any
-		if len(tagFilters) > 0 {
-			// Use attribute tags if available, otherwise try to fetch from API
-			ixTags := ix.AttributeTags
-			if len(ixTags) == 0 {
-				var err error
-				ixTags, err = d.client.IXService.ListIXResourceTags(ctx, ix.ProductUID)
-				if err != nil {
-					diags.AddWarning(
-						"Error fetching IX tags",
-						fmt.Sprintf("Unable to fetch tags for IX %s: %v", ix.ProductUID, err),
-					)
-					continue
-				}
-			}
-
-			// Check if IX matches all tag filters
-			if !matchesTags(ixTags, tagFilters) {
-				continue
-			}
-		}
-
 		// Check custom filters
 		match, filterDiags := matchesIXFilters(ctx, ix, data.Filter)
 		diags.Append(filterDiags...)
