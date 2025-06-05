@@ -59,7 +59,7 @@ func (d *mvesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, vendor, size, location-id, provisioning-status, market, company-name, vxc-permitted.",
+							Description: "Name of the field to filter by. Available filters: name, vendor, size, location-id, provisioning-status, market, company-name, cost-centre, vxc-permitted.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -225,6 +225,8 @@ func matchesMVEFilters(ctx context.Context, mve *megaport.MVE, filters []filterM
 			match = containsBool(filterValues, mve.VXCPermitted)
 		case "diversity-zone":
 			match = containsString(filterValues, mve.DiversityZone)
+		case "cost-centre":
+			match = containsString(filterValues, mve.CostCentre)
 		default:
 			diags.AddWarning(
 				"Unknown filter",
