@@ -29,5 +29,5 @@ Provides a list of IX UIDs matching the specified filters.
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, vlan, asn, network-service-type, location-id, rate-limit, provisioning-status, company-name.
+- `name` (String) Name of the field to filter by. Available filters: name, vlan, asn, network-service-type, location-id, rate-limit, provisioning-status.
 - `values` (List of String) Set of values that are accepted for the given field.

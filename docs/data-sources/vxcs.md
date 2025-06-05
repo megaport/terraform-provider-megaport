@@ -29,5 +29,5 @@ Provides a list of VXC UIDs matching the specified filters.
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, rate-limit, provisioning-status, aend-uid, bend-uid, company-name.
+- `name` (String) Name of the field to filter by. Available filters: name, rate-limit, provisioning-status, aend-uid, bend-uid, cost-centre, company-name.
 - `values` (List of String) Set of values that are accepted for the given field.
