@@ -2812,6 +2812,7 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
 		},
 	})
 }
+
 func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 	portName := RandomTestName()
 	mcrName := RandomTestName()
@@ -3118,6 +3119,10 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                         name = "name"
                         values = ["%s"]
                     }
+                    filter {
+                        name = "provisioning-status"
+                        values = ["ACTIVE"]
+                    }
                 }
                 
                 // VXC data source looking for VXCs that should no longer exist
@@ -3125,6 +3130,10 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     filter {
                         name = "name"
                         values = ["%s"]
+                    }
+                    filter {
+                        name = "provisioning-status"
+                        values = ["ACTIVE"]
                     }
                 }
                 `,
@@ -3143,7 +3152,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttr("data.megaport_mves.test_mve_filter", "uids.#", "1"),
 
-					// Check that VXCs no longer exist in data sources
+					// Check that ACTIVE VXCs no longer exist in data sources
 					resource.TestCheckResourceAttr("data.megaport_vxcs.test_port_mcr_vxc_filter", "uids.#", "0"),
 					resource.TestCheckResourceAttr("data.megaport_vxcs.test_mcr_mve_vxc_filter", "uids.#", "0"),
 				),
