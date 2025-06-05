@@ -17,18 +17,10 @@ const (
 
 type BasicVXCProviderTestSuite ProviderTestSuite
 type BasicVXCInnerVLANProviderTestSuite ProviderTestSuite
-type MCRVLANValidationAEndTestSuite ProviderTestSuite
-type MCRVLANValidationBEndTestSuite ProviderTestSuite
-type MCRVLANValidationNullTestSuite ProviderTestSuite
-type MVEVLANValidationAEndTestSuite ProviderTestSuite
-type MVEVLANValidationBEndTestSuite ProviderTestSuite
-type MVEVLANValidationWithVNICTestSuite ProviderTestSuite
-type MVEVLANValidationNullTestSuite ProviderTestSuite
-type MVEVNICIndexUpdateTestSuite ProviderTestSuite
-type MVEVNICIndexValidationAEndTestSuite ProviderTestSuite
-type MVEVNICIndexValidationBEndTestSuite ProviderTestSuite
-type MCRVLANModificationBEndTestSuite ProviderTestSuite
-type MVEVLANModificationAEndTestSuite ProviderTestSuite
+type MCRVLANValidationProviderTestSuite ProviderTestSuite
+type MVEVLANValidationProviderTestSuite ProviderTestSuite
+type MVEVNICIndexProviderTestSuite ProviderTestSuite
+type VLANModificationProviderTestSuite ProviderTestSuite
 type CSPProviderTestSuite ProviderTestSuite
 
 func TestBasicVXCProviderTestSuite(t *testing.T) {
@@ -41,64 +33,24 @@ func TestBasicVXCInnerVLANProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(BasicVXCInnerVLANProviderTestSuite))
 }
 
-func TestMCRVLANValidationAEndTestSuite(t *testing.T) {
+func TestMCRVLANValidationTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRVLANValidationAEndTestSuite))
+	suite.Run(t, new(MCRVLANValidationProviderTestSuite))
 }
 
-func TestMCRVLANValidationBEndTestSuite(t *testing.T) {
+func TestMVEVLANValidationTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRVLANValidationBEndTestSuite))
+	suite.Run(t, new(MVEVLANValidationProviderTestSuite))
 }
 
-func TestMCRVLANValidationNullTestSuite(t *testing.T) {
+func TestMVEVNICIndexProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRVLANValidationNullTestSuite))
+	suite.Run(t, new(MVEVNICIndexProviderTestSuite))
 }
 
-func TestMVEVLANValidationAEndTestSuite(t *testing.T) {
+func TestVLANModificationProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MVEVLANValidationAEndTestSuite))
-}
-
-func TestMVEVLANValidationBEndTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVLANValidationBEndTestSuite))
-}
-
-func TestMVEVLANValidationWithVNICTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVLANValidationWithVNICTestSuite))
-}
-
-func TestMVEVLANValidationNullTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVLANValidationNullTestSuite))
-}
-
-func TestMVEVNICIndexUpdateTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVNICIndexUpdateTestSuite))
-}
-
-func TestAccMVEVNICIndexValidationAEndTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVNICIndexValidationAEndTestSuite))
-}
-
-func TestAccMVEVNICIndexValidationBEndTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVNICIndexValidationBEndTestSuite))
-}
-
-func TestAccVXCResourceWithMCRBEndVLANModification(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MCRVLANModificationBEndTestSuite))
-}
-
-func TestAccVXCResourceWithMVEAEndVLANModification(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVLANModificationAEndTestSuite))
+	suite.Run(t, new(VLANModificationProviderTestSuite))
 }
 
 func TestVXCBasicCSPProviderTestSuite(t *testing.T) {
@@ -840,7 +792,7 @@ resource "megaport_vxc_basic" "vxc" {
 	})
 }
 
-func (suite *MCRVLANValidationAEndTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_AEnd() {
+func (suite *MCRVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_AEnd() {
 	portName2 := RandomTestName()
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
@@ -893,7 +845,7 @@ func (suite *MCRVLANValidationAEndTestSuite) TestAccMegaportBasicVXC_MCRVLANVali
 	})
 }
 
-func (suite *MCRVLANValidationBEndTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_BEnd() {
+func (suite *MCRVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_BEnd() {
 	portName1 := RandomTestName()
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
@@ -945,7 +897,7 @@ func (suite *MCRVLANValidationBEndTestSuite) TestAccMegaportBasicVXC_MCRVLANVali
 	})
 }
 
-func (suite *MVEVLANValidationAEndTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_AEnd() {
+func (suite *MVEVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_AEnd() {
 	portName2 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1032,7 +984,7 @@ func (suite *MVEVLANValidationAEndTestSuite) TestAccMegaportBasicVXC_MVEVLANVali
 	})
 }
 
-func (suite *MVEVLANValidationBEndTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_BEnd() {
+func (suite *MVEVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_BEnd() {
 	portName1 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1119,7 +1071,7 @@ func (suite *MVEVLANValidationBEndTestSuite) TestAccMegaportBasicVXC_MVEVLANVali
 	})
 }
 
-func (suite *MVEVNICIndexValidationAEndTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexValidation_AEnd() {
+func (suite *MVEVNICIndexProviderTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexValidation_AEnd() {
 	portName2 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1206,7 +1158,7 @@ func (suite *MVEVNICIndexValidationAEndTestSuite) TestAccMegaportBasicVXC_MVEVNI
 	})
 }
 
-func (suite *MVEVNICIndexValidationBEndTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexValidation_BEnd() {
+func (suite *MVEVNICIndexProviderTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexValidation_BEnd() {
 	portName1 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1795,7 +1747,7 @@ func (suite *CSPProviderTestSuite) TestFullEcosystem() {
 	})
 }
 
-func (suite *MCRVLANValidationNullTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_Null() {
+func (suite *MCRVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_Null() {
 	portName1 := RandomTestName()
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1849,7 +1801,7 @@ func (suite *MCRVLANValidationNullTestSuite) TestAccMegaportBasicVXC_MCRVLANVali
 	})
 }
 
-func (suite *MVEVLANValidationNullTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_Null() {
+func (suite *MVEVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_Null() {
 	portName1 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1939,7 +1891,7 @@ func (suite *MVEVLANValidationNullTestSuite) TestAccMegaportBasicVXC_MVEVLANVali
 	})
 }
 
-func (suite *MVEVLANValidationWithVNICTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_WithVNIC() {
+func (suite *MVEVNICIndexProviderTestSuite) TestAccMegaportBasicVXC_MVEVLANValidation_WithVNIC() {
 	portName1 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -2030,7 +1982,7 @@ func (suite *MVEVLANValidationWithVNICTestSuite) TestAccMegaportBasicVXC_MVEVLAN
 	})
 }
 
-func (suite *MVEVLANModificationAEndTestSuite) TestAccVXCResourceWithMVEAEndVLANModification() {
+func (suite *VLANModificationProviderTestSuite) TestAccVXCResourceWithMVEAEndVLANModification() {
 	portName2 := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -2194,7 +2146,7 @@ func (suite *MVEVLANModificationAEndTestSuite) TestAccVXCResourceWithMVEAEndVLAN
 	})
 }
 
-func (suite *MVEVNICIndexUpdateTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexUpdate() {
+func (suite *MVEVNICIndexProviderTestSuite) TestAccMegaportBasicVXC_MVEVNICIndexUpdate() {
 	mveName1 := RandomTestName()
 	mveName2 := RandomTestName()
 	mveName3 := RandomTestName()
@@ -2572,7 +2524,7 @@ resource "megaport_vxc_basic" "mve_vxc" {
 	})
 }
 
-func (suite *MCRVLANModificationBEndTestSuite) TestAccVXCResourceWithMCRBEndVLANModification() {
+func (suite *VLANModificationProviderTestSuite) TestAccVXCResourceWithMCRBEndVLANModification() {
 	portName1 := RandomTestName()
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
