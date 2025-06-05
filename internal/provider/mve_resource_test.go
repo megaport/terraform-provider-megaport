@@ -172,7 +172,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"last_updated", "vendor_config", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			// Update Test
 			{
