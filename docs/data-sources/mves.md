@@ -29,5 +29,5 @@ Provides a list of MVE UIDs matching the specified filters.
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, vendor, size, location-id, provisioning-status, market, company-name, vxc-permitted.
+- `name` (String) Name of the field to filter by. Available filters: name, vendor, size, location-id, provisioning-status, market, company-name, cost-centre, vxc-permitted.
 - `values` (List of String) Set of values that are accepted for the given field.
