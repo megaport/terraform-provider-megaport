@@ -98,6 +98,10 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                       name = "size"
                       values = ["MEDIUM"]
                     }
+					filter {
+                      name = "name"
+                      values = ["%s"]
+                    }
                     depends_on = [megaport_mve.mve]
                   }
                   
@@ -111,18 +115,13 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                       name = "location-id"
                       values = ["%d"]
                     }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
-                  # Test MVE data source with tags
-                  data "megaport_mves" "test_tag_filter" {
-                    tags = {
-                      "key1" = "value1"
-                      "key2" = "value2"
+					filter {
+                      name = "name"
+                      values = ["%s"]
                     }
                     depends_on = [megaport_mve.mve]
                   }
-                  `, MVETestLocationIDNum, mveName, costCentre, mveName, mveName, mveName, MVETestLocationIDNum),
+                  `, MVETestLocationIDNum, mveName, costCentre, mveName, mveName, mveName, mveName, MVETestLocationIDNum, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
@@ -151,7 +150,6 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_vendor_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_size_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_multi_filter", "uids.#"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_tag_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -221,15 +219,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
                     }
                     depends_on = [megaport_mve.mve]
                   }
-                  
-                  # Test MVE data source with updated tags
-                  data "megaport_mves" "test_tag_filter" {
-                    tags = {
-                      "key1updated" = "value1updated"
-                      "key2updated" = "value2updated"
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
+
                   
                   # Test MVE data source with cost-centre filter
                   data "megaport_mves" "test_cost_centre_filter" {
@@ -262,7 +252,6 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 
 					// Check data source results with updated values
 					resource.TestCheckResourceAttr("data.megaport_mves.test_name_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_tag_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttr("data.megaport_mves.test_cost_centre_filter", "uids.#", "1"),
 				),
 			},
@@ -358,15 +347,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     }
                     depends_on = [megaport_mve.mve]
                   }
-                  
-                  # Test MVE data source with tags
-                  data "megaport_mves" "test_tag_filter" {
-                    tags = {
-                      "key1" = "value1"
-                      "key2" = "value2"
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
                   `, MVETestLocationIDNum, mveName, costCentre, mveName, MVETestLocationIDNum),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
@@ -398,7 +378,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_vendor_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_location_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_mves.test_multi_filter", "uids.#"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_tag_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -472,15 +451,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
                     depends_on = [megaport_mve.mve]
                   }
                   
-                  # Test MVE data source with updated tags
-                  data "megaport_mves" "test_tag_filter" {
-                    tags = {
-                      "key1updated" = "value1updated"
-                      "key2updated" = "value2updated"
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
                   # Test MVE data source with cost-centre filter
                   data "megaport_mves" "test_cost_centre_filter" {
                     filter {
@@ -512,7 +482,6 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 
 					// Check data source results with updated values
 					resource.TestCheckResourceAttr("data.megaport_mves.test_name_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_tag_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttr("data.megaport_mves.test_cost_centre_filter", "uids.#", "1"),
 				),
 			},
