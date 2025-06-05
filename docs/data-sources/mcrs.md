@@ -29,5 +29,5 @@ Provides a list of MCR UIDs matching the specified filters.
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, provisioning-status, market, company-name, vxc-permitted, asn, diversity-zone.
+- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, vxc-permitted, asn, diversity-zone.
 - `values` (List of String) Set of values that are accepted for the given field.
