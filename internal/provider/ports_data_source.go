@@ -67,7 +67,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, provisioning-status, market, company-name, vxc-permitted.",
+							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, vxc-permitted.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -235,6 +235,8 @@ func matchesFilters(ctx context.Context, port *megaport.Port, filters []filterMo
 			match = containsString(filterValues, port.Market)
 		case "company-name":
 			match = containsString(filterValues, port.CompanyName)
+		case "cost-centre":
+			match = containsString(filterValues, port.CostCentre)
 		case "vxc-permitted":
 			match = containsBool(filterValues, port.VXCPermitted)
 		// Add more filters as needed

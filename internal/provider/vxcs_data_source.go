@@ -59,7 +59,7 @@ func (d *vxcsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, rate-limit, provisioning-status, aend-uid, bend-uid, company-name.",
+							Description: "Name of the field to filter by. Available filters: name, rate-limit, provisioning-status, aend-uid, bend-uid, cost-centre, company-name.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -219,6 +219,8 @@ func matchesVXCFilters(ctx context.Context, vxc *megaport.VXC, filters []filterM
 			match = containsString(filterValues, vxc.BEndConfiguration.UID)
 		case "company-name":
 			match = containsString(filterValues, vxc.CompanyName)
+		case "cost-centre":
+			match = containsString(filterValues, vxc.CostCentre)
 		default:
 			diags.AddWarning(
 				"Unknown filter",

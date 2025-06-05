@@ -53,7 +53,7 @@ func (d *ixsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, vlan, asn, network-service-type, location-id, rate-limit, provisioning-status, company-name.",
+							Description: "Name of the field to filter by. Available filters: name, vlan, asn, network-service-type, location-id, rate-limit, provisioning-status.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -188,13 +188,6 @@ func matchesIXFilters(ctx context.Context, ix *megaport.IX, filters []filterMode
 			match = containsInt(filterValues, ix.RateLimit)
 		case "provisioning-status":
 			match = containsString(filterValues, ix.ProvisioningStatus)
-		case "company-name":
-			// IX may not have a company name directly, so we'll just check if the filter includes empty string
-			if ix.LocationDetail.Name != "" {
-				match = containsString(filterValues, ix.LocationDetail.Name)
-			} else {
-				match = containsString(filterValues, "")
-			}
 		default:
 			diags.AddWarning(
 				"Unknown filter",
