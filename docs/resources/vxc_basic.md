@@ -39,7 +39,6 @@ Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This r
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `locked` (Boolean) Whether the product is locked.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the product.
 
 <a id="nestedatt--a_end"></a>
 ### Nested Schema for `a_end`
