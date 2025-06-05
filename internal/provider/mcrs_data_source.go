@@ -59,7 +59,7 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, provisioning-status, market, company-name, vxc-permitted, asn, diversity-zone.",
+							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, vxc-permitted, asn, diversity-zone.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -223,6 +223,8 @@ func matchesMCRFilters(ctx context.Context, mcr *megaport.MCR, filters []filterM
 			match = containsBool(filterValues, mcr.VXCPermitted)
 		case "diversity-zone":
 			match = containsString(filterValues, mcr.DiversityZone)
+		case "cost-centre":
+			match = containsString(filterValues, mcr.CostCentre)
 		case "asn":
 			match = containsInt(filterValues, mcr.Resources.VirtualRouter.ASN)
 		default:
