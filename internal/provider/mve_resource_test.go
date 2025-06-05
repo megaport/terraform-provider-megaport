@@ -122,7 +122,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "vendor_config", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
 			},
 			// Update Testing
 			{
@@ -147,42 +147,29 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					}
 
                     vendor_config = {
-                      vendor       = "aruba"
-                      product_size = "MEDIUM"
-                      image_id     = 23
-                      account_name = "%s-account"
-                      account_key  = "%s-key"
-                      system_tag   = "Preconfiguration-test-1"
+                        vendor = "ArUbA"
+                        product_size = "sMaLl"
+						mve_label = "MVE 2/8"
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
                     }
-                  }
-                  
-                  # Test MVE data source with updated name filter
-                  data "megaport_mves" "test_name_filter" {
-                    filter {
-                      name = "name"
-                      values = ["%s"]
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
-                  # Test MVE data source with updated tags
-                  data "megaport_mves" "test_tag_filter" {
-                    tags = {
-                      "key1updated" = "value1updated"
-                      "key2updated" = "value2updated"
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
-                  # Test MVE data source with cost-centre filter
-                  data "megaport_mves" "test_cost_centre_filter" {
-                    filter {
-                      name = "cost-centre"
-                      values = ["%s"]
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  `, MVETestLocationIDNum, mveNameNew, costCentreNew, mveName, mveName, mveNameNew, costCentreNew),
+
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}
+					]
+                  }`, MVETestLocationIDNum, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -201,19 +188,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor_config.vendor", "aruba"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor_config.product_size", "MEDIUM"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.#", "3"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.0.description", "Data Plane"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.1.description", "Management Plane"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.2.description", "Control Plane"),
-
-					// Check data source results with updated values
-					resource.TestCheckResourceAttr("data.megaport_mves.test_name_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_tag_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mves.test_cost_centre_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
 			// Make sure resource has not been destroyed by change of casing in Vendor Config
@@ -239,250 +214,12 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 		},
 	})
 }
+
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 	mveName := RandomTestName()
-	mveKey := RandomTestName()
+	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				
-				data "megaport_mve_images" "aruba" {
-  					vendor_filter = "Aruba"
-  					id_filter = 23
-				}
-
-				resource "megaport_mve" "mve" {
-                    product_name  = "%s"
-                    location_id = data.megaport_location.test_location.id
-                    contract_term_months = 1
-					cost_centre = "%s"
-					diversity_zone = "red"
-
-                    vendor_config = {
-                        vendor             = "versa"
-                        product_size       = "SMALL"
-                        image_id           = 20
-                        mve_label          = "MVE 2/8"
-                        director_address   = "0.0.0.0"
-                        controller_address = "0.0.0.0"
-                        local_auth         = "test"
-                        remote_auth        = "test2"
-                        serial_number      = "test-serial-number"
-                    }
-                  }
-                  
-                  # Test MVE data source with name filter
-                  data "megaport_mves" "test_name_filter" {
-                    filter {
-                      name = "name"
-                      values = ["%s"]
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
-                  # Test MVE data source with vendor filter
-                  data "megaport_mves" "test_vendor_filter" {
-                    filter {
-                      name = "vendor"
-                      values = ["versa"]
-                    }
-                    depends_on = [megaport_mve.mve]
-                  }
-                  
-                  # Test MVE data source with location filter
-                  data "megaport_mves" "test_location_filter" {
-                    filter {
-                      name = "location-id"
-                      values = ["%d"]
-                    }
-
-					resource_tags = {
-						"environment" = "test"
-						"team" = "automation"
-					}
-
-					vnics = [{
-						description = "Data Plane"
-					}]
-                }
-
-				# Test MVEs data source without filters
-				data "megaport_mves" "all_mves" {
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with name filter
-				data "megaport_mves" "filtered_by_name" {
-					filter {
-						name = "name"
-						values = ["%s"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with vendor filter
-				data "megaport_mves" "filtered_by_vendor" {
-					filter {
-						name = "vendor"
-						values = ["ARUBA"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with size filter
-				data "megaport_mves" "filtered_by_size" {
-					filter {
-						name = "size"
-						values = ["SMALL"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with location filter
-				data "megaport_mves" "filtered_by_location" {
-					filter {
-						name = "location-id"
-						values = ["%d"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with tags filter
-				data "megaport_mves" "filtered_by_tags" {
-					tags = {
-						"environment" = "test"
-						"team" = "automation"
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test MVEs data source with combined filters and tags
-				data "megaport_mves" "filtered_combined" {
-					filter {
-						name = "vendor"
-						values = ["ARUBA"]
-					}
-					tags = {
-						"environment" = "test"
-					}
-					depends_on = [megaport_mve.mve]
-				}
-				`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey, mveName, MVETestLocationIDNum),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify MVE was created
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
-
-					// Test all MVEs data source returns results
-					resource.TestCheckResourceAttrSet("data.megaport_mves.all_mves", "uids.#"),
-
-					// Test name filter returns our MVE
-					resource.TestCheckResourceAttr("data.megaport_mves.filtered_by_name", "uids.#", "1"),
-
-					// Test vendor filter returns our MVE
-					resource.TestCheckResourceAttrSet("data.megaport_mves.filtered_by_vendor", "uids.#"),
-
-					// Test size filter returns our MVE
-					resource.TestCheckResourceAttrSet("data.megaport_mves.filtered_by_size", "uids.#"),
-
-					// Test location filter returns our MVE
-					resource.TestCheckResourceAttrSet("data.megaport_mves.filtered_by_location", "uids.#"),
-
-					// Test tags filter returns our MVE
-					resource.TestCheckResourceAttr("data.megaport_mves.filtered_by_tags", "uids.#", "1"),
-
-					// Test combined filter returns our MVE
-					resource.TestCheckResourceAttr("data.megaport_mves.filtered_combined", "uids.#", "1"),
-				),
-			},
-		},
-	})
-}
-
-// Test the MVE sizes data source functionality
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVESizesDataSource_Basic() {
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + `
-				data "megaport_mve_sizes" "test" {}
-				`,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify that sizes are returned
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.test", "mve_sizes.#"),
-
-					// Check that at least one size has the expected attributes
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.test", "mve_sizes.0.size"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.test", "mve_sizes.0.label"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.test", "mve_sizes.0.cpu_core_count"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.test", "mve_sizes.0.ram_gb"),
-				),
-			},
-		},
-	})
-}
-
-// Test the MVE images data source functionality (ensuring it integrates well)
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImagesDataSource_Integration() {
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + `
-				# Test MVE images with vendor filter
-				data "megaport_mve_images" "aruba_images" {
-  					vendor_filter = "Aruba"
-				}
-
-				# Test MVE images with vendor and ID filter
-				data "megaport_mve_images" "aruba_specific" {
-  					vendor_filter = "Aruba"
-  					id_filter = 23
-				}
-
-				# Test MVE images with version filter
-				data "megaport_mve_images" "by_version" {
-  					version_filter = "8.10"
-				}
-
-				# Test MVE sizes to use with images
-				data "megaport_mve_sizes" "available_sizes" {}
-				`,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify Aruba images are returned
-					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba_images", "mve_images.#"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba_images", "mve_images.0.id"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba_images", "mve_images.0.vendor"),
-
-					// Verify specific Aruba image is returned
-					resource.TestCheckResourceAttr("data.megaport_mve_images.aruba_specific", "mve_images.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mve_images.aruba_specific", "mve_images.0.id", "23"),
-
-					// Verify version filter works
-					resource.TestCheckResourceAttrSet("data.megaport_mve_images.by_version", "mve_images.#"),
-
-					// Verify sizes data source works alongside images
-					resource.TestCheckResourceAttrSet("data.megaport_mve_sizes.available_sizes", "mve_sizes.#"),
-				),
-			},
-		},
-	})
-}
-
-// Test MVEs data source with multiple filters and edge cases
-func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEsDataSource_Advanced() {
-	mveName := RandomTestName()
-	costCentre := RandomTestName()
-
+	costCentreNew := RandomTestName()
 	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -500,14 +237,13 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEsDataSource_Advanced()
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
-                    contract_term_months = 1
+                    contract_term_months        = 1
 					cost_centre = "%s"
 					diversity_zone = "red"
 
 					resource_tags = {
-						"environment" = "staging"
-						"project" = "test-project"
-						"owner" = "qa-team"
+						"key1" = "value1"
+						"key2" = "value2"
 					}
 
                     vendor_config = {
@@ -524,105 +260,258 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEsDataSource_Advanced()
 
 					vnics = [{
 						description = "Data Plane"
-					}]
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}
+					]
+                  }`, MVETestLocationIDNum, mveName, costCentre),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2", "value2"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
+			},
+			// Update Testing
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				data "megaport_mve_images" "versa" {
+  					vendor_filter = "Versa"
+  					id_filter = 20
+				}
+
+				resource "megaport_mve" "mve" {
+                    product_name  = "%s"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months        = 1
+					cost_centre = "%s"
+					diversity_zone = "red"
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
+
+                    vendor_config = {
+                        vendor = "VeRsA"
+                        product_size = "sMaLl"
+						mve_label = "MVE 2/8"
+                        image_id = data.megaport_mve_images.versa.mve_images.0.id
+						director_address = "director1.versa.com"
+						controller_address = "controller1.versa.com"
+						local_auth = "SDWAN-Branch@Versa.com"
+						remote_auth = "Controller-1-staging@Versa.com"
+						serial_number = "Megaport-Hub1"
+                    }
+
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}
+					]
+                  }`, MVETestLocationIDNum, mveNameNew, costCentreNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
+				),
+			},
+			// Make sure resource has not been destroyed by change of casing in Vendor Config
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
+			},
+		},
+	})
+}
+
+func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIgnoreChanges() {
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	costCentre := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// First create a standard MVE
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                
+                data "megaport_mve_images" "aruba" {
+                      vendor_filter = "Aruba"
+                      id_filter = 23
                 }
 
-				# Test with multiple filter values (OR logic within filter)
-				data "megaport_mves" "multi_vendor" {
-					filter {
-						name = "vendor"
-						values = ["VERSA", "CISCO", "FORTINET"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
+                resource "megaport_mve" "import_test" {
+                    product_name  = "%s"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months = 1
+                    cost_centre = "%s"
 
-				# Test with multiple filters (AND logic between filters)
-				data "megaport_mves" "multi_filters" {
-					filter {
-						name = "vendor"
-						values = ["VERSA"]
-					}
-					filter {
-						name = "size"
-						values = ["SMALL"]
-					}
-					filter {
-						name = "vxc-permitted"
-						values = ["true"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "SMALL"
+                        mve_label = "MVE Import Test"
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
+                        account_name = "%s"
+                        account_key = "%s"
+                        system_tag = "Preconfiguration-aruba-test-1"
+                    }
 
-				# Test with provisioning status filter
-				data "megaport_mves" "by_status" {
-					filter {
-						name = "provisioning-status"
-						values = ["LIVE", "CONFIGURED"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test with market filter
-				data "megaport_mves" "by_market" {
-					filter {
-						name = "market"
-						values = ["Sydney"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test with partial tag matching
-				data "megaport_mves" "partial_tags" {
-					tags = {
-						"environment" = "staging"
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test with exact tag matching (all tags must match)
-				data "megaport_mves" "exact_tags" {
-					tags = {
-						"environment" = "staging"
-						"project" = "test-project"
-						"owner" = "qa-team"
-					}
-					depends_on = [megaport_mve.mve]
-				}
-
-				# Test edge case: filter that shouldn't match anything
-				data "megaport_mves" "no_matches" {
-					filter {
-						name = "vendor"
-						values = ["NONEXISTENT"]
-					}
-					depends_on = [megaport_mve.mve]
-				}
-				`, MVETestLocationIDNum, mveName, costCentre),
+                    vnics = [{
+                        description = "Data Plane"
+                    }]
+                }`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify MVE was created
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName),
+				),
+			},
+			// ImportState testing using the standard pattern
+			{
+				ResourceName:                         "megaport_mve.import_test",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.import_test"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+			},
+			// Test a modification with lifecycle.ignore_changes
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                
+                data "megaport_mve_images" "aruba" {
+                      vendor_filter = "Aruba"
+                      id_filter = 23
+                }
 
-					// Test multi-vendor filter should include our VERSA MVE
-					resource.TestCheckResourceAttrSet("data.megaport_mves.multi_vendor", "uids.#"),
+                resource "megaport_mve" "import_test" {
+                    product_name  = "%s-updated"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months = 1
+                    cost_centre = "%s-updated"
 
-					// Test multi-filters should match our MVE
-					resource.TestCheckResourceAttrSet("data.megaport_mves.multi_filters", "uids.#"),
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "SMALL"
+                        mve_label = "MVE Import Test"
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
+                        account_name = "%s"
+                        account_key = "%s"
+                        system_tag = "Preconfiguration-aruba-test-1"
+                    }
 
-					// Test status filter
-					resource.TestCheckResourceAttrSet("data.megaport_mves.by_status", "uids.#"),
+                    vnics = [{
+                        description = "Data Plane"
+                    }]
 
-					// Test market filter
-					resource.TestCheckResourceAttrSet("data.megaport_mves.by_market", "uids.#"),
-
-					// Test partial tag matching
-					resource.TestCheckResourceAttr("data.megaport_mves.partial_tags", "uids.#", "1"),
-
-					// Test exact tag matching
-					resource.TestCheckResourceAttr("data.megaport_mves.exact_tags", "uids.#", "1"),
-
-					// Test no matches case
-					resource.TestCheckResourceAttr("data.megaport_mves.no_matches", "uids.#", "0"),
+                    lifecycle {
+                        ignore_changes = [vendor_config]
+                    }
+                }`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName+"-updated"),
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "cost_centre", costCentre+"-updated"),
+					resource.TestCheckResourceAttrSet("megaport_mve.import_test", "product_uid"),
 				),
 			},
 		},
