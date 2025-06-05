@@ -1513,6 +1513,250 @@ func (suite *CSPProviderTestSuite) TestAccMegaportMCRVXCBasicWithBGP_Basic() {
 	})
 }
 
+// Uses the same test suite as the Main VXC Full Ecosystem Test to avoid conflicts with CSP provider VXCs (Azure and GCP).
+func (suite *VXCCSPProviderTestSuite) TestBasicFullEcosystem() {
+	portName := RandomTestName()
+	lagPortName := RandomTestName()
+	mcrName := RandomTestName()
+	portVXCName := RandomTestName()
+	costCentreName := RandomTestName()
+	mcrVXCName := RandomTestName()
+	awsVXCName := RandomTestName()
+	gcpVXCName := RandomTestName()
+	azureVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc2" {
+					id = %d
+				  }
+
+				  data "megaport_location" "loc3" {
+					id = %d
+				  }
+
+				  data "megaport_partner" "aws_port" {
+					connect_type = "AWS"
+					company_name = "AWS"
+					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+					location_id  = data.megaport_location.loc2.id
+				  }
+
+				  resource "megaport_lag_port" "lag_port" {
+			        product_name  = "%s"
+					cost_centre = "%s"
+			        port_speed  = 10000
+			        location_id = data.megaport_location.loc1.id
+			        contract_term_months        = 12
+					marketplace_visibility = false
+                    lag_count = 1
+			      }
+
+				  resource "megaport_port" "port" {
+					product_name            = "%s"
+					port_speed              = 1000
+					location_id             = data.megaport_location.loc2.id
+					contract_term_months    = 12
+					marketplace_visibility  = true
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					asn                      = 64555
+				  }
+
+				  resource "megaport_vxc_basic" "port_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_lag_port.lag_port.product_uid
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "mcr_vxc" {
+					product_name           = "%s"
+					rate_limit             = 1000
+					contract_term_months   = 12
+
+					a_end = {
+					  requested_product_uid = megaport_port.port.product_uid
+					  ordered_vlan = 181
+					}
+
+					b_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 181
+					}
+
+					resource_tags = {
+						"key1" = "value1"
+						"key2" = "value2"
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "aws_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 1
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 191
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.aws_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "aws"
+					  aws_config = {
+						name          = "%s"
+						asn           = 64550
+						type          = "private"
+						connect_type  = "AWS"
+						amazon_asn    = 64551
+						owner_account = "123456789012"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "gcp_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 182
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "google"
+					  google_config = {
+						pairing_key = "%s"
+					  }
+					}
+				  }
+
+				  resource "megaport_vxc_basic" "azure_vxc" {
+					product_name            = "%s"
+					rate_limit              = 200
+					contract_term_months    = 12
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 0
+					}
+
+					b_end = {}
+
+					b_end_partner_config = {
+					  partner = "azure"
+					  azure_config = {
+					    port_choice = "primary"
+						service_key = "%s"
+					  }
+					}
+				  }
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKey, azureVXCName, AzureServiceKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "resource_tags.key2", "value2"),
+					resource.TestCheckResourceAttr("megaport_vxc.mcr_vxc", "resource_tags.key1", "value1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mcr_vxc", "resource_tags.key2", "value2"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.aws_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.aws_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.gcp_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.gcp_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.azure_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.azure_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+			},
+		},
+	})
+}
+
 func (suite *MCRVLANValidationProviderTestSuite) TestAccMegaportBasicVXC_MCRVLANValidation_Null() {
 	portName1 := RandomTestName()
 	mcrName := RandomTestName()
