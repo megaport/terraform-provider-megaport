@@ -20,7 +20,6 @@ func TestSinglePortProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(SinglePortProviderTestSuite))
 }
-
 func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 	portName := RandomTestName()
 	portNameNew := RandomTestName()
@@ -31,23 +30,73 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-					resource "megaport_port" "port" {
-			        product_name  = "%s"
-			        port_speed  = 1000
-					cost_centre = "%s"
-			        location_id = data.megaport_location.test_location.id
-			        contract_term_months        = 12
-					marketplace_visibility = true
-					diversity_zone = "red"
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                resource "megaport_port" "port" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    cost_centre = "%s"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months        = 12
+                    marketplace_visibility = true
+                    diversity_zone = "red"
 
-					resource_tags = {
-						"key1" = "value1"
-						"key2" = "value2"
-  					}
-			      }`, SinglePortTestLocationIDNum, portName, costCentreName),
+                    resource_tags = {
+                        "key1" = "value1"
+                        "key2" = "value2"
+                      }
+                }
+                
+                # Test port data source with name filter
+                data "megaport_ports" "test_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with port-speed filter
+                data "megaport_ports" "test_speed_filter" {
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with location-id filter
+                data "megaport_ports" "test_location_filter" {
+                    filter {
+                        name = "location-id"
+                        values = ["%d"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with multiple filters (speed and cost-centre)
+                data "megaport_ports" "test_multi_filter" {
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    filter {
+                        name = "cost-centre"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with tags
+                data "megaport_ports" "test_tag_filter" {
+                    tags = {
+                        "key1" = "value1"
+                        "key2" = "value2"
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                `, SinglePortTestLocationIDNum, portName, costCentreName, portName, SinglePortTestLocationIDNum, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -64,6 +113,13 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+
+					// Check data source results
+					resource.TestCheckResourceAttr("data.megaport_ports.test_name_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_location_filter", "uids.#"),
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
+					resource.TestCheckResourceAttr("data.megaport_ports.test_tag_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -88,22 +144,63 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-					resource "megaport_port" "port" {
-			        product_name  = "%s"
-			        port_speed  = 1000
-					cost_centre = "%s"
-			        location_id = data.megaport_location.test_location.id
-			        contract_term_months        = 12
-					marketplace_visibility = false
-					diversity_zone = "red"
-					resource_tags = {
-						"key1-updated" = "value1-updated"
-						"key2-updated" = "value2-updated"
-					}
-			      }`, SinglePortTestLocationIDNum, portNameNew, costCentreNameNew),
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                resource "megaport_port" "port" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    cost_centre = "%s"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months        = 12
+                    marketplace_visibility = false
+                    diversity_zone = "red"
+                    resource_tags = {
+                        "key1-updated" = "value1-updated"
+                        "key2-updated" = "value2-updated"
+                    }
+                }
+                
+                # Test port data source with updated name filter
+                data "megaport_ports" "test_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with port-speed filter (still the same)
+                data "megaport_ports" "test_speed_filter" {
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with updated tags
+                data "megaport_ports" "test_tag_filter" {
+                    tags = {
+                        "key1-updated" = "value1-updated"
+                        "key2-updated" = "value2-updated"
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                
+                # Test port data source with multiple filters (speed and cost-centre)
+                data "megaport_ports" "test_multi_filter" {
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    filter {
+                        name = "cost-centre"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_port.port]
+                }
+                `, SinglePortTestLocationIDNum, portNameNew, costCentreNameNew, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -120,6 +217,12 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
+
+					// Check updated data source results
+					resource.TestCheckResourceAttr("data.megaport_ports.test_name_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
+					resource.TestCheckResourceAttr("data.megaport_ports.test_tag_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
 				),
 			},
 		},
