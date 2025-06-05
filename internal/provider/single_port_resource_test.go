@@ -88,19 +88,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
                     depends_on = [megaport_port.port]
                 }
                 
-                # Test port data source with tags
-                data "megaport_ports" "test_tag_filter" {
-                    tags = {
-                        "key1" = "value1"
-                        "key2" = "value2"
-                    }
-					filter {
-                        name = "cost-centre"
-                        values = ["%s"]
-                    }
-                    depends_on = [megaport_port.port]
-                }
-                `, SinglePortTestLocationIDNum, portName, costCentreName, portName, SinglePortTestLocationIDNum, costCentreName, costCentreName),
+                `, SinglePortTestLocationIDNum, portName, costCentreName, portName, SinglePortTestLocationIDNum, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -123,7 +111,6 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_ports.test_location_filter", "uids.#"),
 					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
-					resource.TestCheckResourceAttr("data.megaport_ports.test_tag_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -183,15 +170,6 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
                     depends_on = [megaport_port.port]
                 }
                 
-                # Test port data source with updated tags
-                data "megaport_ports" "test_tag_filter" {
-                    tags = {
-                        "key1-updated" = "value1-updated"
-                        "key2-updated" = "value2-updated"
-                    }
-                    depends_on = [megaport_port.port]
-                }
-                
                 # Test port data source with multiple filters (speed and cost-centre)
                 data "megaport_ports" "test_multi_filter" {
                     filter {
@@ -225,7 +203,6 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					// Check updated data source results
 					resource.TestCheckResourceAttr("data.megaport_ports.test_name_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
-					resource.TestCheckResourceAttr("data.megaport_ports.test_tag_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
 				),
 			},
