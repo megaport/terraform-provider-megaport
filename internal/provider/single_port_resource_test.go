@@ -94,9 +94,13 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
                         "key1" = "value1"
                         "key2" = "value2"
                     }
+					filter {
+                        name = "cost-centre"
+                        values = ["%s"]
+                    }
                     depends_on = [megaport_port.port]
                 }
-                `, SinglePortTestLocationIDNum, portName, costCentreName, portName, SinglePortTestLocationIDNum, costCentreName),
+                `, SinglePortTestLocationIDNum, portName, costCentreName, portName, SinglePortTestLocationIDNum, costCentreName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
