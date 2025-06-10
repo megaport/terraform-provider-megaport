@@ -3,6 +3,7 @@ module github.com/megaport/terraform-provider-megaport
 go 1.24.0
 
 require (
+	github.com/aws/aws-sdk-go v1.55.7
 	github.com/hashicorp/terraform-plugin-docs v0.24.0
 	github.com/hashicorp/terraform-plugin-framework v1.18.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
@@ -24,6 +25,7 @@ require (
 	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/hashicorp/logutils v1.0.0 // indirect
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.38.1 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
