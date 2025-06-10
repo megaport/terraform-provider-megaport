@@ -2,8 +2,13 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/directconnect"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -685,4 +690,105 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 	diags.Append(transitDiags...)
 
 	return diags, transitPartnerConfig, transitConfigObj
+}
+func (r *vxcResource) deleteAWSHostedConnection(ctx context.Context, connectionID string) error {
+	// Check if AWS integration is enabled
+	if r.awsConfig == nil || !r.awsConfig.Enabled {
+		return fmt.Errorf("AWS integration not enabled in provider configuration")
+	}
+
+	// Create AWS session using our helper function
+	sess, err := createAWSSession(*r.awsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create AWS session: %v", err)
+	}
+
+	// Create Direct Connect client
+	dxClient := directconnect.New(sess)
+
+	// First check if the connection has virtual interfaces
+	vifs, err := dxClient.DescribeVirtualInterfacesWithContext(ctx, &directconnect.DescribeVirtualInterfacesInput{
+		ConnectionId: aws.String(connectionID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to describe virtual interfaces: %v", err)
+	}
+
+	// If there are VIFs attached, delete those first
+	for _, vif := range vifs.VirtualInterfaces {
+		_, err := dxClient.DeleteVirtualInterface(&directconnect.DeleteVirtualInterfaceInput{
+			VirtualInterfaceId: vif.VirtualInterfaceId,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete virtual interface %s: %v", *vif.VirtualInterfaceId, err)
+		}
+
+		// Wait for VIF deletion to complete using polling
+		err = waitForVirtualInterfaceDeleted(ctx, dxClient, vif.VirtualInterfaceId)
+		if err != nil {
+			return fmt.Errorf("failed waiting for virtual interface deletion: %v", err)
+		}
+	}
+
+	// Now delete the connection
+	_, err = dxClient.DeleteConnection(&directconnect.DeleteConnectionInput{
+		ConnectionId: aws.String(connectionID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete AWS Direct Connect connection: %v", err)
+	}
+
+	return nil
+}
+
+// waitForVirtualInterfaceDeleted polls the API until the virtual interface is deleted or a timeout occurs
+func waitForVirtualInterfaceDeleted(ctx context.Context, dxClient *directconnect.DirectConnect, vifID *string) error {
+	maxAttempts := 30
+	sleepTime := 10 * time.Second
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		resp, err := dxClient.DescribeVirtualInterfacesWithContext(ctx, &directconnect.DescribeVirtualInterfacesInput{
+			VirtualInterfaceId: vifID,
+		})
+
+		// If we get a resource not found error, the VIF is deleted
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok && (awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found")) {
+				return nil // VIF is deleted
+			}
+			return fmt.Errorf("failed to check virtual interface status: %v", err)
+		}
+
+		// If no VIFs returned, it's deleted
+		if len(resp.VirtualInterfaces) == 0 {
+			return nil
+		}
+
+		// Check if the VIF is in deleted state
+		var vifFound bool
+		for _, vi := range resp.VirtualInterfaces {
+			if *vi.VirtualInterfaceId == *vifID {
+				vifFound = true
+				if *vi.VirtualInterfaceState == "deleted" {
+					return nil // VIF is deleted
+				}
+				break
+			}
+		}
+
+		// If VIF not found, it's deleted
+		if !vifFound {
+			return nil
+		}
+
+		// Wait before next attempt
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(sleepTime):
+			// Continue to next attempt
+		}
+	}
+
+	return fmt.Errorf("timed out waiting for virtual interface %s to be deleted", *vifID)
 }
