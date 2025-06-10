@@ -454,7 +454,8 @@ func NewVXCResource() resource.Resource {
 
 // vxcResource is the resource implementation.
 type vxcResource struct {
-	client *megaport.Client
+	client    *megaport.Client
+	awsConfig *awsConfig
 }
 
 // Metadata returns the resource type name.
@@ -2401,7 +2402,43 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	// Delete existing order
+	// Check if this VXC has AWS connections that need to be deleted first
+	if !state.CSPConnections.IsNull() {
+		var cspConnections []cspConnectionModel
+		diags = state.CSPConnections.ElementsAs(ctx, &cspConnections, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Look for AWS Hosted Connections
+		for _, conn := range cspConnections {
+			if conn.ConnectType.ValueString() == "AWSHC" &&
+				conn.ConnectionID.ValueString() != "" {
+				// Check if AWS integration is enabled
+				if r.awsConfig != nil && r.awsConfig.Enabled {
+					// Use AWS SDK to delete the connection
+					err := r.deleteAWSHostedConnection(ctx, conn.ConnectionID.ValueString())
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error Deleting AWS Hosted Connection",
+							"Could not delete AWS Hosted Connection: "+err.Error(),
+						)
+						return
+					}
+				} else {
+					resp.Diagnostics.AddWarning(
+						"AWS Credentials Not Configured",
+						fmt.Sprintf("This VXC has AWS Hosted Connection %s that must be deleted in AWS first. "+
+							"Configure AWS credentials in the provider to automatically delete these connections.",
+							conn.ConnectionID.ValueString()),
+					)
+				}
+			}
+		}
+	}
+
+	// Now delete the VXC since AWS resources should be gone
 	err := r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
 		DeleteNow: true,
 	})
@@ -2420,17 +2457,17 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	client, ok := req.ProviderData.(*megaport.Client)
+	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *megaport.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			"Unexpected Provider Data Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 
-	r.client = client
+	r.client = data.client
+	r.awsConfig = data.awsConfig
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
