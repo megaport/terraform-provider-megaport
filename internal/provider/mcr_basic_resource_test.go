@@ -98,9 +98,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "prefix_filter_lists.0.description", prefixFilterName),
@@ -144,7 +141,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			// Update Test 1
 			{
@@ -230,9 +226,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "prefix_filter_lists.#", "3"),
@@ -308,9 +301,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "prefix_filter_lists.0.description", prefixFilterNameNew4),
@@ -345,9 +335,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "cost_centre", costCentreNameNew2),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "prefix_filter_lists.#", "0"),
@@ -394,9 +381,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "asn", "65000"),
@@ -420,7 +404,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			// Update Test 1
 			{
@@ -449,9 +432,6 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_basic.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr_basic.mcr", "asn", "65000"),
