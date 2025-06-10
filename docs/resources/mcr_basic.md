@@ -34,7 +34,6 @@ Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This c
 ### Read-Only
 
 - `admin_locked` (Boolean) Whether the product is admin locked.
-- `aggregation_id` (Number) Numeric ID of the aggregation.
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) Megaport Company UID of the product.
 - `locked` (Boolean) Whether the product is locked.

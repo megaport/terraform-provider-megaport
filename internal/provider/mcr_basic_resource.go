@@ -219,10 +219,6 @@ func (r *mcrBasicResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"aggregation_id": schema.Int64Attribute{
-				Description: "Numeric ID of the aggregation.",
-				Computed:    true,
-			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
 				Computed:    true,
