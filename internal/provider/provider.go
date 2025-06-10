@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -31,14 +34,39 @@ type megaportProviderModel struct {
 	AccessKey         types.String `tfsdk:"access_key"`
 	SecretKey         types.String `tfsdk:"secret_key"`
 	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
-	WaitTime          types.Int64  `tfsdk:"wait_time"`
 	CancelAtEndOfTerm types.Bool   `tfsdk:"cancel_at_end_of_term"`
+	AWSEnabled        types.Bool   `tfsdk:"aws_enabled"`
+	AWSRegion         types.String `tfsdk:"aws_region"`
+	AWSAccessKey      types.String `tfsdk:"aws_access_key"`
+	AWSSecretKey      types.String `tfsdk:"aws_secret_key"`
+	AWSSessionToken   types.String `tfsdk:"aws_session_token"`
+	AWSProfile        types.String `tfsdk:"aws_profile"`
+	AWSAssumeRoleARN  types.String `tfsdk:"aws_assume_role_arn"`
+	AWSExternalID     types.String `tfsdk:"aws_external_id"`
+	WaitTime          types.Int64  `tfsdk:"wait_time"`
+}
+
+type awsConfig struct {
+	Region        string
+	AccessKey     string
+	SecretKey     string
+	SessionToken  string
+	Enabled       bool
+	Profile       string
+	AssumeRoleARN string
+	ExternalID    string
 }
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
 	_ provider.Provider = &megaportProvider{}
 )
+
+type megaportProviderData struct {
+	client            *megaport.Client
+	awsConfig         *awsConfig
+	cancelAtEndOfTerm bool
+}
 
 // New is a helper function to simplify provider server and testing implementation.
 func New(version string) func() provider.Provider {
@@ -55,11 +83,6 @@ type megaportProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
-}
-
-type megaportProviderData struct {
-	client            *megaport.Client
-	cancelAtEndOfTerm bool
 }
 
 // Metadata returns the provider type name.
@@ -90,6 +113,41 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			"accept_purchase_terms": schema.BoolAttribute{
 				Optional:    true,
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
+			},
+			"aws_enabled": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Enable AWS integration for managing AWS DirectConnect resources",
+			},
+			"aws_region": schema.StringAttribute{
+				Optional:    true,
+				Description: "AWS region to use for DirectConnect API calls",
+			},
+			"aws_access_key": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "AWS access key for DirectConnect resource management",
+			},
+			"aws_secret_key": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "AWS secret key for DirectConnect resource management",
+			},
+			"aws_session_token": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "AWS session token for temporary credentials",
+			},
+			"aws_profile": schema.StringAttribute{
+				Optional:    true,
+				Description: "AWS profile to use from shared credentials file",
+			},
+			"aws_assume_role_arn": schema.StringAttribute{
+				Optional:    true,
+				Description: "ARN of role to assume for AWS operations",
+			},
+			"aws_external_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "External ID to use when assuming a role",
 			},
 			"wait_time": schema.Int64Attribute{
 				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
@@ -294,10 +352,100 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Make the Megaport client available during DataSource and Resource
-	// type Configure methods.
+	// Parse AWS configuration
+	var awsConfig awsConfig
+
+	// First read environment variables for AWS configuration
+	awsConfig.Region = os.Getenv("AWS_REGION")
+	if region := os.Getenv("AWS_DEFAULT_REGION"); region != "" && awsConfig.Region == "" {
+		awsConfig.Region = region
+	}
+
+	awsConfig.AccessKey = os.Getenv("AWS_ACCESS_KEY_ID")
+	awsConfig.SecretKey = os.Getenv("AWS_SECRET_ACCESS_KEY")
+	awsConfig.SessionToken = os.Getenv("AWS_SESSION_TOKEN")
+
+	// Enable AWS integration if we have either credentials, profile, or assume role
+	awsConfig.Enabled = (awsConfig.AccessKey != "" && awsConfig.SecretKey != "") ||
+		os.Getenv("AWS_PROFILE") != "" ||
+		os.Getenv("AWS_ROLE_ARN") != ""
+
+	awsConfig.Profile = os.Getenv("AWS_PROFILE")
+	awsConfig.AssumeRoleARN = os.Getenv("AWS_ROLE_ARN")
+	awsConfig.ExternalID = os.Getenv("AWS_EXTERNAL_ID")
+
+	// Allow provider config to override environment variables
+	if !config.AWSEnabled.IsNull() {
+		awsConfig.Enabled = config.AWSEnabled.ValueBool()
+	}
+	if !config.AWSRegion.IsNull() {
+		awsConfig.Region = config.AWSRegion.ValueString()
+	}
+	if !config.AWSAccessKey.IsNull() {
+		awsConfig.AccessKey = config.AWSAccessKey.ValueString()
+	}
+	if !config.AWSSecretKey.IsNull() {
+		awsConfig.SecretKey = config.AWSSecretKey.ValueString()
+	}
+	if !config.AWSSessionToken.IsNull() {
+		awsConfig.SessionToken = config.AWSSessionToken.ValueString()
+	}
+	if !config.AWSProfile.IsNull() {
+		awsConfig.Profile = config.AWSProfile.ValueString()
+	}
+	if !config.AWSAssumeRoleARN.IsNull() {
+		awsConfig.AssumeRoleARN = config.AWSAssumeRoleARN.ValueString()
+	}
+	if !config.AWSExternalID.IsNull() {
+		awsConfig.ExternalID = config.AWSExternalID.ValueString()
+	}
+
+	// Add debug logging for AWS configuration
+	ctx = tflog.SetField(ctx, "aws_enabled", awsConfig.Enabled)
+	ctx = tflog.SetField(ctx, "aws_region", awsConfig.Region)
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "aws_access_key", "aws_secret_key", "aws_session_token")
+	tflog.Debug(ctx, "AWS integration configuration")
+
+	// Add this after the AWS config parsing code
+	// Validate AWS configuration when enabled
+	if awsConfig.Enabled {
+		if awsConfig.Region == "" {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("aws_region"),
+				"Missing AWS region",
+				"AWS integration is enabled but no region is specified. "+
+					"Set the aws_region value in the configuration or use the AWS_REGION environment variable.",
+			)
+		}
+
+		// Check if we have credentials (access key + secret key) OR profile OR assume role
+		hasCredentials := awsConfig.AccessKey != "" && awsConfig.SecretKey != ""
+		hasProfile := awsConfig.Profile != ""
+		hasRole := awsConfig.AssumeRoleARN != ""
+
+		if !hasCredentials && !hasProfile && !hasRole {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("aws_enabled"),
+				"Missing AWS authentication",
+				"AWS integration is enabled but no authentication method is specified. "+
+					"Either provide access_key/secret_key, aws_profile, or aws_assume_role_arn.",
+			)
+		}
+
+		tflog.Info(ctx, "AWS integration enabled", map[string]any{
+			"region": awsConfig.Region,
+			"auth_method": map[string]any{
+				"static_credentials": hasCredentials,
+				"profile":            hasProfile,
+				"assume_role":        hasRole,
+			},
+		})
+	}
+
+	// Return provider data including AWS config
 	providerData := &megaportProviderData{
 		client:            megaportClient,
+		awsConfig:         &awsConfig,
 		cancelAtEndOfTerm: cancelAtEndOfTerm,
 	}
 
@@ -335,4 +483,39 @@ func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, dia
 	tags := map[string]string{}
 	diags := in.ElementsAs(ctx, &tags, false)
 	return tags, diags
+}
+
+// Create AWS session based on configuration
+func createAWSSession(config awsConfig) (*session.Session, error) {
+	opts := session.Options{
+		Config: aws.Config{
+			Region: aws.String(config.Region),
+		},
+	}
+
+	// If access key and secret key provided, use static credentials
+	if config.AccessKey != "" && config.SecretKey != "" {
+		opts.Config.Credentials = credentials.NewStaticCredentials(
+			config.AccessKey,
+			config.SecretKey,
+			config.SessionToken,
+		)
+	} else if config.Profile != "" {
+		// Use shared config
+		opts.Profile = config.Profile
+		opts.SharedConfigState = session.SharedConfigEnable
+	}
+
+	sess, err := session.NewSessionWithOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// If role ARN is specified, assume the role
+	if config.AssumeRoleARN != "" {
+		// Implementation for assuming role would go here
+		// This is more complex and would require additional code
+	}
+
+	return sess, nil
 }

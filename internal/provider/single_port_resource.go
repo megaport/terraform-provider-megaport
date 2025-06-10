@@ -645,7 +645,6 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 
