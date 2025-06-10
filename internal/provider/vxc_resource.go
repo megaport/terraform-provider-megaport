@@ -2361,8 +2361,9 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 			return
 		}
 
-		// Look for AWS Hosted Connections
+		// Look for AWS connections
 		for _, conn := range cspConnections {
+			// Handle AWS Hosted Connections (AWSHC)
 			if conn.ConnectType.ValueString() == "AWSHC" &&
 				conn.ConnectionID.ValueString() != "" {
 				// Check if AWS integration is enabled
@@ -2382,6 +2383,30 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 						fmt.Sprintf("This VXC has AWS Hosted Connection %s that must be deleted in AWS first. "+
 							"Configure AWS credentials in the provider to automatically delete these connections.",
 							conn.ConnectionID.ValueString()),
+					)
+				}
+			}
+
+			// Handle AWS Virtual Interfaces (AWS VIFs)
+			if conn.ConnectType.ValueString() == "AWS" &&
+				conn.VIFID.ValueString() != "" {
+				// Check if AWS integration is enabled
+				if r.awsConfig != nil && r.awsConfig.Enabled {
+					// Use AWS SDK to delete the VIF
+					err := r.deleteAWSVirtualInterface(ctx, conn.VIFID.ValueString())
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error Deleting AWS Virtual Interface",
+							"Could not delete AWS Virtual Interface: "+err.Error(),
+						)
+						return
+					}
+				} else {
+					resp.Diagnostics.AddWarning(
+						"AWS Credentials Not Configured",
+						fmt.Sprintf("This VXC has AWS Virtual Interface %s that must be deleted in AWS first. "+
+							"Configure AWS credentials in the provider to automatically delete these connections.",
+							conn.VIFID.ValueString()),
 					)
 				}
 			}

@@ -786,3 +786,42 @@ func waitForVirtualInterfaceDeleted(ctx context.Context, dxClient *directconnect
 
 	return fmt.Errorf("timed out waiting for virtual interface %s to be deleted", *vifID)
 }
+
+// deleteAWSVirtualInterface deletes an AWS Virtual Interface
+func (r *vxcResource) deleteAWSVirtualInterface(ctx context.Context, vifID string) error {
+	// Check if AWS integration is enabled
+	if r.awsConfig == nil || !r.awsConfig.Enabled {
+		return fmt.Errorf("AWS integration not enabled in provider configuration")
+	}
+
+	// Create AWS session using our helper function
+	sess, err := createAWSSession(*r.awsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create AWS session: %v", err)
+	}
+
+	// Create Direct Connect client
+	dxClient := directconnect.New(sess)
+
+	// Delete the virtual interface
+	_, err = dxClient.DeleteVirtualInterfaceWithContext(ctx, &directconnect.DeleteVirtualInterfaceInput{
+		VirtualInterfaceId: aws.String(vifID),
+	})
+	if err != nil {
+		// Check if the error is because the VIF doesn't exist
+		if awsErr, ok := err.(awserr.Error); ok &&
+			(awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found")) {
+			// VIF already deleted, not an error
+			return nil
+		}
+		return fmt.Errorf("failed to delete virtual interface %s: %v", vifID, err)
+	}
+
+	// Wait for VIF deletion to complete
+	err = waitForVirtualInterfaceDeleted(ctx, dxClient, aws.String(vifID))
+	if err != nil {
+		return fmt.Errorf("failed waiting for virtual interface deletion: %v", err)
+	}
+
+	return nil
+}
