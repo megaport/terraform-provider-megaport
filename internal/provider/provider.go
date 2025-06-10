@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -513,8 +514,37 @@ func createAWSSession(config awsConfig) (*session.Session, error) {
 
 	// If role ARN is specified, assume the role
 	if config.AssumeRoleARN != "" {
-		// Implementation for assuming role would go here
-		// This is more complex and would require additional code
+		// Import the AWS STS service for assuming roles
+		stsClient := sts.New(sess)
+
+		// Set up assume role input
+		assumeRoleInput := &sts.AssumeRoleInput{
+			RoleArn:         aws.String(config.AssumeRoleARN),
+			RoleSessionName: aws.String("MegaportTerraformProvider"),
+		}
+
+		// Add external ID if provided
+		if config.ExternalID != "" {
+			assumeRoleInput.ExternalId = aws.String(config.ExternalID)
+		}
+
+		// Assume the role
+		assumeRoleOutput, err := stsClient.AssumeRole(assumeRoleInput)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assume role %s: %v", config.AssumeRoleARN, err)
+		}
+
+		// Create a new session with the temporary credentials from the assumed role
+		newSessionConfig := &aws.Config{
+			Region: aws.String(config.Region),
+			Credentials: credentials.NewStaticCredentials(
+				*assumeRoleOutput.Credentials.AccessKeyId,
+				*assumeRoleOutput.Credentials.SecretAccessKey,
+				*assumeRoleOutput.Credentials.SessionToken,
+			),
+		}
+
+		return session.NewSession(newSessionConfig)
 	}
 
 	return sess, nil
