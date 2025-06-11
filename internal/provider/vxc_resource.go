@@ -2073,6 +2073,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, aEndPlan.RequestedProductUID.ValueString())
+	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, bEndPlan.RequestedProductUID.ValueString())
+
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
 		WaitForTime:   waitForTime,
@@ -2091,6 +2094,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Check VNIC index for A End
 	if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
+	} else if aEndProductType == megaport.PRODUCT_MVE && aEndPlan.NetworkInterfaceIndex.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error updating VXC",
+			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - A End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
+		)
+		return
+	} else {
+		updateReq.AVnicIndex = megaport.PtrTo(int(aEndState.NetworkInterfaceIndex.ValueInt64()))
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
@@ -2114,6 +2125,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Check VNIC index for B End
 	if !bEndPlan.NetworkInterfaceIndex.IsUnknown() && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) {
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
+	} else if bEndProductType == megaport.PRODUCT_MVE && bEndPlan.NetworkInterfaceIndex.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error updating VXC",
+			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - B End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
+		)
+		return
+	} else {
+		updateReq.BVnicIndex = megaport.PtrTo(int(bEndState.NetworkInterfaceIndex.ValueInt64()))
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
