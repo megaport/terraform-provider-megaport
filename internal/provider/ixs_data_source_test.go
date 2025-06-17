@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -159,15 +158,12 @@ func TestFilterIXs(t *testing.T) {
 	testCases := []struct {
 		name           string
 		filters        []filterModel
-		tags           map[string]string
-		mockTags       map[string]map[string]string
 		expectedIXs    []string
 		expectedErrors int
 	}{
 		{
 			name:        "No filters",
 			filters:     []filterModel{},
-			tags:        nil,
 			expectedIXs: []string{"ix-1", "ix-2", "ix-3"},
 		},
 		{
@@ -178,7 +174,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"Test IX 1"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1"},
 		},
 		{
@@ -189,7 +184,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"Test*"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1", "ix-2"},
 		},
 		{
@@ -200,7 +194,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"200"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-2"},
 		},
 		{
@@ -211,7 +204,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"64512"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1"},
 		},
 		{
@@ -222,7 +214,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"Los Angeles IX"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1", "ix-3"},
 		},
 		{
@@ -233,7 +224,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"456"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-2"},
 		},
 		{
@@ -244,7 +234,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"10000"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-2"},
 		},
 		{
@@ -255,19 +244,7 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"LIVE"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1"},
-		},
-		{
-			name: "Filter by company-name",
-			filters: []filterModel{
-				{
-					Name:   types.StringValue("company-name"),
-					Values: listValueMust(t, types.StringType, []string{"Test Location 2"}),
-				},
-			},
-			tags:        nil,
-			expectedIXs: []string{"ix-2"},
 		},
 		{
 			name: "Multiple filters - AND logic",
@@ -281,7 +258,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"LIVE"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1"},
 		},
 		{
@@ -292,30 +268,7 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"LIVE", "CONFIGURED"}),
 				},
 			},
-			tags:        nil,
 			expectedIXs: []string{"ix-1", "ix-2"},
-		},
-		{
-			name:    "Filter by tags",
-			filters: []filterModel{},
-			tags: map[string]string{
-				"environment": "production",
-				"owner":       "team-a",
-			},
-			expectedIXs: []string{"ix-1"},
-		},
-		{
-			name: "Combined filters and tags",
-			filters: []filterModel{
-				{
-					Name:   types.StringValue("network-service-type"),
-					Values: listValueMust(t, types.StringType, []string{"Los Angeles IX"}),
-				},
-			},
-			tags: map[string]string{
-				"environment": "production",
-			},
-			expectedIXs: []string{"ix-1", "ix-3"},
 		},
 		{
 			name: "Unknown filter - should not filter out IXs",
@@ -325,7 +278,6 @@ func TestFilterIXs(t *testing.T) {
 					Values: listValueMust(t, types.StringType, []string{"some-value"}),
 				},
 			},
-			tags:           nil,
 			expectedIXs:    []string{"ix-1", "ix-2", "ix-3"},
 			expectedErrors: 1, // Expecting a warning but not an error
 		},
@@ -338,17 +290,6 @@ func TestFilterIXs(t *testing.T) {
 				ListIXsResult: ixs,
 			}
 
-			// Set up tag mocks if needed
-			if tc.mockTags != nil {
-				// Set custom function to handle IX tag lookup
-				mockIXService.ListIXResourceTagsFunc = func(ctx context.Context, ixID string) (map[string]string, error) {
-					if tags, ok := tc.mockTags[ixID]; ok {
-						return tags, nil
-					}
-					return map[string]string{}, nil
-				}
-			}
-
 			// Create mock client with IX service properly attached
 			mockClient := &megaport.Client{
 				IXService: mockIXService,
@@ -359,19 +300,8 @@ func TestFilterIXs(t *testing.T) {
 				client: mockClient,
 			}
 
-			// Create model with test filters and tags
-			var tagsValue types.Map
-			if tc.tags != nil {
-				var diags diag.Diagnostics
-				tagsValue, diags = types.MapValueFrom(context.Background(), types.StringType, tc.tags)
-				require.False(t, diags.HasError())
-			} else {
-				tagsValue = types.MapNull(types.StringType)
-			}
-
 			model := ixsModel{
 				Filter: tc.filters,
-				Tags:   tagsValue,
 			}
 
 			// Call filterIXs
@@ -426,22 +356,6 @@ func TestReadWithErrorsIXs(t *testing.T) {
 			expectedSummary: "Unable to list IXs",
 			expectError:     true,
 		},
-		{
-			name: "ListIXResourceTags error",
-			setupMock: func(m *MockIXService) {
-				m.ListIXsResult = []*megaport.IX{
-					{
-						ProductUID:  "ix-1",
-						ProductName: "Test IX 1",
-					},
-				}
-				m.ListIXResourceTagsFunc = func(ctx context.Context, ixID string) (map[string]string, error) {
-					return nil, errors.New("Tag API error")
-				}
-			},
-			expectedSummary: "Unable to fetch tags for IX",
-			expectError:     false, // We expect a warning, not an error
-		},
 	}
 
 	for _, tc := range testCases {
@@ -460,18 +374,9 @@ func TestReadWithErrorsIXs(t *testing.T) {
 				client: mockClient,
 			}
 
-			// Create a simplified test configuration that doesn't use tftypes directly
-			tagsMap := map[string]string{}
-			if tc.name == "ListIXResourceTags error" {
-				tagsMap = map[string]string{"environment": "production"}
-			}
-
-			tagsValue, _ := types.MapValueFrom(ctx, types.StringType, tagsMap)
-
 			model := ixsModel{
 				UIDs:   types.ListNull(types.StringType),
 				Filter: []filterModel{},
-				Tags:   tagsValue,
 			}
 
 			if tc.name == "ListIXs error" {

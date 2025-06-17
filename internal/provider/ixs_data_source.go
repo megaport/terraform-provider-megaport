@@ -148,40 +148,8 @@ func (d *ixsDataSource) filterIXs(ctx context.Context, ixs []*megaport.IX, data 
 	}
 
 	var filteredIXs []*megaport.IX
-
-	// Handle tag filtering
-	var tagFilters map[string]string
-	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
-		diags.Append(data.Tags.ElementsAs(ctx, &tagFilters, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
-	}
-
 	// Process each IX
 	for _, ix := range ixs {
-		// Check tag filters if any
-		if len(tagFilters) > 0 {
-			// Use attribute tags if available, otherwise try to fetch from API
-			ixTags := ix.AttributeTags
-			if len(ixTags) == 0 {
-				var err error
-				ixTags, err = d.client.IXService.ListIXResourceTags(ctx, ix.ProductUID)
-				if err != nil {
-					diags.AddWarning(
-						"Error fetching IX tags",
-						fmt.Sprintf("Unable to fetch tags for IX %s: %v", ix.ProductUID, err),
-					)
-					continue
-				}
-			}
-
-			// Check if IX matches all tag filters
-			if !matchesTags(ixTags, tagFilters) {
-				continue
-			}
-		}
-
 		// Check custom filters
 		match, filterDiags := matchesIXFilters(ctx, ix, data.Filter)
 		diags.Append(filterDiags...)
