@@ -142,7 +142,6 @@ func (d *ixsDataSource) filterIXs(ctx context.Context, ixs []*megaport.IX, data 
 	}
 
 	var filteredIXs []*megaport.IX
-
 	// Process each IX
 	for _, ix := range ixs {
 		// Check custom filters
