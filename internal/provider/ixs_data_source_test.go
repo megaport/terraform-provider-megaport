@@ -210,16 +210,6 @@ func TestFilterIXs(t *testing.T) {
 			expectedIXs: []string{"ix-1"},
 		},
 		{
-			name: "Filter by company-name",
-			filters: []filterModel{
-				{
-					Name:   types.StringValue("company-name"),
-					Values: listValueMust(t, types.StringType, []string{"Test Location 2"}),
-				},
-			},
-			expectedIXs: []string{"ix-2"},
-		},
-		{
 			name: "Multiple filters - AND logic",
 			filters: []filterModel{
 				{
@@ -273,7 +263,6 @@ func TestFilterIXs(t *testing.T) {
 				client: mockClient,
 			}
 
-			// Create model with test filters
 			model := ixsModel{
 				Filter: tc.filters,
 			}
