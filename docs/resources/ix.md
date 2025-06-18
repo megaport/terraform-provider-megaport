@@ -49,7 +49,6 @@ resource "megaport_ix" "test_ix" {
 
 - `asn` (Number) The ASN (Autonomous System Number) for the IX connection.
 - `attribute_tags` (Map of String) Attribute tags associated with the IX.
-- `cost_centre` (String) Cost centre for invoicing purposes.
 - `promo_code` (String) Promo code to apply to the IX.
 - `public_graph` (Boolean) Whether the IX usage statistics are publicly viewable.
 - `reverse_dns` (String) Custom hostname for your IP address.
