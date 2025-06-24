@@ -1146,6 +1146,27 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      waitForTime,
 	}
 
+	var serviceKeyBEndUID string
+	if !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown() {
+		// If a service key is provided, we should look up the product UID pertaining to that service key and use that B-End Product UID
+		serviceKeyRes, err := r.client.ServiceKeyService.GetServiceKey(ctx, plan.ServiceKey.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": looking up Service Key failed: "+err.Error(),
+			)
+			return
+		}
+		if serviceKeyRes.ProductUID == "" {
+			resp.Diagnostics.AddError(
+				"Error creating VXC",
+				"Could not create VXC with name "+plan.Name.ValueString()+": the provided Service Key is not associated with a Product",
+			)
+			return
+		}
+		serviceKeyBEndUID = serviceKeyRes.ProductUID
+	}
+
 	if !plan.Shutdown.IsNull() {
 		buyReq.Shutdown = plan.Shutdown.ValueBool()
 	}
@@ -1475,6 +1496,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
 		ProductUID: b.RequestedProductUID.ValueString(),
 		VLAN:       int(b.VLAN.ValueInt64()),
+	}
+	if serviceKeyBEndUID != "" {
+		if b.RequestedProductUID.ValueString() != serviceKeyBEndUID {
+			// Warn that the requested B-End Product UID is being overridden by the Service Key lookup
+			resp.Diagnostics.AddWarning(
+				"Overriding B-End Product UID",
+				"Overriding the requested B-End Product UID of "+b.RequestedProductUID.ValueString()+" with "+serviceKeyBEndUID+" based on the provided Service Key.",
+			)
+		}
+		bEndConfig.ProductUID = serviceKeyBEndUID
 	}
 	if !b.OrderedVLAN.IsNull() {
 		bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
