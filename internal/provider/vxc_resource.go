@@ -1498,6 +1498,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
 	if serviceKeyBEndUID != "" {
+		if b.RequestedProductUID.ValueString() != serviceKeyBEndUID {
+			// Warn that the requested B-End Product UID is being overridden by the Service Key lookup
+			resp.Diagnostics.AddWarning(
+				"Overriding B-End Product UID",
+				"Overriding the requested B-End Product UID of "+b.RequestedProductUID.ValueString()+" with "+serviceKeyBEndUID+" based on the provided Service Key.",
+			)
+		}
 		bEndConfig.ProductUID = serviceKeyBEndUID
 	}
 	if !b.OrderedVLAN.IsNull() {
