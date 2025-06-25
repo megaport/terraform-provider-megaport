@@ -137,7 +137,6 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					},
 					"aws_access_key": schema.StringAttribute{
 						Optional:    true,
-						Sensitive:   true,
 						Description: "AWS access key for DirectConnect resource management",
 					},
 					"aws_secret_key": schema.StringAttribute{
@@ -390,6 +389,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	awsConfig.ExternalID = os.Getenv("AWS_EXTERNAL_ID")
 
 	if !config.AWSConfiguration.IsNull() && !config.AWSConfiguration.IsUnknown() {
+		awsConfig.Enabled = true
 		var awsConfigModel awsConfigurationModel
 
 		diags = config.AWSConfiguration.As(ctx, &awsConfigModel, basetypes.ObjectAsOptions{})
