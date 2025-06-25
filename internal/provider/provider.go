@@ -248,7 +248,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		environment = config.Environment.ValueString()
 	}
 
-	if config.AccessKey.IsNull() {
+	if !config.AccessKey.IsNull() {
 		accessKey = config.AccessKey.ValueString()
 	}
 
