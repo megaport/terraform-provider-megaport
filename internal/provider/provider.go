@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -36,6 +37,7 @@ type megaportProviderModel struct {
 	SecretKey         types.String `tfsdk:"secret_key"`
 	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
 	CancelAtEndOfTerm types.Bool   `tfsdk:"cancel_at_end_of_term"`
+	WaitTime          types.Int64  `tfsdk:"wait_time"`
 	AWSEnabled        types.Bool   `tfsdk:"aws_enabled"`
 	AWSRegion         types.String `tfsdk:"aws_region"`
 	AWSAccessKey      types.String `tfsdk:"aws_access_key"`
@@ -44,7 +46,17 @@ type megaportProviderModel struct {
 	AWSProfile        types.String `tfsdk:"aws_profile"`
 	AWSAssumeRoleARN  types.String `tfsdk:"aws_assume_role_arn"`
 	AWSExternalID     types.String `tfsdk:"aws_external_id"`
-	WaitTime          types.Int64  `tfsdk:"wait_time"`
+	AWSConfiguration  types.Object `tfsdk:"aws_configuration"`
+}
+
+type awsConfigurationModel struct {
+	AWSRegion        types.String `tfsdk:"aws_region"`
+	AWSAccessKey     types.String `tfsdk:"aws_access_key"`
+	AWSSecretKey     types.String `tfsdk:"aws_secret_key"`
+	AWSSessionToken  types.String `tfsdk:"aws_session_token"`
+	AWSProfile       types.String `tfsdk:"aws_profile"`
+	AWSAssumeRoleARN types.String `tfsdk:"aws_assume_role_arn"`
+	AWSExternalID    types.String `tfsdk:"aws_external_id"`
 }
 
 type awsConfig struct {
@@ -115,40 +127,42 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Optional:    true,
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
-			"aws_enabled": schema.BoolAttribute{
+			"aws_configuration": schema.SingleNestedAttribute{
 				Optional:    true,
-				Description: "Enable AWS integration for managing AWS DirectConnect resources",
-			},
-			"aws_region": schema.StringAttribute{
-				Optional:    true,
-				Description: "AWS region to use for DirectConnect API calls",
-			},
-			"aws_access_key": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
-				Description: "AWS access key for DirectConnect resource management",
-			},
-			"aws_secret_key": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
-				Description: "AWS secret key for DirectConnect resource management",
-			},
-			"aws_session_token": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
-				Description: "AWS session token for temporary credentials",
-			},
-			"aws_profile": schema.StringAttribute{
-				Optional:    true,
-				Description: "AWS profile to use from shared credentials file",
-			},
-			"aws_assume_role_arn": schema.StringAttribute{
-				Optional:    true,
-				Description: "ARN of role to assume for AWS operations",
-			},
-			"aws_external_id": schema.StringAttribute{
-				Optional:    true,
-				Description: "External ID to use when assuming a role",
+				Description: "Configuration block for AWS integration to manage AWS DirectConnect resources",
+				Attributes: map[string]schema.Attribute{
+					"aws_region": schema.StringAttribute{
+						Optional:    true,
+						Description: "AWS region to use for DirectConnect API calls",
+					},
+					"aws_access_key": schema.StringAttribute{
+						Optional:    true,
+						Sensitive:   true,
+						Description: "AWS access key for DirectConnect resource management",
+					},
+					"aws_secret_key": schema.StringAttribute{
+						Optional:    true,
+						Sensitive:   true,
+						Description: "AWS secret key for DirectConnect resource management",
+					},
+					"aws_session_token": schema.StringAttribute{
+						Optional:    true,
+						Sensitive:   true,
+						Description: "AWS session token for temporary credentials",
+					},
+					"aws_profile": schema.StringAttribute{
+						Optional:    true,
+						Description: "AWS profile to use from shared credentials file",
+					},
+					"aws_assume_role_arn": schema.StringAttribute{
+						Optional:    true,
+						Description: "ARN of role to assume for AWS operations",
+					},
+					"aws_external_id": schema.StringAttribute{
+						Optional:    true,
+						Description: "External ID to use when assuming a role",
+					},
+				},
 			},
 			"wait_time": schema.Int64Attribute{
 				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
@@ -235,7 +249,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		environment = config.Environment.ValueString()
 	}
 
-	if !config.AccessKey.IsNull() {
+	if config.AccessKey.IsNull() {
 		accessKey = config.AccessKey.ValueString()
 	}
 
@@ -375,30 +389,37 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	awsConfig.AssumeRoleARN = os.Getenv("AWS_ROLE_ARN")
 	awsConfig.ExternalID = os.Getenv("AWS_EXTERNAL_ID")
 
-	// Allow provider config to override environment variables
-	if !config.AWSEnabled.IsNull() {
-		awsConfig.Enabled = config.AWSEnabled.ValueBool()
-	}
-	if !config.AWSRegion.IsNull() {
-		awsConfig.Region = config.AWSRegion.ValueString()
-	}
-	if !config.AWSAccessKey.IsNull() {
-		awsConfig.AccessKey = config.AWSAccessKey.ValueString()
-	}
-	if !config.AWSSecretKey.IsNull() {
-		awsConfig.SecretKey = config.AWSSecretKey.ValueString()
-	}
-	if !config.AWSSessionToken.IsNull() {
-		awsConfig.SessionToken = config.AWSSessionToken.ValueString()
-	}
-	if !config.AWSProfile.IsNull() {
-		awsConfig.Profile = config.AWSProfile.ValueString()
-	}
-	if !config.AWSAssumeRoleARN.IsNull() {
-		awsConfig.AssumeRoleARN = config.AWSAssumeRoleARN.ValueString()
-	}
-	if !config.AWSExternalID.IsNull() {
-		awsConfig.ExternalID = config.AWSExternalID.ValueString()
+	if !config.AWSConfiguration.IsNull() && !config.AWSConfiguration.IsUnknown() {
+		var awsConfigModel awsConfigurationModel
+
+		diags = config.AWSConfiguration.As(ctx, &awsConfigModel, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Allow provider config to override environment variables
+		if !awsConfigModel.AWSRegion.IsNull() {
+			awsConfig.Region = awsConfigModel.AWSRegion.ValueString()
+		}
+		if !awsConfigModel.AWSAccessKey.IsNull() {
+			awsConfig.AccessKey = awsConfigModel.AWSAccessKey.ValueString()
+		}
+		if !awsConfigModel.AWSSecretKey.IsNull() {
+			awsConfig.SecretKey = awsConfigModel.AWSSecretKey.ValueString()
+		}
+		if !awsConfigModel.AWSSessionToken.IsNull() {
+			awsConfig.SessionToken = awsConfigModel.AWSSessionToken.ValueString()
+		}
+		if !awsConfigModel.AWSProfile.IsNull() {
+			awsConfig.Profile = awsConfigModel.AWSProfile.ValueString()
+		}
+		if !awsConfigModel.AWSAssumeRoleARN.IsNull() {
+			awsConfig.AssumeRoleARN = awsConfigModel.AWSAssumeRoleARN.ValueString()
+		}
+		if !awsConfigModel.AWSExternalID.IsNull() {
+			awsConfig.ExternalID = awsConfigModel.AWSExternalID.ValueString()
+		}
 	}
 
 	// Add debug logging for AWS configuration
