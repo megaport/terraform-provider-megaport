@@ -172,7 +172,7 @@ var (
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_addresses": schema.ListAttribute{
-							Description: "The IP addresses of the partner configuration.",
+							Description: "The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., \"169.254.100.6/29\").",
 							Optional:    true,
 							ElementType: types.StringType,
 						},
@@ -244,11 +244,11 @@ var (
 										},
 									},
 									"local_ip_address": schema.StringAttribute{
-										Description: "The local IP address of the BGP connection.",
+										Description: "The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.6\").",
 										Optional:    true,
 									},
 									"peer_ip_address": schema.StringAttribute{
-										Description: "The peer IP address of the BGP connection.",
+										Description: "The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.1\").",
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
@@ -329,7 +329,7 @@ var (
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_addresses": schema.ListAttribute{
-							Description: "The IP addresses of the partner configuration.",
+							Description: "The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., \"169.254.100.6/29\").",
 							Optional:    true,
 							ElementType: types.StringType,
 						},
@@ -390,11 +390,11 @@ var (
 										Optional:    true,
 									},
 									"local_ip_address": schema.StringAttribute{
-										Description: "The local IP address of the BGP connection.",
+										Description: "The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.6\").",
 										Optional:    true,
 									},
 									"peer_ip_address": schema.StringAttribute{
-										Description: "The peer IP address of the BGP connection.",
+										Description: "The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.1\").",
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{

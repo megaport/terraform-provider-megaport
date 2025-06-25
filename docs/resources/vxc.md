@@ -459,7 +459,7 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
+- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 
@@ -488,12 +488,12 @@ Optional:
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
 - `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
@@ -524,7 +524,7 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
+- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
@@ -554,12 +554,12 @@ Optional:
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
 - `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
@@ -690,7 +690,7 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
+- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 
@@ -719,12 +719,12 @@ Optional:
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
 - `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
@@ -755,7 +755,7 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration.
+- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
@@ -785,12 +785,12 @@ Optional:
 - `import_blacklist` (String) The import blacklist of the BGP connection.
 - `import_whitelist` (String) The import whitelist of the BGP connection.
 - `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
 - `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection.
+- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
