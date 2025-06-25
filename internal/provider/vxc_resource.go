@@ -454,8 +454,8 @@ func NewVXCResource() resource.Resource {
 
 // vxcResource is the resource implementation.
 type vxcResource struct {
-	client    *megaport.Client
-	awsConfig *awsConfig
+	megaportClient *megaport.Client
+	awsConfig      *awsConfig
 }
 
 // Metadata returns the resource type name.
@@ -1150,7 +1150,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	var serviceKeyBEndUID string
 	if !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown() {
 		// If a service key is provided, we should look up the product UID pertaining to that service key and use that B-End Product UID
-		serviceKeyRes, err := r.client.ServiceKeyService.GetServiceKey(ctx, plan.ServiceKey.ValueString())
+		serviceKeyRes, err := r.megaportClient.ServiceKeyService.GetServiceKey(ctx, plan.ServiceKey.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1203,7 +1203,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
+	productType, _ := r.megaportClient.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
 	if productType == megaport.PRODUCT_MVE {
 		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
@@ -1288,7 +1288,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Key:     azureConfig.ServiceKey.ValueString(),
 				Partner: "AZURE",
 			}
-			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.ListPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1338,7 +1338,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Partner:   "GOOGLE",
 			}
 			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1377,7 +1377,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			}
 			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
 
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1423,7 +1423,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1453,7 +1453,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1515,7 +1515,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
+	productType, _ = r.megaportClient.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
 	if productType == megaport.PRODUCT_MVE {
 		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
@@ -1597,7 +1597,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				Key:     azureConfig.ServiceKey.ValueString(),
 				Partner: "AZURE",
 			}
-			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.ListPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1650,7 +1650,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if !b.RequestedProductUID.IsNull() {
 				partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
 			}
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1690,7 +1690,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			if !b.RequestedProductUID.IsNull() {
 				partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
 			}
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			partnerPortRes, err := r.megaportClient.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1745,7 +1745,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, b.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, b.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1900,7 +1900,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.BEndConfiguration = *bEndConfig
 
-	err := r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
+	err := r.megaportClient.VXCService.ValidateVXCOrder(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create VXC",
@@ -1909,7 +1909,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createdVXC, err := r.client.VXCService.BuyVXC(ctx, buyReq)
+	createdVXC, err := r.megaportClient.VXCService.BuyVXC(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating VXC",
@@ -1921,7 +1921,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	createdID := createdVXC.TechnicalServiceUID
 
 	// get the created VXC
-	vxc, err := r.client.VXCService.GetVXC(ctx, createdID)
+	vxc, err := r.megaportClient.VXCService.GetVXC(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading newly created VXC",
@@ -1930,7 +1930,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, createdID)
+	tags, err := r.megaportClient.VXCService.ListVXCResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for newly created VXC",
@@ -1964,7 +1964,7 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	// Get refreshed vxc value from API
-	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())
+	vxc, err := r.megaportClient.VXCService.GetVXC(ctx, state.UID.ValueString())
 	if err != nil {
 		// VXC has been deleted or is not found
 		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
@@ -1989,7 +1989,7 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	// Get tags
-	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.megaportClient.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for VXC",
@@ -2105,8 +2105,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, aEndPlan.RequestedProductUID.ValueString())
-	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, bEndPlan.RequestedProductUID.ValueString())
+	aEndProductType, _ := r.megaportClient.ProductService.GetProductType(ctx, aEndPlan.RequestedProductUID.ValueString())
+	bEndProductType, _ := r.megaportClient.ProductService.GetProductType(ctx, bEndPlan.RequestedProductUID.ValueString())
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
@@ -2223,7 +2223,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndPlan.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, aEndPlan.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2252,7 +2252,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2300,7 +2300,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.megaportClient.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2326,7 +2326,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+	_, err := r.megaportClient.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -2345,7 +2345,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	state.BEndConfiguration = bEndStateObj
 
 	// Get refreshed vxc value from API
-	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())
+	vxc, err := r.megaportClient.VXCService.GetVXC(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading VXC",
@@ -2360,7 +2360,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		err := r.client.VXCService.UpdateVXCResourceTags(ctx, state.UID.ValueString(), tagMap)
+		err := r.megaportClient.VXCService.UpdateVXCResourceTags(ctx, state.UID.ValueString(), tagMap)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating tags for VXC",
@@ -2371,7 +2371,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Get resource tags
-	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.megaportClient.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading VXC Tags",
@@ -2464,7 +2464,7 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Now delete the VXC since AWS resources should be gone
-	err := r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
+	err := r.megaportClient.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
 		DeleteNow: true,
 	})
 	if err != nil {
@@ -2491,7 +2491,7 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	r.client = data.client
+	r.megaportClient = data.client
 	r.awsConfig = data.awsConfig
 }
 
