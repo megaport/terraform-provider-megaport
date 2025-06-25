@@ -425,7 +425,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Add debug logging for AWS configuration
 	ctx = tflog.SetField(ctx, "aws_enabled", awsConfig.Enabled)
 	ctx = tflog.SetField(ctx, "aws_region", awsConfig.Region)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "aws_access_key", "aws_secret_key", "aws_session_token")
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "aws_secret_key", "aws_session_token")
 	tflog.Debug(ctx, "AWS integration configuration")
 
 	// Add this after the AWS config parsing code
