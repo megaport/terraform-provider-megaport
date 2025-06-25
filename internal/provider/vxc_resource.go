@@ -1498,8 +1498,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		VLAN:       int(b.VLAN.ValueInt64()),
 	}
 	if serviceKeyBEndUID != "" {
-		if b.RequestedProductUID.ValueString() != serviceKeyBEndUID {
-			// Warn that the requested B-End Product UID is being overridden by the Service Key lookup
+		// If B End Requested Product UID was provided and it differs from the Service Key Product UID, warn that it is being overridden
+		if b.RequestedProductUID.ValueString() != "" && b.RequestedProductUID.ValueString() != serviceKeyBEndUID {
 			resp.Diagnostics.AddWarning(
 				"Overriding B-End Product UID",
 				"Overriding the requested B-End Product UID of "+b.RequestedProductUID.ValueString()+" with "+serviceKeyBEndUID+" based on the provided Service Key.",
