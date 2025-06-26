@@ -2335,14 +2335,28 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+	// Only send API call if there are changes to the VXC in the Update Request
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating VXC",
-			"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
-		return
+	var isChanged bool
+	if updateReq.Name != nil || updateReq.AEndInnerVLAN != nil || updateReq.BEndInnerVLAN != nil ||
+		updateReq.AEndVLAN != nil || updateReq.BEndVLAN != nil ||
+		updateReq.AVnicIndex != nil || updateReq.BVnicIndex != nil ||
+		updateReq.RateLimit != nil || updateReq.CostCentre != nil ||
+		updateReq.Shutdown != nil || updateReq.Term != nil ||
+		updateReq.AEndProductUID != nil || updateReq.BEndProductUID != nil ||
+		updateReq.AEndPartnerConfig != nil || updateReq.BEndPartnerConfig != nil {
+		isChanged = true
+	}
+	if isChanged {
+		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating VXC",
+				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Update state with any changes from plan configuration following successful update
