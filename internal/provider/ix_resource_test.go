@@ -46,7 +46,38 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixName, ixRateLimit, ixVLAN)
+
+// Test port data source with name filter
+data "megaport_ports" "test_port_filter" {
+    filter {
+        name = "name"
+        values = ["%s"]
+    }
+    depends_on = [megaport_port.test_port]
+}
+
+// Test IX data source with name filter
+data "megaport_ixs" "test_ix_filter" {
+    filter {
+        name = "name"
+        values = ["%s"]
+    }
+    depends_on = [megaport_ix.test_ix]
+}
+
+// Test IX data source with multiple filters
+data "megaport_ixs" "test_ix_multi_filter" {
+    filter {
+        name = "rate-limit"
+        values = ["%d"]
+    }
+    filter {
+        name = "vlan"
+        values = ["%d"]
+    }
+    depends_on = [megaport_ix.test_ix]
+}
+`, portName, SinglePortTestLocationIDNum, ixName, ixRateLimit, ixVLAN, portName, ixName, ixRateLimit, ixVLAN)
 
 	// Updated Terraform config
 	configUpdated := fmt.Sprintf(`
@@ -68,7 +99,38 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
+
+// Test port data source with name filter
+data "megaport_ports" "test_port_filter" {
+    filter {
+        name = "name"
+        values = ["%s"]
+    }
+    depends_on = [megaport_port.test_port]
+}
+
+// Test IX data source with name filter (updated name)
+data "megaport_ixs" "test_ix_filter" {
+    filter {
+        name = "name"
+        values = ["%s"]
+    }
+    depends_on = [megaport_ix.test_ix]
+}
+
+// Test IX data source with multiple filters (updated values)
+data "megaport_ixs" "test_ix_multi_filter" {
+    filter {
+        name = "rate-limit"
+        values = ["%d"]
+    }
+    filter {
+        name = "vlan"
+        values = ["%d"]
+    }
+    depends_on = [megaport_ix.test_ix]
+}
+`, portName, SinglePortTestLocationIDNum, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated, portName, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
 
 	resourceName := "megaport_ix.test_ix"
 
@@ -81,6 +143,11 @@ resource "megaport_ix" "test_ix" {
 					resource.TestCheckResourceAttr(resourceName, "product_name", ixName),
 					resource.TestCheckResourceAttr(resourceName, "rate_limit", fmt.Sprintf("%d", ixRateLimit)),
 					resource.TestCheckResourceAttr(resourceName, "vlan", fmt.Sprintf("%d", ixVLAN)),
+					// Validate port data source results
+					resource.TestCheckResourceAttr("data.megaport_ports.test_port_filter", "uids.#", "1"),
+					// Validate IX data source results
+					resource.TestCheckResourceAttr("data.megaport_ixs.test_ix_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_ixs.test_ix_multi_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -109,6 +176,12 @@ resource "megaport_ix" "test_ix" {
 					resource.TestCheckResourceAttr(resourceName, "product_name", ixNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "rate_limit", fmt.Sprintf("%d", ixRateLimitUpdated)),
 					resource.TestCheckResourceAttr(resourceName, "vlan", fmt.Sprintf("%d", ixVLANUpdated)),
+					// Validate port data source results (still finding the same port)
+					resource.TestCheckResourceAttr("data.megaport_ports.test_port_filter", "uids.#", "1"),
+					// Validate IX data source results with updated name
+					resource.TestCheckResourceAttr("data.megaport_ixs.test_ix_filter", "uids.#", "1"),
+					// Validate IX data source results with updated filters
+					resource.TestCheckResourceAttr("data.megaport_ixs.test_ix_multi_filter", "uids.#", "1"),
 				),
 			},
 		},
