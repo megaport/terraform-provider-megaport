@@ -2025,17 +2025,18 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	var aEndPartnerChange, bEndPartnerChange bool
 
 	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
-	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-		aEndPartnerChange = true
-	}
+
 	if state.AEndPartnerConfig.IsNull() {
 		state.AEndPartnerConfig = plan.AEndPartnerConfig
 	}
-	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-		bEndPartnerChange = true
+	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+		aEndPartnerChange = true
 	}
 	if state.BEndPartnerConfig.IsNull() {
 		state.BEndPartnerConfig = plan.BEndPartnerConfig
+	}
+	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+		bEndPartnerChange = true
 	}
 
 	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
@@ -2122,17 +2123,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
-	// Check VNIC index for A End
-	if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
-		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
-	} else if aEndProductType == megaport.PRODUCT_MVE && aEndPlan.NetworkInterfaceIndex.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - A End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
-		)
-		return
-	} else {
-		updateReq.AVnicIndex = megaport.PtrTo(int(aEndState.NetworkInterfaceIndex.ValueInt64()))
+	// Check VNIC index for A End if product is MVE
+	if aEndProductType == megaport.PRODUCT_MVE {
+		if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
+			updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
+		} else if aEndPlan.NetworkInterfaceIndex.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error updating VXC",
+				"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - A End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
+			)
+			return
+		} else {
+			updateReq.AVnicIndex = megaport.PtrTo(int(aEndState.NetworkInterfaceIndex.ValueInt64()))
+		}
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
@@ -2153,17 +2156,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
 
-	// Check VNIC index for B End
-	if !bEndPlan.NetworkInterfaceIndex.IsUnknown() && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) {
-		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
-	} else if bEndProductType == megaport.PRODUCT_MVE && bEndPlan.NetworkInterfaceIndex.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - B End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
-		)
-		return
-	} else {
-		updateReq.BVnicIndex = megaport.PtrTo(int(bEndState.NetworkInterfaceIndex.ValueInt64()))
+	// Check VNIC index for B End if product is MVE
+	if bEndProductType == megaport.PRODUCT_MVE {
+		if !bEndPlan.NetworkInterfaceIndex.IsUnknown() && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) {
+			updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
+		} else if bEndPlan.NetworkInterfaceIndex.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error updating VXC",
+				"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - B End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
+			)
+			return
+		} else {
+			updateReq.BVnicIndex = megaport.PtrTo(int(bEndState.NetworkInterfaceIndex.ValueInt64()))
+		}
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
@@ -2184,19 +2189,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
 		// Do not update the product UID if the partner is a CSP
-		if !aEndCSP {
+		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
 			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
 			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+		} else {
+			aEndState.RequestedProductUID = aEndState.CurrentProductUID
 		}
 	}
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
 		// Do not update the product UID if the partner is a CSP
-		if !bEndCSP {
+		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
 			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
 			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
+		} else {
+			bEndState.RequestedProductUID = bEndState.CurrentProductUID
 		}
 	}
-
 	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerChange && !aEndCSP {
 		aPartnerConfig := aEndPartnerPlan
 		switch aEndPartnerPlan.Partner.ValueString() {
@@ -2325,14 +2333,28 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+	// Only send API call if there are changes to the VXC in the Update Request
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating VXC",
-			"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
-		return
+	var isChanged bool
+	if updateReq.Name != nil || updateReq.AEndInnerVLAN != nil || updateReq.BEndInnerVLAN != nil ||
+		updateReq.AEndVLAN != nil || updateReq.BEndVLAN != nil ||
+		updateReq.AVnicIndex != nil || updateReq.BVnicIndex != nil ||
+		updateReq.RateLimit != nil || updateReq.CostCentre != nil ||
+		updateReq.Shutdown != nil || updateReq.Term != nil ||
+		updateReq.AEndProductUID != nil || updateReq.BEndProductUID != nil ||
+		updateReq.AEndPartnerConfig != nil || updateReq.BEndPartnerConfig != nil {
+		isChanged = true
+	}
+	if isChanged {
+		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating VXC",
+				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Update state with any changes from plan configuration following successful update
