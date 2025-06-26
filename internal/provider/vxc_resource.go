@@ -2027,17 +2027,18 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	var aEndPartnerChange, bEndPartnerChange bool
 
 	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
-	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-		aEndPartnerChange = true
-	}
+
 	if state.AEndPartnerConfig.IsNull() {
 		state.AEndPartnerConfig = plan.AEndPartnerConfig
 	}
-	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-		bEndPartnerChange = true
+	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
+		aEndPartnerChange = true
 	}
 	if state.BEndPartnerConfig.IsNull() {
 		state.BEndPartnerConfig = plan.BEndPartnerConfig
+	}
+	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+		bEndPartnerChange = true
 	}
 
 	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
@@ -2190,19 +2191,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
 		// Do not update the product UID if the partner is a CSP
-		if !aEndCSP {
+		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
 			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
 			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+		} else {
+			aEndState.RequestedProductUID = aEndState.CurrentProductUID
 		}
 	}
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
 		// Do not update the product UID if the partner is a CSP
-		if !bEndCSP {
+		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
 			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
 			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
+		} else {
+			bEndState.RequestedProductUID = bEndState.CurrentProductUID
 		}
 	}
-
 	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerChange && !aEndCSP {
 		aPartnerConfig := aEndPartnerPlan
 		switch aEndPartnerPlan.Partner.ValueString() {
