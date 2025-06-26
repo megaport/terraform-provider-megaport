@@ -80,7 +80,7 @@ resource "megaport_vxc" "expressroute_vxc_1" {
     azure_config = {
       port_choice = "primary"
       service_key = azurerm_express_route_circuit.express_route_circuit_1.service_key
-        peers = [{
+      peers = [{
         type             = "private"
         vlan             = var.azure_express_route_circuit_vlan_1
         peer_asn         = var.megaport_mcr_1_asn

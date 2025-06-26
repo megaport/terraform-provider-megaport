@@ -42,7 +42,7 @@ resource "azurerm_public_ip" "er_gateway_1_public_ip" {
   name                = var.azure_er_gateway_1_public_ip_name
   location            = azurerm_resource_group.resource_group_1.location
   resource_group_name = azurerm_resource_group.resource_group_1.name
-    
+
   sku               = "Standard"
   allocation_method = "Static"
 }
