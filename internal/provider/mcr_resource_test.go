@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -470,35 +469,23 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 }
 
 func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefixLists() {
-	mcrName1 := RandomTestName()
-	mcrName2 := RandomTestName()
-	prefixList1 := "AWS-prefixes"
-	prefixList2 := "Azure-prefixes"
-	prefixList3 := "OCI-prefixes"
-	prefixList4 := "GCP-prefixes"
-	costCentre := RandomTestName()
+    mcrName1 := RandomTestName()
+    mcrName2 := RandomTestName()
+    prefixList1 := "AWS-prefixes"
+    prefixList2 := "Azure-prefixes"
+    prefixList3 := "OCI-prefixes"
+    prefixList4 := "GCP-prefixes"
+    costCentre := RandomTestName()
 
-	// Initial configuration: Create multiple MCRs with multiple prefix filter lists
-	initialConfig := providerConfig + fmt.Sprintf(`
+    // Initial configuration: Create multiple MCRs with multiple prefix filter lists
+    initialConfig := providerConfig + fmt.Sprintf(`
     data "megaport_location" "test_location" {
         id = %d
     }
     
-    locals {
-        mcrs = {
-            "FR" = {
-                name = "%s"
-            }
-            "US" = {
-                name = "%s"
-            }
-        }
-    }
-    
-    resource "megaport_mcr" "test" {
-        for_each = local.mcrs
-        
-        product_name         = each.value.name
+    # First MCR with prefix filter lists
+    resource "megaport_mcr" "test_fr" {
+        product_name         = "%s"
         port_speed           = 1000
         location_id          = data.megaport_location.test_location.id
         contract_term_months = 12
@@ -506,7 +493,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
         
         prefix_filter_lists = [
             {
-                description    = "${each.key}-%s"
+                description    = "FR-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -518,7 +505,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
                 ]
             },
             {
-                description    = "${each.key}-%s"
+                description    = "FR-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -530,7 +517,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
                 ]
             },
             {
-                description    = "${each.key}-%s"
+                description    = "FR-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -543,29 +530,10 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
             }
         ]
     }
-    `, MCRTestLocationIDNum, mcrName1, mcrName2, costCentre, prefixList1, prefixList2, prefixList3)
-
-	// Updated configuration: Change entries and add new prefix filter list
-	updatedConfig := providerConfig + fmt.Sprintf(`
-    data "megaport_location" "test_location" {
-        id = %d
-    }
     
-    locals {
-        mcrs = {
-            "FR" = {
-                name = "%s"
-            }
-            "US" = {
-                name = "%s"
-            }
-        }
-    }
-    
-    resource "megaport_mcr" "test" {
-        for_each = local.mcrs
-        
-        product_name         = each.value.name
+    # Second MCR with prefix filter lists
+    resource "megaport_mcr" "test_us" {
+        product_name         = "%s"
         port_speed           = 1000
         location_id          = data.megaport_location.test_location.id
         contract_term_months = 12
@@ -573,7 +541,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
         
         prefix_filter_lists = [
             {
-                description    = "${each.key}-%s"
+                description    = "US-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -585,7 +553,62 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
                 ]
             },
             {
-                description    = "${each.key}-%s"
+                description    = "US-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.2.0/24"
+                        ge     = 24
+                        le     = 32
+                    }
+                ]
+            },
+            {
+                description    = "US-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.3.0/24"
+                        ge     = 24
+                        le     = 32
+                    }
+                ]
+            }
+        ]
+    }
+    `, MCRTestLocationIDNum, mcrName1, costCentre, prefixList1, prefixList2, prefixList3, mcrName2, costCentre, prefixList1, prefixList2, prefixList3)
+
+    // Updated configuration: Change entries and add new prefix filter list
+    updatedConfig := providerConfig + fmt.Sprintf(`
+    data "megaport_location" "test_location" {
+        id = %d
+    }
+    
+    # First MCR with modified prefix filter lists
+    resource "megaport_mcr" "test_fr" {
+        product_name         = "%s"
+        port_speed           = 1000
+        location_id          = data.megaport_location.test_location.id
+        contract_term_months = 12
+        cost_centre          = "%s"
+        
+        prefix_filter_lists = [
+            {
+                description    = "FR-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.1.0/24"
+                        ge     = 24
+                        le     = 32
+                    }
+                ]
+            },
+            {
+                description    = "FR-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -597,7 +620,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
                 ]
             },
             {
-                description    = "${each.key}-%s"
+                description    = "FR-%s"
                 address_family = "IPv4"
                 entries = [
                     {
@@ -609,7 +632,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
                 ]
             },
             {
-                description    = "${each.key}-%s"
+                description    = "FR-%s"
                 address_family = "IPv4" 
                 entries = [
                     {
@@ -622,56 +645,116 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_MultipleInstancesWithPrefi
             }
         ]
     }
-    `, MCRTestLocationIDNum, mcrName1, mcrName2, costCentre, prefixList1, prefixList2, prefixList3, prefixList4)
+    
+    # Second MCR with modified prefix filter lists
+    resource "megaport_mcr" "test_us" {
+        product_name         = "%s"
+        port_speed           = 1000
+        location_id          = data.megaport_location.test_location.id
+        contract_term_months = 12
+        cost_centre          = "%s"
+        
+        prefix_filter_lists = [
+            {
+                description    = "US-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.1.0/24"
+                        ge     = 24
+                        le     = 32
+                    }
+                ]
+            },
+            {
+                description    = "US-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.2.0/24"
+                        ge     = 25  # Changed from 24
+                        le     = 30  # Changed from 32
+                    }
+                ]
+            },
+            {
+                description    = "US-%s"
+                address_family = "IPv4"
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.4.0/24"  # Changed from 10.0.3.0/24
+                        ge     = 26
+                        le     = 32
+                    }
+                ]
+            },
+            {
+                description    = "US-%s"
+                address_family = "IPv4" 
+                entries = [
+                    {
+                        action = "permit"
+                        prefix = "10.0.5.0/24"
+                        ge     = 24
+                        le     = 28
+                    }
+                ]
+            }
+        ]
+    }
+    `, MCRTestLocationIDNum, mcrName1, costCentre, prefixList1, prefixList2, prefixList3, prefixList4, mcrName2, costCentre, prefixList1, prefixList2, prefixList3, prefixList4)
 
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Initial creation
-			{
-				Config: initialConfig,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Check first MCR (FR)
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "product_name", mcrName1),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.#", "3"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.0.description", fmt.Sprintf("FR-%s", prefixList1)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.1.description", fmt.Sprintf("FR-%s", prefixList2)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.2.description", fmt.Sprintf("FR-%s", prefixList3)),
+    resource.Test(suite.T(), resource.TestCase{
+        ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+        Steps: []resource.TestStep{
+            // Initial creation
+            {
+                Config: initialConfig,
+                Check: resource.ComposeAggregateTestCheckFunc(
+                    // Check first MCR (FR)
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "product_name", mcrName1),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.#", "3"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.0.description", fmt.Sprintf("FR-%s", prefixList1)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.1.description", fmt.Sprintf("FR-%s", prefixList2)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.2.description", fmt.Sprintf("FR-%s", prefixList3)),
 
-					// Check second MCR (US)
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "product_name", mcrName2),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.#", "3"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.0.description", fmt.Sprintf("US-%s", prefixList1)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.1.description", fmt.Sprintf("US-%s", prefixList2)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.2.description", fmt.Sprintf("US-%s", prefixList3)),
-				),
-			},
-			// Update with changes to prefix filter lists and add a new one
-			{
-				Config: updatedConfig,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Check first MCR (FR)
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.#", "4"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.0.description", fmt.Sprintf("FR-%s", prefixList1)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.1.description", fmt.Sprintf("FR-%s", prefixList2)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.1.entries.0.ge", "25"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.1.entries.0.le", "30"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.2.description", fmt.Sprintf("FR-%s", prefixList3)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.2.entries.0.prefix", "10.0.4.0/24"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"FR\"]", "prefix_filter_lists.3.description", fmt.Sprintf("FR-%s", prefixList4)),
+                    // Check second MCR (US)
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "product_name", mcrName2),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.#", "3"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.0.description", fmt.Sprintf("US-%s", prefixList1)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.1.description", fmt.Sprintf("US-%s", prefixList2)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.2.description", fmt.Sprintf("US-%s", prefixList3)),
+                ),
+            },
+            // Update with changes to prefix filter lists and add a new one
+            {
+                Config: updatedConfig,
+                Check: resource.ComposeAggregateTestCheckFunc(
+                    // Check first MCR (FR)
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.#", "4"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.0.description", fmt.Sprintf("FR-%s", prefixList1)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.1.description", fmt.Sprintf("FR-%s", prefixList2)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.1.entries.0.ge", "25"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.1.entries.0.le", "30"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.2.description", fmt.Sprintf("FR-%s", prefixList3)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.2.entries.0.prefix", "10.0.4.0/24"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_fr", "prefix_filter_lists.3.description", fmt.Sprintf("FR-%s", prefixList4)),
 
-					// Check second MCR (US)
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.#", "4"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.0.description", fmt.Sprintf("US-%s", prefixList1)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.1.description", fmt.Sprintf("US-%s", prefixList2)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.1.entries.0.ge", "25"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.2.description", fmt.Sprintf("US-%s", prefixList3)),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.2.entries.0.prefix", "10.0.4.0/24"),
-					resource.TestCheckResourceAttr("megaport_mcr.test[\"US\"]", "prefix_filter_lists.3.description", fmt.Sprintf("US-%s", prefixList4)),
-				),
-			},
-		},
-	})
+                    // Check second MCR (US)
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.#", "4"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.0.description", fmt.Sprintf("US-%s", prefixList1)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.1.description", fmt.Sprintf("US-%s", prefixList2)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.1.entries.0.ge", "25"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.2.description", fmt.Sprintf("US-%s", prefixList3)),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.2.entries.0.prefix", "10.0.4.0/24"),
+                    resource.TestCheckResourceAttr("megaport_mcr.test_us", "prefix_filter_lists.3.description", fmt.Sprintf("US-%s", prefixList4)),
+                ),
+            },
+        },
+    })
 }
 
 func TestRateLimiter_SingleToken(t *testing.T) {
