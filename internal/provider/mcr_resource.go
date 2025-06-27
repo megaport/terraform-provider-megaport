@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -809,48 +808,22 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		)
 		return
 	}
+
+	// Process prefix filter lists sequentially instead of concurrently
 	detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
-	wg := sync.WaitGroup{}
-	mux := sync.Mutex{}
-	errs := []error{}
-
-	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds
-	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
-
-	for _, l := range prefixFilterLists {
-		wg.Add(1)
-		go func(list *megaport.PrefixFilterList) {
-			defer wg.Done()
-			// Get a token from the rate limiter to apply rate limiting
-
-			<-rateLimiter.rateLimitCh
-
-			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
-			if err != nil {
-				mux.Lock()
-				errs = append(errs, err)
-				mux.Unlock()
-				return
-			}
-			mux.Lock()
-			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
-			mux.Unlock()
-		}(l)
-	}
-
-	wg.Wait()
-	if len(errs) > 0 {
-		var errStr string
-		for _, err := range errs {
-			errStr += err.Error() + ", "
+	for _, list := range prefixFilterLists {
+		detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Prefix Filter List",
+				"Could not read prefix filter list for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
 		}
-		resp.Diagnostics.AddError(
-			"Error Reading Prefix Filter Lists",
-			"Could not read prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-		)
-		return
+		detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 	}
 
+	// Ensure consistent ordering
 	sort.Slice(detailedPrefixFilterLists, func(i, j int) bool {
 		return detailedPrefixFilterLists[i].ID < detailedPrefixFilterLists[j].ID
 	})
@@ -997,95 +970,55 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		planPrefixFilterListMap[planPrefixFilterList.ID.ValueInt64()] = planPrefixFilterList
 	}
 
-	wg := sync.WaitGroup{}
-	mux := sync.Mutex{}
-	errs := []error{}
-
-	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
-
+	// Process updates and creations sequentially instead of concurrently
 	for _, planModel := range planPrefixFilterLists {
-		wg.Add(1)
-		go func(planModel *mcrPrefixFilterListModel) {
-			defer wg.Done()
-			// Get a token from the rate limiter to apply rate limiting
-			<-rateLimiter.rateLimitCh
-
-			// Check if the prefix filter list exists in the state
-			if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
-				// Check if there are any changes to the prefix filter list, if so, update.
-				if !planModel.Description.Equal(statePrefixFilterList.Description) || !planModel.AddressFamily.Equal(statePrefixFilterList.AddressFamily) || !planModel.Entries.Equal(statePrefixFilterList.Entries) {
-					apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
-					resp.Diagnostics.Append(apiPrefixFilterListDiags...)
-					_, modifyErr := r.client.MCRService.ModifyMCRPrefixFilterList(ctx, state.UID.ValueString(), int(planModel.ID.ValueInt64()), apiPrefixFilterList)
-					if modifyErr != nil {
-						mux.Lock()
-						errs = append(errs, modifyErr)
-						mux.Unlock()
-					}
-				}
-			} else {
+		// Check if the prefix filter list exists in the state
+		if statePrefixFilterList, ok := statePrefixFilterListMap[planModel.ID.ValueInt64()]; ok {
+			// Check if there are any changes to the prefix filter list, if so, update.
+			if !planModel.Description.Equal(statePrefixFilterList.Description) ||
+				!planModel.AddressFamily.Equal(statePrefixFilterList.AddressFamily) ||
+				!planModel.Entries.Equal(statePrefixFilterList.Entries) {
 				apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
 				resp.Diagnostics.Append(apiPrefixFilterListDiags...)
-				_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
-					MCRID:            state.UID.ValueString(),
-					PrefixFilterList: *apiPrefixFilterList,
-				})
-				if createErr != nil {
-					mux.Lock()
-					errs = append(errs, createErr)
-					mux.Unlock()
+				_, modifyErr := r.client.MCRService.ModifyMCRPrefixFilterList(ctx, state.UID.ValueString(), int(planModel.ID.ValueInt64()), apiPrefixFilterList)
+				if modifyErr != nil {
+					resp.Diagnostics.AddError(
+						"Error Modifying Prefix Filter List",
+						"Could not modify prefix filter list for MCR with ID "+state.UID.ValueString()+": "+modifyErr.Error(),
+					)
+					return
 				}
 			}
-		}(planModel)
-	}
-
-	wg.Wait()
-
-	if len(errs) > 0 {
-		var errStr string
-		for _, err := range errs {
-			errStr += err.Error() + ", "
+		} else {
+			apiPrefixFilterList, apiPrefixFilterListDiags := planModel.toAPIMCRPrefixFilterList(ctx)
+			resp.Diagnostics.Append(apiPrefixFilterListDiags...)
+			_, createErr := r.client.MCRService.CreatePrefixFilterList(ctx, &megaport.CreateMCRPrefixFilterListRequest{
+				MCRID:            state.UID.ValueString(),
+				PrefixFilterList: *apiPrefixFilterList,
+			})
+			if createErr != nil {
+				resp.Diagnostics.AddError(
+					"Error Creating Prefix Filter List",
+					"Could not create prefix filter list for MCR with ID "+state.UID.ValueString()+": "+createErr.Error(),
+				)
+				return
+			}
 		}
-		resp.Diagnostics.AddError(
-			"Error Modifying Prefix Filter Lists",
-			"Could not modify prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-		)
-		return
 	}
 
-	// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
-	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
-
+	// Process deletions sequentially
 	for _, stateModel := range statePrefixFilterLists {
-		wg.Add(1)
-		go func(stateModel *mcrPrefixFilterListModel) {
-			defer wg.Done()
-
-			<-deleteRateLimiter.rateLimitCh
-
-			// If the prefix filter list does not exist in the plan, delete it.
-			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
-				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
-				if deleteErr != nil {
-					mux.Lock()
-					errs = append(errs, deleteErr)
-					mux.Unlock()
-				}
+		// If the prefix filter list does not exist in the plan, delete it.
+		if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
+			_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
+			if deleteErr != nil {
+				resp.Diagnostics.AddError(
+					"Error Deleting Prefix Filter List",
+					"Could not delete prefix filter list for MCR with ID "+state.UID.ValueString()+": "+deleteErr.Error(),
+				)
+				return
 			}
-		}(stateModel)
-	}
-	wg.Wait()
-
-	if len(errs) > 0 {
-		var errStr string
-		for _, err := range errs {
-			errStr += err.Error() + ", "
 		}
-		resp.Diagnostics.AddError(
-			"Error Deleting Prefix Filter Lists",
-			"Could not delete prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-		)
-		return
 	}
 
 	pfFilterListModels := []*mcrPrefixFilterListModel{}
@@ -1097,6 +1030,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		state.PrefixFilterLists = types.ListNull(types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes))
 	}
 
+	// Get updated list of prefix filter lists
 	prefixFilterLists, prefixFilterListErr := r.client.MCRService.ListMCRPrefixFilterLists(ctx, state.UID.ValueString())
 	if prefixFilterListErr != nil {
 		resp.Diagnostics.AddError(
@@ -1105,40 +1039,22 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		)
 		return
 	}
+
+	// Process list sequentially
 	detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
-
-	for _, l := range prefixFilterLists {
-		wg.Add(1)
-		go func(list *megaport.PrefixFilterList) {
-			defer wg.Done()
-
-			<-rateLimiter.rateLimitCh
-
-			detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
-			if err != nil {
-				mux.Lock()
-				errs = append(errs, err)
-				mux.Unlock()
-				return
-			}
-			mux.Lock()
-			detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
-			mux.Unlock()
-		}(l)
-	}
-	wg.Wait()
-	if len(errs) > 0 {
-		var errStr string
-		for _, err := range errs {
-			errStr += err.Error() + ", "
+	for _, list := range prefixFilterLists {
+		detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Prefix Filter List",
+				"Could not read prefix filter list for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
 		}
-		resp.Diagnostics.AddError(
-			"Error Reading Prefix Filter Lists",
-			"Could not read prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-		)
-		return
+		detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 	}
 
+	// Ensure consistent ordering by ID to avoid state mismatches
 	sort.Slice(detailedPrefixFilterLists, func(i, j int) bool {
 		return detailedPrefixFilterLists[i].ID < detailedPrefixFilterLists[j].ID
 	})
@@ -1160,7 +1076,6 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		parsedLists, parsedDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), parsedListObjs)
 		resp.Diagnostics.Append(parsedDiags...)
 		state.PrefixFilterLists = parsedLists
-
 	} else {
 		emptyList := []types.Object{}
 		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
