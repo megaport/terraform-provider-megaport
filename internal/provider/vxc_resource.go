@@ -147,7 +147,6 @@ var (
 
 	// deprecated
 	vxcInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":           types.Int64Type,
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
