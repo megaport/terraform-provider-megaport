@@ -171,6 +171,13 @@ var (
 				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
+						"ip_mtu": schema.Int64Attribute{
+							Description: "The IP MTU of the partner configuration interface. Defaults to 1500.",
+							Optional:    true,
+							Validators: []validator.Int64{
+								int64validator.Between(68, 9074),
+							},
+						},
 						"ip_addresses": schema.ListAttribute{
 							Description: "The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., \"169.254.100.6/29\").",
 							Optional:    true,
