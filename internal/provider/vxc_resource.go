@@ -147,6 +147,7 @@ var (
 
 	// deprecated
 	vxcInterfaceAttrs = map[string]attr.Type{
+		"ip_mtu":           types.Int64Type,
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
@@ -181,6 +182,7 @@ var (
 	}
 
 	vxcVrouterInterfaceAttrs = map[string]attr.Type{
+		"ip_mtu":           types.Int64Type,
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
@@ -402,6 +404,7 @@ type vxcPartnerConfigIbmModel struct {
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
 type vxcPartnerConfigInterfaceModel struct {
+	IpMtu          types.Int64  `tfsdk:"ip_mtu"`
 	IPAddresses    types.List   `tfsdk:"ip_addresses"`
 	IPRoutes       types.List   `tfsdk:"ip_routes"`
 	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
