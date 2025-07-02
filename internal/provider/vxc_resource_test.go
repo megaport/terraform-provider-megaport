@@ -1605,6 +1605,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					vendor_config = {
 					  vendor        = "aruba"
 					  product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -1736,6 +1737,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					vendor_config = {
 					  vendor        = "aruba"
 					  product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -1937,6 +1939,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					vendor_config = {
 					  vendor        = "aruba"
 					  product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -2081,6 +2084,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
                     vendor_config = {
                         vendor = "aruba"
                         product_size = "MEDIUM"
+						mve_label     = "MVE 4/16"
                         image_id = 23
 						account_name = "%s"
 						account_key = "%s"
@@ -2194,6 +2198,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
                     vendor_config = {
                         vendor = "aruba"
                         product_size = "MEDIUM"
+						mve_label     = "MVE 4/16"
                         image_id = 23
 						account_name = "%s"
 						account_key = "%s"
@@ -2511,6 +2516,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     vendor_config = {
                         vendor       = "aruba"
                         product_size = "MEDIUM"
+						mve_label     = "MVE 4/16"
                         image_id     = 23
                         account_name = "%s-account"
                         account_key  = "%s-key"
@@ -2653,6 +2659,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     vendor_config = {
                         vendor       = "aruba"
                         product_size = "MEDIUM"
+						mve_label     = "MVE 4/16"
                         image_id     = 23
                         account_name = "%s-account"
                         account_key  = "%s-key"
@@ -2712,6 +2719,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-1"
                       account_key   = "%s-1"
@@ -2736,6 +2744,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-2"
                       account_key   = "%s-2"
@@ -2760,6 +2769,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-3"
                       account_key   = "%s-3"
@@ -2784,6 +2794,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-4"
                       account_key   = "%s-4"
@@ -2852,6 +2863,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-1"
                       account_key   = "%s-1"
@@ -2876,6 +2888,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-2"
                       account_key   = "%s-2"
@@ -2900,6 +2913,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-3"
                       account_key   = "%s-3"
@@ -2924,6 +2938,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     vendor_config = {
                       vendor        = "aruba"
                       product_size  = "MEDIUM"
+					  mve_label     = "MVE 4/16"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-4"
                       account_key   = "%s-4"
