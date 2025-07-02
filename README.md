@@ -120,9 +120,17 @@ Megaport users are also bound by the [Acceptable Use Policy](https://www.megapor
 
 Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider.
 
-They can be retrieved by searching either by `id`, `name`, or by `site_code` similar to the examples below:
+They can be retrieved by searching by `id`, `name`, or `site_code`. **For the most reliable and deterministic behavior, we strongly recommend using the location `id` as your search criterion**, since IDs never change while names and site codes may be updated over time.
+
+Examples:
 
 ```terraform
+# Recommended approach - using ID (most reliable)
+data "megaport_location" "my_location_3" {
+  id = 5
+}
+
+# Alternative approaches - may be subject to change
 data "megaport_location" "my_location_1" {
   name = "NextDC B1"
 }
@@ -130,14 +138,8 @@ data "megaport_location" "my_location_1" {
 data "megaport_location" "my_location_2" {
   site_code = "bne_nxt1"
 }
-
-data "megaport_location" "my_location_3" {
-  id = 5
-}
 ```
 
-Please note that datacenter locations can sometimes change their name or less frequently their site code in the API.
-
-However, their numeric ID will always remain the same in the Megaport API.
+**Important:** Datacenter locations can change their name or site code in the API over time, which may cause Terraform configurations using these attributes to break unexpectedly. However, the numeric ID will always remain consistent in the Megaport API, ensuring your Terraform configurations remain stable.
 
 The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v2/locations`
