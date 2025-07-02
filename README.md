@@ -141,3 +141,38 @@ Please note that datacenter locations can sometimes change their name or less fr
 However, their numeric ID will always remain the same in the Megaport API.
 
 The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v2/locations`
+
+## Partner Port Stability
+
+Partner ports (used to connect to cloud service providers) may occasionally have their UIDs changed by Megaport as part of capacity management. This can lead to unexpected warning messages during Terraform operations even when the VXCs themselves are not being modified:
+
+```
+Warning: VXC B-End product UID is from a partner port, therefore it will not be changed.
+```
+
+This warning appears because Terraform detects a difference in the partner port UID even when applying changes unrelated to those specific VXCs.
+
+### Workaround
+
+To prevent these warnings and ensure configuration stability, we recommend explicitly specifying the `product_uid` in your partner port data source once your connections are established:
+
+```terraform
+# Initial setup - use standard filtering to find the partner port
+data "megaport_partner" "awshc" {
+  connect_type    = "AWSHC"
+  company_name    = "AWS"
+  product_name    = "US East (N. Virginia) (us-east-1)"
+  diversity_zone  = "blue"
+  location_id     = 123
+}
+
+# After your connections are established, update your configuration
+# to explicitly specify the product_uid for stability
+data "megaport_partner" "awshc" {
+  product_uid     = "a1b2c3d4-5678-90ef-ghij-klmnopqrstuv"
+  # You can keep other filters for documentation purposes
+  # but product_uid takes precedence
+}
+```
+
+This ensures that even if Megaport rotates the underlying ports, your Terraform configurations will continue to reference the same specific partner port.
