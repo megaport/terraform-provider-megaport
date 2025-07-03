@@ -2119,8 +2119,18 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
+	var aEndPartnerType, bEndPartnerType string
+	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerPlan != nil {
+		aEndPartnerType = aEndPartnerPlan.Partner.ValueString()
+	}
+	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerPlan != nil {
+		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
+	}
+
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() && !aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) &&
+		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
@@ -2130,10 +2140,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Always include the VLAN when updating VNIC index to ensure API validation passes
-		if !aEndPlan.OrderedVLAN.IsNull() {
-			updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
-		} else if !aEndState.VLAN.IsNull() {
-			updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
+		// But only if the partner type supports VLAN updates
+		if supportVLANUpdates(aEndPartnerType) {
+			if !aEndPlan.OrderedVLAN.IsNull() {
+				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+			} else if !aEndState.VLAN.IsNull() {
+				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
+			}
 		}
 	} else if aEndProductType == megaport.PRODUCT_MVE && aEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
@@ -2148,7 +2161,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() && !bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) &&
+		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
@@ -2170,10 +2185,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Always include the VLAN when updating VNIC index to ensure API validation passes
-		if !bEndPlan.OrderedVLAN.IsNull() {
-			updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
-		} else if !bEndState.VLAN.IsNull() {
-			updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
+		// But only if the partner type supports VLAN updates
+		if supportVLANUpdates(bEndPartnerType) {
+			if !bEndPlan.OrderedVLAN.IsNull() {
+				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+			} else if !bEndState.VLAN.IsNull() {
+				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
+			}
 		}
 	} else if bEndProductType == megaport.PRODUCT_MVE && bEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
