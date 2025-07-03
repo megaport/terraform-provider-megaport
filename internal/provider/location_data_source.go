@@ -117,10 +117,20 @@ func (d *locationDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. You use the 'id', 'name', or 'site_code' field to identify a specific data center. Please note that names and site_codes of data centers are subject to change (while IDs will remain constant), and the most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations",
+		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id', 'name', or 'site_code' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Names and site_codes of data centers are subject to change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations",
 		Attributes: map[string]schema.Attribute{
+			"id": &schema.Int64Attribute{
+				Description: "The ID of the location. Using ID is strongly recommended as the most reliable way to identify locations since IDs remain constant, unlike names and site codes which can change.",
+				Optional:    true,
+				Computed:    true,
+			},
 			"name": &schema.StringAttribute{
-				Description: "The name of the location.",
+				Description: "The name of the location. Note that location names can change over time, which may lead to non-deterministic behavior. For consistent results, use the location ID instead.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"site_code": &schema.StringAttribute{
+				Description: "The site code of the location. Note that site codes can change over time, which may lead to non-deterministic behavior. For consistent results, use the location ID instead.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -130,11 +140,6 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			},
 			"live_date": &schema.StringAttribute{
 				Description: "The live date of the location.",
-				Computed:    true,
-			},
-			"site_code": &schema.StringAttribute{
-				Description: "The site code of the location.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"network_region": &schema.StringAttribute{
@@ -266,11 +271,6 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			},
 			"v_router_available": &schema.BoolAttribute{
 				Description: "The vRouter availability of the location.",
-				Computed:    true,
-			},
-			"id": &schema.Int64Attribute{
-				Description: "The ID of the location.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"status": &schema.StringAttribute{
