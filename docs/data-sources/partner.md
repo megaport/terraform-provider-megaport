@@ -40,7 +40,7 @@ data "megaport_partner" "aws_port" {
 - `diversity_zone` (String) The diversity zone of the partner port.
 - `location_id` (Number) The unique identifier of the location of the partner port.
 - `product_name` (String) The name of the partner port.
-- `product_uid` (String) The unique identifier of the partner port. This ID may change over time as Megaport rotates ports for capacity management, which can cause warnings like "VXC B-End product UID is from a partner port, therefore it will not be changed" during unrelated modifications. To avoid this, once you've established your connections, you can explicitly set this value in your configuration to ensure stability.
+- `product_uid` (String) The unique identifier of the partner port. This ID may change when port parameters are modified, especially when changing which port has vxc_permitted: true. This can cause warnings like "VXC B-End product UID is from a partner port, therefore it will not be changed" during unrelated modifications. To ensure stability after establishing your connections, explicitly set this value in your configuration.
 
 ### Read-Only
 

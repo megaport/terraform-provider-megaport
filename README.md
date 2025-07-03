@@ -144,7 +144,7 @@ The most up-to-date listing of Megaport Datacenter Locations can be accessed thr
 
 ## Partner Port Stability
 
-Partner ports (used to connect to cloud service providers) may occasionally have their UIDs changed by Megaport as part of capacity management. This can lead to unexpected warning messages during Terraform operations even when the VXCs themselves are not being modified:
+When using filter criteria to select partner ports (used to connect to cloud service providers), the specific partner port (and therefore UID) that best matches your filters may change over time as Megaport manages capacity by rotating ports. This can lead to unexpected warning messages during Terraform operations even when the VXCs themselves are not being modified:
 
 ```
 Warning: VXC B-End product UID is from a partner port, therefore it will not be changed.
