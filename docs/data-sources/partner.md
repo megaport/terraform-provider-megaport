@@ -4,11 +4,19 @@ page_title: "megaport_partner Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
   Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.
+  NOTE: Partner port UIDs may change over time as Megaport manages capacity by rotating ports.
+  This can cause unexpected warnings when modifying resources that reference partner ports,
+  even when those resources are not being directly changed. If you need stability, consider explicitly
+  specifying the product_uid in your configuration once you've established your connections.
 ---
 
 # megaport_partner (Data Source)
 
-Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers.
+Partner Port Data Source. Returns the interfaces Megaport has with cloud service providers. 
+NOTE: Partner port UIDs may change over time as Megaport manages capacity by rotating ports. 
+This can cause unexpected warnings when modifying resources that reference partner ports, 
+even when those resources are not being directly changed. If you need stability, consider explicitly 
+specifying the product_uid in your configuration once you've established your connections.
 
 ## Example Usage
 
@@ -28,14 +36,14 @@ data "megaport_partner" "aws_port" {
 
 - `company_name` (String) The name of the company that owns the partner port.
 - `company_uid` (String) The unique identifier of the company that owns the partner port.
-- `connect_type` (String) The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT fto display Ports that support a Megaport Internet connection. Use FRANCEIX to display France-IX Ports that you can connect to.
+- `connect_type` (String) The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT to display Ports that support a Megaport Internet connection. Use FRANCEIX to display France-IX Ports that you can connect to.
 - `diversity_zone` (String) The diversity zone of the partner port.
 - `location_id` (Number) The unique identifier of the location of the partner port.
 - `product_name` (String) The name of the partner port.
+- `product_uid` (String) The unique identifier of the partner port. This ID may change when port parameters are modified, especially when changing which port has vxc_permitted: true. This can cause warnings like "VXC B-End product UID is from a partner port, therefore it will not be changed" during unrelated modifications. To ensure stability after establishing your connections, explicitly set this value in your configuration.
 
 ### Read-Only
 
-- `product_uid` (String) The unique identifier of the partner port.
 - `rank` (Number) The rank of the partner port.
 - `speed` (Number) The speed of the partner port.
 - `vxc_permitted` (Boolean) Whether VXCs are permitted on the partner port. If false, you can not create a VXC on this port. If true, you can create a VXC on this port.
