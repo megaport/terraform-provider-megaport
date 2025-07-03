@@ -2,7 +2,7 @@ terraform {
   required_providers {
     megaport = {
       source  = "megaport/megaport"
-      version = "1.3.7"
+      version = "1.3.8"
     }
     aws = {
       source  = "hashicorp/aws"
