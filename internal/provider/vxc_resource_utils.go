@@ -696,3 +696,11 @@ func shouldIncludeVnicIndex(productType string, vnicIndex types.Int64) bool {
 	// For non-MVE products, only include if explicitly set
 	return !vnicIndex.IsNull()
 }
+
+func supportVLANUpdates(partnerType string) bool {
+	// AWS and Transit connections do not support VLAN updates
+	if partnerType == "aws" || partnerType == "transit" {
+		return false
+	}
+	return true
+}
