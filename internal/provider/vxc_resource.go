@@ -2125,19 +2125,26 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
-	// Check VNIC index for A End if product is MVE
-	if aEndProductType == megaport.PRODUCT_MVE {
-		if !aEndPlan.NetworkInterfaceIndex.IsUnknown() && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) {
-			updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
-		} else if aEndPlan.NetworkInterfaceIndex.IsNull() {
-			resp.Diagnostics.AddError(
-				"Error updating VXC",
-				"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - A End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
-			)
-			return
-		} else {
-			updateReq.AVnicIndex = megaport.PtrTo(int(aEndState.NetworkInterfaceIndex.ValueInt64()))
+	// Check VNIC index for A End
+	if shouldIncludeVnicIndex(aEndProductType, aEndPlan.NetworkInterfaceIndex) {
+		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
+
+		// Always include the VLAN when updating VNIC index to ensure API validation passes
+		if !aEndPlan.OrderedVLAN.IsNull() {
+			updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+		} else if !aEndState.VLAN.IsNull() {
+			updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 		}
+	} else if aEndProductType == megaport.PRODUCT_MVE && aEndPlan.NetworkInterfaceIndex.IsNull() {
+		// Error case for MVE with null VNIC index
+		resp.Diagnostics.AddError(
+			"Error updating VXC",
+			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
+		)
+		return
+	} else {
+		// For non-MVE products, explicitly set to null in state
+		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
 	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
@@ -2158,19 +2165,26 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
 
-	// Check VNIC index for B End if product is MVE
-	if bEndProductType == megaport.PRODUCT_MVE {
-		if !bEndPlan.NetworkInterfaceIndex.IsUnknown() && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) {
-			updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
-		} else if bEndPlan.NetworkInterfaceIndex.IsNull() {
-			resp.Diagnostics.AddError(
-				"Error updating VXC",
-				"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products - B End is MVE. Please specify which network interface on the MVE device this VXC should connect to.",
-			)
-			return
-		} else {
-			updateReq.BVnicIndex = megaport.PtrTo(int(bEndState.NetworkInterfaceIndex.ValueInt64()))
+	// Check VNIC index for B End
+	if shouldIncludeVnicIndex(bEndProductType, bEndPlan.NetworkInterfaceIndex) {
+		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
+
+		// Always include the VLAN when updating VNIC index to ensure API validation passes
+		if !bEndPlan.OrderedVLAN.IsNull() {
+			updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+		} else if !bEndState.VLAN.IsNull() {
+			updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 		}
+	} else if bEndProductType == megaport.PRODUCT_MVE && bEndPlan.NetworkInterfaceIndex.IsNull() {
+		// Error case for MVE with null VNIC index
+		resp.Diagnostics.AddError(
+			"Error updating VXC",
+			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
+		)
+		return
+	} else {
+		// For non-MVE products, explicitly set to null in state
+		bEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
