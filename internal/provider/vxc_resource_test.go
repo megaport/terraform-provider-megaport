@@ -5,10 +5,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	megaport "github.com/megaport/megaportgo"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -3145,38 +3143,4 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
 			},
 		},
 	})
-}
-
-func TestShouldIncludeVnicIndex(t *testing.T) {
-	testCases := []struct {
-		name        string
-		productType string
-		vnicIndex   types.Int64
-		expected    bool
-	}{
-		{
-			name:        "MVE",
-			productType: megaport.PRODUCT_MVE,
-			expected:    true,
-		},
-		{
-			name:        "PORT",
-			productType: megaport.PRODUCT_MEGAPORT,
-			expected:    false,
-		},
-		{
-			name:        "MCR",
-			productType: megaport.PRODUCT_MCR,
-			expected:    false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := shouldIncludeVnicIndex(tc.productType)
-			if result != tc.expected {
-				t.Errorf("Expected %v but got %v for %s", tc.expected, result, tc.name)
-			}
-		})
-	}
 }

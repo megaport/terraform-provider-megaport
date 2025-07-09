@@ -1205,7 +1205,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// Check product type - if MVE, require VNIC Index
 	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
-	if productType == megaport.PRODUCT_MVE {
+	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
 		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -1517,7 +1517,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// Check product type - if MVE, require VNIC Index
 	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
-	if productType == megaport.PRODUCT_MVE {
+	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
 		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
@@ -2136,7 +2136,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
 	// Check VNIC index for A End
-	if shouldIncludeVnicIndex(aEndProductType) {
+	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
@@ -2152,7 +2152,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 			}
 		}
-	} else if aEndProductType == megaport.PRODUCT_MVE && aEndPlan.NetworkInterfaceIndex.IsNull() {
+	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
 			"Error updating VXC",
@@ -2189,7 +2189,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
 
 	// Check VNIC index for B End
-	if shouldIncludeVnicIndex(bEndProductType) {
+	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
@@ -2205,7 +2205,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 			}
 		}
-	} else if bEndProductType == megaport.PRODUCT_MVE && bEndPlan.NetworkInterfaceIndex.IsNull() {
+	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
 			"Error updating VXC",
@@ -2215,7 +2215,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		bEndState.NetworkInterfaceIndex = types.Int64Null()
-		updateReq.BVnicIndex = nil
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
@@ -2393,6 +2392,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		isChanged = true
 	}
 	if isChanged {
+
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 
 		if err != nil {
