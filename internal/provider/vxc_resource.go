@@ -2136,15 +2136,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
 	// Check VNIC index for A End
-	if shouldIncludeVnicIndex(aEndProductType, aEndPlan.NetworkInterfaceIndex) {
+	if shouldIncludeVnicIndex(aEndProductType) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Always include the VLAN when updating VNIC index to ensure API validation passes
-		// But only if the partner type supports VLAN updates
-		if supportVLANUpdates(aEndPartnerType) {
-			if !aEndPlan.OrderedVLAN.IsNull() {
+		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
+		if supportVLANUpdates(aEndPartnerType) &&
+			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
+			// Only include VLAN if we need it for validation but don't already have it set correctly
+			if !aEndPlan.OrderedVLAN.IsNull() &&
+				!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
-			} else if !aEndState.VLAN.IsNull() {
+			} else if !aEndState.VLAN.IsNull() &&
+				updateReq.AEndVLAN == nil {
+				// Only include the current VLAN if we haven't already added a VLAN update
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 			}
 		}
@@ -2168,28 +2172,36 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
-	// Prevent setting inner_vlan to 0 during updates (auto-assignment only works on creation)
-	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
+	// Prevent setting inner_vlan during updates for partners that don't support VLAN changes
+	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() &&
+		!aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) &&
+		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
 	aEndState.InnerVLAN = aEndPlan.InnerVLAN
 
 	// Similarly add for B-End
-	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) {
+	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
+		!bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) &&
+		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	bEndState.InnerVLAN = bEndPlan.InnerVLAN
 
 	// Check VNIC index for B End
-	if shouldIncludeVnicIndex(bEndProductType, bEndPlan.NetworkInterfaceIndex) {
+	if shouldIncludeVnicIndex(bEndProductType) {
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Always include the VLAN when updating VNIC index to ensure API validation passes
-		// But only if the partner type supports VLAN updates
-		if supportVLANUpdates(bEndPartnerType) {
-			if !bEndPlan.OrderedVLAN.IsNull() {
+		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
+		if supportVLANUpdates(bEndPartnerType) &&
+			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
+			// Only include VLAN if we need it for validation but don't already have it set correctly
+			if !bEndPlan.OrderedVLAN.IsNull() &&
+				!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
-			} else if !bEndState.VLAN.IsNull() {
+			} else if !bEndState.VLAN.IsNull() &&
+				updateReq.BEndVLAN == nil {
+				// Only include the current VLAN if we haven't already added a VLAN update
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 			}
 		}
@@ -2203,6 +2215,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		bEndState.NetworkInterfaceIndex = types.Int64Null()
+		updateReq.BVnicIndex = nil
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {

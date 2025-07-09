@@ -687,14 +687,9 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 	return diags, transitPartnerConfig, transitConfigObj
 }
 
-func shouldIncludeVnicIndex(productType string, vnicIndex types.Int64) bool {
+func shouldIncludeVnicIndex(productType string) bool {
 	// For MVE products, always include VNIC index (even if null, which would trigger an error)
-	if productType == megaport.PRODUCT_MVE {
-		return true
-	}
-
-	// For non-MVE products, only include if explicitly set
-	return !vnicIndex.IsNull()
+	return productType == megaport.PRODUCT_MVE
 }
 
 func supportVLANUpdates(partnerType string) bool {

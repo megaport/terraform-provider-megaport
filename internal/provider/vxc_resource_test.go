@@ -3155,46 +3155,25 @@ func TestShouldIncludeVnicIndex(t *testing.T) {
 		expected    bool
 	}{
 		{
-			name:        "MVE with VNIC index",
+			name:        "MVE",
 			productType: megaport.PRODUCT_MVE,
-			vnicIndex:   types.Int64Value(1),
 			expected:    true,
 		},
 		{
-			name:        "MVE with null VNIC index",
-			productType: megaport.PRODUCT_MVE,
-			vnicIndex:   types.Int64Null(),
-			expected:    true, // Always include for MVE
-		},
-		{
-			name:        "PORT with VNIC index",
+			name:        "PORT",
 			productType: megaport.PRODUCT_MEGAPORT,
-			vnicIndex:   types.Int64Value(1),
-			expected:    true, // Include if provided
+			expected:    false,
 		},
 		{
-			name:        "PORT with null VNIC index",
-			productType: megaport.PRODUCT_MEGAPORT,
-			vnicIndex:   types.Int64Null(),
-			expected:    false, // Don't include if null
-		},
-		{
-			name:        "MCR with VNIC index",
+			name:        "MCR",
 			productType: megaport.PRODUCT_MCR,
-			vnicIndex:   types.Int64Value(1),
-			expected:    true, // Include if provided
-		},
-		{
-			name:        "MCR with null VNIC index",
-			productType: megaport.PRODUCT_MCR,
-			vnicIndex:   types.Int64Null(),
-			expected:    false, // Don't include if null
+			expected:    false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := shouldIncludeVnicIndex(tc.productType, tc.vnicIndex)
+			result := shouldIncludeVnicIndex(tc.productType)
 			if result != tc.expected {
 				t.Errorf("Expected %v but got %v for %s", tc.expected, result, tc.name)
 			}
