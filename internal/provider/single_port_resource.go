@@ -157,7 +157,8 @@ func NewPortResource() resource.Resource {
 
 // portResource is the resource implementation.
 type portResource struct {
-	client *megaport.Client
+	client            *megaport.Client
+	cancelAtEndOfTerm bool
 }
 
 // Metadata returns the resource type name.
@@ -623,7 +624,7 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	// Delete existing order
 	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
 		PortID:     state.UID.ValueString(),
-		DeleteNow:  true,
+		DeleteNow:  !r.cancelAtEndOfTerm,
 		SafeDelete: true,
 	})
 	if err != nil {
@@ -641,17 +642,21 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	client, ok := req.ProviderData.(*megaport.Client)
+	providerData, ok := req.ProviderData.(*megaportProviderData)
+
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *megaport.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
+	client := providerData.client
+
 	r.client = client
+	r.cancelAtEndOfTerm = providerData.cancelAtEndOfTerm
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
