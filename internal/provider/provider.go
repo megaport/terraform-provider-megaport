@@ -38,14 +38,6 @@ type megaportProviderModel struct {
 	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
 	CancelAtEndOfTerm types.Bool   `tfsdk:"cancel_at_end_of_term"`
 	WaitTime          types.Int64  `tfsdk:"wait_time"`
-	AWSEnabled        types.Bool   `tfsdk:"aws_enabled"`
-	AWSRegion         types.String `tfsdk:"aws_region"`
-	AWSAccessKey      types.String `tfsdk:"aws_access_key"`
-	AWSSecretKey      types.String `tfsdk:"aws_secret_key"`
-	AWSSessionToken   types.String `tfsdk:"aws_session_token"`
-	AWSProfile        types.String `tfsdk:"aws_profile"`
-	AWSAssumeRoleARN  types.String `tfsdk:"aws_assume_role_arn"`
-	AWSExternalID     types.String `tfsdk:"aws_external_id"`
 	AWSConfiguration  types.Object `tfsdk:"aws_configuration"`
 }
 
