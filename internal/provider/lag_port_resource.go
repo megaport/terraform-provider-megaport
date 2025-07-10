@@ -671,21 +671,20 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 
-	providerData, ok := req.ProviderData.(*megaportProviderData)
-
+	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
+			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	client := providerData.client
+	client := data.client
 
 	r.client = client
-	r.cancelAtEndOfTerm = providerData.cancelAtEndOfTerm
+	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
 
 }
 

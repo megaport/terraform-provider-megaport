@@ -140,18 +140,17 @@ func (d *mveSizeDataSource) Configure(_ context.Context, req datasource.Configur
 		return
 	}
 
-	providerData, ok := req.ProviderData.(*megaportProviderData)
-
+	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
+			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	client := providerData.client
+	client := data.client
 
 	d.client = client
 }

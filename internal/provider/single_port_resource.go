@@ -642,21 +642,20 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	providerData, ok := req.ProviderData.(*megaportProviderData)
-
+	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
+			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	client := providerData.client
+	client := data.client
 
 	r.client = client
-	r.cancelAtEndOfTerm = providerData.cancelAtEndOfTerm
+	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
