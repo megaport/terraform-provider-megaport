@@ -1209,15 +1209,17 @@ func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	client, ok := req.ProviderData.(*megaport.Client)
+	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *megaport.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			"Unexpected Provider Data Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
+
+	client := data.client
 
 	r.client = client
 }

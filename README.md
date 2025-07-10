@@ -177,4 +177,26 @@ data "megaport_partner" "awshc" {
 }
 ```
 
-This ensures that even if Megaport rotates the underlying ports, your Terraform configurations will continue to reference the same specific partner port.
+## End-of-Term Cancellation
+
+By default, when Terraform deletes resources, they are immediately cancelled in the Megaport portal. However, you may prefer to have resources marked for cancellation at the end of their current billing term instead of immediate cancellation.
+
+The provider supports this with the `cancel_at_end_of_term` configuration option:
+
+```terraform
+provider "megaport" {
+  environment           = "production"
+  access_key            = "your-access-key"
+  secret_key            = "your-secret-key"
+  accept_purchase_terms = true
+  cancel_at_end_of_term = true  # Mark resources for end-of-term cancellation
+}
+```
+
+**Important notes:**
+
+- This feature is currently only supported for Single Ports and LAG Ports
+- For other resource types, the option will be ignored and immediate cancellation will occur
+- When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
+- Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
+- If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
