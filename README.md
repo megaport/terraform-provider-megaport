@@ -198,5 +198,5 @@ provider "megaport" {
 - This feature is currently only supported for Single Ports and LAG Ports
 - For other resource types, the option will be ignored and immediate cancellation will occur
 - When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
-- Resources are removed from Terraform state immediately, regardless of this setting
+- Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
 - If you re-apply your configuration after marking a resource for cancellation, Terraform will not attempt to recreate the resource as long as it remains in your state file
