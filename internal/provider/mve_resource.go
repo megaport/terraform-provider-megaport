@@ -1049,6 +1049,11 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	if !state.UID.IsNull() {
 		// If VendorConfig is null in the state, set it to the value from the plan
 		if state.VendorConfig.IsNull() {
+			// Add this check to avoid trying to convert a null value
+			if plan.VendorConfig.IsNull() {
+				// Both state and plan have null VendorConfig, nothing to do
+				return
+			}
 			var planVendorConfig vendorConfigModel
 			planVendorConfigDiags := plan.VendorConfig.As(ctx, &planVendorConfig, basetypes.ObjectAsOptions{})
 			resp.Diagnostics = append(resp.Diagnostics, planVendorConfigDiags...)

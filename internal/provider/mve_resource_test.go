@@ -407,3 +407,113 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 		},
 	})
 }
+
+func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIgnoreChanges() {
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	costCentre := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// First create a standard MVE
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                
+                data "megaport_mve_images" "aruba" {
+                      vendor_filter = "Aruba"
+                      id_filter = 23
+                }
+
+                resource "megaport_mve" "import_test" {
+                    product_name  = "%s"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months = 1
+                    cost_centre = "%s"
+
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "SMALL"
+                        mve_label = "MVE Import Test"
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
+                        account_name = "%s"
+                        account_key = "%s"
+                        system_tag = "Preconfiguration-aruba-test-1"
+                    }
+
+                    vnics = [{
+                        description = "Data Plane"
+                    }]
+                }`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName),
+				),
+			},
+			// ImportState testing using the standard pattern
+			{
+				ResourceName:                         "megaport_mve.import_test",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.import_test"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+			},
+			// Test a modification with lifecycle.ignore_changes
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                
+                data "megaport_mve_images" "aruba" {
+                      vendor_filter = "Aruba"
+                      id_filter = 23
+                }
+
+                resource "megaport_mve" "import_test" {
+                    product_name  = "%s-updated"
+                    location_id = data.megaport_location.test_location.id
+                    contract_term_months = 1
+                    cost_centre = "%s-updated"
+
+                    vendor_config = {
+                        vendor = "aruba"
+                        product_size = "SMALL"
+                        mve_label = "MVE Import Test"
+                        image_id = data.megaport_mve_images.aruba.mve_images.0.id
+                        account_name = "%s"
+                        account_key = "%s"
+                        system_tag = "Preconfiguration-aruba-test-1"
+                    }
+
+                    vnics = [{
+                        description = "Data Plane"
+                    }]
+
+                    lifecycle {
+                        ignore_changes = [vendor_config]
+                    }
+                }`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName+"-updated"),
+					resource.TestCheckResourceAttr("megaport_mve.import_test", "cost_centre", costCentre+"-updated"),
+					resource.TestCheckResourceAttrSet("megaport_mve.import_test", "product_uid"),
+				),
+			},
+		},
+	})
+}
