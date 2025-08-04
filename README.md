@@ -145,6 +145,17 @@ data "megaport_location" "recommended" {
 data "megaport_location" "alternative" {
   name = "NextDC B1"  # Names can change, but currently supported
 }
+
+# 💡 TIP: Save the location ID for future use
+output "location_id_for_nextdc_b1" {
+  value = data.megaport_location.alternative.id
+  description = "Location ID for NextDC B1 - save this for consistent future references"
+}
+
+# Then use the saved ID in future configurations:
+# data "megaport_location" "stable_reference" {
+#   id = 5  # Use the ID from the output above
+# }
 ```
 
 ### 🔧 Migration Guide
@@ -184,8 +195,19 @@ Several location fields are now deprecated and will show warnings:
 
 If you need to find the location ID for a specific site code, you can:
 
-1. **Check the Megaport Portal**: Location IDs are displayed in the portal
-2. **Use the API**: Call the locations endpoint to see all available locations
+1. **Use Terraform data source**: Query by name to get the ID:
+
+   ```terraform
+   data "megaport_location" "lookup" {
+     name = "Your Location Name"
+   }
+
+   output "location_id" {
+     value = data.megaport_location.lookup.id
+   }
+   ```
+
+2. **Use the API directly**: Call `GET /v3/locations` to see all available locations
 3. **Contact Support**: Megaport support can help map site codes to location IDs
 
 ---
@@ -210,6 +232,12 @@ data "megaport_location" "stable_example" {
 # ✅ ALTERNATIVE: Use name (less stable, may change)
 data "megaport_location" "name_example" {
   name = "NextDC B1"
+}
+
+# 💡 TIP: Save the location ID for future use
+output "location_id_for_nextdc_b1" {
+  value = data.megaport_location.name_example.id
+  description = "Location ID for NextDC B1 - save this for consistent future references"
 }
 ```
 
