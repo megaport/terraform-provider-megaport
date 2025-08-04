@@ -35,7 +35,7 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@v8
         with:
-          version: 'v2.6.0' # Use golangci-lint v2 to match config version
+          version: 'v2.3.1' # Use golangci-lint v2 to match config version
           args: --timeout=10m
           skip-cache: true # Disable golangci-lint-action's cache
         # Add retry logic
@@ -46,7 +46,7 @@ jobs:
         if: steps.lint.outcome == 'failure'
         uses: golangci/golangci-lint-action@v8
         with:
-          version: 'v2.6.0' # Use golangci-lint v2 to match config version
+          version: 'v2.3.1' # Use golangci-lint v2 to match config version
           args: --timeout=10m
           skip-cache: true # Also disable cache in the retry step
 
