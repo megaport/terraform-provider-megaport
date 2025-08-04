@@ -116,33 +116,106 @@ acceptance of the CLA terms. Pull Requests can not be merged until this is compl
 
 Megaport users are also bound by the [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy).
 
+## 🚨 BREAKING CHANGE: Location Data Source Migration
+
+### ⚠️ URGENT: `site_code` Filtering No Longer Supported
+
+**If you are using `site_code` to filter locations in your Terraform configurations, you must update your code immediately or your configurations will fail.**
+
+The Megaport Location API has been upgraded to v3, and several important changes affect how you interact with location data:
+
+#### ❌ What No Longer Works
+
+```terraform
+# THIS WILL FAIL - site_code filtering is no longer supported
+data "megaport_location" "broken_example" {
+  site_code = "NTT-TOK"  # ❌ This will cause an error
+}
+```
+
+#### ✅ What You Should Use Instead
+
+```terraform
+# ✅ RECOMMENDED: Use location ID for most reliable results
+data "megaport_location" "recommended" {
+  id = 123  # IDs never change and are the most stable
+}
+
+# ✅ ALTERNATIVE: Use location name (may change over time)
+data "megaport_location" "alternative" {
+  name = "NextDC B1"  # Names can change, but currently supported
+}
+```
+
+### 🔧 Migration Guide
+
+**Step 1: Identify affected configurations**
+Search your Terraform files for any usage of `site_code`:
+
+```bash
+grep -r "site_code" *.tf
+```
+
+**Step 2: Replace with `id` or `name`**
+
+- **Best option**: Replace with the location `id` (most stable)
+- **Alternative**: Replace with the location `name` (may change over time)
+
+**Step 3: Update deprecated field usage**
+Several location fields are now deprecated and will show warnings:
+
+```terraform
+# These fields are deprecated and will show warnings:
+# - site_code (also no longer available for filtering)
+# - campus
+# - network_region
+# - live_date
+# - v_router_available
+```
+
+### 📋 Complete Migration Checklist
+
+- [ ] Replace all `site_code = "..."` filters with `id = ...` or `name = "..."`
+- [ ] Remove any code that depends on deprecated fields
+- [ ] Test your configurations thoroughly
+- [ ] Update any documentation or comments
+
+### 🆘 Need Help?
+
+If you need to find the location ID for a specific site code, you can:
+
+1. **Check the Megaport Portal**: Location IDs are displayed in the portal
+2. **Use the API**: Call the locations endpoint to see all available locations
+3. **Contact Support**: Megaport support can help map site codes to location IDs
+
+---
+
 ## Datacenter Location Data Source
 
 Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider.
 
-They can be retrieved by searching by `id`, `name`, or `site_code`. **For the most reliable and deterministic behavior, we strongly recommend using the location `id` as your search criterion**, since IDs never change while names and site codes may be updated over time.
+**Current supported search methods:**
+
+- `id` - **RECOMMENDED** (most reliable and stable)
+- `name` - Alternative option (may change over time)
 
 Examples:
 
 ```terraform
-# Recommended approach - using ID (most reliable)
-data "megaport_location" "my_location_3" {
+# ✅ RECOMMENDED: Use ID for most reliable results
+data "megaport_location" "stable_example" {
   id = 5
 }
 
-# Alternative approaches - may be subject to change
-data "megaport_location" "my_location_1" {
+# ✅ ALTERNATIVE: Use name (less stable, may change)
+data "megaport_location" "name_example" {
   name = "NextDC B1"
-}
-
-data "megaport_location" "my_location_2" {
-  site_code = "bne_nxt1"
 }
 ```
 
-**Important:** Datacenter locations can change their name or site code in the API over time, which may cause Terraform configurations using these attributes to break unexpectedly. However, the numeric ID will always remain consistent in the Megaport API, ensuring your Terraform configurations remain stable.
+**Important:** Location IDs never change and provide the most reliable and deterministic behavior. Location names may be updated over time, which could cause Terraform configurations to break unexpectedly.
 
-The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v2/locations`
+The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v3/locations`
 
 ## Partner Port Stability
 

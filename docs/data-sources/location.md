@@ -3,12 +3,12 @@
 page_title: "megaport_location Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id', 'name', or 'site_code' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Names and site_codes of data centers are subject to change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations
+  Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id' or 'name' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Location names can change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v3/locations
 ---
 
 # megaport_location (Data Source)
 
-Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id', 'name', or 'site_code' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Names and site_codes of data centers are subject to change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations
+Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id' or 'name' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Location names can change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v3/locations
 
 ## Example Usage
 
@@ -33,22 +33,22 @@ data "megaport_location" "my_location_3" {
 
 - `id` (Number) The ID of the location. Using ID is strongly recommended as the most reliable way to identify locations since IDs remain constant, unlike names and site codes which can change.
 - `name` (String) The name of the location. Note that location names can change over time, which may lead to non-deterministic behavior. For consistent results, use the location ID instead.
-- `site_code` (String) The site code of the location. Note that site codes can change over time, which may lead to non-deterministic behavior. For consistent results, use the location ID instead.
+- `site_code` (String) DEPRECATED: The site_code field is no longer available in the v3 locations API and will be removed in a future version. Use the location ID instead. Filtering by site_code is no longer supported.
 
 ### Read-Only
 
 - `address` (Map of String) The address of the location.
-- `campus` (String) The campus of the location.
+- `campus` (String) DEPRECATED: The campus field is no longer available in the v3 locations API and will be removed in a future version.
 - `country` (String) The country of the location.
 - `latitude` (Number) The latitude of the location.
-- `live_date` (String) The live date of the location.
+- `live_date` (String) DEPRECATED: The live_date field is no longer available in the v3 locations API and will be removed in a future version.
 - `longitude` (Number) The longitude of the location.
 - `market` (String) The market of the location.
 - `metro` (String) The metro of the location.
-- `network_region` (String) The network region of the location.
+- `network_region` (String) DEPRECATED: The network_region field is no longer available in the v3 locations API and will be removed in a future version.
 - `products` (Attributes) The products available in the location. (see [below for nested schema](#nestedatt--products))
 - `status` (String) The status of the location.
-- `v_router_available` (Boolean) The vRouter availability of the location.
+- `v_router_available` (Boolean) DEPRECATED: The v_router_available field is no longer available in the v3 locations API and will be removed in a future version.
 
 <a id="nestedatt--products"></a>
 ### Nested Schema for `products`
