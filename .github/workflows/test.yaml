@@ -33,7 +33,7 @@ jobs:
       - run: go mod download
       - run: go build -v .
       - name: Run linters
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: 'v2.6.0' # Use golangci-lint v2 to match config version
           args: --timeout=10m
@@ -44,7 +44,7 @@ jobs:
       # Retry once if it fails
       - name: Run linters (retry)
         if: steps.lint.outcome == 'failure'
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: 'v2.6.0' # Use golangci-lint v2 to match config version
           args: --timeout=10m
