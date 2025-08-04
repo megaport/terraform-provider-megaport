@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -82,28 +81,6 @@ type locationProductsModel struct {
 	MCR2       types.List  `tfsdk:"mcr2"`
 }
 
-// locationMVEMovel maps the data source schema data.
-type locationMVEMovel struct {
-	Sizes             types.List   `tfsdk:"sizes"`
-	Details           types.List   `tfsdk:"details"`
-	MaxCPUCount       types.Int64  `tfsdk:"max_cpu_count"`
-	Version           types.String `tfsdk:"version"`
-	Product           types.String `tfsdk:"product"`
-	Vendor            types.String `tfsdk:"vendor"`
-	VendorDescription types.String `tfsdk:"vendor_description"`
-	ID                types.Int64  `tfsdk:"id"`
-	ReleaseImage      types.Bool   `tfsdk:"release_image"`
-}
-
-// locationMVEDetailsModel maps the data source schema data.
-type locationMVEDetailsModel struct {
-	Size          types.String `tfsdk:"size"`
-	Label         types.String `tfsdk:"label"`
-	CPUCoreCount  types.Int64  `tfsdk:"cpu_core_count"`
-	RamGB         types.Int64  `tfsdk:"ram_gb"`
-	BandwidthMbps types.Int64  `tfsdk:"bandwidth_mbps"`
-}
-
 // NewlocationDataSource is a helper function to simplify the provider implementation.
 func NewlocationDataSource() datasource.DataSource {
 	return &locationDataSource{}
@@ -117,7 +94,7 @@ func (d *locationDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id', 'name', or 'site_code' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Names and site_codes of data centers are subject to change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v2/locations",
+		Description: "Location data source for Megaport. Returns a list of data centers where you can order a Megaport, MCR, or MVE. While you can use 'id' or 'name' field to identify a specific data center, it is strongly recommended to use 'id' for consistent results. Location names can change over time, while IDs remain constant. Using the location ID ensures deterministic behavior in your Terraform configurations. The most up to date listing of locations can be retrieved from the Megaport API at GET /v3/locations",
 		Attributes: map[string]schema.Attribute{
 			"id": &schema.Int64Attribute{
 				Description: "The ID of the location. Using ID is strongly recommended as the most reliable way to identify locations since IDs remain constant, unlike names and site codes which can change.",
@@ -130,7 +107,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"site_code": &schema.StringAttribute{
-				Description: "The site code of the location. Note that site codes can change over time, which may lead to non-deterministic behavior. For consistent results, use the location ID instead.",
+				Description: "DEPRECATED: The site_code field is no longer available in the v3 locations API and will be removed in a future version. Use the location ID instead. Filtering by site_code is no longer supported.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -139,11 +116,11 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"live_date": &schema.StringAttribute{
-				Description: "The live date of the location.",
+				Description: "DEPRECATED: The live_date field is no longer available in the v3 locations API and will be removed in a future version.",
 				Computed:    true,
 			},
 			"network_region": &schema.StringAttribute{
-				Description: "The network region of the location.",
+				Description: "DEPRECATED: The network_region field is no longer available in the v3 locations API and will be removed in a future version.",
 				Computed:    true,
 			},
 			"address": &schema.MapAttribute{
@@ -152,7 +129,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				ElementType: types.StringType,
 			},
 			"campus": &schema.StringAttribute{
-				Description: "The campus of the location.",
+				Description: "DEPRECATED: The campus field is no longer available in the v3 locations API and will be removed in a future version.",
 				Computed:    true,
 			},
 			"latitude": &schema.Float64Attribute{
@@ -270,7 +247,7 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"v_router_available": &schema.BoolAttribute{
-				Description: "The vRouter availability of the location.",
+				Description: "DEPRECATED: The v_router_available field is no longer available in the v3 locations API and will be removed in a future version.",
 				Computed:    true,
 			},
 			"status": &schema.StringAttribute{
@@ -281,82 +258,66 @@ func (d *locationDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 	}
 }
 
-func (orm *locationModel) fromAPILocation(ctx context.Context, l *megaport.Location) diag.Diagnostics {
+func (orm *locationModel) fromAPILocation(ctx context.Context, l *megaport.LocationV3) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 	orm.Name = types.StringValue(l.Name)
-	orm.Country = types.StringValue(l.Country)
-	if l.LiveDate != nil {
-		orm.LiveDate = types.StringValue(l.LiveDate.Format(time.RFC850))
-	}
-	orm.SiteCode = types.StringValue(l.SiteCode)
-	orm.NetworkRegion = types.StringValue(l.NetworkRegion)
-	orm.Campus = types.StringValue(l.Campus)
+	orm.Country = types.StringValue(l.Address.Country)
+
+	// Deprecated fields - set to empty/zero values
+	orm.LiveDate = types.StringNull()
+	orm.SiteCode = types.StringNull()
+	orm.NetworkRegion = types.StringNull()
+	orm.Campus = types.StringNull()
+	orm.VRouterAvailable = types.BoolNull()
+
 	orm.Latitude = types.Float64Value(l.Latitude)
 	orm.Longitude = types.Float64Value(l.Longitude)
 	orm.Market = types.StringValue(l.Market)
 	orm.Metro = types.StringValue(l.Metro)
-	orm.VRouterAvailable = types.BoolValue(l.VRouterAvailable)
 	orm.ID = types.Int64Value(int64(l.ID))
 	orm.Status = types.StringValue(l.Status)
 
-	address, addressDiags := types.MapValueFrom(ctx, types.StringType, l.Address)
+	// Convert v3 address structure to map
+	addressMap := map[string]string{
+		"street":   l.Address.Street,
+		"suburb":   l.Address.Suburb,
+		"city":     l.Address.City,
+		"state":    l.Address.State,
+		"postcode": l.Address.Postcode,
+		"country":  l.Address.Country,
+	}
+	address, addressDiags := types.MapValueFrom(ctx, types.StringType, addressMap)
 	diags = append(diags, addressDiags...)
 	orm.Address = address
 
+	// Convert v3 diversity zones to legacy products structure
 	products := &locationProductsModel{
-		MCR:        types.BoolValue(l.Products.MCR),
-		MCRVersion: types.Int64Value(int64(l.Products.MCRVersion)),
+		MCR:        types.BoolValue(l.HasMCRSupport()),
+		MCRVersion: types.Int64Null(), // Not available in v3
 	}
-	megaportsList, mpListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.Megaport)
+
+	megaportSpeeds := l.GetMegaportSpeeds()
+	megaportsList, mpListDiags := types.ListValueFrom(ctx, types.Int64Type, megaportSpeeds)
 	diags = append(diags, mpListDiags...)
 	products.Megaport = megaportsList
 
-	mcr1List, mcr1ListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.MCR1)
+	// MCR1 not available in v3 - set to empty list
+	mcr1List, mcr1ListDiags := types.ListValueFrom(ctx, types.Int64Type, []int{})
 	diags = append(diags, mcr1ListDiags...)
 	products.MCR1 = mcr1List
 
-	mcr2List, mcr2ListDiags := types.ListValueFrom(ctx, types.Int64Type, l.Products.MCR2)
+	// MCR2 speeds from v3
+	mcrSpeeds := l.GetMCRSpeeds()
+	mcr2List, mcr2ListDiags := types.ListValueFrom(ctx, types.Int64Type, mcrSpeeds)
 	diags = append(diags, mcr2ListDiags...)
 	products.MCR2 = mcr2List
 
+	// MVE not available in same format in v3 - set to empty list
 	mveObjects := []types.Object{}
-
-	for _, mve := range l.Products.MVE {
-		m := &locationMVEMovel{
-			MaxCPUCount:       types.Int64Value(int64(mve.MaxCPUCount)),
-			Version:           types.StringValue(mve.Version),
-			Product:           types.StringValue(mve.Product),
-			Vendor:            types.StringValue(mve.Vendor),
-			VendorDescription: types.StringValue(mve.VendorDescription),
-			ID:                types.Int64Value(int64(mve.ID)),
-			ReleaseImage:      types.BoolValue(mve.ReleaseImage),
-		}
-		sizesList, sizesListDiags := types.ListValueFrom(ctx, types.StringType, mve.Sizes)
-		diags = append(diags, sizesListDiags...)
-		m.Sizes = sizesList
-		detailsObjects := []types.Object{}
-		for _, detail := range mve.Details {
-			d := &locationMVEDetailsModel{
-				Size:          types.StringValue(detail.Size),
-				Label:         types.StringValue(detail.Label),
-				CPUCoreCount:  types.Int64Value(int64(detail.CPUCoreCount)),
-				RamGB:         types.Int64Value(int64(detail.RamGB)),
-				BandwidthMbps: types.Int64Value(int64(detail.BandwidthMbps)),
-			}
-			detailObj, detailDiags := types.ObjectValueFrom(ctx, locationMVEDetailsAttrs, d)
-			diags = append(diags, detailDiags...)
-			detailsObjects = append(detailsObjects, detailObj)
-		}
-		detailsList, detailsListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(locationMVEDetailsAttrs), detailsObjects)
-		diags = append(diags, detailsListDiags...)
-		m.Details = detailsList
-		mveObj, mveDiags := types.ObjectValueFrom(ctx, locationMVEAttrs, m)
-		diags = append(diags, mveDiags...)
-		mveObjects = append(mveObjects, mveObj)
-	}
 	mveList, mveListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(locationMVEAttrs), mveObjects)
 	diags = append(diags, mveListDiags...)
 	products.MVE = mveList
+
 	productsObj, productsDiags := types.ObjectValueFrom(ctx, locationProductsAttrs, products)
 	diags = append(diags, productsDiags...)
 	orm.Products = productsObj
@@ -376,16 +337,25 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	if state.ID.IsNull() && state.Name.IsNull() && state.SiteCode.IsNull() {
 		resp.Diagnostics.AddError(
-			"Either 'id', 'name', or 'site_code' must be set",
-			"Either 'id', 'name', or 'site_code' must be set",
+			"Either 'id' or 'name' must be set",
+			"Either 'id' or 'name' must be set. The 'site_code' field is deprecated and no longer supported.",
 		)
 		return
 	}
 
-	// Prioritize 'name' over 'site_code'
-	var location *megaport.Location
+	// Return error if site_code is used for filtering
+	if !state.SiteCode.IsNull() && state.ID.IsNull() && state.Name.IsNull() {
+		resp.Diagnostics.AddError(
+			"site_code filtering is no longer supported",
+			"The site_code field is deprecated and no longer available in the v3 locations API. Please use 'id' or 'name' instead.",
+		)
+		return
+	}
+
+	// Prioritize 'id' over 'name'
+	var location *megaport.LocationV3
 	if !state.ID.IsNull() {
-		l, err := d.client.LocationService.GetLocationByID(ctx, int(state.ID.ValueInt64()))
+		l, err := d.client.LocationService.GetLocationByIDV3(ctx, int(state.ID.ValueInt64()))
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Unable to Get location by ID",
@@ -395,7 +365,7 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 		location = l
 	} else if !state.Name.IsNull() {
-		l, err := d.client.LocationService.GetLocationByName(ctx, state.Name.ValueString())
+		l, err := d.client.LocationService.GetLocationByNameV3(ctx, state.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Unable to Get location by name",
@@ -404,21 +374,6 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 			return
 		}
 		location = l
-	} else {
-		locations, err := d.client.LocationService.ListLocations(ctx)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to List locations",
-				err.Error(),
-			)
-			return
-		}
-		for _, l := range locations {
-			if l.SiteCode == state.SiteCode.ValueString() {
-				location = l
-				break
-			}
-		}
 	}
 
 	if location == nil {

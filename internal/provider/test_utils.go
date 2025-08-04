@@ -12,7 +12,7 @@ const TestNamePrefix = "tf-acc-test-"
 func RandomTestName(additionalNames ...string) string {
 	prefix := TestNamePrefix
 	for _, n := range additionalNames {
-		prefix += "-" + strings.Replace(n, " ", "_", -1)
+		prefix += "-" + strings.ReplaceAll(n, " ", "_")
 	}
 	return randomName(prefix, 10)
 }

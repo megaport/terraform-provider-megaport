@@ -16,14 +16,6 @@ const (
 	VXCLocationIDTwo         = 3
 	VXCLocationIDThree       = 23
 
-	LagPortTestSiteCode      = "bne-nxt1"
-	MCRTestSiteCode          = "sjc-tx2"
-	MVETestSiteCode          = "sjc-tx2"
-	SinglePortTestSiteCode   = "bne-nxt1"
-	VXCLocationOneSiteCode   = "mel-nxt1"
-	VXCLocationTwoSiteCode   = "syd-gs"
-	VXCLocationThreeSiteCode = "mel-mdc"
-
 	LagPortTestLocationName    = "NextDC B1"
 	MCRTestLocationName        = "Digital Realty Silicon Valley SJC34 (SCL2)"
 	MVETestLocationName        = "Digital Realty Silicon Valley SJC34 (SCL2)"
@@ -46,7 +38,6 @@ func TestLagPortLocation(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", LagPortTestLocationID)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", LagPortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", LagPortTestSiteCode),
 				),
 			},
 			// Search by Lag Port Name
@@ -56,17 +47,6 @@ func TestLagPortLocation(t *testing.T) {
 				}`, LagPortTestLocationName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", LagPortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", LagPortTestSiteCode),
-				),
-			},
-			// Search by Lag Port Site Code
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, LagPortTestSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", LagPortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", LagPortTestSiteCode),
 				),
 			},
 		},
@@ -86,7 +66,6 @@ func TestMCRLocation(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", MCRTestLocationID)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MCRTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MCRTestSiteCode),
 				),
 			},
 			// Search by MCR Name
@@ -96,17 +75,6 @@ func TestMCRLocation(t *testing.T) {
 				}`, MCRTestLocationName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MCRTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MCRTestSiteCode),
-				),
-			},
-			// Search by MCR Site Code
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, MCRTestSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MCRTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MCRTestSiteCode),
 				),
 			},
 		},
@@ -126,7 +94,6 @@ func TestMVELocation(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", MVETestLocationID)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MVETestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MVETestSiteCode),
 				),
 			},
 			// Search by MVE Name
@@ -136,17 +103,6 @@ func TestMVELocation(t *testing.T) {
 				}`, MVETestLocationName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MVETestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MVETestSiteCode),
-				),
-			},
-			// Search by MVE Site Code
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, MVETestSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", MVETestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", MVETestSiteCode),
 				),
 			},
 		},
@@ -166,7 +122,6 @@ func TestSinglePortLocation(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", SinglePortTestLocationID)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", SinglePortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", SinglePortTestSiteCode),
 				),
 			},
 			// Search by Single Port Name
@@ -176,17 +131,6 @@ func TestSinglePortLocation(t *testing.T) {
 				}`, SinglePortTestLocationName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", SinglePortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", SinglePortTestSiteCode),
-				),
-			},
-			// Search by Single Port Site Code
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, SinglePortTestSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", SinglePortTestLocationName),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", SinglePortTestSiteCode),
 				),
 			},
 		},
@@ -206,7 +150,6 @@ func TestVXCLocationOne(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDOne)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameOne),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationOneSiteCode),
 				),
 			},
 			// Search by VXC Name One
@@ -216,17 +159,6 @@ func TestVXCLocationOne(t *testing.T) {
 				}`, VXCLocationNameOne),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameOne),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationOneSiteCode),
-				),
-			},
-			// Search by VXC Site Code One
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, VXCLocationOneSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameOne),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationOneSiteCode),
 				),
 			},
 		},
@@ -246,7 +178,6 @@ func TestVXCLocationTwo(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDTwo)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameTwo),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationTwoSiteCode),
 				),
 			},
 			// Search by VXC Name Two
@@ -256,17 +187,6 @@ func TestVXCLocationTwo(t *testing.T) {
 				}`, VXCLocationNameTwo),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameTwo),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationTwoSiteCode),
-				),
-			},
-			// Search by VXC Site Code Two
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, VXCLocationTwoSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameTwo),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationTwoSiteCode),
 				),
 			},
 		},
@@ -286,7 +206,6 @@ func TestVXCLocationThree(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDThree)),
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameThree),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationThreeSiteCode),
 				),
 			},
 			// Search by VXC Name Three
@@ -296,17 +215,6 @@ func TestVXCLocationThree(t *testing.T) {
 				}`, VXCLocationNameThree),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameThree),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationThreeSiteCode),
-				),
-			},
-			// Search by VXC Site Code Three
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-					site_code = "%s"
-				}`, VXCLocationThreeSiteCode),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "name", VXCLocationNameThree),
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "site_code", VXCLocationThreeSiteCode),
 				),
 			},
 		},
