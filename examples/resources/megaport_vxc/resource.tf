@@ -222,13 +222,13 @@ resource "megaport_vxc" "azure_vxc" {
   }
 }
 
-resource "megaport_vxc" "service_key_vxc" {
+resource "megaport_vxc" "transit_vxc" {
   product_name         = "Transit VXC Example"
   rate_limit           = 100
   contract_term_months = 1
 
   a_end = {
-    requested_product_uid = megaport_port.port.product_uid
+    requested_product_uid = megaport_mve.mve.product_uid
     vnic_index            = 2
   }
 
