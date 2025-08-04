@@ -81,28 +81,6 @@ type locationProductsModel struct {
 	MCR2       types.List  `tfsdk:"mcr2"`
 }
 
-// locationMVEMovel maps the data source schema data.
-type locationMVEMovel struct {
-	Sizes             types.List   `tfsdk:"sizes"`
-	Details           types.List   `tfsdk:"details"`
-	MaxCPUCount       types.Int64  `tfsdk:"max_cpu_count"`
-	Version           types.String `tfsdk:"version"`
-	Product           types.String `tfsdk:"product"`
-	Vendor            types.String `tfsdk:"vendor"`
-	VendorDescription types.String `tfsdk:"vendor_description"`
-	ID                types.Int64  `tfsdk:"id"`
-	ReleaseImage      types.Bool   `tfsdk:"release_image"`
-}
-
-// locationMVEDetailsModel maps the data source schema data.
-type locationMVEDetailsModel struct {
-	Size          types.String `tfsdk:"size"`
-	Label         types.String `tfsdk:"label"`
-	CPUCoreCount  types.Int64  `tfsdk:"cpu_core_count"`
-	RamGB         types.Int64  `tfsdk:"ram_gb"`
-	BandwidthMbps types.Int64  `tfsdk:"bandwidth_mbps"`
-}
-
 // NewlocationDataSource is a helper function to simplify the provider implementation.
 func NewlocationDataSource() datasource.DataSource {
 	return &locationDataSource{}
