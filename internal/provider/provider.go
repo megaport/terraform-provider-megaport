@@ -211,13 +211,14 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 
 	// Validate and set the correct environment
 	var megaportGoEnv megaport.Environment
-	if environment == "" || environment == "staging" {
+	switch environment {
+	case "", "staging":
 		megaportGoEnv = megaport.EnvironmentStaging
-	} else if environment == "production" {
+	case "production":
 		megaportGoEnv = megaport.EnvironmentProduction
-	} else if environment == "development" {
+	case "development":
 		megaportGoEnv = megaport.EnvironmentDevelopment
-	} else {
+	default:
 		resp.Diagnostics.AddAttributeError(
 			path.Root("environment"),
 			"Invalid Megaport environment",
