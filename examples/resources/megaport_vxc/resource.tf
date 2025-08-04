@@ -242,7 +242,7 @@ resource "megaport_vxc" "transit_vxc" {
 }
 
 resource "megaport_vxc" "service_key_vxc" {
-  product_name         = "Transit VXC Example"
+  product_name         = "Service Key Example"
   rate_limit           = 100
   contract_term_months = 1
   service_key          = "SERVICE_KEY_TO_B_END_HERE" # For the B-End Product
