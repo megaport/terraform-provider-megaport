@@ -237,13 +237,13 @@ resource "megaport_vxc" "azure_vxc" {
   }
 }
 
-resource "megaport_vxc" "transit_vxc" {
+resource "megaport_vxc" "service_key_vxc" {
   product_name         = "Transit VXC Example"
   rate_limit           = 100
   contract_term_months = 1
 
   a_end = {
-    requested_product_uid = megaport_mve.mve.product_uid
+    requested_product_uid = megaport_port.port.product_uid
     vnic_index            = 2
   }
 
@@ -254,6 +254,19 @@ resource "megaport_vxc" "transit_vxc" {
   b_end_partner_config = {
     partner = "transit"
   }
+}
+
+resource "megaport_vxc" "service_key_vxc" {
+  product_name         = "Transit VXC Example"
+  rate_limit           = 100
+  contract_term_months = 1
+  service_key          = "SERVICE_KEY_TO_B_END_HERE" # For the B-End Product
+
+  a_end = {
+    requested_product_uid = megaport_port.port.product_uid
+  }
+
+  b_end = {}
 }
 ```
 
