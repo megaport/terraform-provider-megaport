@@ -222,6 +222,9 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	// Set the employee ID from the create response
+	plan.EmployeeID = types.Int64Value(int64(createResp.EmployeeID))
+
 	// Get the created user details
 	user, err := userMgmt.GetUser(ctx, createResp.EmployeeID)
 	if err != nil {
@@ -318,24 +321,14 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.Phone = &phone
 	}
 
-	if !plan.Mobile.Equal(state.Mobile) {
-		mobile := plan.Mobile.ValueString()
-		updateReq.Mobile = &mobile
-	}
-
 	if !plan.Position.Equal(state.Position) {
-		position := megaport.UserPosition(plan.Position.ValueString())
+		position := plan.Position.ValueString()
 		updateReq.Position = &position
 	}
 
 	if !plan.Active.Equal(state.Active) {
 		active := plan.Active.ValueBool()
 		updateReq.Active = &active
-	}
-
-	if !plan.RequireTotp.Equal(state.RequireTotp) {
-		requireTotp := plan.RequireTotp.ValueBool()
-		updateReq.RequireTotp = &requireTotp
 	}
 
 	if !plan.NotificationEnabled.Equal(state.NotificationEnabled) {
@@ -351,6 +344,11 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if !plan.Promotions.Equal(state.Promotions) {
 		promotions := plan.Promotions.ValueBool()
 		updateReq.Promotions = &promotions
+	}
+
+	if !plan.ChannelManager.Equal(state.ChannelManager) {
+		channelManager := plan.ChannelManager.ValueBool()
+		updateReq.ChannelManager = &channelManager
 	}
 
 	// Check for security roles changes
