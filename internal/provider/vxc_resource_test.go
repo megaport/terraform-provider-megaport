@@ -1604,8 +1604,8 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 
 					vendor_config = {
 					  vendor        = "aruba"
-					  product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+					  product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -1736,8 +1736,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					vendor_config = {
 					  vendor        = "aruba"
-					  product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+					  product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -1938,8 +1938,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 					vendor_config = {
 					  vendor        = "aruba"
-					  product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+					  product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
 					  image_id      = 23
 					  account_name  = "%s"
 					  account_key   = "%s"
@@ -2083,8 +2083,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 
                     vendor_config = {
                         vendor = "aruba"
-                        product_size = "MEDIUM"
-						mve_label     = "MVE 4/16"
+                        product_size = "SMALL"
+						mve_label     = "MVE 2/8"
                         image_id = 23
 						account_name = "%s"
 						account_key = "%s"
@@ -2197,8 +2197,8 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 
                     vendor_config = {
                         vendor = "aruba"
-                        product_size = "MEDIUM"
-						mve_label     = "MVE 4/16"
+                        product_size = "SMALL"
+						mve_label     = "MVE 2/8"
                         image_id = 23
 						account_name = "%s"
 						account_key = "%s"
@@ -2515,8 +2515,8 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 
                     vendor_config = {
                         vendor       = "aruba"
-                        product_size = "MEDIUM"
-						mve_label     = "MVE 4/16"
+                        product_size = "SMALL"
+						mve_label     = "MVE 2/8"
                         image_id     = 23
                         account_name = "%s-account"
                         account_key  = "%s-key"
@@ -2658,8 +2658,8 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 
                     vendor_config = {
                         vendor       = "aruba"
-                        product_size = "MEDIUM"
-						mve_label     = "MVE 4/16"
+                        product_size = "SMALL"
+						mve_label     = "MVE 2/8"
                         image_id     = 23
                         account_name = "%s-account"
                         account_key  = "%s-key"
@@ -2718,8 +2718,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-1"
                       account_key   = "%s-1"
@@ -2743,8 +2743,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-2"
                       account_key   = "%s-2"
@@ -2768,8 +2768,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-3"
                       account_key   = "%s-3"
@@ -2793,8 +2793,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-4"
                       account_key   = "%s-4"
@@ -2862,8 +2862,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-1"
                       account_key   = "%s-1"
@@ -2887,8 +2887,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-2"
                       account_key   = "%s-2"
@@ -2912,8 +2912,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-3"
                       account_key   = "%s-3"
@@ -2937,8 +2937,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     ]
                     vendor_config = {
                       vendor        = "aruba"
-                      product_size  = "MEDIUM"
-					  mve_label     = "MVE 4/16"
+                      product_size  = "SMALL"
+					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
                       account_name  = "%s-4"
                       account_key   = "%s-4"
@@ -2985,6 +2985,160 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
 						"megaport_vxc.mve_vxc", "b_end.requested_product_uid",
 						"megaport_mve.mve_4", "product_uid",
 					),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
+	// Test names
+	portName := RandomTestName()
+	mveName := RandomTestName()
+	vxcName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create a Port, MVE, and VXC connecting them with VNIC index 0
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                // Create a port
+                resource "megaport_port" "test_port" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                
+                // Create an MVE
+                resource "megaport_mve" "test_mve" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    
+                    vnics = [
+                        {
+                            description = "Data Plane"
+                        },
+                        {
+                            description = "Management Plane"
+                        },
+                        {
+                            description = "Control Plane"
+                        }
+                    ]
+                    
+                    vendor_config = {
+                        vendor       = "aruba"
+                        product_size = "SMALL"
+                        mve_label    = "MVE 2/8"
+                        image_id     = 23
+                        account_name = "%s-account"
+                        account_key  = "%s-key"
+                        system_tag   = "Preconfiguration-test-1"
+                    }
+                }
+                
+                // Connect port to MVE with VXC
+                resource "megaport_vxc" "port_to_mve" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.test_port.product_uid
+                        ordered_vlan          = 100
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_mve.test_mve.product_uid
+                        vnic_index            = 0
+                        ordered_vlan          = 101
+                    }
+                }
+                `,
+					portName, VXCLocationID1,
+					mveName, MVETestLocationIDNum,
+					mveName, mveName,
+					vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check port and MVE were created
+					resource.TestCheckResourceAttrSet("megaport_port.test_port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.test_mve", "product_uid"),
+
+					// Check VXC was created with VNIC index 0
+					resource.TestCheckResourceAttrSet("megaport_vxc.port_to_mve", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.port_to_mve", "b_end.vnic_index", "0"),
+				),
+			},
+			// Step 2: Update the VNIC index to 1 - this should pass only if the VNIC index is properly sent in the update
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                // Create a port
+                resource "megaport_port" "test_port" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                
+                // Create an MVE
+                resource "megaport_mve" "test_mve" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    
+                    vnics = [
+                        {
+                            description = "Data Plane"
+                        },
+                        {
+                            description = "Management Plane"
+                        },
+                        {
+                            description = "Control Plane"
+                        }
+                    ]
+                    
+                    vendor_config = {
+                        vendor       = "aruba"
+                        product_size = "SMALL"
+                        mve_label    = "MVE 2/8"
+                        image_id     = 23
+                        account_name = "%s-account"
+                        account_key  = "%s-key"
+                        system_tag   = "Preconfiguration-test-1"
+                    }
+                }
+                
+                // Connect port to MVE with VXC - updated VNIC index
+                resource "megaport_vxc" "port_to_mve" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+                    
+                    a_end = {
+                        requested_product_uid = megaport_port.test_port.product_uid
+                        ordered_vlan          = 100
+                    }
+                    
+                    b_end = {
+                        requested_product_uid = megaport_mve.test_mve.product_uid
+                        vnic_index            = 1  // Changed from 0 to 1
+                        ordered_vlan          = 101
+                    }
+                }
+                `,
+					portName, VXCLocationID1,
+					mveName, MVETestLocationIDNum,
+					mveName, mveName,
+					vxcName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check VXC was updated with new VNIC index
+					resource.TestCheckResourceAttr("megaport_vxc.port_to_mve", "b_end.vnic_index", "1"),
 				),
 			},
 		},
