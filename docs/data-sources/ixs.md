@@ -18,7 +18,6 @@ Provides a list of IX UIDs matching the specified filters.
 ### Optional
 
 - `filter` (Block List) Custom filter block to select IXs. (see [below for nested schema](#nestedblock--filter))
-- `tags` (Map of String) Map of resource tags, each pair of which must exactly match a pair on the desired IXs.
 
 ### Read-Only
 
