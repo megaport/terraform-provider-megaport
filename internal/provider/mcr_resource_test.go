@@ -23,7 +23,6 @@ func TestMCRProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(MCRProviderTestSuite))
 }
-
 func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
@@ -42,60 +41,82 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				  resource "megaport_mcr" "mcr" {
-					product_name             = "%s"
-					port_speed               = 1000
-					location_id              = data.megaport_location.test_location.id
-					contract_term_months     = 12
-					cost_centre              = "%s"
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                  resource "megaport_mcr" "mcr" {
+                    product_name             = "%s"
+                    port_speed               = 1000
+                    location_id              = data.megaport_location.test_location.id
+                    contract_term_months     = 12
+                    cost_centre              = "%s"
 
-					resource_tags = {
-						"key1" = "value1"
-						"key2" = "value2"
-					}
+                    resource_tags = {
+                        "key1" = "value1"
+                        "key2" = "value2"
+                    }
 
-					prefix_filter_lists = [
-					{
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 25
-							le      = 32
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 25
-							le      = 27
-						  }
-						]
-					  },
-					  {
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 26
-							le      = 32
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 24
-							le      = 25
-						  }
-						]
-					  }]
-				  }
-				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+                    prefix_filter_lists = [
+                    {
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 25
+                            le      = 32
+                          },
+                          {
+                            action  = "deny"
+                            prefix  = "10.0.2.0/24"
+                            ge      = 25
+                            le      = 27
+                          }
+                        ]
+                      },
+                      {
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 26
+                            le      = 32
+                          },
+                          {
+                            action  = "deny"
+                            prefix  = "10.0.2.0/24"
+                            ge      = 24
+                            le      = 25
+                          }
+                        ]
+                      }]
+                  }
+
+                  # Test MCR data source with name filter
+                  data "megaport_mcrs" "test_mcr_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+
+                  # Test MCR data source with multiple filters
+                  data "megaport_mcrs" "test_mcr_multi_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+                  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2, mcrName, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -132,6 +153,9 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.prefix", "10.0.2.0/24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.le", "25"),
+					// Check data source results
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_multi_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -157,77 +181,86 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 			// Update Test 1
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				  resource "megaport_mcr" "mcr" {
-					product_name             = "%s"
-					port_speed               = 1000
-					location_id              = data.megaport_location.test_location.id
-					contract_term_months     = 12
-					cost_centre              = "%s"
-					resource_tags = {
-						"key1updated" = "value1updated"
-						"key2updated" = "value2updated"
-					}
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                  resource "megaport_mcr" "mcr" {
+                    product_name             = "%s"
+                    port_speed               = 1000
+                    location_id              = data.megaport_location.test_location.id
+                    contract_term_months     = 12
+                    cost_centre              = "%s"
+                    resource_tags = {
+                        "key1updated" = "value1updated"
+                        "key2updated" = "value2updated"
+                    }
 
-					prefix_filter_lists = [
-					{
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 24
-							le      = 32
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 25
-							le      = 29
-						  }
-						]
-					  },
-					  {
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 25
-							le      = 32
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 24
-							le      = 26
-						  }
-						]
-					  },
-					  {
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 24
-							le      = 24
-						  },
-						  {
-							action  = "deny"
-							prefix  = "10.0.2.0/24"
-							ge      = 27
-							le      = 32
-						  }
-						]
-					  }]
-				  }
-				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+                    prefix_filter_lists = [
+                    {
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 24
+                            le      = 32
+                          },
+                          {
+                            action  = "deny"
+                            prefix  = "10.0.2.0/24"
+                            ge      = 25
+                            le      = 29
+                          }
+                        ]
+                      },
+                      {
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 25
+                            le      = 32
+                          },
+                          {
+                            action  = "deny"
+                            prefix  = "10.0.2.0/24"
+                            ge      = 24
+                            le      = 26
+                          }
+                        ]
+                      },
+                      {
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 24
+                            le      = 24
+                          },
+                          {
+                            action  = "deny"
+                            prefix  = "10.0.2.0/24"
+                            ge      = 27
+                            le      = 32
+                          }
+                        ]
+                      }]
+                  }
+
+                  # Test MCR data source with name filter
+                  data "megaport_mcrs" "test_mcr_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+                  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -273,40 +306,73 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.prefix", "10.0.2.0/24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.ge", "27"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.le", "32"),
+					// Check data source results with updated attributes
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
 				),
 			},
 			// Update Test 2
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				  resource "megaport_mcr" "mcr" {
-					product_name             = "%s"
-					port_speed               = 1000
-					location_id              = data.megaport_location.test_location.id
-					contract_term_months     = 12
-					cost_centre              = "%s"
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                  resource "megaport_mcr" "mcr" {
+                    product_name             = "%s"
+                    port_speed               = 1000
+                    location_id              = data.megaport_location.test_location.id
+                    contract_term_months     = 12
+                    cost_centre              = "%s"
 
-					resource_tags = {
-						"key1updated" = "value1updated"
-						"key2updated" = "value2updated"
-					}
+                    resource_tags = {
+                        "key1updated" = "value1updated"
+                        "key2updated" = "value2updated"
+                    }
 
-					prefix_filter_lists = [{
-						description     = "%s"
-						address_family  = "IPv4"
-						entries = [
-						  {
-							action  = "permit"
-							prefix  = "10.0.1.0/24"
-							ge      = 28
-							le      = 32
-						  }
-						]
-					  }]
-				  }
-				  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
+                    prefix_filter_lists = [{
+                        description     = "%s"
+                        address_family  = "IPv4"
+                        entries = [
+                          {
+                            action  = "permit"
+                            prefix  = "10.0.1.0/24"
+                            ge      = 28
+                            le      = 32
+                          }
+                        ]
+                      }]
+                  }
+
+                  # Test MCR data source with updated name filter
+                  data "megaport_mcrs" "test_mcr_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+
+                  # Test MCR data source with cost-centre filter
+                  data "megaport_mcrs" "test_mcr_cost_centre_filter" {
+                    filter {
+                        name = "cost-centre"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+
+                  # Test MCR data source with multiple filters
+                  data "megaport_mcrs" "test_mcr_multi_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    filter {
+                        name = "port-speed"
+                        values = ["1000"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+                  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4, mcrNameNew, costCentreNameNew, mcrNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -328,24 +394,37 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "28"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
+					// Check data source results with updated attributes
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_cost_centre_filter", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_multi_filter", "uids.#", "1"),
 				),
 			},
 			// Update Test 3
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				  resource "megaport_mcr" "mcr" {
-					product_name             = "%s"
-					port_speed               = 1000
-					location_id              = data.megaport_location.test_location.id
-					contract_term_months     = 12
-					cost_centre              = "%s"
+                data "megaport_location" "test_location" {
+                    id = %d
+                }
+                  resource "megaport_mcr" "mcr" {
+                    product_name             = "%s"
+                    port_speed               = 1000
+                    location_id              = data.megaport_location.test_location.id
+                    contract_term_months     = 12
+                    cost_centre              = "%s"
 
-					prefix_filter_lists = []
-				  }
-				  `, MCRTestLocationIDNum, mcrNameNew2, costCentreNameNew2),
+                    prefix_filter_lists = []
+                  }
+
+                  # Test MCR data source with final name filter
+                  data "megaport_mcrs" "test_mcr_name_filter" {
+                    filter {
+                        name = "name"
+                        values = ["%s"]
+                    }
+                    depends_on = [megaport_mcr.mcr]
+                  }
+                  `, MCRTestLocationIDNum, mcrNameNew2, costCentreNameNew2, mcrNameNew2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew2),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -359,6 +438,8 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "0"),
+					// Check data source results with final name
+					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
 				),
 			},
 		},
