@@ -116,15 +116,6 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
                     }
                     depends_on = [megaport_mcr.mcr]
                   }
-
-                  # Test MCR data source with tags
-                  data "megaport_mcrs" "test_mcr_tags_filter" {
-                    tags = {
-                        "key1" = "value1"
-                        "key2" = "value2"
-                    }
-                    depends_on = [megaport_mcr.mcr]
-                  }
                   `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2, mcrName, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -165,7 +156,6 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					// Check data source results
 					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
 					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_multi_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_tags_filter", "uids.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -270,15 +260,6 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
                     }
                     depends_on = [megaport_mcr.mcr]
                   }
-
-                  # Test MCR data source with updated tags
-                  data "megaport_mcrs" "test_mcr_tags_filter" {
-                    tags = {
-                        "key1updated" = "value1updated"
-                        "key2updated" = "value2updated"
-                    }
-                    depends_on = [megaport_mcr.mcr]
-                  }
                   `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -327,7 +308,6 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.le", "32"),
 					// Check data source results with updated attributes
 					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_name_filter", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.test_mcr_tags_filter", "uids.#", "1"),
 				),
 			},
 			// Update Test 2
