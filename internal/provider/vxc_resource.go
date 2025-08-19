@@ -2228,7 +2228,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
 	}
 
-	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
+	// Always use the planned cost centre value, even if it's empty/null
+	if !plan.CostCentre.Equal(state.CostCentre) {
 		updateReq.CostCentre = megaport.PtrTo(plan.CostCentre.ValueString())
 	}
 
