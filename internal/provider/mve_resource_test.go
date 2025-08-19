@@ -215,6 +215,105 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	})
 }
 
+func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemoval() {
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	costCentreName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+					id_filter = 23
+				}
+				resource "megaport_mve" "mve" {
+					product_name = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre = "%s"
+					diversity_zone = "red"
+					vendor_config = {
+						vendor = "aruba"
+						product_size = "SMALL"
+						mve_label = "MVE 2/8"
+						image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+					}
+					resource_tags = {
+						"key1" = "value1"
+					}
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}]
+				}`, MVETestLocationIDNum, mveName, costCentreName, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreName),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+					id_filter = 23
+				}
+				resource "megaport_mve" "mve" {
+					product_name = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre = ""
+					diversity_zone = "red"
+					vendor_config = {
+						vendor = "aruba"
+						product_size = "SMALL"
+						mve_label = "MVE 2/8"
+						image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+					}
+					resource_tags = {
+						"key1" = "value1"
+					}
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}]
+				}`, MVETestLocationIDNum, mveName, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", ""),
+				),
+			},
+		},
+	})
+}
+
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
