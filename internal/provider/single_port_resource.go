@@ -531,11 +531,8 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	} else {
 		name = state.Name.ValueString()
 	}
-	if !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.CostCentre.ValueString()
-	} else {
-		costCentre = state.CostCentre.ValueString()
-	}
+	// Always use the planned cost centre value, even if it's empty/null
+	costCentre = plan.CostCentre.ValueString()
 	if !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
 		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
 	} else {
