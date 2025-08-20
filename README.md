@@ -50,7 +50,7 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
-  
+
   # Optional: AWS integration for managing DirectConnect VIFs
   aws_configuration {
     aws_region          = "us-east-1"
@@ -65,10 +65,11 @@ provider "megaport" {
 When creating VXCs to AWS, the provider can optionally manage AWS DirectConnect Virtual Interfaces (VIFs) on your behalf. This requires AWS credentials to be configured in the provider:
 
 **Assume Role (Recommended)**
+
 ```terraform
 provider "megaport" {
   # ... other configuration ...
-  
+
   aws_configuration {
     aws_region          = "us-east-1"
     aws_assume_role_arn = "arn:aws:iam::123456789012:role/MegaportRole"
@@ -78,10 +79,11 @@ provider "megaport" {
 ```
 
 **AWS Profile**
+
 ```terraform
 provider "megaport" {
   # ... other configuration ...
-  
+
   aws_configuration {
     aws_region  = "us-east-1"
     aws_profile = "your-aws-profile"
@@ -90,10 +92,11 @@ provider "megaport" {
 ```
 
 **Static Credentials**
+
 ```terraform
 provider "megaport" {
   # ... other configuration ...
-  
+
   aws_configuration {
     aws_region     = "us-east-1"
     aws_access_key = "your-aws-access-key"
