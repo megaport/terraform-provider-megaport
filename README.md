@@ -50,8 +50,62 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
+
+  # Optional: AWS integration for managing DirectConnect VIFs
+  aws_configuration {
+    aws_region          = "us-east-1"
+    aws_assume_role_arn = "arn:aws:iam::123456789012:role/MegaportRole"
+    aws_external_id     = "your-external-id"  # Optional
+  }
 }
 ```
+
+### AWS Integration
+
+When creating VXCs to AWS, the provider can optionally manage AWS DirectConnect Virtual Interfaces (VIFs) on your behalf. This requires AWS credentials to be configured in the provider:
+
+**Assume Role (Recommended)**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region          = "us-east-1"
+    aws_assume_role_arn = "arn:aws:iam::123456789012:role/MegaportRole"
+    aws_external_id     = "your-external-id"  # Required only if role has external ID condition
+  }
+}
+```
+
+**AWS Profile**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region  = "us-east-1"
+    aws_profile = "your-aws-profile"
+  }
+}
+```
+
+**Static Credentials**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region     = "us-east-1"
+    aws_access_key = "your-aws-access-key"
+    aws_secret_key = "your-aws-secret-key"
+  }
+}
+```
+
+All AWS configuration options can also be set using environment variables (`AWS_REGION`, `AWS_ROLE_ARN`, `AWS_EXTERNAL_ID`, `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
 
 ## Terraform MCP Server
 
