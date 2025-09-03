@@ -1284,32 +1284,33 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(azureDiags...)
 				return
 			}
-
-			partnerPortReq := &megaport.ListPartnerPortsRequest{
-				Key:     azureConfig.ServiceKey.ValueString(),
-				Partner: "AZURE",
-			}
-			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			// find primary or secondary port
-			for _, port := range partnerPortRes.Data.Megaports {
-				p := &port
-				if p.Type == azureConfig.PortChoice.ValueString() {
-					aEndConfig.ProductUID = p.ProductUID
-				}
-			}
 			if aEndConfig.ProductUID == "" {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
-				)
-				return
+				partnerPortReq := &megaport.ListPartnerPortsRequest{
+					Key:     azureConfig.ServiceKey.ValueString(),
+					Partner: "AZURE",
+				}
+				partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				// find primary or secondary port
+				for _, port := range partnerPortRes.Data.Megaports {
+					p := &port
+					if p.Type == azureConfig.PortChoice.ValueString() {
+						aEndConfig.ProductUID = p.ProductUID
+					}
+				}
+				if aEndConfig.ProductUID == "" {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
+					)
+					return
+				}
 			}
 
 			plan.AEndPartnerConfig = partnerConfigObj
@@ -1333,21 +1334,23 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(googleDiags...)
 				return
 			}
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       googleConfig.PairingKey.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "GOOGLE",
+			if aEndConfig.ProductUID == "" {
+				partnerPortReq := &megaport.LookupPartnerPortsRequest{
+					Key:       googleConfig.PairingKey.ValueString(),
+					PortSpeed: int(plan.RateLimit.ValueInt64()),
+					Partner:   "GOOGLE",
+				}
+				partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
+				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				aEndConfig.ProductUID = partnerPortRes.ProductUID
 			}
-			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			aEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = googlePartnerConfig
@@ -1370,23 +1373,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(oracleDiags...)
 				return
 			}
+			if aEndConfig.ProductUID == "" {
+				partnerPortReq := &megaport.LookupPartnerPortsRequest{
+					Key:       oracleConfig.VirtualCircuitId.ValueString(),
+					PortSpeed: int(plan.RateLimit.ValueInt64()),
+					Partner:   "ORACLE",
+				}
+				partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
 
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       oracleConfig.VirtualCircuitId.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "ORACLE",
+				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				aEndConfig.ProductUID = partnerPortRes.ProductUID
 			}
-			partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			aEndConfig.ProductUID = partnerPortRes.ProductUID
 			plan.AEndPartnerConfig = partnerConfigObj
 			aEndConfig.PartnerConfig = oraclePartnerConfig
 		case "ibm":
@@ -1593,32 +1597,33 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(azureDiags...)
 				return
 			}
-
-			partnerPortReq := &megaport.ListPartnerPortsRequest{
-				Key:     azureConfig.ServiceKey.ValueString(),
-				Partner: "AZURE",
-			}
-			partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			// find primary or secondary port
-			for _, port := range partnerPortRes.Data.Megaports {
-				p := &port
-				if p.Type == azureConfig.PortChoice.ValueString() {
-					bEndConfig.ProductUID = p.ProductUID
-				}
-			}
 			if bEndConfig.ProductUID == "" {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
-				)
-				return
+				partnerPortReq := &megaport.ListPartnerPortsRequest{
+					Key:     azureConfig.ServiceKey.ValueString(),
+					Partner: "AZURE",
+				}
+				partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				// find primary or secondary port
+				for _, port := range partnerPortRes.Data.Megaports {
+					p := &port
+					if p.Type == azureConfig.PortChoice.ValueString() {
+						bEndConfig.ProductUID = p.ProductUID
+					}
+				}
+				if bEndConfig.ProductUID == "" {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
+					)
+					return
+				}
 			}
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = azurePartnerConfig
@@ -1642,24 +1647,25 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(googleDiags...)
 				return
 			}
-
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       googleConfig.PairingKey.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "GOOGLE",
+			if bEndConfig.ProductUID == "" {
+				partnerPortReq := &megaport.LookupPartnerPortsRequest{
+					Key:       googleConfig.PairingKey.ValueString(),
+					PortSpeed: int(plan.RateLimit.ValueInt64()),
+					Partner:   "GOOGLE",
+				}
+				if !b.RequestedProductUID.IsNull() {
+					partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
+				}
+				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				bEndConfig.ProductUID = partnerPortRes.ProductUID
 			}
-			if !b.RequestedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
-			}
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			bEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = googlePartnerConfig
@@ -1682,24 +1688,25 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(oracleDiags...)
 				return
 			}
-
-			partnerPortReq := &megaport.LookupPartnerPortsRequest{
-				Key:       oracleConfig.VirtualCircuitId.ValueString(),
-				PortSpeed: int(plan.RateLimit.ValueInt64()),
-				Partner:   "ORACLE",
+			if bEndConfig.ProductUID == "" {
+				partnerPortReq := &megaport.LookupPartnerPortsRequest{
+					Key:       oracleConfig.VirtualCircuitId.ValueString(),
+					PortSpeed: int(plan.RateLimit.ValueInt64()),
+					Partner:   "ORACLE",
+				}
+				if !b.RequestedProductUID.IsNull() {
+					partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
+				}
+				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating VXC",
+						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+					)
+					return
+				}
+				bEndConfig.ProductUID = partnerPortRes.ProductUID
 			}
-			if !b.RequestedProductUID.IsNull() {
-				partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
-			}
-			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-				)
-				return
-			}
-			bEndConfig.ProductUID = partnerPortRes.ProductUID
 
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = oraclePartnerConfig
