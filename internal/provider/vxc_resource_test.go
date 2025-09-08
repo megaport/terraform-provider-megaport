@@ -19,7 +19,7 @@ type VXCMixedProviderTestSuite ProviderTestSuite
 const (
 	VXCLocationOne   = "NextDC M1"
 	VXCLocationTwo   = "Global Switch Sydney West"
-	VXCLocationThree = "5GN Melbourne Data Centre (MDC)"
+	VXCLocationThree = "5G Networks MDC"
 
 	VXCLocationID1 = 4  // "NextDC M1"
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
@@ -27,7 +27,11 @@ const (
 
 	AzureServiceKey        = "1b2329a5-56dc-45d0-8a0d-87b706297777"
 	GooglePairingKey       = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
+	GooglePartnerPortName  = "Denver (den-zone1-389)"
 	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
+	OraclePartnerPortName  = "OCI (us-luke-1) (BMC)"
+	AzurePartnerPortName   = "Washington DC Secondary"
+	AzurePartnerPortUID    = "07ab0ee6-7f77-41ac-bbe6-335e3ee6d182" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -1228,6 +1232,194 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	})
 }
 
+func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
+	mcrName := RandomTestName()
+	mcrCostCentreName := RandomTestName()
+	gcpCostCentreName := RandomTestName()
+	gcpVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+				
+				data "megaport_partner" "gcp_port" {
+  					connect_type = "GOOGLE"
+  					company_name = "Google inc.."
+  					product_name = "%s"
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					asn                      = 64555
+					cost_centre = "%s"
+				  }
+
+				  
+
+				  resource "megaport_vxc" "gcp_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+					cost_centre             = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 182
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.gcp_port.product_uid
+					}
+
+					b_end_partner_config = {
+					  partner = "google"
+					  google_config = {
+						pairing_key = "%s"
+					  }
+					}
+				  }
+                  `, VXCLocationID1, GooglePartnerPortName, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, GooglePairingKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.gcp_vxc", "cost_centre", gcpCostCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.gcp_vxc", "b_end.product_name", GooglePartnerPortName),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
+	mcrName := RandomTestName()
+	mcrCostCentreName := RandomTestName()
+	oracleCostCentreName := RandomTestName()
+	oracleVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				data "megaport_partner" "oracle_port" {
+  					connect_type = "ORACLE"
+  					product_name = "%s"
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					asn                      = 64555
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_vxc" "oracle_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+					cost_centre             = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 182
+					}
+
+					b_end = {
+					  requested_product_uid = data.megaport_partner.oracle_port.product_uid
+					}
+
+					b_end_partner_config = {
+                        partner = "oracle"
+                        oracle_config = {
+                            virtual_circuit_id = "%s"
+                        }
+                    }
+				  }
+                  `, VXCLocationID1, OraclePartnerPortName, mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, OracleVirtualCircuitID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "cost_centre", oracleCostCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end.product_name", OraclePartnerPortName),
+				),
+			},
+		},
+	})
+}
+
+func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
+	mcrName := RandomTestName()
+	mcrCostCentreName := RandomTestName()
+	azureCostCentreName := RandomTestName()
+	azureVXCName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc1" {
+					id = %d
+				  }
+
+				  resource "megaport_mcr" "mcr" {
+					product_name            = "%s"
+					port_speed              = 2500
+					location_id             = data.megaport_location.loc1.id
+					contract_term_months    = 1
+					asn                      = 64555
+					cost_centre = "%s"
+				  }
+
+				  resource "megaport_vxc" "azure_vxc" {
+					product_name            = "%s"
+					rate_limit              = 1000
+					contract_term_months    = 12
+					cost_centre             = "%s"
+
+					a_end = {
+					  requested_product_uid = megaport_mcr.mcr.product_uid
+					  ordered_vlan = 182
+					}
+
+					b_end = {
+					  requested_product_uid = "%s"
+					}
+
+					b_end_partner_config = {
+					  partner = "azure"
+					  azure_config = {
+						service_key = "%s"
+						port_choice = "secondary"
+					  }
+					}
+				  }
+                  `, VXCLocationID1, mcrName, mcrCostCentreName, azureVXCName, azureCostCentreName, AzurePartnerPortUID, AzureServiceKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "cost_centre", azureCostCentreName),
+					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "b_end.product_name", AzurePartnerPortName),
+				),
+			},
+		},
+	})
+}
+
 func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
@@ -1392,8 +1584,8 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					b_end_partner_config = {
 					  partner = "azure"
 					  azure_config = {
-					    port_choice = "primary"
 						service_key = "%s"
+					  port_choice = "primary"
 					  }
 					}
 				  }

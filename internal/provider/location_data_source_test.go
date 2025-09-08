@@ -22,7 +22,7 @@ const (
 	SinglePortTestLocationName = "NextDC B1"
 	VXCLocationNameOne         = "NextDC M1"
 	VXCLocationNameTwo         = "Global Switch Sydney West"
-	VXCLocationNameThree       = "5GN Melbourne Data Centre (MDC)"
+	VXCLocationNameThree       = "5G Networks MDC"
 )
 
 func TestLagPortLocation(t *testing.T) {
