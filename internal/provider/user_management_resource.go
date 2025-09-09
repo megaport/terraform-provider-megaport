@@ -297,6 +297,22 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	userToUpdate, err := r.client.UserManagementService.GetUser(ctx, int(state.EmployeeID.ValueInt64()))
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading user",
+			"Could not read user with ID "+state.EmployeeID.String()+": "+err.Error(),
+		)
+		return
+	}
+	if userToUpdate.InvitationPending {
+		resp.Diagnostics.AddError(
+			"Error updating user",
+			"User with ID "+state.EmployeeID.String()+" has a pending invitation.",
+		)
+		return
+	}
+
 	// Build update request with only changed fields
 	updateReq := &megaport.UpdateUserRequest{}
 
@@ -371,7 +387,7 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Update the user
 	userMgmt := r.client.UserManagementService
-	err := userMgmt.UpdateUser(ctx, int(state.EmployeeID.ValueInt64()), updateReq)
+	err = userMgmt.UpdateUser(ctx, int(state.EmployeeID.ValueInt64()), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating user",
