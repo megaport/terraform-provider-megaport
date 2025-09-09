@@ -47,6 +47,7 @@ type userResourceModel struct {
 	Promotions                 types.Bool   `tfsdk:"promotions"`
 	MfaEnabled                 types.Bool   `tfsdk:"mfa_enabled"`
 	ConfirmationPending        types.Bool   `tfsdk:"confirmation_pending"`
+	InvitationPending          types.Bool   `tfsdk:"invitation_pending"`
 	Name                       types.String `tfsdk:"name"`
 	ReceivesChildNotifications types.Bool   `tfsdk:"receives_child_notifications"`
 	SecurityRoles              types.List   `tfsdk:"security_roles"`
@@ -91,6 +92,7 @@ func (orm *userResourceModel) fromAPIUser(ctx context.Context, u *megaport.User)
 	orm.Promotions = types.BoolValue(u.Promotions)
 	orm.MfaEnabled = types.BoolValue(u.MfaEnabled)
 	orm.ConfirmationPending = types.BoolValue(u.ConfirmationPending)
+	orm.InvitationPending = types.BoolValue(u.InvitationPending)
 	orm.Name = types.StringValue(u.Name)
 	orm.ReceivesChildNotifications = types.BoolValue(u.ReceivesChildNotifications)
 
