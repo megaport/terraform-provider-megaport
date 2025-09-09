@@ -43,6 +43,7 @@ Megaport User resource for managing users in your company.
 - `emails` (Attributes List) List of email addresses associated with the user. (see [below for nested schema](#nestedatt--emails))
 - `employee_id` (Number) The employee ID of the user.
 - `feature_flags` (List of String) List of feature flags enabled for the user.
+- `invitation_pending` (Boolean) Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted.
 - `last_updated` (String)
 - `mfa_enabled` (Boolean) Whether multi-factor authentication is enabled for the user.
 - `name` (String) The full name of the user.

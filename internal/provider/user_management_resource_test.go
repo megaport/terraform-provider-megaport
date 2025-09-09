@@ -21,11 +21,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_Basic() {
 	email := fmt.Sprintf("test.user.%s@example.com", RandomTestName())
 	position := "Technical Contact"
 
-	firstNameNew := "Updated"
-	lastNameNew := "User" + RandomTestName()
-	emailNew := fmt.Sprintf("updated.user.%s@example.com", RandomTestName())
-	positionNew := "Read Only"
-
 	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -48,29 +43,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_Basic() {
 					resource.TestCheckResourceAttrSet("megaport_user.test_user", "party_id"),
 					resource.TestCheckResourceAttrSet("megaport_user.test_user", "uid"),
 					resource.TestCheckResourceAttrSet("megaport_user.test_user", "username"),
-				),
-			},
-			{
-				Config: providerConfig + fmt.Sprintf(`
-					resource "megaport_user" "test_user" {
-						first_name = "%s"
-						last_name  = "%s"
-						email      = "%s"
-						position   = "%s"
-						active     = false
-						notification_enabled = false
-						newsletter = false
-						promotions = false
-					}`, firstNameNew, lastNameNew, emailNew, positionNew),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_user.test_user", "first_name", firstNameNew),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "last_name", lastNameNew),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "email", emailNew),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "position", positionNew),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "active", "false"),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "notification_enabled", "false"),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "newsletter", "false"),
-					resource.TestCheckResourceAttr("megaport_user.test_user", "promotions", "false"),
 				),
 			},
 		},

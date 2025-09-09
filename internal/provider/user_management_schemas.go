@@ -160,6 +160,13 @@ func userSchema() schema.Schema {
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"invitation_pending": schema.BoolAttribute{
+				Description: "Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				Description: "The full name of the user.",
 				Computed:    true,
