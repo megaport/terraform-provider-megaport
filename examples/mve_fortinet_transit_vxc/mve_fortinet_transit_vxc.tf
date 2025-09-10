@@ -1,14 +1,14 @@
 data "megaport_location" "location_1" {
-  name = "Equinix SY1"
+  id = 2 // Equinix SY1
 }
 data "megaport_location" "location_2" {
-  name = "NextDC S1"
+  id = 10 // NextDC S1
 }
 data "megaport_location" "location_3" {
-  name = "Global Switch Sydney West"
+  id = 3 // Global Switch Sydney West 
 }
 data "megaport_location" "location_4" {
-  name = "Equinix SY3"
+  id = 6 // Equinix SY3
 }
 data "megaport_mve_images" "fortinet" {
   vendor_filter  = "Fortinet"
