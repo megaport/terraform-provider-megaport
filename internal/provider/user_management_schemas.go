@@ -170,9 +170,6 @@ func userSchema() schema.Schema {
 			"name": schema.StringAttribute{
 				Description: "The full name of the user.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"receives_child_notifications": schema.BoolAttribute{
 				Description: "Whether the user receives notifications for child entities.",
