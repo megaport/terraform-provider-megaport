@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -186,6 +187,46 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = userSchema()
 }
 
+// ModifyPlan allows the provider to modify the proposed resource changes before they are applied.
+func (r *userResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Skip if this is a create operation (state is null) or destroy operation (plan is null)
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state userResourceModel
+
+	// Get current state and planned changes
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Check if email is being changed
+	if !plan.Email.Equal(state.Email) {
+		// Add a warning diagnostic to inform the user about the replacement
+		resp.Diagnostics.AddWarning(
+			"Email change will force resource replacement",
+			fmt.Sprintf("You are changing the email from '%s' to '%s'. "+
+				"Because the Megaport API does not allow email changes after user creation, "+
+				"Terraform will destroy the existing user and create a new one. "+
+				"This means the user will get a new employee ID and any external references "+
+				"to the old user will be invalidated.",
+				state.Email.ValueString(),
+				plan.Email.ValueString()),
+		)
+
+		// Log the plan modification
+		r.client.Logger.WarnContext(ctx, "User email change detected in plan - resource will be replaced",
+			slog.String("resource_type", "megaport_user"),
+			slog.Int64("current_employee_id", state.EmployeeID.ValueInt64()),
+			slog.String("current_email", state.Email.ValueString()),
+			slog.String("planned_email", plan.Email.ValueString()),
+		)
+	}
+}
+
 // Create a new resource.
 func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
@@ -329,9 +370,25 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.LastName = &lastName
 	}
 
+	// Check if user is trying to change email (not allowed by API)
 	if !plan.Email.Equal(state.Email) {
-		email := plan.Email.ValueString()
-		updateReq.Email = &email
+		// Log warning about email change attempt
+		r.client.Logger.WarnContext(ctx, "Email change detected - this will require resource replacement",
+			slog.String("current_email", state.Email.ValueString()),
+			slog.String("new_email", plan.Email.ValueString()),
+			slog.Int64("employee_id", state.EmployeeID.ValueInt64()),
+		)
+
+		resp.Diagnostics.AddError(
+			"Email cannot be changed - resource replacement required",
+			fmt.Sprintf("The Megaport API does not allow changing a user's email address after creation. "+
+				"Current email: %s, Requested email: %s. "+
+				"Terraform will automatically replace this resource (delete and recreate) when you apply this change. "+
+				"This is the expected behavior for email changes.",
+				state.Email.ValueString(),
+				plan.Email.ValueString()),
+		)
+		return
 	}
 
 	if !plan.Phone.Equal(state.Phone) {
