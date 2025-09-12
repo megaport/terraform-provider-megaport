@@ -55,8 +55,11 @@ func userSchema() schema.Schema {
 				Required:    true,
 			},
 			"email": schema.StringAttribute{
-				Description: "The primary email address of the user.",
+				Description: "The primary email address of the user. **Important**: The email address cannot be changed after user creation. Changing this value will force Terraform to destroy and recreate the user resource.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"phone": schema.StringAttribute{
 				Description: "The phone number of the user.",
