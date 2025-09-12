@@ -17,7 +17,7 @@ Megaport User resource for managing users in your company.
 
 ### Required
 
-- `email` (String) The primary email address of the user.
+- `email` (String) The primary email address of the user. **Important**: The email address cannot be changed after user creation. Changing this value will force Terraform to destroy and recreate the user resource.
 - `first_name` (String) The first name of the user.
 - `last_name` (String) The last name of the user.
 - `position` (String) The position/role of the user in the organization.
