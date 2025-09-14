@@ -3,12 +3,12 @@
 page_title: "megaport_user Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Megaport User resource for managing users in your company.
+  Megaport User resource for managing users in your company. User Lifecycle: When created, users have a pending invitation status. Users with pending invitations can be updated minimally and deleted completely. Once a user accepts their invitation and logs in, they can be fully updated but can only be deactivated (not deleted) via Terraform. The provider automatically handles the appropriate deletion/deactivation behavior based on the user's invitation status.
 ---
 
 # megaport_user (Resource)
 
-Megaport User resource for managing users in your company.
+Megaport User resource for managing users in your company. **User Lifecycle**: When created, users have a pending invitation status. Users with pending invitations can be updated minimally and deleted completely. Once a user accepts their invitation and logs in, they can be fully updated but can only be deactivated (not deleted) via Terraform. The provider automatically handles the appropriate deletion/deactivation behavior based on the user's invitation status.
 
 
 
@@ -24,7 +24,6 @@ Megaport User resource for managing users in your company.
 
 ### Optional
 
-- `active` (Boolean) Whether the user account is active.
 - `description` (String) A description of the user.
 - `mobile` (String) The mobile phone number of the user.
 - `newsletter` (Boolean) Whether the user has opted into the newsletter.
@@ -38,12 +37,13 @@ Megaport User resource for managing users in your company.
 
 ### Read-Only
 
+- `active` (Boolean) Whether the user account is active. This field is computed and cannot be directly modified. User deactivation is handled automatically during resource deletion: users who have logged in (`invitation_pending = false`) will be deactivated rather than deleted when you run `terraform destroy`.
 - `channel_manager` (Boolean) Whether the user is a channel manager.
 - `confirmation_pending` (Boolean) Whether the user has a pending confirmation.
 - `emails` (Attributes List) List of email addresses associated with the user. (see [below for nested schema](#nestedatt--emails))
 - `employee_id` (Number) The employee ID of the user.
 - `feature_flags` (List of String) List of feature flags enabled for the user.
-- `invitation_pending` (Boolean) Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted.
+- `invitation_pending` (Boolean) Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted. **Important for resource deletion**: Users with `invitation_pending = true` can be deleted directly, while users with `invitation_pending = false` (who have logged in) can only be deactivated. When you run `terraform destroy` on a user resource, Terraform will automatically delete users with pending invitations or deactivate users who have already logged in, based on this field.
 - `last_updated` (String)
 - `mfa_enabled` (Boolean) Whether multi-factor authentication is enabled for the user.
 - `name` (String) The full name of the user.

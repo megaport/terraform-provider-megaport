@@ -250,10 +250,6 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		createReq.Phone = plan.Phone.ValueString()
 	}
 
-	if !plan.Active.IsNull() {
-		createReq.Active = plan.Active.ValueBool()
-	}
-
 	// Create the user
 	userMgmt := r.client.UserManagementService
 	createResp, err := userMgmt.CreateUser(ctx, createReq)
@@ -401,11 +397,6 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.Position = &position
 	}
 
-	if !plan.Active.Equal(state.Active) {
-		active := plan.Active.ValueBool()
-		updateReq.Active = &active
-	}
-
 	if !plan.NotificationEnabled.Equal(state.NotificationEnabled) {
 		notificationEnabled := plan.NotificationEnabled.ValueBool()
 		updateReq.NotificationEnabled = &notificationEnabled
@@ -487,15 +478,66 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	// Delete the user
 	userMgmt := r.client.UserManagementService
-	err := userMgmt.DeleteUser(ctx, int(state.EmployeeID.ValueInt64()))
+	employeeID := int(state.EmployeeID.ValueInt64())
+
+	// First, get the current user status to determine the appropriate deletion approach
+	user, err := userMgmt.GetUser(ctx, employeeID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting user",
-			"Could not delete user with ID "+state.EmployeeID.String()+": "+err.Error(),
+			"Error reading user before deletion",
+			"Could not read user with ID "+state.EmployeeID.String()+" before deletion: "+err.Error(),
 		)
 		return
+	}
+
+	r.client.Logger.DebugContext(ctx, "Attempting to delete user",
+		slog.Int("employee_id", employeeID),
+		slog.Bool("invitation_pending", user.InvitationPending),
+		slog.Bool("active", user.Active),
+	)
+
+	if user.InvitationPending {
+		// User hasn't confirmed their invitation yet, so we can delete them directly
+		r.client.Logger.DebugContext(ctx, "User has pending invitation - attempting direct deletion",
+			slog.Int("employee_id", employeeID))
+
+		err = userMgmt.DeleteUser(ctx, employeeID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting user",
+				"Could not delete user with ID "+state.EmployeeID.String()+": "+err.Error(),
+			)
+			return
+		}
+
+		r.client.Logger.DebugContext(ctx, "User deleted successfully", slog.Int("employee_id", employeeID))
+	} else {
+		// User has confirmed their invitation and logged in, so we can only deactivate them
+		r.client.Logger.DebugContext(ctx, "User has confirmed invitation - deactivating instead of deleting",
+			slog.Int("employee_id", employeeID))
+
+		err = userMgmt.DeactivateUser(ctx, employeeID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deactivating user",
+				"Could not deactivate user with ID "+state.EmployeeID.String()+". "+
+					"Users who have logged in cannot be deleted, only deactivated: "+err.Error(),
+			)
+			return
+		}
+
+		r.client.Logger.InfoContext(ctx, "User deactivated successfully (deletion not permitted for confirmed users)",
+			slog.Int("employee_id", employeeID))
+
+		// Add a warning to inform the user about the deactivation vs deletion
+		resp.Diagnostics.AddWarning(
+			"User deactivated instead of deleted",
+			fmt.Sprintf("User with ID %d has logged in before and cannot be deleted via the Megaport API. "+
+				"The user has been deactivated instead. The user will remain in your Megaport account but will be inactive. "+
+				"This is the expected behavior for users who have confirmed their invitations.",
+				employeeID),
+		)
 	}
 }
 

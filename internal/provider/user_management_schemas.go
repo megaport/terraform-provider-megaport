@@ -26,7 +26,7 @@ var (
 
 func userSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Megaport User resource for managing users in your company.",
+		Description: "Megaport User resource for managing users in your company. **User Lifecycle**: When created, users have a pending invitation status. Users with pending invitations can be updated minimally and deleted completely. Once a user accepts their invitation and logs in, they can be fully updated but can only be deactivated (not deleted) via Terraform. The provider automatically handles the appropriate deletion/deactivation behavior based on the user's invitation status.",
 
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
@@ -103,8 +103,7 @@ func userSchema() schema.Schema {
 				Computed:    true,
 			},
 			"active": schema.BoolAttribute{
-				Description: "Whether the user account is active.",
-				Optional:    true,
+				Description: "Whether the user account is active. This field is computed and cannot be directly modified. User deactivation is handled automatically during resource deletion: users who have logged in (`invitation_pending = false`) will be deactivated rather than deleted when you run `terraform destroy`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -164,7 +163,7 @@ func userSchema() schema.Schema {
 				},
 			},
 			"invitation_pending": schema.BoolAttribute{
-				Description: "Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted.",
+				Description: "Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted. **Important for resource deletion**: Users with `invitation_pending = true` can be deleted directly, while users with `invitation_pending = false` (who have logged in) can only be deactivated. When you run `terraform destroy` on a user resource, Terraform will automatically delete users with pending invitations or deactivate users who have already logged in, based on this field.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
