@@ -32,7 +32,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_Basic() {
 						last_name  = "%s"
 						email      = "%s"
 						position   = "%s"
-						active     = true
 					}`, firstName, lastName, email, position),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_user.test_user", "first_name", firstName),
@@ -87,7 +86,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_WithDataSource
 						last_name  = "%s"
 						email      = "%s"
 						position   = "%s"
-						active     = true
 					}
 
 					# Data source to list all users
@@ -153,7 +151,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_DataSourceFilt
 						last_name  = "%s"
 						email      = "%s"
 						position   = "%s"
-						active     = true
 					}
 
 					resource "megaport_user" "test_user2" {
@@ -161,7 +158,6 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_DataSourceFilt
 						last_name  = "%s"
 						email      = "%s"
 						position   = "%s"
-						active     = true
 					}
 
 					# Filter by first name (should return both users)
