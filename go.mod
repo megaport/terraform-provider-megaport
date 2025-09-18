@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework-validators v0.12.0
 	github.com/hashicorp/terraform-plugin-go v0.22.1
 	github.com/hashicorp/terraform-plugin-log v0.9.0
-	github.com/megaport/megaportgo v1.4.1
+	github.com/megaport/megaportgo v1.4.3
 )
 
 require (
