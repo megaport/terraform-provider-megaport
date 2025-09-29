@@ -1,3 +1,9 @@
+---
+page_title: 'Megaport Provider'
+description: |-
+  The Megaport Terraform Provider.
+---
+
 # Megaport Terraform Provider
 
 The `terraform-provider-megaport` or Megaport Terraform Provider lets you create and manage
@@ -5,7 +11,7 @@ Megaport's product and services using the [Megaport API](https://dev.megaport.co
 
 This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software
 Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
-Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), MCR Prefix Filter Lists, Megaport Virtual Edges (MVEs), and Partner VXCs.
+Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), MCR Prefix Filter Lists, and Megaport Virtual Edges (MVEs).
 
 This provider is compatible with HashiCorp Terraform, and we have tested compatibility with OpenTofu and haven't seen issues.
 
