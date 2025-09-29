@@ -46,16 +46,10 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 			return nil, diags
 		}
 
-		for i, entry := range entries {
+		for _, entry := range entries {
 			apiEntry, convertDiags := convertEntryToAPI(entry, m.AddressFamily.ValueString())
 			diags.Append(convertDiags...)
 			if diags.HasError() {
-				continue
-			}
-
-			// Validate entry
-			if validationDiags := validatePrefixListEntry(entry, m.AddressFamily.ValueString(), i); validationDiags.HasError() {
-				diags.Append(validationDiags...)
 				continue
 			}
 
@@ -199,63 +193,6 @@ func calculateGeLe(entry *mcrPrefixFilterListEntryResourceModel, addressFamily s
 	}
 
 	return ge, le, diags
-}
-
-// validatePrefixListEntry validates a single prefix list entry
-func validatePrefixListEntry(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string, index int) diag.Diagnostics {
-	diags := diag.Diagnostics{}
-
-	// Validate prefix format
-	_, network, err := net.ParseCIDR(entry.Prefix.ValueString())
-	if err != nil {
-		diags.AddError(
-			fmt.Sprintf("Invalid prefix in entry %d", index),
-			fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix.ValueString(), err.Error()),
-		)
-		return diags
-	}
-
-	// Validate address family matches prefix type
-	isIPv4 := network.IP.To4() != nil
-	expectedIPv4 := addressFamily == "IPv4"
-
-	if isIPv4 != expectedIPv4 {
-		diags.AddError(
-			fmt.Sprintf("Address family mismatch in entry %d", index),
-			fmt.Sprintf("Prefix %s is %s but address family is set to %s",
-				entry.Prefix.ValueString(),
-				map[bool]string{true: "IPv4", false: "IPv6"}[isIPv4],
-				addressFamily),
-		)
-	}
-
-	// Validate ge/le ranges based on address family
-	maxLength := 32
-	if addressFamily == "IPv6" {
-		maxLength = 128
-	}
-
-	if !entry.Ge.IsNull() {
-		ge := entry.Ge.ValueInt64()
-		if ge < 0 || ge > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid ge value in entry %d", index),
-				fmt.Sprintf("ge must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	if !entry.Le.IsNull() {
-		le := entry.Le.ValueInt64()
-		if le < 0 || le > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid le value in entry %d", index),
-				fmt.Sprintf("le must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	return diags
 }
 
 // generateImportID creates an import ID in the format "mcr_uid:prefix_list_id"

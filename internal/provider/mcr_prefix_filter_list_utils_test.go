@@ -275,7 +275,9 @@ func TestValidatePrefixListEntry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			diags := validatePrefixListEntry(&tt.entry, tt.addressFamily, tt.index)
+			// Create a resource instance to call the validation method
+			resource := &mcrPrefixFilterListResource{}
+			diags := resource.validatePrefixListEntry(&tt.entry, tt.addressFamily, tt.index)
 			hasError := diags.HasError()
 
 			if hasError != tt.wantError {
