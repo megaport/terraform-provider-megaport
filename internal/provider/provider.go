@@ -312,6 +312,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 	return []func() datasource.DataSource{
 		NewlocationDataSource,
 		NewPartnerPortDataSource,
+		NewCloudPortLookupDataSource,
 		NewMVEImageDataSource,
 		NewMVESizeDataSource,
 		NewMCRPrefixFilterListDataSource,

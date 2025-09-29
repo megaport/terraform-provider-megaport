@@ -63,6 +63,12 @@ specifying the product_uid in your configuration once you've established your co
 				Description: "The type of connection for the partner port. Filters the locations based on the cloud providers, such as AWS (for Hosted VIF), AWSHC (for Hosted Connection), AZURE, GOOGLE, ORACLE, OUTSCALE, and IBM. Use TRANSIT to display Ports that support a Megaport Internet connection. Use FRANCEIX to display France-IX Ports that you can connect to.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"AWS", "AWSHC", "AZURE", "GOOGLE", "ORACLE", "IBM", 
+						"OUTSCALE", "TRANSIT", "FRANCEIX",
+					),
+				},
 			},
 			"product_uid": &schema.StringAttribute{
 				Description: `The unique identifier of the partner port. This ID may change when port parameters are modified, especially when changing which port has vxc_permitted: true. This can cause warnings like "VXC B-End product UID is from a partner port, therefore it will not be changed" during unrelated modifications. To ensure stability after establishing your connections, explicitly set this value in your configuration.`,
