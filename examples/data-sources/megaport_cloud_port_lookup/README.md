@@ -43,7 +43,7 @@ locals {
     for port in data.megaport_cloud_port_lookup.all_aws_ports.ports :
     port if port.rank == min([for p in data.megaport_cloud_port_lookup.all_aws_ports.ports : p.rank]...)
   ][0]
-  
+
   # Or select by name pattern
   sydney_ap_port = [
     for port in data.megaport_cloud_port_lookup.all_aws_ports.ports :
@@ -114,7 +114,7 @@ data "megaport_cloud_port_lookup" "aws_ports" {
 # Validate that we have available ports
 locals {
   has_ports = length(data.megaport_cloud_port_lookup.aws_ports.ports) > 0
-  
+
   selected_port = local.has_ports ? data.megaport_cloud_port_lookup.aws_ports.ports[0] : null
 }
 
@@ -130,6 +130,7 @@ check "ports_available" {
 ## Migration from megaport_partner
 
 ### Old way (single port, warnings):
+
 ```hcl
 data "megaport_partner" "aws_port" {
   connect_type = "AWS"
@@ -139,6 +140,7 @@ data "megaport_partner" "aws_port" {
 ```
 
 ### New way (array of ports, full control):
+
 ```hcl
 data "megaport_cloud_port_lookup" "aws_ports" {
   connect_type = "AWS"

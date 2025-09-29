@@ -27,14 +27,14 @@ type cloudPortLookupDataSource struct {
 
 // cloudPortLookupModel maps the data source schema data.
 type cloudPortLookupModel struct {
-	ConnectType     types.String     `tfsdk:"connect_type"`
-	LocationID      types.Int64      `tfsdk:"location_id"`
-	DiversityZone   types.String     `tfsdk:"diversity_zone"`
-	CompanyName     types.String     `tfsdk:"company_name"`
-	VXCPermitted    types.Bool       `tfsdk:"vxc_permitted"`
-	IncludeSecure   types.Bool       `tfsdk:"include_secure"`
-	ServiceKey      types.String     `tfsdk:"service_key"`
-	Ports           []cloudPortModel `tfsdk:"ports"`
+	ConnectType   types.String     `tfsdk:"connect_type"`
+	LocationID    types.Int64      `tfsdk:"location_id"`
+	DiversityZone types.String     `tfsdk:"diversity_zone"`
+	CompanyName   types.String     `tfsdk:"company_name"`
+	VXCPermitted  types.Bool       `tfsdk:"vxc_permitted"`
+	IncludeSecure types.Bool       `tfsdk:"include_secure"`
+	Key           types.String     `tfsdk:"key"`
+	Ports         []cloudPortModel `tfsdk:"ports"`
 }
 
 // cloudPortModel represents a single cloud port
@@ -51,8 +51,8 @@ type cloudPortModel struct {
 	VXCPermitted  types.Bool   `tfsdk:"vxc_permitted"`
 	IsSecure      types.Bool   `tfsdk:"is_secure"`
 	// Secure product specific fields
-	SecureServiceKey types.String `tfsdk:"secure_service_key"`
-	VLAN            types.Int64  `tfsdk:"vlan"`
+	SecureKey types.String `tfsdk:"secure_key"`
+	VLAN      types.Int64  `tfsdk:"vlan"`
 }
 
 // NewCloudPortLookupDataSource is a helper function to simplify the provider implementation.
@@ -77,7 +77,7 @@ Unlike the partner data source, this returns ALL matching ports, allowing you to
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						"AWS", "AWSHC", "AZURE", "GOOGLE", "ORACLE", "IBM", 
+						"AWS", "AWSHC", "AZURE", "GOOGLE", "ORACLE", "IBM",
 						"OUTSCALE", "TRANSIT", "FRANCEIX",
 					),
 				},
@@ -102,11 +102,11 @@ Unlike the partner data source, this returns ALL matching ports, allowing you to
 				Optional:    true,
 			},
 			"include_secure": &schema.BoolAttribute{
-				Description: "Include secure partner ports (those requiring service_key). Defaults to false. When true, you must also provide a service_key.",
+				Description: "Include secure partner ports (those requiring a key). Defaults to false. When true, you must also provide a key.",
 				Optional:    true,
 			},
-			"service_key": &schema.StringAttribute{
-				Description: "Service key required for looking up secure partner ports. Only used when include_secure is true.",
+			"key": &schema.StringAttribute{
+				Description: "Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle). Only used when include_secure is true.",
 				Optional:    true,
 				Sensitive:   true,
 			},
@@ -156,13 +156,13 @@ Unlike the partner data source, this returns ALL matching ports, allowing you to
 							Computed:    true,
 						},
 						"is_secure": &schema.BoolAttribute{
-							Description: "Whether this is a secure partner port requiring a service key.",
+							Description: "Whether this is a secure partner port requiring a key.",
 							Computed:    true,
 						},
-						"secure_service_key": &schema.StringAttribute{
-							Description: "Service key for secure partner ports (if available from the API response).",
-							Computed:  true,
-							Sensitive: true,
+						"secure_key": &schema.StringAttribute{
+							Description: "Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle).",
+							Computed:    true,
+							Sensitive:   true,
 						},
 						"vlan": &schema.Int64Attribute{
 							Description: "VLAN ID for secure partner ports (if available from the API response).",
@@ -190,17 +190,17 @@ func (d *cloudPortLookupDataSource) Read(ctx context.Context, req datasource.Rea
 	if !config.VXCPermitted.IsNull() {
 		vxcPermitted = config.VXCPermitted.ValueBool()
 	}
-	
+
 	includeSecure := false
 	if !config.IncludeSecure.IsNull() {
 		includeSecure = config.IncludeSecure.ValueBool()
 	}
 
-	// Validate service_key is provided when include_secure is true
-	if includeSecure && config.ServiceKey.IsNull() {
+	// Validate key is provided when include_secure is true
+	if includeSecure && config.Key.IsNull() {
 		resp.Diagnostics.AddError(
-			"Missing service_key",
-			"service_key is required when include_secure is true.",
+			"Missing key",
+			"key is required when include_secure is true.",
 		)
 		return
 	}
@@ -225,8 +225,8 @@ func (d *cloudPortLookupDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	// Get secure partner ports if requested
-	if includeSecure && !config.ServiceKey.IsNull() {
-		securePorts, secureErr := d.getSecurePorts(ctx, config.ConnectType.ValueString(), config.ServiceKey.ValueString())
+	if includeSecure && !config.Key.IsNull() {
+		securePorts, secureErr := d.getSecurePorts(ctx, config.ConnectType.ValueString(), config.Key.ValueString())
 		if secureErr != nil {
 			resp.Diagnostics.AddWarning(
 				"Could not retrieve secure partner ports",
@@ -289,11 +289,11 @@ func (cp *cloudPortModel) fromPublicPartnerPort(port *megaport.PartnerMegaport) 
 	cp.Rank = types.Int64Value(int64(port.Rank))
 	cp.VXCPermitted = types.BoolValue(port.VXCPermitted)
 	cp.IsSecure = types.BoolValue(false)
-	cp.SecureServiceKey = types.StringNull()
+	cp.SecureKey = types.StringNull()
 	cp.VLAN = types.Int64Null()
 }
 
-func (cp *cloudPortModel) fromSecurePartnerPort(item *megaport.PartnerLookupItem, serviceKey string, vlan int) {
+func (cp *cloudPortModel) fromSecurePartnerPort(item *megaport.PartnerLookupItem, key string, vlan int) {
 	cp.ProductUID = types.StringValue(item.ProductUID)
 	cp.ProductName = types.StringValue(item.Name)
 	cp.ConnectType = types.StringValue(item.Type)
@@ -302,36 +302,36 @@ func (cp *cloudPortModel) fromSecurePartnerPort(item *megaport.PartnerLookupItem
 	cp.DiversityZone = types.StringNull() // Not available in secure port response
 	cp.LocationID = types.Int64Value(int64(item.LocationID))
 	cp.Speed = types.Int64Value(int64(item.PortSpeed))
-	cp.Rank = types.Int64Value(0) // Not available in secure port response, default to 0
+	cp.Rank = types.Int64Value(0)           // Not available in secure port response, default to 0
 	cp.VXCPermitted = types.BoolValue(true) // Secure ports typically allow VXCs
 	cp.IsSecure = types.BoolValue(true)
-	cp.SecureServiceKey = types.StringValue(serviceKey)
+	cp.SecureKey = types.StringValue(key)
 	cp.VLAN = types.Int64Value(int64(vlan))
 }
 
-func (d *cloudPortLookupDataSource) getSecurePorts(ctx context.Context, connectType string, serviceKey string) ([]cloudPortModel, error) {
+func (d *cloudPortLookupDataSource) getSecurePorts(ctx context.Context, connectType string, key string) ([]cloudPortModel, error) {
 	var securePorts []cloudPortModel
-	
+
 	// Map connect types to partner names for the secure API
 	partners := d.getPartnersForConnectType(connectType)
-	
+
 	for _, partner := range partners {
 		// Use ListPartnerPorts instead of LookupPartnerPorts to get all available ports
 		partnerPorts, err := d.client.VXCService.ListPartnerPorts(ctx, &megaport.ListPartnerPortsRequest{
-			Key:     serviceKey,
+			Key:     key,
 			Partner: partner,
 		})
 		if err != nil {
 			continue // Skip this partner if there's an error
 		}
-		
+
 		for _, port := range partnerPorts.Data.Megaports {
 			cloudPort := cloudPortModel{}
 			cloudPort.fromSecurePartnerPort(&port, partnerPorts.Data.ServiceKey, partnerPorts.Data.VLAN)
 			securePorts = append(securePorts, cloudPort)
 		}
 	}
-	
+
 	return securePorts, nil
 }
 
@@ -362,14 +362,14 @@ func (d *cloudPortLookupDataSource) applyFilters(ports []cloudPortModel, config 
 		}
 
 		// Filter by connect type
-		if !config.ConnectType.IsNull() && 
-		   !strings.EqualFold(port.ConnectType.ValueString(), config.ConnectType.ValueString()) {
+		if !config.ConnectType.IsNull() &&
+			!strings.EqualFold(port.ConnectType.ValueString(), config.ConnectType.ValueString()) {
 			continue
 		}
 
 		// Filter by location ID
-		if !config.LocationID.IsNull() && 
-		   port.LocationID.ValueInt64() != config.LocationID.ValueInt64() {
+		if !config.LocationID.IsNull() &&
+			port.LocationID.ValueInt64() != config.LocationID.ValueInt64() {
 			continue
 		}
 
@@ -386,8 +386,8 @@ func (d *cloudPortLookupDataSource) applyFilters(ports []cloudPortModel, config 
 		}
 
 		// Filter by company name
-		if !config.CompanyName.IsNull() && 
-		   !strings.EqualFold(port.CompanyName.ValueString(), config.CompanyName.ValueString()) {
+		if !config.CompanyName.IsNull() &&
+			!strings.EqualFold(port.CompanyName.ValueString(), config.CompanyName.ValueString()) {
 			continue
 		}
 
