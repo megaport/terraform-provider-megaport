@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
@@ -33,7 +34,7 @@ type cloudPortLookupModel struct {
 	CompanyName   types.String     `tfsdk:"company_name"`
 	VXCPermitted  types.Bool       `tfsdk:"vxc_permitted"`
 	IncludeSecure types.Bool       `tfsdk:"include_secure"`
-	Key           types.String     `tfsdk:"key"`
+	SecureKey     types.String     `tfsdk:"secure_key"`
 	Ports         []cloudPortModel `tfsdk:"ports"`
 }
 
@@ -68,9 +69,9 @@ func (d *cloudPortLookupDataSource) Metadata(_ context.Context, req datasource.M
 // Schema defines the schema for the data source.
 func (d *cloudPortLookupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: `Cloud Port Lookup Data Source. Returns an array of cloud service provider ports that match the specified criteria. 
-This data source allows you to find and select the appropriate cloud ports for your VXC connections, including support for both public and secure partner ports.
-Unlike the partner data source, this returns ALL matching ports, allowing you to choose the most suitable one for your requirements.`,
+		Description: `Cloud Port Lookup Data Source. Returns an array of ALL cloud service provider ports that match the specified criteria. 
+This data source provides complete visibility into available cloud ports, returning multiple results for you to filter and select from based on your specific requirements.
+Unlike the legacy partner data source, this returns the full list of matching ports, giving you complete control over port selection.`,
 		Attributes: map[string]schema.Attribute{
 			"connect_type": &schema.StringAttribute{
 				Description: "The type of connection for the partner port. Filters by cloud provider connection types.",
@@ -102,16 +103,22 @@ Unlike the partner data source, this returns ALL matching ports, allowing you to
 				Optional:    true,
 			},
 			"include_secure": &schema.BoolAttribute{
-				Description: "Include secure partner ports (those requiring a key). Defaults to false. When true, you must also provide a key.",
+				Description: "Include secure partner ports (those requiring a secure_key). Defaults to false. When true, you must also provide a secure_key.",
 				Optional:    true,
 			},
-			"key": &schema.StringAttribute{
-				Description: "Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle). Only used when include_secure is true.",
+			"secure_key": &schema.StringAttribute{
+				Description: "Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle/IBM). Only used when include_secure is true and connect_type is GOOGLE, AZURE, ORACLE or IBM.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRoot("include_secure"),
+						path.MatchRoot("connect_type"),
+					}...),
+				},
 			},
 			"ports": &schema.ListNestedAttribute{
-				Description: "List of matching cloud ports.",
+				Description: "List of ALL matching cloud ports. You can use Terraform's for expressions and conditionals to filter this list based on your specific requirements (e.g., by name patterns, speed, rank, etc.).",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -160,7 +167,7 @@ Unlike the partner data source, this returns ALL matching ports, allowing you to
 							Computed:    true,
 						},
 						"secure_key": &schema.StringAttribute{
-							Description: "Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle).",
+							Description: "Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle/IBM).",
 							Computed:    true,
 							Sensitive:   true,
 						},
@@ -196,13 +203,33 @@ func (d *cloudPortLookupDataSource) Read(ctx context.Context, req datasource.Rea
 		includeSecure = config.IncludeSecure.ValueBool()
 	}
 
-	// Validate key is provided when include_secure is true
-	if includeSecure && config.Key.IsNull() {
+	// Validate secure_key is provided when include_secure is true
+	if includeSecure && config.SecureKey.IsNull() {
 		resp.Diagnostics.AddError(
-			"Missing key",
-			"key is required when include_secure is true.",
+			"Missing secure_key",
+			"secure_key is required when include_secure is true.",
 		)
 		return
+	}
+
+	// Validate connect_type is valid for secure ports when secure_key is provided
+	if !config.SecureKey.IsNull() {
+		connectType := strings.ToUpper(config.ConnectType.ValueString())
+		validSecureTypes := []string{"GOOGLE", "AZURE", "ORACLE", "IBM"}
+		isValid := false
+		for _, validType := range validSecureTypes {
+			if connectType == validType {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			resp.Diagnostics.AddError(
+				"Invalid connect_type for secure_key",
+				fmt.Sprintf("When using secure_key, connect_type must be one of: %s. Got: %s", strings.Join(validSecureTypes, ", "), connectType),
+			)
+			return
+		}
 	}
 
 	var allPorts []cloudPortModel
@@ -225,8 +252,8 @@ func (d *cloudPortLookupDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	// Get secure partner ports if requested
-	if includeSecure && !config.Key.IsNull() {
-		securePorts, secureErr := d.getSecurePorts(ctx, config.ConnectType.ValueString(), config.Key.ValueString())
+	if includeSecure && !config.SecureKey.IsNull() {
+		securePorts, secureErr := d.getSecurePorts(ctx, config.ConnectType.ValueString(), config.SecureKey.ValueString())
 		if secureErr != nil {
 			resp.Diagnostics.AddWarning(
 				"Could not retrieve secure partner ports",
@@ -344,9 +371,11 @@ func (d *cloudPortLookupDataSource) getPartnersForConnectType(connectType string
 		return []string{"ORACLE"}
 	case "AZURE":
 		return []string{"AZURE"}
+	case "IBM":
+		return []string{"IBM"}
 	case "":
 		// If no connect type specified, try all secure partners
-		return []string{"GOOGLE", "ORACLE", "AZURE"}
+		return []string{"GOOGLE", "ORACLE", "AZURE", "IBM"}
 	default:
 		return []string{}
 	}

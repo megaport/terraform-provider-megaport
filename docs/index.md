@@ -308,7 +308,7 @@ For cloud providers requiring service keys (GCP, Oracle, Azure):
 data "megaport_cloud_port_lookup" "gcp_secure" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = var.gcp_pairing_key
+  secure_key     = var.gcp_pairing_key
   location_id    = 123
 }
 
@@ -316,7 +316,7 @@ data "megaport_cloud_port_lookup" "gcp_secure" {
 data "megaport_cloud_port_lookup" "oracle_secure" {
   connect_type   = "ORACLE"
   include_secure = true
-  service_key    = var.oracle_service_key
+  secure_key     = var.oracle_service_key
   location_id    = 123
 }
 ```
@@ -372,11 +372,11 @@ The `megaport_cloud_port_lookup` data source accepts the following arguments:
 - `company_name` (String) - Filter by company name
 - `vxc_permitted` (Boolean) - Filter by VXC permission (default: `true`)
 - `include_secure` (Boolean) - Include secure partner ports (default: `false`)
-- `service_key` (String, Sensitive) - Required for secure ports when `include_secure = true`
+- `secure_key` (String, Sensitive) - Required for secure ports when `include_secure = true`. Only valid with `connect_type` of `GOOGLE`, `AZURE`, or `ORACLE` (pairing key for GCP, service key for Azure/Oracle)
 
 #### Computed Attributes
 
-- `ports` (List) - Array of matching ports, each containing:
+- `ports` (List) - Array of ALL matching ports. Use Terraform expressions to filter and select the specific port you need, each containing:
   - `product_uid` (String) - Port unique identifier
   - `product_name` (String) - Port name
   - `connect_type` (String) - Connection type
@@ -388,7 +388,7 @@ The `megaport_cloud_port_lookup` data source accepts the following arguments:
   - `rank` (Number) - Port rank (lower = better)
   - `vxc_permitted` (Boolean) - VXC permission status
   - `is_secure` (Boolean) - Whether port requires service key
-  - `secure_service_key` (String, Sensitive) - Service key (secure ports only)
+  - `secure_key` (String, Sensitive) - Key for secure ports (pairing key for GCP, service key for Azure/Oracle)
   - `vlan` (Number) - VLAN ID (secure ports only)
 
 ### Advanced Usage Patterns
@@ -461,7 +461,7 @@ resource "megaport_vxc" "aws_connections" {
 1. **Replace data source name**: `megaport_partner` → `megaport_cloud_port_lookup`
 2. **Update attribute access**: Add `.ports[0]` to access the first port
 3. **Add validation**: Check port availability before use
-4. **Update secure connections**: Use `include_secure` and `service_key`
+4. **Update secure connections**: Use `include_secure` and `secure_key`
 
 ### Migration Examples
 
@@ -513,7 +513,7 @@ resource "megaport_vxc" "gcp_connection" {
 data "megaport_cloud_port_lookup" "gcp_secure" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = var.gcp_pairing_key
+  secure_key     = var.gcp_pairing_key
   location_id    = 3
 }
 

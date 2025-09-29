@@ -90,7 +90,7 @@ resource "megaport_vxc" "backup_connection" {
 data "megaport_cloud_port_lookup" "gcp_secure" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = var.gcp_pairing_key
+  secure_key     = var.gcp_pairing_key
   location_id    = 3
 }
 
@@ -98,7 +98,7 @@ data "megaport_cloud_port_lookup" "gcp_secure" {
 data "megaport_cloud_port_lookup" "oracle_secure" {
   connect_type   = "ORACLE"
   include_secure = true
-  service_key    = var.oracle_service_key
+  secure_key     = var.oracle_service_key
   location_id    = 3
 }
 ```
