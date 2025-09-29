@@ -65,7 +65,7 @@ specifying the product_uid in your configuration once you've established your co
 				Computed:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						"AWS", "AWSHC", "AZURE", "GOOGLE", "ORACLE", "IBM", 
+						"AWS", "AWSHC", "AZURE", "GOOGLE", "ORACLE", "IBM",
 						"OUTSCALE", "TRANSIT", "FRANCEIX",
 					),
 				},

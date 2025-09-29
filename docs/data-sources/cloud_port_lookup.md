@@ -92,9 +92,9 @@ resource "megaport_vxc" "aws_connection" {
 - `company_name` (String) Filter by the name of the company that owns the partner port.
 - `connect_type` (String) The type of connection for the partner port. Filters by cloud provider connection types.
 - `diversity_zone` (String) Filter by diversity zone (red or blue).
-- `include_secure` (Boolean) Include secure partner ports (those requiring service_key). Defaults to false. When true, you must also provide a service_key.
+- `include_secure` (Boolean) Include secure partner ports (those requiring a key). Defaults to false. When true, you must also provide a key.
+- `key` (String, Sensitive) Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle). Only used when include_secure is true.
 - `location_id` (Number) Filter by the unique identifier of the location.
-- `service_key` (String, Sensitive) Service key required for looking up secure partner ports. Only used when include_secure is true.
 - `vxc_permitted` (Boolean) Filter by whether VXCs are permitted on the port. Defaults to true if not specified.
 
 ### Read-Only
@@ -110,12 +110,12 @@ Read-Only:
 - `company_uid` (String) The unique identifier of the company that owns the partner port.
 - `connect_type` (String) The type of connection for the partner port.
 - `diversity_zone` (String) The diversity zone of the partner port.
-- `is_secure` (Boolean) Whether this is a secure partner port requiring a service key.
+- `is_secure` (Boolean) Whether this is a secure partner port requiring a key.
 - `location_id` (Number) The unique identifier of the location of the partner port.
 - `product_name` (String) The name of the partner port.
 - `product_uid` (String) The unique identifier of the partner port.
 - `rank` (Number) The rank of the partner port (lower is better).
-- `secure_service_key` (String, Sensitive) Service key for secure partner ports (if available from the API response).
+- `secure_key` (String, Sensitive) Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle).
 - `speed` (Number) The speed of the partner port in Mbps.
 - `vlan` (Number) VLAN ID for secure partner ports (if available from the API response).
 - `vxc_permitted` (Boolean) Whether VXCs are permitted on the partner port.

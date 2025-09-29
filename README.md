@@ -3,8 +3,22 @@
 The `terraform-provider-megaport` or Megaport Terraform Provider lets you create and manage
 Megaport's product and services using the [Megaport API](https://dev.megaport.com).
 
-This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software
-Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
+This provides an opportunity for true multi-cloud hybrid environments supported by Megaport'# GCP with pairing key
+data "megaport_cloud_port_lookup" "gcp_secure" {
+connect_type = "GOOGLE"
+include_secure = true
+key = var.gcp_pairing_key
+location_id = 123
+}
+
+# Oracle with service key
+
+data "megaport_cloud_port_lookup" "oracle_secure" {
+connect_type = "ORACLE"
+include_secure = true
+key = var.oracle_service_key
+location_id = 123
+}ned Network (SDN). Using the Terraform provider, you can create and manage Ports,
 Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs.
 
 This provider is compatible with HashiCorp Terraform, and we have tested compatibility with OpenTofu and haven't seen issues.
@@ -254,7 +268,7 @@ When connecting to cloud service providers, you need to select the appropriate p
 The **`megaport_cloud_port_lookup`** data source is the recommended approach for selecting partner ports. It addresses common issues with partner port selection by:
 
 - **Returning all matching ports** instead of just one, giving you full visibility and control
-- **Supporting secure partner ports** for GCP, Oracle, and Azure connections requiring service keys
+- **Supporting secure partner ports** for GCP, Oracle, and Azure connections requiring keys
 - **Providing proper validation** with clear error messages for connect types
 - **Eliminating confusing warnings** by letting you choose the specific port you want
 
@@ -271,13 +285,13 @@ data "megaport_cloud_port_lookup" "aws_ports" {
 locals {
   # Option 1: Use the first available port
   selected_port = data.megaport_cloud_port_lookup.aws_ports.ports[0]
-  
+
   # Option 2: Choose by name pattern
   preferred_port = [
     for port in data.megaport_cloud_port_lookup.aws_ports.ports :
     port if can(regex("us-east-1", lower(port.product_name)))
   ][0]
-  
+
   # Option 3: Select by lowest rank (best performance)
   best_port = [
     for port in data.megaport_cloud_port_lookup.aws_ports.ports :
@@ -295,7 +309,7 @@ resource "megaport_vxc" "aws_connection" {
 
 #### Secure Partner Ports
 
-For cloud providers requiring service keys (GCP, Oracle, Azure):
+For cloud providers requiring keys (GCP, Oracle, Azure):
 
 ```terraform
 # GCP with pairing key
@@ -306,7 +320,7 @@ data "megaport_cloud_port_lookup" "gcp_secure" {
   location_id    = 123
 }
 
-# Oracle with service key  
+# Oracle with service key
 data "megaport_cloud_port_lookup" "oracle_secure" {
   connect_type   = "ORACLE"
   include_secure = true
@@ -320,6 +334,7 @@ data "megaport_cloud_port_lookup" "oracle_secure" {
 The `megaport_partner` data source is still supported but has limitations:
 
 **Issues with the legacy approach:**
+
 - Returns only one port with potential warnings if multiple matches are found
 - No support for secure partner ports
 - Less control over port selection
@@ -366,7 +381,7 @@ The `megaport_cloud_port_lookup` data source accepts the following arguments:
 - `company_name` (String) - Filter by company name
 - `vxc_permitted` (Boolean) - Filter by VXC permission (default: `true`)
 - `include_secure` (Boolean) - Include secure partner ports (default: `false`)
-- `service_key` (String, Sensitive) - Required for secure ports when `include_secure = true`
+- `key` (String, Sensitive) - Required for secure ports when `include_secure = true` (pairing key for GCP, service key for Azure/Oracle)
 
 #### Computed Attributes
 
@@ -374,15 +389,15 @@ The `megaport_cloud_port_lookup` data source accepts the following arguments:
   - `product_uid` (String) - Port unique identifier
   - `product_name` (String) - Port name
   - `connect_type` (String) - Connection type
-  - `company_uid` (String) - Company unique identifier  
+  - `company_uid` (String) - Company unique identifier
   - `company_name` (String) - Company name
   - `diversity_zone` (String) - Diversity zone
   - `location_id` (Number) - Location ID
   - `speed` (Number) - Port speed in Mbps
   - `rank` (Number) - Port rank (lower = better)
   - `vxc_permitted` (Boolean) - VXC permission status
-  - `is_secure` (Boolean) - Whether port requires service key
-  - `secure_service_key` (String, Sensitive) - Service key (secure ports only)
+  - `is_secure` (Boolean) - Whether port requires a key
+  - `secure_key` (String, Sensitive) - Key for secure ports (pairing key for GCP, service key for Azure/Oracle)
   - `vlan` (Number) - VLAN ID (secure ports only)
 
 ### Advanced Usage Patterns
@@ -429,7 +444,7 @@ locals {
 # Get ports for each region
 data "megaport_cloud_port_lookup" "aws_ports" {
   for_each = local.regions
-  
+
   connect_type   = "AWSHC"
   location_id    = each.value.location_id
   diversity_zone = each.value.diversity_zone
@@ -438,10 +453,10 @@ data "megaport_cloud_port_lookup" "aws_ports" {
 # Create connections for each region
 resource "megaport_vxc" "aws_connections" {
   for_each = local.regions
-  
+
   product_name = "AWS-${each.key}"
   # ... configuration
-  
+
   b_end = {
     requested_product_uid = data.megaport_cloud_port_lookup.aws_ports[each.key].ports[0].product_uid
   }
@@ -455,13 +470,14 @@ resource "megaport_vxc" "aws_connections" {
 1. **Replace data source name**: `megaport_partner` → `megaport_cloud_port_lookup`
 2. **Update attribute access**: Add `.ports[0]` to access the first port
 3. **Add validation**: Check port availability before use
-4. **Update secure connections**: Use `include_secure` and `service_key`
+4. **Update secure connections**: Use `include_secure` and `key`
 
 ### Migration Examples
 
 #### Basic Migration
 
 **Before:**
+
 ```terraform
 data "megaport_partner" "aws_port" {
   connect_type = "AWS"
@@ -476,6 +492,7 @@ resource "megaport_vxc" "connection" {
 ```
 
 **After:**
+
 ```terraform
 data "megaport_cloud_port_lookup" "aws_ports" {
   connect_type = "AWS"
@@ -492,6 +509,7 @@ resource "megaport_vxc" "connection" {
 #### Secure Connection Migration
 
 **Before (not possible):**
+
 ```terraform
 # Secure connections required hardcoded UIDs
 resource "megaport_vxc" "gcp_connection" {
@@ -503,11 +521,12 @@ resource "megaport_vxc" "gcp_connection" {
 ```
 
 **After:**
+
 ```terraform
 data "megaport_cloud_port_lookup" "gcp_secure" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = var.gcp_pairing_key
+  key            = var.gcp_pairing_key
   location_id    = 3
 }
 
@@ -522,6 +541,7 @@ resource "megaport_vxc" "gcp_connection" {
 #### Shared Port Selection
 
 **Before:**
+
 ```terraform
 data "megaport_partner" "aws_port" {
   connect_type = "AWS"
@@ -539,6 +559,7 @@ resource "megaport_vxc" "connection_2" {
 ```
 
 **After:**
+
 ```terraform
 data "megaport_cloud_port_lookup" "aws_ports" {
   connect_type = "AWS"
@@ -560,17 +581,17 @@ resource "megaport_vxc" "connection_2" {
 
 ### Connect Type Reference
 
-| Connect Type | Description | Secure Support |
-|--------------|-------------|----------------|
-| `AWS` | Amazon Web Services Private VIF | No |
-| `AWSHC` | AWS Hosted Connection | No |
-| `AZURE` | Microsoft Azure ExpressRoute | Yes |
-| `GOOGLE` | Google Cloud Partner Interconnect | Yes |
-| `ORACLE` | Oracle FastConnect | Yes |
-| `IBM` | IBM Cloud Direct Link | No |
-| `OUTSCALE` | Outscale Direct Connection | No |
-| `TRANSIT` | Megaport Internet | No |
-| `FRANCEIX` | France-IX | No |
+| Connect Type | Description                       | Secure Support |
+| ------------ | --------------------------------- | -------------- |
+| `AWS`        | Amazon Web Services Private VIF   | No             |
+| `AWSHC`      | AWS Hosted Connection             | No             |
+| `AZURE`      | Microsoft Azure ExpressRoute      | Yes            |
+| `GOOGLE`     | Google Cloud Partner Interconnect | Yes            |
+| `ORACLE`     | Oracle FastConnect                | Yes            |
+| `IBM`        | IBM Cloud Direct Link             | No             |
+| `OUTSCALE`   | Outscale Direct Connection        | No             |
+| `TRANSIT`    | Megaport Internet                 | No             |
+| `FRANCEIX`   | France-IX                         | No             |
 
 ## End-of-Term Cancellation
 

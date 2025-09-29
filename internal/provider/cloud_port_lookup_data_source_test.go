@@ -44,17 +44,17 @@ func TestCloudPortLookupFilters(t *testing.T) {
 	}
 
 	securePort1 := cloudPortModel{
-		ProductUID:       types.StringValue("sec1"),
-		ProductName:      types.StringValue("Google Secure Port 1"),
-		ConnectType:      types.StringValue("GOOGLE"),
-		CompanyName:      types.StringValue("Google"),
-		DiversityZone:    types.StringNull(),
-		LocationID:       types.Int64Value(1),
-		VXCPermitted:     types.BoolValue(true),
-		IsSecure:         types.BoolValue(true),
-		SecureServiceKey: types.StringValue("test-key"),
-		VLAN:            types.Int64Value(100),
-		Rank:            types.Int64Value(0),
+		ProductUID:    types.StringValue("sec1"),
+		ProductName:   types.StringValue("Google Secure Port 1"),
+		ConnectType:   types.StringValue("GOOGLE"),
+		CompanyName:   types.StringValue("Google"),
+		DiversityZone: types.StringNull(),
+		LocationID:    types.Int64Value(1),
+		VXCPermitted:  types.BoolValue(true),
+		IsSecure:      types.BoolValue(true),
+		SecureKey:     types.StringValue("test-key"),
+		VLAN:          types.Int64Value(100),
+		Rank:          types.Int64Value(0),
 	}
 
 	allPorts := []cloudPortModel{publicPort1, publicPort2, securePort1}
@@ -63,15 +63,15 @@ func TestCloudPortLookupFilters(t *testing.T) {
 
 	for _, scenario := range []filterTestCases{
 		{
-			description: "filter_by_vxc_permitted_true",
-			config:      cloudPortLookupModel{},
-			vxcPermitted: true,
+			description:   "filter_by_vxc_permitted_true",
+			config:        cloudPortLookupModel{},
+			vxcPermitted:  true,
 			expectedPorts: []cloudPortModel{publicPort1, securePort1},
 		},
 		{
-			description: "filter_by_vxc_permitted_false",
-			config:      cloudPortLookupModel{},
-			vxcPermitted: false,
+			description:   "filter_by_vxc_permitted_false",
+			config:        cloudPortLookupModel{},
+			vxcPermitted:  false,
 			expectedPorts: []cloudPortModel{publicPort2},
 		},
 		{
@@ -197,19 +197,19 @@ func TestFromPublicPartnerPort(t *testing.T) {
 	assert.Equal(t, int64(5), cloudPort.Rank.ValueInt64())
 	assert.True(t, cloudPort.VXCPermitted.ValueBool())
 	assert.False(t, cloudPort.IsSecure.ValueBool())
-	assert.True(t, cloudPort.SecureServiceKey.IsNull())
+	assert.True(t, cloudPort.SecureKey.IsNull())
 	assert.True(t, cloudPort.VLAN.IsNull())
 }
 
 func TestFromSecurePartnerPort(t *testing.T) {
 	securePort := &megaport.PartnerLookupItem{
-		ProductUID:   "secure-uid",
-		Name:         "Secure Test Port",
-		Type:         "GOOGLE",
-		CompanyID:    456,
-		CompanyName:  "Google",
-		LocationID:   789,
-		PortSpeed:    10000,
+		ProductUID:  "secure-uid",
+		Name:        "Secure Test Port",
+		Type:        "GOOGLE",
+		CompanyID:   456,
+		CompanyName: "Google",
+		LocationID:  789,
+		PortSpeed:   10000,
 	}
 
 	cloudPort := cloudPortModel{}
@@ -226,7 +226,7 @@ func TestFromSecurePartnerPort(t *testing.T) {
 	assert.Equal(t, int64(0), cloudPort.Rank.ValueInt64()) // Default to 0 for secure ports
 	assert.True(t, cloudPort.VXCPermitted.ValueBool())     // Secure ports typically allow VXCs
 	assert.True(t, cloudPort.IsSecure.ValueBool())
-	assert.Equal(t, "test-service-key", cloudPort.SecureServiceKey.ValueString())
+	assert.Equal(t, "test-service-key", cloudPort.SecureKey.ValueString())
 	assert.Equal(t, int64(200), cloudPort.VLAN.ValueInt64())
 }
 
@@ -241,7 +241,7 @@ func TestGetPartnersForConnectType(t *testing.T) {
 		{"google", []string{"GOOGLE"}},
 		{"ORACLE", []string{"ORACLE"}},
 		{"AZURE", []string{"AZURE"}},
-		{"AWS", []string{}}, // AWS doesn't support secure ports via this API
+		{"AWS", []string{}},                         // AWS doesn't support secure ports via this API
 		{"", []string{"GOOGLE", "ORACLE", "AZURE"}}, // Empty returns all
 		{"INVALID", []string{}},
 	}
