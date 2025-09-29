@@ -338,9 +338,14 @@ func (cp *cloudPortModel) fromSecurePartnerPort(item *megaport.PartnerLookupItem
 
 func (d *cloudPortLookupDataSource) getSecurePorts(ctx context.Context, connectType string, key string) ([]cloudPortModel, error) {
 	var securePorts []cloudPortModel
+	var errors []error
 
 	// Map connect types to partner names for the secure API
 	partners := d.getPartnersForConnectType(connectType)
+
+	if len(partners) == 0 {
+		return nil, fmt.Errorf("no partners found for connect type '%s'", connectType)
+	}
 
 	for _, partner := range partners {
 		// Use ListPartnerPorts instead of LookupPartnerPorts to get all available ports
@@ -349,6 +354,7 @@ func (d *cloudPortLookupDataSource) getSecurePorts(ctx context.Context, connectT
 			Partner: partner,
 		})
 		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to list ports for partner %s: %w", partner, err))
 			continue // Skip this partner if there's an error
 		}
 
@@ -359,6 +365,13 @@ func (d *cloudPortLookupDataSource) getSecurePorts(ctx context.Context, connectT
 		}
 	}
 
+	// If we have no ports and encountered errors, return the errors
+	if len(securePorts) == 0 && len(errors) > 0 {
+		return nil, fmt.Errorf("failed to retrieve secure ports from all partners: %v", errors)
+	}
+
+	// If we have some ports but also some errors, return partial success with no error
+	// The caller can handle this as a successful operation with potentially incomplete data
 	return securePorts, nil
 }
 
