@@ -270,7 +270,7 @@ terraform import megaport_mcr_prefix_filter_list.example a1b2c3d4-5678-90ef-ghij
 ```terraform
 # Production MCR with standalone prefix filter lists
 resource "megaport_mcr" "production" {
-  product_name         = "prod-mcr-us-east"
+  product_name         = "prod-mcr"
   port_speed          = 2500
   location_id         = 1  # Use stable location ID
   contract_term_months = 12
