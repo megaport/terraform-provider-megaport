@@ -1,25 +1,17 @@
+---
+page_title: 'Megaport Provider'
+description: |-
+  The Megaport Terraform Provider.
+---
+
 # Megaport Terraform Provider
 
 The `terraform-provider-megaport` or Megaport Terraform Provider lets you create and manage
 Megaport's product and services using the [Megaport API](https://dev.megaport.com).
 
-This provides an opportunity for true multi-cloud hybrid environments supported by Megaport'# GCP with pairing key
-data "megaport_cloud_port_lookup" "gcp_secure" {
-connect_type = "GOOGLE"
-include_secure = true
-key = var.gcp_pairing_key
-location_id = 123
-}
-
-# Oracle with service key
-
-data "megaport_cloud_port_lookup" "oracle_secure" {
-connect_type = "ORACLE"
-include_secure = true
-key = var.oracle_service_key
-location_id = 123
-}ned Network (SDN). Using the Terraform provider, you can create and manage Ports,
-Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), and Partner VXCs.
+This provides an opportunity for true multi-cloud hybrid environments supported by Megaport's Software
+Defined Network (SDN). Using the Terraform provider, you can create and manage Ports,
+Virtual Cross Connects (VXCs), Megaport Cloud Routers (MCRs), Megaport Virtual Edges (MVEs), and Partner VXCs.
 
 This provider is compatible with HashiCorp Terraform, and we have tested compatibility with OpenTofu and haven't seen issues.
 
