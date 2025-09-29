@@ -41,7 +41,7 @@ locals {
 data "megaport_cloud_port_lookup" "gcp_secure_ports" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = "your-gcp-pairing-key-here"
+  secure_key     = "your-gcp-pairing-key-here"
   location_id    = 3
 }
 

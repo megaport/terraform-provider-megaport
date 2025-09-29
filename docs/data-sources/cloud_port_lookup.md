@@ -3,16 +3,16 @@
 page_title: "megaport_cloud_port_lookup Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Cloud Port Lookup Data Source. Returns an array of cloud service provider ports that match the specified criteria.
-  This data source allows you to find and select the appropriate cloud ports for your VXC connections, including support for both public and secure partner ports.
-  Unlike the partner data source, this returns ALL matching ports, allowing you to choose the most suitable one for your requirements.
+  Cloud Port Lookup Data Source. Returns an array of ALL cloud service provider ports that match the specified criteria.
+  This data source provides complete visibility into available cloud ports, returning multiple results for you to filter and select from based on your specific requirements.
+  Unlike the legacy partner data source, this returns the full list of matching ports, giving you complete control over port selection.
 ---
 
 # megaport_cloud_port_lookup (Data Source)
 
-Cloud Port Lookup Data Source. Returns an array of cloud service provider ports that match the specified criteria. 
-This data source allows you to find and select the appropriate cloud ports for your VXC connections, including support for both public and secure partner ports.
-Unlike the partner data source, this returns ALL matching ports, allowing you to choose the most suitable one for your requirements.
+Cloud Port Lookup Data Source. Returns an array of ALL cloud service provider ports that match the specified criteria. 
+This data source provides complete visibility into available cloud ports, returning multiple results for you to filter and select from based on your specific requirements.
+Unlike the legacy partner data source, this returns the full list of matching ports, giving you complete control over port selection.
 
 ## Example Usage
 
@@ -60,7 +60,7 @@ locals {
 data "megaport_cloud_port_lookup" "gcp_secure_ports" {
   connect_type   = "GOOGLE"
   include_secure = true
-  service_key    = "your-gcp-pairing-key-here"
+  secure_key     = "your-gcp-pairing-key-here"
   location_id    = 3
 }
 
@@ -92,14 +92,14 @@ resource "megaport_vxc" "aws_connection" {
 - `company_name` (String) Filter by the name of the company that owns the partner port.
 - `connect_type` (String) The type of connection for the partner port. Filters by cloud provider connection types.
 - `diversity_zone` (String) Filter by diversity zone (red or blue).
-- `include_secure` (Boolean) Include secure partner ports (those requiring a key). Defaults to false. When true, you must also provide a key.
-- `key` (String, Sensitive) Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle). Only used when include_secure is true.
+- `include_secure` (Boolean) Include secure partner ports (those requiring a secure_key). Defaults to false. When true, you must also provide a secure_key.
 - `location_id` (Number) Filter by the unique identifier of the location.
+- `secure_key` (String, Sensitive) Key required for looking up secure partner ports (pairing key for GCP, service key for Azure/Oracle/IBM). Only used when include_secure is true and connect_type is GOOGLE, AZURE, ORACLE or IBM.
 - `vxc_permitted` (Boolean) Filter by whether VXCs are permitted on the port. Defaults to true if not specified.
 
 ### Read-Only
 
-- `ports` (Attributes List) List of matching cloud ports. (see [below for nested schema](#nestedatt--ports))
+- `ports` (Attributes List) List of ALL matching cloud ports. You can use Terraform's for expressions and conditionals to filter this list based on your specific requirements (e.g., by name patterns, speed, rank, etc.). (see [below for nested schema](#nestedatt--ports))
 
 <a id="nestedatt--ports"></a>
 ### Nested Schema for `ports`
@@ -115,7 +115,7 @@ Read-Only:
 - `product_name` (String) The name of the partner port.
 - `product_uid` (String) The unique identifier of the partner port.
 - `rank` (Number) The rank of the partner port (lower is better).
-- `secure_key` (String, Sensitive) Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle).
+- `secure_key` (String, Sensitive) Key for secure partner ports (pairing key for GCP, service key for Azure/Oracle/IBM).
 - `speed` (Number) The speed of the partner port in Mbps.
 - `vlan` (Number) VLAN ID for secure partner ports (if available from the API response).
 - `vxc_permitted` (Boolean) Whether VXCs are permitted on the partner port.
