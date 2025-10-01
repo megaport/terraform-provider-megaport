@@ -26,6 +26,9 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
+// Update Timeout for VXC Update Verification - will be configurable in future release.
+const updateTimeout = 60 * time.Second
+
 // Ensure the implementation satisfies the expected interfaces.
 var (
 	_ resource.Resource                = &vxcResource{}
@@ -2401,15 +2404,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		isChanged = true
 	}
 	if isChanged {
-
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
-
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Updating VXC",
 				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
 			)
 			return
+		}
+
+		// Add retry logic to wait for API propagation
+		err = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
+		if err != nil {
+			resp.Diagnostics.AddWarning(
+				"VXC Update Propagation Delay",
+				fmt.Sprintf("VXC update completed but verification timed out: %s. The update may still be propagating.", err.Error()),
+			)
 		}
 	}
 
@@ -2429,6 +2439,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			"Could not read VXC with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
 		return
+	}
+
+	// Add validation warnings
+	if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+		resp.Diagnostics.AddWarning(
+			"A-End Inner VLAN Mismatch",
+			fmt.Sprintf("Expected A-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+				*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN),
+		)
+	}
+
+	if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+		resp.Diagnostics.AddWarning(
+			"B-End Inner VLAN Mismatch",
+			fmt.Sprintf("Expected B-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+				*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN),
+		)
 	}
 
 	if !plan.ResourceTags.Equal(state.ResourceTags) {
