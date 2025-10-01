@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -690,6 +691,52 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 func supportVLANUpdates(partnerType string) bool {
 	// AWS and Transit connections do not support VLAN updates
 	if partnerType == "aws" || partnerType == "transit" {
+		return false
+	}
+	return true
+}
+
+func (r *vxcResource) waitForVXCUpdate(ctx context.Context, uid string, updateReq *megaport.UpdateVXCRequest, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	backoff := 2 * time.Second
+	maxBackoff := 10 * time.Second
+
+	for time.Now().Before(deadline) {
+		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("failed to verify update: %w", err)
+		}
+
+		// Verify the expected changes are reflected
+		if r.verifyUpdateApplied(vxc, updateReq) {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+			backoff = time.Duration(float64(backoff) * 1.5)
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+
+	return fmt.Errorf("update verification timed out after %v", timeout)
+}
+
+func (r *vxcResource) verifyUpdateApplied(vxc *megaport.VXC, updateReq *megaport.UpdateVXCRequest) bool {
+	if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+		return false
+	}
+	if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+		return false
+	}
+	if updateReq.AEndVLAN != nil && vxc.AEndConfiguration.VLAN != *updateReq.AEndVLAN {
+		return false
+	}
+	if updateReq.BEndVLAN != nil && vxc.BEndConfiguration.VLAN != *updateReq.BEndVLAN {
 		return false
 	}
 	return true
