@@ -2185,7 +2185,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
-	aEndState.InnerVLAN = aEndPlan.InnerVLAN
+	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
+	if aEndPlan.InnerVLAN.ValueInt64() == -1 {
+		aEndState.InnerVLAN = types.Int64Value(-1)
+	}
 
 	// Similarly add for B-End
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
@@ -2193,7 +2196,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
-	bEndState.InnerVLAN = bEndPlan.InnerVLAN
+	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
+	if bEndPlan.InnerVLAN.ValueInt64() == -1 {
+		bEndState.InnerVLAN = types.Int64Value(-1)
+	}
 
 	// Check VNIC index for B End
 	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
