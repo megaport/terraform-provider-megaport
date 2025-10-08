@@ -53,6 +53,10 @@ provider "megaport" {
 }
 ```
 
+## Terraform MCP Server
+
+This provider has been tested with the [Terraform MCP Server](https://developer.hashicorp.com/terraform/mcp-server) for AI-assisted infrastructure provisioning. See our [Terraform MCP Server tutorial](terraform-mcp-server.md) for a quick guide on using AI agents to generate and deploy Megaport network configurations.
+
 ## Local Development
 
 ### Set up a Go workspace
