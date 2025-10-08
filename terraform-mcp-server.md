@@ -15,9 +15,76 @@ Before you begin, ensure you have the following set up and configured:
    - [VSCode MCP Server Setup Guide](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
 
 2. **Terraform MCP Server** deployed and integrated with VS Code
+
    - [Terraform MCP Server Main Page](https://developer.hashicorp.com/terraform/mcp-server)
    - [Deployment Guide](https://developer.hashicorp.com/terraform/mcp-server/deploy)
    - [Prompting Best Practices](https://developer.hashicorp.com/terraform/mcp-server/prompt)
+
+3. **Megaport API Credentials** - You'll need access and secret keys for authentication
+   - Sign up or log in to the [Megaport Portal](https://portal.megaport.com)
+   - Generate API credentials from your account settings
+
+---
+
+## Configuring the Megaport Provider
+
+Before building resources, you need to configure the Megaport Terraform provider. The AI agent should generate this configuration, but it's important to understand what's required.
+
+### Provider Configuration
+
+The Megaport provider requires the following configuration:
+
+```hcl
+terraform {
+  required_providers {
+    megaport = {
+      source  = "megaport/megaport"
+      version = "~> 1.4"
+    }
+  }
+}
+
+provider "megaport" {
+  environment            = "staging"  # Use "production" for live resources
+  access_key            = var.megaport_access_key
+  secret_key            = var.megaport_secret_key
+  accept_purchase_terms = true
+}
+```
+
+### Variables Configuration
+
+Create a `variables.tf` file to store your credential variables:
+
+```hcl
+variable "megaport_access_key" {
+  description = "Megaport API Access Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "megaport_secret_key" {
+  description = "Megaport API Secret Key"
+  type        = string
+  sensitive   = true
+}
+```
+
+### Setting Your Credentials
+
+Create a `terraform.tfvars` file (never commit this to version control):
+
+```hcl
+megaport_access_key = "your-actual-access-key"
+megaport_secret_key = "your-actual-secret-key"
+```
+
+**Important Notes:**
+
+- Use `environment = "staging"` for testing to avoid charges on production resources
+- Set `accept_purchase_terms = true` to acknowledge Megaport's terms of service
+- Always mark credentials as `sensitive = true` in variable declarations
+- Add `terraform.tfvars` to your `.gitignore` file to prevent credential exposure
 
 ---
 
@@ -140,7 +207,14 @@ Open `main.tf` and verify that all four resource blocks (`megaport_port`, `megap
 
 ### Step 2: Prepare for Deployment
 
-Create a `terraform.tfvars` file from the `terraform.tfvars.example` template and populate it with your Megaport API credentials.
+Review the generated `terraform.tfvars.example` file and create your actual `terraform.tfvars` file with your Megaport API credentials:
+
+```hcl
+megaport_access_key = "your-actual-access-key"
+megaport_secret_key = "your-actual-secret-key"
+```
+
+**Security reminder:** Never commit `terraform.tfvars` to version control. Add it to your `.gitignore` file.
 
 ### Step 3: Initialize, Plan, and Apply
 
