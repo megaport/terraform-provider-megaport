@@ -99,10 +99,7 @@ A **Port** is your physical point of connection to the Megaport network.
 **Prompt:**
 
 ```
-Generate a Terraform resource block for a megaport_port named 'agentic-port'.
-It should have a speed of 1000 Mbps, a 1-month contract term, and be located in
-'CoreSite SV1 - San Jose'. Also include the necessary provider configuration and a
-data source block to look up the location.
+Generate a Terraform resource block for a megaport_port named 'agentic-port'. It should have a speed of 1000 Mbps, a 1-month contract term, and be located in 'CoreSite SV1 - San Jose'. Also include the necessary provider configuration and a data source block to look up the location.
 ```
 
 ### 2. Megaport Cloud Router (MCR)
@@ -112,8 +109,7 @@ An **MCR** enables Layer 3 routing and connectivity between your different cloud
 **Prompt:**
 
 ```
-Generate a Terraform resource block for a megaport_mcr named 'agentic-mcr'.
-It should have a speed of 1000 Mbps and be located in 'CoreSite SV1 - San Jose'.
+Generate a Terraform resource block for a megaport_mcr named 'agentic-mcr'. It should have a speed of 1000 Mbps and be located in 'CoreSite SV1 - San Jose'.
 ```
 
 ### 3. Aruba Megaport Virtual Edge (MVE)
@@ -123,12 +119,7 @@ An **MVE** is a virtual networking device that allows you to extend your network
 **Prompt:**
 
 ```
-Generate Terraform configuration for an Aruba MVE. Include a data source block
-for megaport_mve_images to find the latest image for the 'Aruba' vendor. Then,
-create a megaport_mve resource named 'agentic-mve' in 'CoreSite SV1 - San
-Jose' with a mve_size of 'small'. The resource must include a vendor_config block
-with placeholders for account_name and account_key, and it should reference the
-ID from the image data source.
+Generate Terraform configuration for an Aruba MVE. Include a data source block for megaport_mve_images to find the latest image for the 'Aruba' vendor. Then, create a megaport_mve resource named 'agentic-mve' in 'CoreSite SV1 - San Jose' with a mve_size of 'small'. The resource must include a vendor_config block with placeholders for account_name and account_key, and it should reference the ID from the image data source.
 ```
 
 ### 4. Virtual Cross Connect (VXC)
@@ -138,10 +129,7 @@ A **VXC** is a Layer 2 connection that links your resources together on the Mega
 **Prompt:**
 
 ```
-Generate a Terraform resource block for a megaport_vxc named 'mcr-to-mve-vxc'.
-The VXC rate_limit should be 500 Mbps. Configure the a_end to connect to the
-product_uid of megaport_mcr.agentic-mcr and the b_end to connect to the
-product_uid of megaport_mve.agentic-mve.
+Generate a Terraform resource block for a megaport_vxc named 'mcr-to-mve-vxc'. The VXC rate_limit should be 500 Mbps. Configure the a_end to connect to the product_uid of megaport_mcr.agentic-mcr and the b_end to connect to the product_uid of megaport_mve.agentic-mve.
 ```
 
 ---
