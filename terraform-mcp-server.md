@@ -43,7 +43,7 @@ An MVE is a virtual networking device that allows you to extend your network to 
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the `megaport_mve` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a Terraform configuration for an Aruba MVE named 'agentic-mve' located in 'NextDC B1'. It must include a `data` source for `megaport_mve_images` to find the latest 'Aruba' image. The main resource block must contain a properly structured `vendor_config` block that includes a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` referencing the ID from the image data source."
+> "Using the Terraform MCP Server, look up the `megaport_mve` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a Terraform configuration for an Aruba MVE named 'agentic-mve' located in 'NextDC B1'. It must include a `data` source for `megaport_mve_images` to find the latest 'Aruba' image. The main resource block must contain a properly structured `vendor_config` block that includes a `product_size` of 'small', the `vendor` set to 'aruba', an `account_name` that references `var.aruba_account_name`, an `account_key` that references `var.aruba_account_key`, and the `image_id` referencing the ID from the image data source. Also generate the necessary variable definitions for the Aruba account details."
 
 ### 4. Virtual Cross Connect (VXC)
 
@@ -65,11 +65,11 @@ Copy and paste the following prompt into the GitHub Copilot chat window in VS Co
 
 > "Using the Terraform MCP Server as the primary tool, generate a complete, multi-file Terraform configuration by looking up the latest documentation for the `megaport/megaport` provider in the Terraform Registry. The configuration must deploy four distinct resources: a Port, an MCR, an Aruba MVE, and a VXC.
 >
-> 1.  **Provider and Variables**: Include `terraform`, `provider`, `variables.tf`, and `terraform.tfvars.example` files. Configure the provider for the 'staging' environment and use variables for the access and secret keys.
+> 1.  **Provider and Variables**: Include `terraform`, `provider`, `variables.tf`, and `terraform.tfvars.example` files. The `variables.tf` file must define variables for the Megaport access and secret keys, as well as for the Aruba `account_name` and `account_key`. All keys and secrets should be marked as sensitive.
 > 2.  **Location Data**: Create a single `data` source for `megaport_location` for 'NextDC B1'. All resources must use this location.
 > 3.  **Megaport Port**: Define a `megaport_port` resource named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, `marketplace_visibility` set to false, and a `contract_term_months` of 1.
 > 4.  **Megaport Cloud Router (MCR)**: Define a `megaport_mcr` resource named 'agentic-mcr' with a `product_name` of 'My Agentic MCR', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 12.
-> 5.  **Aruba MVE**: Define a `data` source for `megaport_mve_images` for the 'Aruba' vendor. Create a `megaport_mve` resource named 'agentic-mve'. Its `vendor_config` block must be correctly structured to contain a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` from the data source.
+> 5.  **Aruba MVE**: Define a `data` source for `megaport_mve_images` for the 'Aruba' vendor. Create a `megaport_mve` resource named 'agentic-mve'. Its `vendor_config` block must be correctly structured to contain a `product_size` of 'small', the `vendor` set to 'aruba', an `account_name` that references `var.aruba_account_name`, an `account_key` that references `var.aruba_account_key`, and the `image_id` from the data source.
 > 6.  **Virtual Cross Connect (VXC)**: Define a `megaport_vxc` resource named 'mcr-to-mve-vxc' with a `rate_limit` of 500 Mbps and a `contract_term_months` of 12. Its `a_end` block must have a `requested_product_uid` referencing the MCR's `product_uid`, and its `b_end` block must have a `requested_product_uid` referencing the MVE's `product_uid`.
 >
 > Ensure all resource blocks correctly reference the location data source and that the VXC resource correctly references the MCR and MVE resources."
@@ -82,11 +82,20 @@ After you submit the prompt, the AI agent will generate the necessary files.
 
 ### 1. Review the Generated Files
 
-The AI should create several files, including `main.tf`, `variables.tf`, and `terraform.tfvars.example`. Open `main.tf` and verify that all four resource blocks are present and correctly configured.
+The AI should create several files, including `main.tf`, `variables.tf`, and `terraform.tfvars.example`. Open `variables.tf` and confirm that it contains definitions for `megaport_access_key`, `megaport_secret_key`, `aruba_account_name`, and `aruba_account_key`.
 
 ### 2. Prepare for Deployment
 
-Create a `terraform.tfvars` file from the `terraform.tfvars.example` template and populate it with your Megaport API credentials.
+Create your `terraform.tfvars` file and add all four required variables:
+
+```hcl
+megaport_access_key = "your-megaport-access-key"
+megaport_secret_key = "your-megaport-secret-key"
+aruba_account_name  = "your-aruba-account-name"
+aruba_account_key   = "your-aruba-account-key"
+```
+
+**Security reminder:** Never commit `terraform.tfvars` to version control. Add it to your `.gitignore` file.
 
 ### 3. Initialize, Plan, and Apply
 
