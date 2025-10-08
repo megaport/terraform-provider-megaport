@@ -27,7 +27,7 @@ A Port is your physical point of connection to the Megaport network.
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_port` resource from the `megaport/megaport` provider in the Terraform Registry. Based on that documentation, generate a resource block named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, a `contract_term_months` of 1, and `marketplace_visibility` set to false. The port should be located in 'CoreSite SV1 - San Jose', so also generate the necessary `data` source block to look up the location."
+> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_port` resource from the `megaport/megaport` provider in the Terraform Registry. Based on that documentation, generate a resource block named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, a `contract_term_months` of 1, and `marketplace_visibility` set to false. The port should be located in 'NextDC B1', so also generate the necessary `data` source block to look up the location."
 
 ### 2. Megaport Cloud Router (MCR)
 
@@ -35,7 +35,7 @@ An MCR enables Layer 3 routing and connectivity between your different cloud and
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_mcr` resource from the `megaport/megaport` provider in the Terraform Registry. Then, generate a resource block named 'agentic-mcr' with a `product_name` of 'My Agentic MCR', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 12, located in 'CoreSite SV1 - San Jose'."
+> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_mcr` resource from the `megaport/megaport` provider in the Terraform Registry. Then, generate a resource block named 'agentic-mcr' with a `product_name` of 'My Agentic MCR', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 12, located in 'NextDC B1'."
 
 ### 3. Aruba Megaport Virtual Edge (MVE)
 
@@ -43,7 +43,7 @@ An MVE is a virtual networking device that allows you to extend your network to 
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the `megaport_mve` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a Terraform configuration for an Aruba MVE named 'agentic-mve' located in 'CoreSite SV1 - San Jose'. It must include a `data` source for `megaport_mve_images` to find the latest 'Aruba' image. The main resource block must contain a properly structured `vendor_config` block that includes a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` referencing the ID from the image data source."
+> "Using the Terraform MCP Server, look up the `megaport_mve` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a Terraform configuration for an Aruba MVE named 'agentic-mve' located in 'NextDC B1'. It must include a `data` source for `megaport_mve_images` to find the latest 'Aruba' image. The main resource block must contain a properly structured `vendor_config` block that includes a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` referencing the ID from the image data source."
 
 ### 4. Virtual Cross Connect (VXC)
 
@@ -66,7 +66,7 @@ Copy and paste the following prompt into the GitHub Copilot chat window in VS Co
 > "Using the Terraform MCP Server as the primary tool, generate a complete, multi-file Terraform configuration by looking up the latest documentation for the `megaport/megaport` provider in the Terraform Registry. The configuration must deploy four distinct resources: a Port, an MCR, an Aruba MVE, and a VXC.
 >
 > 1.  **Provider and Variables**: Include `terraform`, `provider`, `variables.tf`, and `terraform.tfvars.example` files. Configure the provider for the 'staging' environment and use variables for the access and secret keys.
-> 2.  **Location Data**: Create a single `data` source for `megaport_location` for 'CoreSite SV1 - San Jose'. All resources must use this location.
+> 2.  **Location Data**: Create a single `data` source for `megaport_location` for 'NextDC B1'. All resources must use this location.
 > 3.  **Megaport Port**: Define a `megaport_port` resource named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, `marketplace_visibility` set to false, and a `contract_term_months` of 1.
 > 4.  **Megaport Cloud Router (MCR)**: Define a `megaport_mcr` resource named 'agentic-mcr' with a `product_name` of 'My Agentic MCR', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 12.
 > 5.  **Aruba MVE**: Define a `data` source for `megaport_mve_images` for the 'Aruba' vendor. Create a `megaport_mve` resource named 'agentic-mve'. Its `vendor_config` block must be correctly structured to contain a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` from the data source.
