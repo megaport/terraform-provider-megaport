@@ -27,7 +27,7 @@ A Port is your physical point of connection to the Megaport network.
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_port` resource from the `megaport/megaport` provider in the Terraform Registry. Based on that documentation, generate a resource block named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 1. The port should be located in 'CoreSite SV1 - San Jose', so also generate the necessary `data` source block to look up the location."
+> "Using the Terraform MCP Server, look up the latest documentation for the `megaport_port` resource from the `megaport/megaport` provider in the Terraform Registry. Based on that documentation, generate a resource block named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, a `contract_term_months` of 1, and `marketplace_visibility` set to false. The port should be located in 'CoreSite SV1 - San Jose', so also generate the necessary `data` source block to look up the location."
 
 ### 2. Megaport Cloud Router (MCR)
 
@@ -51,7 +51,7 @@ A VXC is a Layer 2 connection that links your resources together on the Megaport
 
 **Prompt:**
 
-> "Using the Terraform MCP Server, look up the `megaport_vxc` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a resource block for a `megaport_vxc` named 'mcr-to-mve-vxc' with a `rate_limit` of 500 Mbps. Configure its `a_end` block with a `requested_product_uid` pointing to the `product_uid` of a resource named `megaport_mcr.agentic-mcr`, and its `b_end` block with a `requested_product_uid` pointing to the `product_uid` of a resource named `megaport_mve.agentic-mve`."
+> "Using the Terraform MCP Server, look up the `megaport_vxc` resource from the `megaport/megaport` provider in the Terraform Registry. Generate a resource block for a `megaport_vxc` named 'mcr-to-mve-vxc' with a `rate_limit` of 500 Mbps and a `contract_term_months` of 12. Configure its `a_end` block with a `requested_product_uid` pointing to the `product_uid` of a resource named `megaport_mcr.agentic-mcr`, and its `b_end` block with a `requested_product_uid` pointing to the `product_uid` of a resource named `megaport_mve.agentic-mve`."
 
 ---
 
@@ -67,10 +67,10 @@ Copy and paste the following prompt into the GitHub Copilot chat window in VS Co
 >
 > 1.  **Provider and Variables**: Include `terraform`, `provider`, `variables.tf`, and `terraform.tfvars.example` files. Configure the provider for the 'staging' environment and use variables for the access and secret keys.
 > 2.  **Location Data**: Create a single `data` source for `megaport_location` for 'CoreSite SV1 - San Jose'. All resources must use this location.
-> 3.  **Megaport Port**: Define a `megaport_port` resource named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 1.
+> 3.  **Megaport Port**: Define a `megaport_port` resource named 'agentic-port' with a `product_name` of 'My Agentic Port', a `port_speed` of 1000 Mbps, `marketplace_visibility` set to false, and a `contract_term_months` of 1.
 > 4.  **Megaport Cloud Router (MCR)**: Define a `megaport_mcr` resource named 'agentic-mcr' with a `product_name` of 'My Agentic MCR', a `port_speed` of 1000 Mbps, and a `contract_term_months` of 12.
 > 5.  **Aruba MVE**: Define a `data` source for `megaport_mve_images` for the 'Aruba' vendor. Create a `megaport_mve` resource named 'agentic-mve'. Its `vendor_config` block must be correctly structured to contain a `product_size` of 'small', the `vendor` set to 'aruba', placeholders for `account_name` and `account_key`, and the `image_id` from the data source.
-> 6.  **Virtual Cross Connect (VXC)**: Define a `megaport_vxc` resource named 'mcr-to-mve-vxc' with a `rate_limit` of 500 Mbps. Its `a_end` block must have a `requested_product_uid` referencing the MCR's `product_uid`, and its `b_end` block must have a `requested_product_uid` referencing the MVE's `product_uid`.
+> 6.  **Virtual Cross Connect (VXC)**: Define a `megaport_vxc` resource named 'mcr-to-mve-vxc' with a `rate_limit` of 500 Mbps and a `contract_term_months` of 12. Its `a_end` block must have a `requested_product_uid` referencing the MCR's `product_uid`, and its `b_end` block must have a `requested_product_uid` referencing the MVE's `product_uid`.
 >
 > Ensure all resource blocks correctly reference the location data source and that the VXC resource correctly references the MCR and MVE resources."
 
