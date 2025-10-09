@@ -510,7 +510,3 @@ For more information about Terraform lifecycle management, see:
 - [Terraform Lifecycle Meta-Arguments](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle)
 - [Manage Resource Lifecycle Tutorial](https://developer.hashicorp.com/terraform/tutorials/state/resource-lifecycle)
 - [Megaport Documentation - Terraform State Management](https://docs.megaport.com/cloud/terraform/state-management/)
-
-```
-
-```
