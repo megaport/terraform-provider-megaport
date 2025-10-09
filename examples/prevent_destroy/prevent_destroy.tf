@@ -50,12 +50,8 @@ resource "megaport_mcr" "production_mcr" {
   product_name         = "Production MCR - Protected"
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 12
+  port_speed           = 1000
   cost_centre          = "Production Infrastructure"
-
-  router {
-    port_speed    = 5000
-    requested_asn = 64512
-  }
 
   # Lifecycle block to prevent accidental destruction
   lifecycle {
@@ -76,11 +72,11 @@ resource "megaport_vxc" "production_vxc" {
   cost_centre          = "Production Infrastructure"
 
   a_end {
-    requested_product_uid = megaport_port.production_port.id
+    requested_product_uid = megaport_port.production_port.product_uid
   }
 
   b_end {
-    requested_product_uid = megaport_mcr.production_mcr.id
+    requested_product_uid = megaport_mcr.production_mcr.product_uid
   }
 
   # Lifecycle block to prevent accidental destruction

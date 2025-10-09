@@ -336,6 +336,8 @@ resource "megaport_port" "my_port" {
   product_name = "My Production Port"
   port_speed   = 10000
   location_id  = 123
+  contract_term_months = 12
+  marketplace_visibility = false
 }
 
 # Create a VXC attached to the port
@@ -344,11 +346,11 @@ resource "megaport_vxc" "my_vxc" {
   rate_limit   = 1000
 
   a_end {
-    port_id = megaport_port.my_port.id
+    requested_product_uid = megaport_port.my_port.product_uid
   }
 
   b_end {
-    port_id = megaport_mcr.my_mcr.id
+    requested_product_uid = megaport_mcr.my_mcr.product_uid
   }
 }
 ```
@@ -433,11 +435,6 @@ resource "megaport_mcr" "production_mcr" {
   location_id          = data.megaport_location.my_location.id
   contract_term_months = 12
 
-  router {
-    port_speed    = 5000
-    requested_asn = 64512
-  }
-
   # Lifecycle block to prevent accidental destruction
   lifecycle {
     prevent_destroy = true
@@ -450,11 +447,11 @@ resource "megaport_vxc" "production_vxc" {
   contract_term_months = 12
 
   a_end {
-    port_id = megaport_port.production_port.id
+    requested_product_uid = megaport_port.production_port.product_uid
   }
 
   b_end {
-    port_id = megaport_mcr.production_mcr.id
+    requested_product_uid = megaport_mcr.production_mcr.product_uid
   }
 
   # Lifecycle block to prevent accidental destruction
