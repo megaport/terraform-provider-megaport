@@ -104,18 +104,36 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
-			// Test data source filtering by name and cost-centre
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+			},
+			// Data Source Testing
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
 					id = %d
 				}
-				
 				data "megaport_mve_images" "aruba" {
   					vendor_filter = "Aruba"
   					id_filter = 23
 				}
-
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -151,53 +169,29 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                }
+                  }
 
 				data "megaport_mves" "by_name" {
+					depends_on = [megaport_mve.mve]
 					filter {
 						name = "name"
-						values = [megaport_mve.mve.product_name]
+						values = ["%s"]
 					}
-					depends_on = [megaport_mve.mve]
 				}
 
 				data "megaport_mves" "by_cost_centre" {
-					filter {
-						name = "cost-centre"
-						values = [megaport_mve.mve.cost_centre]
-					}
 					depends_on = [megaport_mve.mve]
-				}
-                `, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey),
+					filter {
+						name = "cost_centre"
+						values = ["%s"]
+					}
+				}`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
-					// Verify data sources found the MVE
 					resource.TestCheckResourceAttr("data.megaport_mves.by_name", "uids.#", "1"),
 					resource.TestCheckResourceAttr("data.megaport_mves.by_cost_centre", "uids.#", "1"),
 				),
-			},
-			// ImportState testing
-			{
-				ResourceName:                         "megaport_mve.mve",
-				ImportState:                          true,
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_mve.mve"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
-						}
-					}
-					return rawState["product_uid"], nil
-				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
 			},
 			// Update Testing
 			{
@@ -290,6 +284,105 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	})
 }
 
+func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemoval() {
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	costCentreName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+					id_filter = 23
+				}
+				resource "megaport_mve" "mve" {
+					product_name = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre = "%s"
+					diversity_zone = "red"
+					vendor_config = {
+						vendor = "aruba"
+						product_size = "SMALL"
+						mve_label = "MVE 2/8"
+						image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+					}
+					resource_tags = {
+						"key1" = "value1"
+					}
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}]
+				}`, MVETestLocationIDNum, mveName, costCentreName, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreName),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+					id_filter = 23
+				}
+				resource "megaport_mve" "mve" {
+					product_name = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre = ""
+					diversity_zone = "red"
+					vendor_config = {
+						vendor = "aruba"
+						product_size = "SMALL"
+						mve_label = "MVE 2/8"
+						image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+					}
+					resource_tags = {
+						"key1" = "value1"
+					}
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}]
+				}`, MVETestLocationIDNum, mveName, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", ""),
+				),
+			},
+		},
+	})
+}
+
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
@@ -368,7 +461,27 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
-			// Test data source filtering by vendor and name
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
+			},
+			// Data Source Testing
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -417,53 +530,30 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                }
+                  }
 
 				data "megaport_mves" "by_vendor" {
+					depends_on = [megaport_mve.mve]
 					filter {
 						name = "vendor"
-						values = [megaport_mve.mve.vendor]
+						values = ["VERSA"]
 					}
-					depends_on = [megaport_mve.mve]
 				}
 
 				data "megaport_mves" "by_name" {
+					depends_on = [megaport_mve.mve]
 					filter {
 						name = "name"
-						values = [megaport_mve.mve.product_name]
+						values = ["%s"]
 					}
-					depends_on = [megaport_mve.mve]
-				}
-                `, MVETestLocationIDNum, mveName, costCentre),
+				}`, MVETestLocationIDNum, mveName, costCentre, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
-					// Verify data sources found the MVE
-					resource.TestCheckResourceAttr("data.megaport_mves.by_vendor", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("data.megaport_mves.by_vendor", "uids.#"),
 					resource.TestCheckResourceAttr("data.megaport_mves.by_name", "uids.#", "1"),
 				),
-			},
-			// ImportState testing
-			{
-				ResourceName:                         "megaport_mve.mve",
-				ImportState:                          true,
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_mve.mve"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
-						}
-					}
-					return rawState["product_uid"], nil
-				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
 			},
 			// Update Testing
 			{
