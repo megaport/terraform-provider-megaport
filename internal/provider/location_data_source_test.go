@@ -16,11 +16,11 @@ const (
 	VXCLocationIDTwo         = 3
 	VXCLocationIDThree       = 23
 
-	LagPortTestLocationName    = "NextDC B1"
+	LagPortTestLocationName    = "NextDC Brisbane B1"
 	MCRTestLocationName        = "Digital Realty Silicon Valley SJC34 (SCL2)"
 	MVETestLocationName        = "Digital Realty Silicon Valley SJC34 (SCL2)"
-	SinglePortTestLocationName = "NextDC B1"
-	VXCLocationNameOne         = "NextDC M1"
+	SinglePortTestLocationName = "NextDC Brisbane B1"
+	VXCLocationNameOne         = "NextDC Melbourne M1"
 	VXCLocationNameTwo         = "Global Switch Sydney West"
 	VXCLocationNameThree       = "5G Networks MDC"
 )
