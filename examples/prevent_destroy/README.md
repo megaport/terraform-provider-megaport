@@ -221,7 +221,7 @@ the -target flag.
 
 - [Terraform Lifecycle Meta-Arguments](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle)
 - [Manage Resource Lifecycle](https://developer.hashicorp.com/terraform/tutorials/state/resource-lifecycle)
-- [Megaport Documentation - Terraform State Management](https://docs.megaport.com/cloud/terraform/state-management/)
+- [Megaport Documentation - Terraform State Management](https://docs.megaport.com/terraform/terraform-state-management/?h=#understanding-terraform-state-for-megaport-resources)
 - [Megaport Documentation - Service Locking](https://docs.megaport.com/portal-admin/locking/)
 
 ## Running This Example
