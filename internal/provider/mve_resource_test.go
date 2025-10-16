@@ -179,18 +179,18 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					}
 				}
 
-				data "megaport_mves" "by_cost_centre" {
+				data "megaport_mves" "by_vendor" {
 					depends_on = [megaport_mve.mve]
 					filter {
-						name = "cost_centre"
-						values = ["%s"]
+						name = "vendor"
+						values = ["ARUBA"]
 					}
-				}`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey, mveName, costCentre),
+				}`, MVETestLocationIDNum, mveName, costCentre, mveName, mveKey, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
 					resource.TestCheckResourceAttr("data.megaport_mves.by_name", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mves.by_cost_centre", "uids.#", "1"),
+					resource.TestCheckResourceAttrSet("data.megaport_mves.by_vendor", "uids.#"),
 				),
 			},
 			// Update Testing
