@@ -301,3 +301,212 @@ provider "megaport" {
 - When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
 - Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
 - If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
+
+## Safe Delete Protection
+
+The Megaport Terraform Provider includes automatic **Safe Delete Protection** to prevent accidental deletion of resources that have active dependencies. This feature is always enabled and works at the API level to protect your infrastructure.
+
+### What is Safe Delete?
+
+Safe Delete is a built-in safety mechanism that prevents you from deleting Ports, MCRs (Megaport Cloud Routers), or MVEs (Megaport Virtual Edge) that have VXCs (Virtual Cross Connects) attached to them. This prevents accidental service disruptions caused by deleting infrastructure that is actively in use.
+
+### How It Works
+
+When you attempt to delete a resource using Terraform:
+
+1. The provider sends a delete request with the `safeDelete=true` parameter
+2. The Megaport API checks if the resource has any attached VXCs
+3. If VXCs are attached, the API returns an error and **prevents the deletion**
+4. If no VXCs are attached, the deletion proceeds normally
+
+### Protected Resources
+
+Safe Delete protection applies to:
+
+- **Single Ports** - Physical network ports
+- **LAG Ports** - Link Aggregation Group ports
+- **MCRs** - Megaport Cloud Routers
+- **MVEs** - Megaport Virtual Edge instances
+
+### Example Scenario
+
+```terraform
+# Create a port
+resource "megaport_port" "my_port" {
+  product_name = "My Production Port"
+  port_speed   = 10000
+  location_id  = 123
+  contract_term_months = 12
+  marketplace_visibility = false
+}
+
+# Create a VXC attached to the port
+resource "megaport_vxc" "my_vxc" {
+  product_name = "My VXC"
+  rate_limit   = 1000
+
+  a_end {
+    requested_product_uid = megaport_port.my_port.product_uid
+  }
+
+  b_end {
+    requested_product_uid = megaport_mcr.my_mcr.product_uid
+  }
+}
+```
+
+If you try to run `terraform destroy -target=megaport_port.my_port` while the VXC is still attached, the operation will fail with an error:
+
+```
+Error: Could not delete port, unexpected error: Cannot delete product with active VXCs attached
+```
+
+### Proper Deletion Order
+
+To successfully delete resources with dependencies, delete them in the correct order:
+
+1. **First**: Delete all VXCs attached to the resource
+2. **Then**: Delete the Port, MCR, or MVE
+
+```bash
+# Correct order for targeted deletions
+terraform destroy -target=megaport_vxc.my_vxc      # Delete VXC first
+terraform destroy -target=megaport_port.my_port    # Then delete the port
+
+# Or simply destroy everything (Terraform handles dependencies automatically)
+terraform destroy
+```
+
+When you run a full `terraform destroy`, Terraform automatically determines the correct deletion order based on resource dependencies, so you don't need to worry about the order.
+
+### Benefits
+
+Safe Delete protection provides several benefits:
+
+- **Prevents service disruptions** - Can't accidentally delete infrastructure carrying active traffic
+- **Enforces proper cleanup** - Forces you to delete VXCs before their parent resources
+- **Automatic protection** - No configuration needed, always enabled
+- **Clear error messages** - Tells you exactly why deletion failed
+
+### Difference from Lifecycle Prevent Destroy
+
+Safe Delete protection is different from Terraform's `lifecycle { prevent_destroy = true }` feature:
+
+| Feature                       | Level        | When It Protects                               | Configuration Required |
+| ----------------------------- | ------------ | ---------------------------------------------- | ---------------------- |
+| **Safe Delete**               | API/Provider | When resource has attached VXCs                | None (always enabled)  |
+| **Lifecycle prevent_destroy** | Terraform    | Always prevents deletion of specific resources | Yes (per resource)     |
+
+**Safe Delete** is automatic dependency protection, while **lifecycle prevent_destroy** is optional protection for critical resources you specifically designate.
+
+For more information about using lifecycle blocks to protect critical resources, see the [prevent_destroy example](examples/prevent_destroy/).
+
+## Protecting Critical Resources with Lifecycle Prevent Destroy
+
+In addition to the automatic Safe Delete protection, you can use Terraform's `lifecycle` block with `prevent_destroy = true` to explicitly protect critical production resources from accidental deletion.
+
+### When to Use Prevent Destroy
+
+Use `prevent_destroy` for resources that are critical to your infrastructure and should never be accidentally deleted:
+
+- Production ports carrying live traffic
+- MCRs routing traffic between multiple cloud providers
+- VXCs connecting to critical services
+- Any resource that would be expensive or time-consuming to recreate
+
+### Example Usage
+
+```terraform
+resource "megaport_port" "production_port" {
+  product_name           = "Production Port - Protected"
+  port_speed             = 10000
+  location_id            = data.megaport_location.my_location.id
+  contract_term_months   = 12
+  marketplace_visibility = false
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "megaport_mcr" "production_mcr" {
+  product_name         = "Production MCR - Protected"
+  location_id          = data.megaport_location.my_location.id
+  contract_term_months = 12
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "megaport_vxc" "production_vxc" {
+  product_name         = "Production VXC - Protected"
+  rate_limit           = 1000
+  contract_term_months = 12
+
+  a_end {
+    requested_product_uid = megaport_port.production_port.product_uid
+  }
+
+  b_end {
+    requested_product_uid = megaport_mcr.production_mcr.product_uid
+  }
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+```
+
+### How It Works
+
+When you add `prevent_destroy = true` to a resource:
+
+- ✅ Terraform allows creation and updates to the resource
+- ❌ Terraform refuses to destroy the resource via `terraform destroy`
+- ❌ Terraform refuses to destroy the resource when it's removed from configuration
+- ❌ Terraform refuses targeted destroy attempts with `-target`
+
+If you attempt to destroy a protected resource, Terraform will fail with an error:
+
+```
+Error: Instance cannot be destroyed
+
+Resource megaport_port.production_port has lifecycle.prevent_destroy set,
+but the plan calls for this resource to be destroyed.
+```
+
+### Removing Protection
+
+To destroy a protected resource:
+
+1. Remove the `lifecycle { prevent_destroy = true }` block from your configuration
+2. Run `terraform apply` to update the configuration
+3. Run `terraform destroy` to destroy the resource
+
+### Best Practices
+
+- **Apply to all production resources** - Add `prevent_destroy` to all critical infrastructure
+- **Document protection reasons** - Use comments to explain why resources are protected
+- **Combine with Portal locking** - Use Megaport Portal's [service locking feature](https://docs.megaport.com/portal-admin/locking/) for additional protection
+- **Use version control** - Track changes to lifecycle blocks in Git and require code review
+- **Separate environments** - Use different Terraform workspaces for production and non-production resources
+
+### Comparison of Protection Features
+
+| Feature             | Protection Level | When It Activates               | Configuration              |
+| ------------------- | ---------------- | ------------------------------- | -------------------------- |
+| **Safe Delete**     | API/Provider     | When resource has attached VXCs | Automatic (always enabled) |
+| **prevent_destroy** | Terraform        | For any deletion attempt        | Manual (per resource)      |
+| **Portal Locking**  | Megaport Portal  | Prevents all modifications      | Manual (via Portal)        |
+
+For a complete example with detailed explanations, see the [prevent_destroy example](examples/prevent_destroy/).
+
+For more information about Terraform lifecycle management, see:
+
+- [Terraform Lifecycle Meta-Arguments](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle)
+- [Manage Resource Lifecycle Tutorial](https://developer.hashicorp.com/terraform/tutorials/state/resource-lifecycle)
+- [Megaport Documentation - Terraform State Management](https://docs.megaport.com/cloud/terraform/state-management/)
