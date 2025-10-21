@@ -209,13 +209,13 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "The speed of the port in Mbps.",
+				Description: "The speed of the port in Mbps. Can be 1000(1g), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 				Validators: []validator.Int64{
-					int64validator.OneOf(1000, 10000, 100000),
+					int64validator.OneOf(1000, 10000, 100000, 400000),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
