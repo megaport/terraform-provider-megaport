@@ -277,7 +277,7 @@ resource "megaport_vxc" "service_key_vxc" {
 
 - `a_end` (Attributes) The current A-End configuration of the VXC. (see [below for nested schema](#nestedatt--a_end))
 - `b_end` (Attributes) The current B-End configuration of the VXC. (see [below for nested schema](#nestedatt--b_end))
-- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.
+- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `product_name` (String) The name of the product.
 - `rate_limit` (Number) The rate limit of the product.
 
