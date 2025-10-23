@@ -642,7 +642,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
-						Description: "The admin password hash for the vendor config. Required for Palo Alto MVE.",
+						Description: `The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".`,
 						Optional:    true,
 					},
 					"director_address": schema.StringAttribute{

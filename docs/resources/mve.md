@@ -149,7 +149,7 @@ Optional:
 
 - `account_key` (String) The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.
 - `account_name` (String) The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.
-- `admin_password_hash` (String) The admin password hash for the vendor config. Required for Palo Alto MVE.
+- `admin_password_hash` (String) The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".
 - `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.
 - `cloud_init` (String) The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.
 - `controller_address` (String) The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.
