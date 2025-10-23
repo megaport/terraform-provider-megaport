@@ -306,6 +306,52 @@ func NewMCRResource() resource.Resource {
 	return &mcrResource{}
 }
 
+// validatePrefixFilterListUsage validates that users aren't mixing inline and standalone prefix filter list management
+func (r *mcrResource) validatePrefixFilterListUsage(ctx context.Context, mcrUID string, planPrefixFilterLists types.List) diag.Diagnostics {
+	diags := diag.Diagnostics{}
+
+	// Skip validation if plan has no inline prefix filter lists
+	if planPrefixFilterLists.IsNull() || len(planPrefixFilterLists.Elements()) == 0 {
+		return diags
+	}
+
+	// Check if there are any standalone prefix filter list resources for this MCR
+	existingLists, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, mcrUID)
+	if err != nil {
+		diags.AddWarning(
+			"Unable to validate prefix filter list usage",
+			"Could not verify if standalone megaport_mcr_prefix_filter_list resources exist for this MCR. "+
+				"Please ensure you're not mixing inline prefix_filter_lists with standalone megaport_mcr_prefix_filter_list resources. "+
+				fmt.Sprintf("Error: %s", err.Error()),
+		)
+		return diags
+	}
+
+	planListCount := len(planPrefixFilterLists.Elements())
+
+	// If there are more existing lists than planned inline lists, warn about potential conflicts
+	if len(existingLists) > planListCount {
+		diags.AddWarning(
+			"Potential prefix filter list management conflict detected",
+			fmt.Sprintf("Found %d existing prefix filter lists but only %d are defined inline. "+
+				"This may indicate that some prefix filter lists are managed by standalone "+
+				"megaport_mcr_prefix_filter_list resources. Mixing inline and standalone management "+
+				"can lead to unexpected behavior. Consider migrating to use only "+
+				"megaport_mcr_prefix_filter_list resources.", len(existingLists), planListCount),
+		)
+	}
+
+	// Add deprecation warning when using inline lists
+	diags.AddWarning(
+		"Deprecated feature usage",
+		"The inline prefix_filter_lists attribute is deprecated. Consider using the "+
+			"megaport_mcr_prefix_filter_list resource for better resource management. "+
+			"See the migration guide in the provider documentation.",
+	)
+
+	return diags
+}
+
 // mcrResource is the resource implementation.
 type mcrResource struct {
 	client *megaport.Client
@@ -551,9 +597,14 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"prefix_filter_lists": schema.ListNestedAttribute{
-				Description: "Prefix filter list associated with the product.",
-				Optional:    true,
-				Computed:    true,
+				Description: "**DEPRECATED**: Prefix filter list associated with the product. " +
+					"Use the `megaport_mcr_prefix_filter_list` resource instead for better resource management. " +
+					"This attribute will be removed in a future version.",
+				Optional: true,
+				Computed: true,
+				DeprecationMessage: "Use the megaport_mcr_prefix_filter_list resource instead. " +
+					"This inline configuration will be removed in a future version. " +
+					"See the provider documentation for migration guidance.",
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 					EmptyPrefixFilterListIfNull(),
@@ -698,6 +749,10 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	// Create Prefix Filter List for MCR Upon Creation
 	if !plan.PrefixFilterLists.IsNull() && len(plan.PrefixFilterLists.Elements()) > 0 { // Check if Prefix Filter List is not null and has elements
+		// Validate prefix filter list usage and add deprecation warnings
+		validationDiags := r.validatePrefixFilterListUsage(ctx, createdID, plan.PrefixFilterLists)
+		resp.Diagnostics.Append(validationDiags...)
+
 		listDiags := plan.PrefixFilterLists.ElementsAs(ctx, &pfFilterLists, false)
 		resp.Diagnostics.Append(listDiags...)
 
@@ -977,6 +1032,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
+
+	// Validate prefix filter list usage and add deprecation warnings
+	validationDiags := r.validatePrefixFilterListUsage(ctx, state.UID.ValueString(), plan.PrefixFilterLists)
+	resp.Diagnostics.Append(validationDiags...)
 
 	statePrefixFilterListMap := map[int64]*mcrPrefixFilterListModel{}
 	statePrefixFilterLists := []*mcrPrefixFilterListModel{}
