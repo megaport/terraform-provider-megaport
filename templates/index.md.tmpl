@@ -74,7 +74,6 @@ resource "megaport_mcr" "example" {
   port_speed          = 1000
   location_id         = 5
   contract_term_months = 12
-  cost_centre         = "networking"
 }
 
 # Manage prefix filter lists as individual resources
@@ -124,7 +123,6 @@ resource "megaport_mcr" "deprecated_example" {
   port_speed          = 1000
   location_id         = 5
   contract_term_months = 12
-  cost_centre         = "networking"
   
   # This approach is deprecated and will show warnings
   prefix_filter_lists = [
@@ -220,11 +218,9 @@ Run `terraform plan` to ensure no unexpected changes are detected.
 
 The provider includes validation to prevent managing the same prefix filter lists through both methods simultaneously. If you attempt to use both inline and standalone management for the same MCR, you'll receive warnings about potential conflicts.
 
-### Timeline for Deprecation
+### Deprecation Notice
 
-- **Current**: Inline `prefix_filter_lists` shows deprecation warnings
-- **3 months**: Enhanced warnings encourage migration to standalone resources
-- **6 months**: Removal of inline `prefix_filter_lists` support
+The inline `prefix_filter_lists` attribute in the MCR resource is deprecated and will be removed in a future version. We recommend migrating to standalone `megaport_mcr_prefix_filter_list` resources for better lifecycle management and improved state handling.
 
 ### Troubleshooting and Best Practices
 
@@ -232,7 +228,11 @@ The provider includes validation to prevent managing the same prefix filter list
 
 **MCR Resource Shows Drift with Standalone Resources**
 
-If your MCR resource shows unexpected changes to `prefix_filter_lists` when using standalone resources, add a lifecycle rule:
+When using standalone `megaport_mcr_prefix_filter_list` resources, you should add a lifecycle rule to your MCR resource to prevent Terraform from detecting drift on the `prefix_filter_lists` attribute. This is necessary because:
+
+1. The standalone prefix filter list resources manage the lists independently
+2. The MCR resource still reads the lists from the API, which can cause Terraform to detect "changes" even though the lists are being managed by the standalone resources
+3. This applies to both newly created MCRs and existing ones - the lifecycle rule tells Terraform to ignore differences in this attribute since it's being managed elsewhere
 
 ```terraform
 resource "megaport_mcr" "example" {
@@ -243,6 +243,8 @@ resource "megaport_mcr" "example" {
   }
 }
 ```
+
+**Why is this needed for new resources?** Even when creating a new MCR alongside standalone prefix filter list resources, Terraform's refresh cycle will detect that the MCR has prefix filter lists attached (via the standalone resources), and without the lifecycle rule, it may show these as unexpected changes on subsequent plan/apply operations.
 
 **Mixed Usage Warning**
 
@@ -274,7 +276,6 @@ resource "megaport_mcr" "production" {
   port_speed          = 2500
   location_id         = 1  # Use stable location ID
   contract_term_months = 12
-  cost_centre         = "networking"
   
   resource_tags = {
     Environment = "production"

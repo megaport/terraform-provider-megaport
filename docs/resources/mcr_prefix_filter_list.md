@@ -137,7 +137,7 @@ output "prefix_filter_list_id" {
 
 ### Required
 
-- `address_family` (String) The IP address standard of the IP network addresses in the prefix filter list. Valid values are 'IPv4' and 'IPv6'.
+- `address_family` (String) The IP address standard of the IP network addresses in the prefix filter list. Valid values are 'IPv4' and 'IPv6' (case-insensitive).
 - `description` (String) Description of the prefix filter list.
 - `entries` (Attributes List) Entries in the prefix filter list. Must contain between 1 and 200 entries. (see [below for nested schema](#nestedatt--entries))
 - `mcr_id` (String) The UID of the MCR instance this prefix filter list belongs to.
