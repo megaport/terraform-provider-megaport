@@ -6,15 +6,15 @@ provider "megaport" {
 }
 
 data "megaport_location" "bne_nxt1" {
-  name = "NextDC B1"
+  id = 5 # NextDC Brisbane B1
 }
 
 data "megaport_location" "bne_nxt2" {
-  name = "NextDC B2"
+  id = 383 # NextDC Brisbane B2
 }
 
 data "megaport_location" "syd_gs" {
-  name = "Global Switch Sydney West"
+  id = 3 # Global Switch Sydney West
 }
 
 data "megaport_partner" "aws_port" {

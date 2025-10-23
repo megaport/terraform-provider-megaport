@@ -15,15 +15,15 @@ provider "megaport" {
 }
 
 data "megaport_location" "location_1" {
-  name = "Equinix SG1"
+  id = 36 # Equinix Singapore SG1
 }
 
 data "megaport_location" "location_2" {
-  name = "Equinix SG2"
+  id = 37 # Equinix Singapore SG2
 }
 
 data "megaport_location" "location_3" {
-  name = "Global Switch Singapore - Tai Seng"
+  id = 39 # Global Switch Singapore
 }
 
 resource "megaport_lag_port" "lag_port_1_sin" {
