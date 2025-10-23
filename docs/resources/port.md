@@ -31,7 +31,7 @@ resource "megaport_port" "port" {
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.
-- `port_speed` (Number) The speed of the port in Mbps.
+- `port_speed` (Number) The speed of the port in Mbps. Can be 1000(1g), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available.
 - `product_name` (String) The name of the product. Specify a name for the Port that is easily identifiable, particularly if you plan on having more than one Port.
 
 ### Optional
