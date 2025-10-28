@@ -1629,6 +1629,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 					return
 				}
 			}
+
 			plan.BEndPartnerConfig = partnerConfigObj
 			bEndConfig.PartnerConfig = azurePartnerConfig
 		case "google":
