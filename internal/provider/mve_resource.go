@@ -430,10 +430,10 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
 				Required:    true,
 				Validators: []validator.Int64{
-					int64validator.OneOf(1, 12, 24, 36),
+					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
@@ -642,7 +642,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
-						Description: "The admin password hash for the vendor config. Required for Palo Alto MVE.",
+						Description: `The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".`,
 						Optional:    true,
 					},
 					"director_address": schema.StringAttribute{
@@ -900,11 +900,8 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		name = state.Name.ValueString()
 	}
 
-	if !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.CostCentre.ValueString()
-	} else {
-		costCentre = state.CostCentre.ValueString()
-	}
+	// Always use the planned cost centre value, even if it's empty/null
+	costCentre = plan.CostCentre.ValueString()
 
 	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		months := int(plan.ContractTermMonths.ValueInt64())

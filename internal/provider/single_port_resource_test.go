@@ -125,3 +125,47 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 		},
 	})
 }
+
+func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRemoval() {
+	portName := RandomTestName()
+	costCentreName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_port" "port" {
+					product_name  = "%s"
+					port_speed  = 1000
+					cost_centre = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					marketplace_visibility = false
+				}`, SinglePortTestLocationIDNum, portName, costCentreName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", costCentreName),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_port" "port" {
+					product_name  = "%s"
+					port_speed  = 1000
+					cost_centre = ""
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					marketplace_visibility = false
+				}`, SinglePortTestLocationIDNum, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", ""),
+				),
+			},
+		},
+	})
+}

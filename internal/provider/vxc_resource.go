@@ -565,10 +565,10 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
 				Required:    true,
 				Validators: []validator.Int64{
-					int64validator.OneOf(1, 12, 24, 36),
+					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},
 			},
 			"shutdown": schema.BoolAttribute{
@@ -2228,13 +2228,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
 	}
 
-	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
-		updateReq.CostCentre = megaport.PtrTo(plan.CostCentre.ValueString())
-	}
-
-	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
-		updateReq.Shutdown = megaport.PtrTo(plan.Shutdown.ValueBool())
-	}
+	// Always use the planned cost centre value, even if it's empty/null
+	costCentre := plan.CostCentre.ValueString()
+	updateReq.CostCentre = &costCentre
 
 	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		updateReq.Term = megaport.PtrTo(int(plan.ContractTermMonths.ValueInt64()))
