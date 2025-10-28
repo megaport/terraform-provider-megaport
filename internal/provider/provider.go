@@ -425,7 +425,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	if awsConfig.Enabled {
 		if awsConfig.Region == "" {
 			resp.Diagnostics.AddAttributeWarning(
-				path.Root("aws_region"),
+				path.Root("aws_configuration").AtName("aws_region"),
 				"Missing AWS region",
 				"AWS integration is enabled but no region is specified. "+
 					"Set the aws_region value in the configuration or use the AWS_REGION environment variable.",
@@ -439,7 +439,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 
 		if !hasCredentials && !hasProfile && !hasRole {
 			resp.Diagnostics.AddAttributeWarning(
-				path.Root("aws_enabled"),
+				path.Root("aws_configuration"),
 				"Missing AWS authentication",
 				"AWS integration is enabled but no authentication method is specified. "+
 					"Either provide access_key/secret_key, aws_profile, or aws_assume_role_arn.",
