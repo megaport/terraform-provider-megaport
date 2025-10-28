@@ -838,7 +838,7 @@ func (r *vxcResource) deleteAWSHostedConnection(ctx context.Context, connectionI
 
 	// If there are VIFs attached, delete those first
 	for _, vif := range vifs.VirtualInterfaces {
-		_, err := dxClient.DeleteVirtualInterface(&directconnect.DeleteVirtualInterfaceInput{
+		_, err := dxClient.DeleteVirtualInterfaceWithContext(ctx, &directconnect.DeleteVirtualInterfaceInput{
 			VirtualInterfaceId: vif.VirtualInterfaceId,
 		})
 		if err != nil {
@@ -875,7 +875,7 @@ func waitForVirtualInterfaceDeleted(ctx context.Context, dxClient *directconnect
 
 		// If we get a resource not found error, the VIF is deleted
 		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok && (awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found")) {
+			if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found") {
 				return nil // VIF is deleted
 			}
 			return fmt.Errorf("failed to check virtual interface status: %v", err)
@@ -891,7 +891,7 @@ func waitForVirtualInterfaceDeleted(ctx context.Context, dxClient *directconnect
 		for _, vi := range resp.VirtualInterfaces {
 			if *vi.VirtualInterfaceId == *vifID {
 				vifFound = true
-				if *vi.VirtualInterfaceState == "deleted" {
+				if vi.VirtualInterfaceState != nil && *vi.VirtualInterfaceState == "deleted" {
 					return nil // VIF is deleted
 				}
 				break
@@ -937,8 +937,7 @@ func (r *vxcResource) deleteAWSVirtualInterface(ctx context.Context, vifID strin
 	})
 	if err != nil {
 		// Check if the error is because the VIF doesn't exist
-		if awsErr, ok := err.(awserr.Error); ok &&
-			(awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found")) {
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "DirectConnectClientException" && strings.Contains(awsErr.Message(), "not found") {
 			// VIF already deleted, not an error
 			return nil
 		}
