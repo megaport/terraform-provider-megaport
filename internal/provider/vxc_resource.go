@@ -2189,7 +2189,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
-	if aEndPlan.InnerVLAN.ValueInt64() == -1 {
+	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.IsUnknown() && aEndPlan.InnerVLAN.ValueInt64() == -1 {
 		aEndState.InnerVLAN = types.Int64Value(-1)
 	}
 
@@ -2200,7 +2200,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
-	if bEndPlan.InnerVLAN.ValueInt64() == -1 {
+	if !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.IsUnknown() && bEndPlan.InnerVLAN.ValueInt64() == -1 {
 		bEndState.InnerVLAN = types.Int64Value(-1)
 	}
 
@@ -2394,6 +2394,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Only send API call if there are changes to the VXC in the Update Request
 
 	var isChanged bool
+	var waitErr error
 	if updateReq.Name != nil || updateReq.AEndInnerVLAN != nil || updateReq.BEndInnerVLAN != nil ||
 		updateReq.AEndVLAN != nil || updateReq.BEndVLAN != nil ||
 		updateReq.AVnicIndex != nil || updateReq.BVnicIndex != nil ||
@@ -2414,11 +2415,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 
 		// Add retry logic to wait for API propagation
-		err = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
-		if err != nil {
+		waitErr = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
+		if waitErr != nil {
 			resp.Diagnostics.AddWarning(
 				"VXC Update Propagation Delay",
-				fmt.Sprintf("VXC update completed but verification timed out: %s. The update may still be propagating.", err.Error()),
+				fmt.Sprintf("VXC update completed but verification timed out: %s. The update may still be propagating.", waitErr.Error()),
 			)
 		}
 	}
@@ -2441,21 +2442,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Add validation warnings
-	if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
-		resp.Diagnostics.AddWarning(
-			"A-End Inner VLAN Mismatch",
-			fmt.Sprintf("Expected A-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
-				*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN),
-		)
-	}
+	// Only show VLAN mismatch warnings if waitForVXCUpdate failed (timed out or errored)
+	if isChanged && waitErr != nil {
+		if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+			resp.Diagnostics.AddWarning(
+				"A-End Inner VLAN Mismatch",
+				fmt.Sprintf("Expected A-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+					*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN),
+			)
+		}
 
-	if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
-		resp.Diagnostics.AddWarning(
-			"B-End Inner VLAN Mismatch",
-			fmt.Sprintf("Expected B-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
-				*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN),
-		)
+		if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+			resp.Diagnostics.AddWarning(
+				"B-End Inner VLAN Mismatch",
+				fmt.Sprintf("Expected B-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+					*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN),
+			)
+		}
 	}
 
 	if !plan.ResourceTags.Equal(state.ResourceTags) {
