@@ -413,41 +413,43 @@ resource "megaport_mcr" "example" {
 }
 
 # Manage prefix filter lists as individual resources
-resource "megaport_mcr_prefix_filter_list" "allow_private_ipv4" {
-  mcr_id         = megaport_mcr.example.product_uid
-  description    = "Allow private IPv4 networks"
-  address_family = "IPv4"
 
-  entries = [
-    {
-      action = "permit"
-      prefix = "10.0.0.0/8"
-      ge     = 16
-      le     = 24
-    },
-    {
-      action = "permit"
-      prefix = "192.168.0.0/16"
-      ge     = 24
-      le     = 32
-    }
-  ]
+resource "megaport_mcr_prefix_filter_list" "allow_private_ipv4" {
+mcr_id = megaport_mcr.example.product_uid
+description = "Allow private IPv4 networks"
+address_family = "IPv4"
+
+entries = [
+{
+action = "permit"
+prefix = "10.0.0.0/8"
+ge = 16
+le = 24
+},
+{
+action = "permit"
+prefix = "192.168.0.0/16"
+ge = 24
+le = 32
+}
+]
 }
 
 resource "megaport_mcr_prefix_filter_list" "allow_private_ipv6" {
-  mcr_id         = megaport_mcr.example.product_uid
-  description    = "Allow private IPv6 networks"
-  address_family = "IPv6"
+mcr_id = megaport_mcr.example.product_uid
+description = "Allow private IPv6 networks"
+address_family = "IPv6"
 
-  entries = [
-    {
-      action = "permit"
-      prefix = "fd00::/8"
-      ge     = 48
-      le     = 64
-    }
-  ]
+entries = [
+{
+action = "permit"
+prefix = "fd00::/8"
+ge = 48
+le = 64
 }
+]
+}
+
 ```
 
 #### ⚠️ Deprecated Inline Approach
