@@ -26,6 +26,9 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
+// Update Timeout for VXC Update Verification - will be configurable in future release.
+const updateTimeout = 60 * time.Second
+
 // Ensure the implementation satisfies the expected interfaces.
 var (
 	_ resource.Resource                = &vxcResource{}
@@ -2185,7 +2188,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
-	aEndState.InnerVLAN = aEndPlan.InnerVLAN
+	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
+	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.IsUnknown() && aEndPlan.InnerVLAN.ValueInt64() == -1 {
+		aEndState.InnerVLAN = types.Int64Value(-1)
+	}
 
 	// Similarly add for B-End
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
@@ -2193,7 +2199,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
-	bEndState.InnerVLAN = bEndPlan.InnerVLAN
+	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
+	if !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.IsUnknown() && bEndPlan.InnerVLAN.ValueInt64() == -1 {
+		bEndState.InnerVLAN = types.Int64Value(-1)
+	}
 
 	// Check VNIC index for B End
 	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
@@ -2385,6 +2394,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Only send API call if there are changes to the VXC in the Update Request
 
 	var isChanged bool
+	var waitErr error
 	if updateReq.Name != nil || updateReq.AEndInnerVLAN != nil || updateReq.BEndInnerVLAN != nil ||
 		updateReq.AEndVLAN != nil || updateReq.BEndVLAN != nil ||
 		updateReq.AVnicIndex != nil || updateReq.BVnicIndex != nil ||
@@ -2395,15 +2405,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		isChanged = true
 	}
 	if isChanged {
-
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
-
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Updating VXC",
 				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
 			)
 			return
+		}
+
+		// Add retry logic to wait for API propagation
+		waitErr = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
+		if waitErr != nil {
+			resp.Diagnostics.AddWarning(
+				"VXC Update Propagation Delay",
+				fmt.Sprintf("VXC update completed but verification timed out: %s. The update may still be propagating.", waitErr.Error()),
+			)
 		}
 	}
 
@@ -2423,6 +2440,25 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			"Could not read VXC with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
 		return
+	}
+
+	// Only show VLAN mismatch warnings if waitForVXCUpdate failed (timed out or errored)
+	if isChanged && waitErr != nil {
+		if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+			resp.Diagnostics.AddWarning(
+				"A-End Inner VLAN Mismatch",
+				fmt.Sprintf("Expected A-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+					*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN),
+			)
+		}
+
+		if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+			resp.Diagnostics.AddWarning(
+				"B-End Inner VLAN Mismatch",
+				fmt.Sprintf("Expected B-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
+					*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN),
+			)
+		}
 	}
 
 	if !plan.ResourceTags.Equal(state.ResourceTags) {

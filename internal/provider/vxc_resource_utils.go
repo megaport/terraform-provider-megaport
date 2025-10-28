@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -692,5 +693,118 @@ func supportVLANUpdates(partnerType string) bool {
 	if partnerType == "aws" || partnerType == "transit" {
 		return false
 	}
+	return true
+}
+
+// waitForVXCUpdate polls the VXC API to verify that an update has propagated successfully.
+// It uses exponential backoff with a maximum backoff time to efficiently wait for API propagation.
+//
+// Parameters:
+//   - ctx: Context for the operation (can be used for cancellation)
+//   - uid: The unique identifier of the VXC being updated
+//   - updateReq: The update request containing the expected values to verify
+//   - timeout: Maximum time to wait for the update to propagate
+//
+// Returns an error if:
+//   - The API calls fail
+//   - The context is cancelled
+//   - The timeout is reached before the update is verified
+func (r *vxcResource) waitForVXCUpdate(ctx context.Context, uid string, updateReq *megaport.UpdateVXCRequest, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	backoff := 2 * time.Second
+	maxBackoff := 10 * time.Second
+
+	// Add initial delay before first check to allow for quick propagation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(1 * time.Second):
+	}
+
+	for time.Now().Before(deadline) {
+		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve VXC status during update verification for VXC UID %s: %w", uid, err)
+		}
+
+		// Verify the expected changes are reflected
+		if r.verifyUpdateApplied(vxc, updateReq) {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+			backoff = time.Duration(float64(backoff) * 1.5)
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+
+	return fmt.Errorf("update verification timed out after %v", timeout)
+}
+
+// verifyUpdateApplied checks if the VXC returned from the API matches the expected values
+// from the update request. It verifies all fields that can be updated.
+//
+// Parameters:
+//   - vxc: The VXC object retrieved from the API
+//   - updateReq: The update request containing the expected values
+//
+// Returns true if all updated fields match their expected values, false otherwise.
+func (r *vxcResource) verifyUpdateApplied(vxc *megaport.VXC, updateReq *megaport.UpdateVXCRequest) bool {
+	// Verify VLAN-related fields
+	if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+		return false
+	}
+	if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+		return false
+	}
+	if updateReq.AEndVLAN != nil && vxc.AEndConfiguration.VLAN != *updateReq.AEndVLAN {
+		return false
+	}
+	if updateReq.BEndVLAN != nil && vxc.BEndConfiguration.VLAN != *updateReq.BEndVLAN {
+		return false
+	}
+
+	// Verify basic VXC properties
+	if updateReq.Name != nil && vxc.Name != *updateReq.Name {
+		return false
+	}
+	if updateReq.RateLimit != nil && vxc.RateLimit != *updateReq.RateLimit {
+		return false
+	}
+	if updateReq.CostCentre != nil && vxc.CostCentre != *updateReq.CostCentre {
+		return false
+	}
+	if updateReq.Shutdown != nil && vxc.Shutdown != *updateReq.Shutdown {
+		return false
+	}
+	if updateReq.Term != nil && vxc.ContractTermMonths != *updateReq.Term {
+		return false
+	}
+
+	// Verify endpoint product UIDs
+	if updateReq.AEndProductUID != nil && vxc.AEndConfiguration.UID != *updateReq.AEndProductUID {
+		return false
+	}
+	if updateReq.BEndProductUID != nil && vxc.BEndConfiguration.UID != *updateReq.BEndProductUID {
+		return false
+	}
+
+	// Verify VNIC indices
+	if updateReq.AVnicIndex != nil && vxc.AEndConfiguration.NetworkInterfaceIndex != *updateReq.AVnicIndex {
+		return false
+	}
+	if updateReq.BVnicIndex != nil && vxc.BEndConfiguration.NetworkInterfaceIndex != *updateReq.BVnicIndex {
+		return false
+	}
+
+	// Note: Partner configs (AEndPartnerConfig, BEndPartnerConfig) are complex objects
+	// and their verification would require deep comparison. For now, we focus on the
+	// simpler scalar fields that are more prone to propagation delays.
+
 	return true
 }
