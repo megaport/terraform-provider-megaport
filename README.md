@@ -73,6 +73,290 @@ provider "megaport" {
 }
 ```
 
+## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
+
+### Enhanced MCR Management with Standalone Resources
+
+The Megaport Terraform Provider now supports managing MCR prefix filter lists as individual resources, providing better lifecycle management and improved state handling compared to the previous inline approach.
+
+#### ✅ New Standalone Approach (Recommended)
+
+```terraform
+# Create MCR without inline prefix filter lists
+resource "megaport_mcr" "example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+}
+
+# Manage prefix filter lists as individual resources
+resource "megaport_mcr_prefix_filter_list" "allow_private_ipv4" {
+  mcr_id         = megaport_mcr.example.product_uid
+  description    = "Allow private IPv4 networks"
+  address_family = "IPv4"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "10.0.0.0/8"
+      ge     = 16
+      le     = 24
+    },
+    {
+      action = "permit"
+      prefix = "192.168.0.0/16"
+      ge     = 24
+      le     = 32
+    }
+  ]
+}
+
+resource "megaport_mcr_prefix_filter_list" "allow_private_ipv6" {
+  mcr_id         = megaport_mcr.example.product_uid
+  description    = "Allow private IPv6 networks"
+  address_family = "IPv6"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "fd00::/8"
+      ge     = 48
+      le     = 64
+    }
+  ]
+}
+```
+
+#### ⚠️ Deprecated Inline Approach
+
+```terraform
+# ❌ DEPRECATED: Inline prefix filter lists (will be removed in future version)
+resource "megaport_mcr" "deprecated_example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+
+  # This approach is deprecated and will show warnings
+  prefix_filter_lists = [
+    {
+      description    = "Allow private networks"
+      address_family = "IPv4"
+      entries = [
+        {
+          action = "permit"
+          prefix = "10.0.0.0/8"
+          ge     = 16
+          le     = 24
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Benefits of Standalone Resources
+
+- **Individual Lifecycle Management**: Each prefix filter list has its own Terraform state and lifecycle
+- **Better Error Handling**: Failures in one list don't affect others
+- **Enhanced Reusability**: Lists can be referenced and managed independently
+- **Cleaner State**: Avoid complex nested object handling in Terraform state
+- **Import Support**: Easy migration of existing lists using `terraform import`
+
+### Migration Guide
+
+#### Step 1: Inventory Existing Lists
+
+Use the data source to see what prefix filter lists you currently have:
+
+```terraform
+data "megaport_mcr_prefix_filter_lists" "existing" {
+  mcr_id = "your-mcr-uid-here"
+}
+
+output "current_lists" {
+  value = data.megaport_mcr_prefix_filter_lists.existing.prefix_filter_lists
+}
+```
+
+#### Step 2: Create Standalone Resources
+
+For each existing list, create a corresponding resource:
+
+```terraform
+resource "megaport_mcr_prefix_filter_list" "migrated_list_1" {
+  mcr_id         = "your-mcr-uid-here"
+  description    = "Copy description from existing list"
+  address_family = "IPv4"
+  entries = [
+    # Copy entries from existing configuration
+  ]
+}
+```
+
+#### Step 3: Import Existing Lists
+
+Import each existing list to avoid recreation:
+
+```bash
+terraform import megaport_mcr_prefix_filter_list.migrated_list_1 mcr-uid:prefix-list-id
+```
+
+#### Step 4: Update MCR Resource
+
+Remove the `prefix_filter_lists` attribute from your MCR resource and add a lifecycle rule:
+
+```terraform
+resource "megaport_mcr" "example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+
+  # Remove or comment out the old prefix_filter_lists attribute
+  # prefix_filter_lists = [...]
+
+  # Add lifecycle rule to prevent drift warnings
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+```
+
+#### Step 5: Verify Migration
+
+Run `terraform plan` to ensure no unexpected changes are detected.
+
+### Mixed Usage Prevention
+
+The provider includes validation to prevent managing the same prefix filter lists through both methods simultaneously. If you attempt to use both inline and standalone management for the same MCR, you'll receive warnings about potential conflicts.
+
+### Deprecation Notice
+
+The inline `prefix_filter_lists` attribute in the MCR resource is deprecated and will be removed in a future version. We recommend migrating to standalone `megaport_mcr_prefix_filter_list` resources for better lifecycle management and improved state handling.
+
+### Troubleshooting and Best Practices
+
+#### Common Issues
+
+**MCR Resource Shows Drift with Standalone Resources**
+
+When using standalone `megaport_mcr_prefix_filter_list` resources, you should add a lifecycle rule to your MCR resource to prevent Terraform from detecting drift on the `prefix_filter_lists` attribute. This is necessary because:
+
+1. The standalone prefix filter list resources manage the lists independently
+2. The MCR resource still reads the lists from the API, which can cause Terraform to detect "changes" even though the lists are being managed by the standalone resources
+3. This applies to both newly created MCRs and existing ones - the lifecycle rule tells Terraform to ignore differences in this attribute since it's being managed elsewhere
+
+```terraform
+resource "megaport_mcr" "example" {
+  # ... configuration ...
+
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+```
+
+**Why is this needed for new resources?** Even when creating a new MCR alongside standalone prefix filter list resources, Terraform's refresh cycle will detect that the MCR has prefix filter lists attached (via the standalone resources), and without the lifecycle rule, it may show these as unexpected changes on subsequent plan/apply operations.
+
+**Mixed Usage Warning**
+
+If you see warnings about mixed usage, ensure you're not managing the same prefix filter lists through both inline and standalone methods simultaneously.
+
+**Import Format**
+
+When importing existing prefix filter lists, use the format `mcr_uid:prefix_list_id`:
+
+```bash
+# Get the MCR UID and prefix list ID from the Megaport Portal or API
+terraform import megaport_mcr_prefix_filter_list.example a1b2c3d4-5678-90ef-ghij-klmnopqrstuv:1234
+```
+
+#### Best Practices
+
+- **Use Location IDs**: Always use location IDs instead of names for MCR placement (more stable)
+- **Validate Prefix Ranges**: Ensure ge (greater than or equal) and le (less than or equal) values make sense for your prefix lengths
+- **Group Related Lists**: Create logically grouped prefix filter lists for easier management
+- **Test Migrations**: Always test migrations in a non-production environment first
+- **Document Purposes**: Use descriptive names and descriptions for prefix filter lists
+
+#### Example Production Configuration
+
+```terraform
+# Production MCR with standalone prefix filter lists
+resource "megaport_mcr" "production" {
+  product_name         = "prod-mcr"
+  port_speed          = 2500
+  location_id         = 1  # Use stable location ID
+  contract_term_months = 12
+
+  resource_tags = {
+    Environment = "production"
+    Owner       = "network-team"
+    Purpose     = "multi-cloud-connectivity"
+  }
+
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+
+# Allow internal corporate networks
+resource "megaport_mcr_prefix_filter_list" "corporate_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "Corporate internal networks"
+  address_family = "IPv4"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "10.100.0.0/16"
+      ge     = 24
+      le     = 28
+    },
+    {
+      action = "permit"
+      prefix = "10.200.0.0/16"
+      ge     = 24
+      le     = 28
+    }
+  ]
+}
+
+# Allow cloud provider networks
+resource "megaport_mcr_prefix_filter_list" "cloud_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "AWS and Azure networks"
+  address_family = "IPv4"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "172.16.0.0/12"
+      ge     = 16
+      le     = 24
+    }
+  ]
+}
+
+# IPv6 support for future expansion
+resource "megaport_mcr_prefix_filter_list" "ipv6_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "IPv6 corporate networks"
+  address_family = "IPv6"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "2001:db8:100::/48"
+      ge     = 56
+      le     = 64
+    }
+  ]
+}
+```
+
 ## Local Development
 
 ### Set up a Go workspace
@@ -622,3 +906,212 @@ provider "megaport" {
 - When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
 - Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
 - If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
+
+## Safe Delete Protection
+
+The Megaport Terraform Provider includes automatic **Safe Delete Protection** to prevent accidental deletion of resources that have active dependencies. This feature is always enabled and works at the API level to protect your infrastructure.
+
+### What is Safe Delete?
+
+Safe Delete is a built-in safety mechanism that prevents you from deleting Ports, MCRs (Megaport Cloud Routers), or MVEs (Megaport Virtual Edge) that have VXCs (Virtual Cross Connects) attached to them. This prevents accidental service disruptions caused by deleting infrastructure that is actively in use.
+
+### How It Works
+
+When you attempt to delete a resource using Terraform:
+
+1. The provider sends a delete request with the `safeDelete=true` parameter
+2. The Megaport API checks if the resource has any attached VXCs
+3. If VXCs are attached, the API returns an error and **prevents the deletion**
+4. If no VXCs are attached, the deletion proceeds normally
+
+### Protected Resources
+
+Safe Delete protection applies to:
+
+- **Single Ports** - Physical network ports
+- **LAG Ports** - Link Aggregation Group ports
+- **MCRs** - Megaport Cloud Routers
+- **MVEs** - Megaport Virtual Edge instances
+
+### Example Scenario
+
+```terraform
+# Create a port
+resource "megaport_port" "my_port" {
+  product_name = "My Production Port"
+  port_speed   = 10000
+  location_id  = 123
+  contract_term_months = 12
+  marketplace_visibility = false
+}
+
+# Create a VXC attached to the port
+resource "megaport_vxc" "my_vxc" {
+  product_name = "My VXC"
+  rate_limit   = 1000
+
+  a_end {
+    requested_product_uid = megaport_port.my_port.product_uid
+  }
+
+  b_end {
+    requested_product_uid = megaport_mcr.my_mcr.product_uid
+  }
+}
+```
+
+If you try to run `terraform destroy -target=megaport_port.my_port` while the VXC is still attached, the operation will fail with an error:
+
+```
+Error: Could not delete port, unexpected error: Cannot delete product with active VXCs attached
+```
+
+### Proper Deletion Order
+
+To successfully delete resources with dependencies, delete them in the correct order:
+
+1. **First**: Delete all VXCs attached to the resource
+2. **Then**: Delete the Port, MCR, or MVE
+
+```bash
+# Correct order for targeted deletions
+terraform destroy -target=megaport_vxc.my_vxc      # Delete VXC first
+terraform destroy -target=megaport_port.my_port    # Then delete the port
+
+# Or simply destroy everything (Terraform handles dependencies automatically)
+terraform destroy
+```
+
+When you run a full `terraform destroy`, Terraform automatically determines the correct deletion order based on resource dependencies, so you don't need to worry about the order.
+
+### Benefits
+
+Safe Delete protection provides several benefits:
+
+- **Prevents service disruptions** - Can't accidentally delete infrastructure carrying active traffic
+- **Enforces proper cleanup** - Forces you to delete VXCs before their parent resources
+- **Automatic protection** - No configuration needed, always enabled
+- **Clear error messages** - Tells you exactly why deletion failed
+
+### Difference from Lifecycle Prevent Destroy
+
+Safe Delete protection is different from Terraform's `lifecycle { prevent_destroy = true }` feature:
+
+| Feature                       | Level        | When It Protects                               | Configuration Required |
+| ----------------------------- | ------------ | ---------------------------------------------- | ---------------------- |
+| **Safe Delete**               | API/Provider | When resource has attached VXCs                | None (always enabled)  |
+| **Lifecycle prevent_destroy** | Terraform    | Always prevents deletion of specific resources | Yes (per resource)     |
+
+**Safe Delete** is automatic dependency protection, while **lifecycle prevent_destroy** is optional protection for critical resources you specifically designate.
+
+For more information about using lifecycle blocks to protect critical resources, see the [prevent_destroy example](examples/prevent_destroy/).
+
+## Protecting Critical Resources with Lifecycle Prevent Destroy
+
+In addition to the automatic Safe Delete protection, you can use Terraform's `lifecycle` block with `prevent_destroy = true` to explicitly protect critical production resources from accidental deletion.
+
+### When to Use Prevent Destroy
+
+Use `prevent_destroy` for resources that are critical to your infrastructure and should never be accidentally deleted:
+
+- Production ports carrying live traffic
+- MCRs routing traffic between multiple cloud providers
+- VXCs connecting to critical services
+- Any resource that would be expensive or time-consuming to recreate
+
+### Example Usage
+
+```terraform
+resource "megaport_port" "production_port" {
+  product_name           = "Production Port - Protected"
+  port_speed             = 10000
+  location_id            = data.megaport_location.my_location.id
+  contract_term_months   = 12
+  marketplace_visibility = false
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "megaport_mcr" "production_mcr" {
+  product_name         = "Production MCR - Protected"
+  location_id          = data.megaport_location.my_location.id
+  contract_term_months = 12
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "megaport_vxc" "production_vxc" {
+  product_name         = "Production VXC - Protected"
+  rate_limit           = 1000
+  contract_term_months = 12
+
+  a_end {
+    requested_product_uid = megaport_port.production_port.product_uid
+  }
+
+  b_end {
+    requested_product_uid = megaport_mcr.production_mcr.product_uid
+  }
+
+  # Lifecycle block to prevent accidental destruction
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+```
+
+### How It Works
+
+When you add `prevent_destroy = true` to a resource:
+
+- ✅ Terraform allows creation and updates to the resource
+- ❌ Terraform refuses to destroy the resource via `terraform destroy`
+- ❌ Terraform refuses to destroy the resource when it's removed from configuration
+- ❌ Terraform refuses targeted destroy attempts with `-target`
+
+If you attempt to destroy a protected resource, Terraform will fail with an error:
+
+```
+Error: Instance cannot be destroyed
+
+Resource megaport_port.production_port has lifecycle.prevent_destroy set,
+but the plan calls for this resource to be destroyed.
+```
+
+### Removing Protection
+
+To destroy a protected resource:
+
+1. Remove the `lifecycle { prevent_destroy = true }` block from your configuration
+2. Run `terraform apply` to update the configuration
+3. Run `terraform destroy` to destroy the resource
+
+### Best Practices
+
+- **Apply to all production resources** - Add `prevent_destroy` to all critical infrastructure
+- **Document protection reasons** - Use comments to explain why resources are protected
+- **Combine with Portal locking** - Use Megaport Portal's [service locking feature](https://docs.megaport.com/portal-admin/locking/) for additional protection
+- **Use version control** - Track changes to lifecycle blocks in Git and require code review
+- **Separate environments** - Use different Terraform workspaces for production and non-production resources
+
+### Comparison of Protection Features
+
+| Feature             | Protection Level | When It Activates               | Configuration              |
+| ------------------- | ---------------- | ------------------------------- | -------------------------- |
+| **Safe Delete**     | API/Provider     | When resource has attached VXCs | Automatic (always enabled) |
+| **prevent_destroy** | Terraform        | For any deletion attempt        | Manual (per resource)      |
+| **Portal Locking**  | Megaport Portal  | Prevents all modifications      | Manual (via Portal)        |
+
+For a complete example with detailed explanations, see the [prevent_destroy example](examples/prevent_destroy/).
+
+For more information about Terraform lifecycle management, see:
+
+- [Terraform Lifecycle Meta-Arguments](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle)
+- [Manage Resource Lifecycle Tutorial](https://developer.hashicorp.com/terraform/tutorials/state/resource-lifecycle)
+- [Megaport Documentation - Terraform State Management](https://docs.megaport.com/cloud/terraform/state-management/)

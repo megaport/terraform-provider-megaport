@@ -15,11 +15,11 @@ provider "megaport" {
 }
 
 data "megaport_location" "location_1" {
-  name = "Equinix SG1"
+  id = 36 # Equinix Singapore SG1
 }
 
 data "megaport_location" "location_2" {
-  name = "Equinix SG2"
+  id = 37 # Equinix Singapore SG2
 }
 
 resource "megaport_mve" "mve_1_sin" {

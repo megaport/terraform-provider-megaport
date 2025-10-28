@@ -198,13 +198,13 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"port_speed": schema.Int64Attribute{
-				Description: "The speed of the port in Mbps. Can be 10000 (10 G) or 100000 (100 G, where available).",
+				Description: "The speed of the port in Mbps. Can be 10000 (10 G), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available..",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 				Validators: []validator.Int64{
-					int64validator.OneOf(10000, 100000),
+					int64validator.OneOf(10000, 100000, 400000),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
@@ -230,10 +230,10 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, and 36. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
 				Required:    true,
 				Validators: []validator.Int64{
-					int64validator.OneOf(1, 12, 24, 36),
+					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},
 			},
 			"promo_code": schema.StringAttribute{
