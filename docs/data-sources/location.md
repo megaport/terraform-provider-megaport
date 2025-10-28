@@ -18,7 +18,7 @@ data "megaport_location" "my_location_1" {
 }
 
 data "megaport_location" "my_location_2" {
-  name = "NextDC B1"
+  id = 5 # NextDC Brisbane B1
 }
 ```
 

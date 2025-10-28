@@ -21,7 +21,7 @@ provider "megaport" {
 }
 
 data "megaport_location" "loc" {
-  name = "NextDC B1"
+  id = 5 # NextDC Brisbane B1
 }
 
 resource "megaport_port" "port_1" {
@@ -70,7 +70,7 @@ provider "megaport" {
 }
 
 data "megaport_location" "loc" {
-  name = "NextDC B1"
+  id = 5 # NextDC Brisbane B1
 }
 
 resource "megaport_port" "port_1" {

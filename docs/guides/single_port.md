@@ -29,7 +29,7 @@ provider "megaport" {
 }
 
 data "megaport_location" "bne_nxt1" {
-  name = "NextDC B1"
+  id = 5 # NextDC Brisbane B1
 }
 
 resource "megaport_port" "port" {
