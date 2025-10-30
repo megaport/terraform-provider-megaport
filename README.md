@@ -504,6 +504,14 @@ If you need to find the location ID for a specific site code, you can:
 
 Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider.
 
+### Using Location IDs for Reliable Configurations
+
+In the Megaport API, data center location names and site codes might occasionally change as facilities are rebranded, merged, or updated. However, the location ID remains constant and is the most reliable way to identify a data center.
+
+If your Terraform configurations or API scripts rely on a location name or code that changes, those integrations will fail to execute until the references are manually updated. This can lead to automation failures, deployment delays, or service disruptions.
+
+**To ensure consistency and reliability, we strongly recommend using the location ID instead of the name or site code when integrating with the Megaport API or defining resources in Terraform.**
+
 **Current supported search methods:**
 
 - `id` - **RECOMMENDED** (most reliable and stable)
@@ -529,9 +537,12 @@ output "location_id_for_nextdc_b1" {
 }
 ```
 
-**Important:** Location IDs never change and provide the most reliable and deterministic behavior. Location names may be updated over time, which could cause Terraform configurations to break unexpectedly.
+### Location Reference Resources
 
-The most up-to-date listing of Megaport Datacenter Locations can be accessed through the Megaport API at `GET /v3/locations`
+For the most up-to-date list of Megaport data center locations:
+
+- **[Megaport Location IDs Documentation](https://docs.megaport.com/enabled-locations/location-ids/)** - Complete list of location IDs (dynamically updated with the API)
+- **[Megaport API GET /v3/locations](https://dev.megaport.com/#7c8e0706-e138-4d9a-bc4f-0419d97604cf)** - Programmatic access to location data
 
 ## Partner Port Stability
 
