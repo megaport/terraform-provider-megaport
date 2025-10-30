@@ -314,6 +314,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewPartnerPortDataSource,
 		NewMVEImageDataSource,
 		NewMVESizeDataSource,
+		NewUsersDataSource,
 		NewMCRPrefixFilterListDataSource,
 	}
 }
@@ -328,6 +329,7 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 		NewMVEResource,
 		NewVXCResource,
 		NewIXResource,
+		NewUserResource,
 	}
 }
 
