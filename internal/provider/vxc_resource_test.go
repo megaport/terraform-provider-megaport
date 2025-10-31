@@ -2336,7 +2336,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 				  }
 
 				  data "megaport_location" "syd_gs" {
-					name = "Global Switch Sydney West"
+					id = %d
 				  }
 
 				  data "megaport_partner" "aws_port" {
@@ -2413,7 +2413,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationID1, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
