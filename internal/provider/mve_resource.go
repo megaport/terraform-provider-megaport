@@ -374,11 +374,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the MVE.",
+				Description: "The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the MVE was created.",
+				Description: "The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -392,11 +392,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"terminate_date": schema.StringAttribute{
-				Description: "The date the MVE will be terminated.",
+				Description: "The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the MVE went live.",
+				Description: "The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
@@ -451,11 +451,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The contract start date of the MVE.",
+				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The contract end date of the MVE.",
+				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"cost_centre": schema.StringAttribute{

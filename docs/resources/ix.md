@@ -57,13 +57,13 @@ resource "megaport_ix" "test_ix" {
 
 ### Read-Only
 
-- `create_date` (String) The date the IX was created.
+- `create_date` (String) The date the IX was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `deploy_date` (String) The date the IX was deployed.
 - `ix_peer_macro` (String) IX peer macro configuration.
 - `location_id` (Number) The ID of the location where the IX is provisioned.
 - `product_id` (Number) Numeric ID of the IX product.
 - `product_uid` (String) UID identifier of the IX product.
-- `provisioning_status` (String) The provisioning status of the IX.
+- `provisioning_status` (String) The provisioning status of the IX. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the IX lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `resources` (Attributes) Resources associated with the IX. (see [below for nested schema](#nestedatt--resources))
 - `secondary_name` (String) Secondary name for the IX.
 - `term` (Number) The term of the IX in months.
