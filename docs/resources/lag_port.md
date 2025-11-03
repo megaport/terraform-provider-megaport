@@ -58,7 +58,7 @@ resource "megaport_lag_port" "lag_port" {
 - `market` (String) The market the product is in.
 - `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the product.
+- `provisioning_status` (String) The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 - `terminate_date` (String) The date the product will be terminated.
 - `usage_algorithm` (String) The usage algorithm for the product.

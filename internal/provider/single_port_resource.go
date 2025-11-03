@@ -194,11 +194,11 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the product.",
+				Description: "The provisioning status of the port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the product was created.",
+				Description: "The date the port was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"created_by": schema.StringAttribute{
@@ -219,11 +219,11 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"terminate_date": schema.StringAttribute{
-				Description: "The date the product will be terminated.",
+				Description: "The date the port will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the product went live.",
+				Description: "The date the port went live. This value is set by the Megaport API when the port becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"market": schema.StringAttribute{
@@ -277,11 +277,11 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract started.",
+				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the port is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends.",
+				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{

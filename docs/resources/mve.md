@@ -114,12 +114,12 @@ resource "megaport_mve" "mve_aviatrix" {
 - `cancelable` (Boolean) Whether the MVE is cancelable.
 - `company_name` (String) The company name of the MVE.
 - `company_uid` (String) The company UID of the MVE.
-- `contract_end_date` (String) The contract end date of the MVE.
-- `contract_start_date` (String) The contract start date of the MVE.
-- `create_date` (String) The date the MVE was created.
+- `contract_end_date` (String) The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `contract_start_date` (String) The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `create_date` (String) The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `created_by` (String) The user who created the MVE.
 - `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
-- `live_date` (String) The date the MVE went live.
+- `live_date` (String) The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `locked` (Boolean) Whether the MVE is locked.
 - `market` (String) The market the MVE is in.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
@@ -127,9 +127,9 @@ resource "megaport_mve" "mve_aviatrix" {
 - `product_id` (Number) The Numeric ID of the MVE.
 - `product_type` (String) The type of product (MVE).
 - `product_uid` (String) The unique identifier of the MVE.
-- `provisioning_status` (String) The provisioning status of the MVE.
+- `provisioning_status` (String) The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `secondary_name` (String) The secondary name of the MVE.
-- `terminate_date` (String) The date the MVE will be terminated.
+- `terminate_date` (String) The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `usage_algorithm` (String) The usage algorithm of the MVE.
 - `vendor` (String) The vendor of the MVE.
 - `virtual` (Boolean) Whether the MVE is virtual.
