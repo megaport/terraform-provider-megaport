@@ -196,10 +196,16 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the product.",
@@ -221,10 +227,16 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"terminate_date": schema.StringAttribute{
 				Description: "The date the product will be terminated.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"market": schema.StringAttribute{
 				Description: "The market the product is in.",
@@ -279,10 +291,16 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract started.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.",

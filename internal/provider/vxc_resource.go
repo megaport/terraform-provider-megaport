@@ -530,6 +530,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"secondary_name": schema.StringAttribute{
 				Description: "The secondary name of the product.",
@@ -562,10 +565,16 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
@@ -870,10 +879,16 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_start_date": schema.StringAttribute{
 				Description: "The date the contract starts.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The UID of the company the product is associated with.",
