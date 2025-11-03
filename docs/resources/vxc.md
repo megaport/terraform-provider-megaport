@@ -298,19 +298,19 @@ resource "megaport_vxc" "service_key_vxc" {
 - `cancelable` (Boolean) Whether the product is cancelable.
 - `company_name` (String) The name of the company the product is associated with.
 - `company_uid` (String) The UID of the company the product is associated with.
-- `contract_end_date` (String) The date the contract ends.
-- `contract_start_date` (String) The date the contract starts.
-- `create_date` (String) The date the product was created.
+- `contract_end_date` (String) The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `contract_start_date` (String) The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `create_date` (String) The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `created_by` (String) The user who created the product.
 - `csp_connections` (Attributes List) The Cloud Service Provider (CSP) connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `distance_band` (String) The distance band of the product.
 - `last_updated` (String) The last time the resource was updated.
-- `live_date` (String) The date the product went live.
+- `live_date` (String) The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.
 - `locked` (Boolean) Whether the product is locked.
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the product.
+- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
