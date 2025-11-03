@@ -528,7 +528,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the product.",
+				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),
@@ -563,14 +563,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the product went live.",
+				Description: "The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),
 				},
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the product was created.",
+				Description: "The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),
@@ -877,14 +877,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts.",
+				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),
 				},
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends.",
+				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),

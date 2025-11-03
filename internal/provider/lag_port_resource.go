@@ -183,7 +183,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the product.",
+				Description: "The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					PreserveStateForComputed(),
