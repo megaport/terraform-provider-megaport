@@ -377,7 +377,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The provisioning status of the MVE.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"create_date": schema.StringAttribute{
@@ -398,14 +398,14 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The date the MVE will be terminated.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the MVE went live.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"diversity_zone": schema.StringAttribute{
@@ -463,7 +463,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The contract start date of the MVE.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"contract_end_date": schema.StringAttribute{
@@ -478,7 +478,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"marketplace_visibility": schema.BoolAttribute{

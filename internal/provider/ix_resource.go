@@ -374,14 +374,14 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "The provisioning status of the IX.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the IX was created.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"term": schema.Int64Attribute{
@@ -401,28 +401,28 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "The date the IX was deployed.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"secondary_name": schema.StringAttribute{
 				Description: "Secondary name for the IX.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"ix_peer_macro": schema.StringAttribute{
 				Description: "IX peer macro configuration.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
 				Description: "Usage algorithm for the IX.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"resources": schema.SingleNestedAttribute{

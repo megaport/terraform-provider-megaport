@@ -186,14 +186,14 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The provisioning status of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the product was created.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"created_by": schema.StringAttribute{
@@ -217,14 +217,14 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The date the product will be terminated.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "The date the product went live.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"market": schema.StringAttribute{
@@ -278,14 +278,14 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The date the contract started.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "The date the contract ends.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"marketplace_visibility": schema.BoolAttribute{

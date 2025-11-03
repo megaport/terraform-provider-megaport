@@ -400,7 +400,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Provisioning status of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"diversity_zone": schema.StringAttribute{
@@ -447,14 +447,14 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Date the product will be terminated.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"live_date": schema.StringAttribute{
 				Description: "Date the product went live.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"market": schema.StringAttribute{
@@ -504,14 +504,14 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "Contract start date of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"contract_end_date": schema.StringAttribute{
 				Description: "Contract end date of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					PreserveStateForComputed(),
 				},
 			},
 			"secondary_name": schema.StringAttribute{
