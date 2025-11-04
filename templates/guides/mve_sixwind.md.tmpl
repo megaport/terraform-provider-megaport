@@ -1,0 +1,46 @@
+---
+page_title: "6WIND Megaport Virtual Edge (MVE)"
+description: |-
+  6WIND Megaport Virtual Edge (MVE) Deployment
+---
+
+# 6WIND Megaport Virtual Edge (MVE)
+
+This guide provides an example configuration for deploying a 6WIND Megaport Virtual Edge (MVE).
+
+## Important Requirements
+
+### SSH Key Requirements
+
+6WIND MVE **requires a 2048-bit RSA SSH key**. Other key types such as ED25519, ECDSA, or RSA keys with different bit lengths (1024, 4096) are **not supported** and will cause provisioning failures.
+
+To generate a compatible SSH key:
+
+```bash
+ssh-keygen -t rsa -b 2048 -C "your_email@example.com"
+```
+
+After generation, use the content of the `.pub` file (your public key) in the `ssh_public_key` field of the `vendor_config`.
+
+### vNIC Configuration
+
+6WIND MVE supports up to 5 vNICs. The network interfaces in the guest OS are named:
+- `ens4` (first vNIC)
+- `ens5` (second vNIC)
+- `ens6` (third vNIC)
+- `ens7` (fourth vNIC)
+- `ens8` (fifth vNIC)
+
+You can configure between 1 and 5 vNICs depending on your networking requirements. The examples below demonstrate both static and dynamic vNIC configuration approaches.
+
+## Example Configuration
+
+This example configuration creates a 6WIND MVE with both static and dynamic vNIC configurations.
+
+{{ tffile "examples/mve_sixwind/mve_sixwind.tf" }}
+
+## MVE Documentation
+
+For more information on creating and using a 6WIND Megaport Virtual Edge, additional documentation is available:
+- [Megaport MVE Documentation](https://docs.megaport.com/mve/)
+- [6WIND MVE Specific Documentation](https://docs.megaport.com/mve/6wind/)
