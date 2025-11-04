@@ -1,5 +1,5 @@
 data "megaport_location" "sixwind_location" {
-  name = "Global Switch Sydney West"
+  id = 3 # DigiCo Sydney SYD1 (Global Switch)	
 }
 
 data "megaport_mve_images" "sixwind" {

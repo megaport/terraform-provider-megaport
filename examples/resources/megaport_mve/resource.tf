@@ -131,7 +131,7 @@ variable "sixwind_ssh_public_key" {
 
 resource "megaport_mve" "mve_sixwind_dynamic" {
   product_name         = "6WIND MVE Example - Dynamic vNICs"
-  location_id          = 6
+  location_id          = 3 # DigiCo Sydney SYD1 (Global Switch)	
   contract_term_months = 1
 
   vendor_config = {
