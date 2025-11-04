@@ -407,6 +407,45 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_CostCentreRemoval() {
 	})
 }
 
+func (suite *MCRProviderTestSuite) TestAccMegaportMCR_ContractTermUpdate() {
+	mcrName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_mcr" "mcr" {
+					product_name = "%s"
+					port_speed = 1000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+				}`, MCRTestLocationIDNum, mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "1"),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_mcr" "mcr" {
+					product_name = "%s"
+					port_speed = 1000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 12
+				}`, MCRTestLocationIDNum, mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+				),
+			},
+		},
+	})
+}
+
 func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 	mcrName := RandomTestName()
 	mcrNameNew := RandomTestName()
