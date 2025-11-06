@@ -3,7 +3,6 @@ package provider
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -190,7 +189,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 				}`, SinglePortTestLocationIDNum, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_port.port", 20*time.Minute),
+					waitForProvisioningStatus("megaport_port.port"),
 				),
 			},
 			{

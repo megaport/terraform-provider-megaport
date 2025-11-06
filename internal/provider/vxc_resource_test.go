@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -519,7 +518,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_ContractTermUpdate() 
 				}`, VXCLocationID1, portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_vxc.vxc", 20*time.Minute),
+					waitForProvisioningStatus("megaport_vxc.vxc"),
 				),
 			},
 			{
