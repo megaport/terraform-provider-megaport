@@ -193,7 +193,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_ContractTermUpdate
 				}`, LagPortTestLocationIDNum, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_lag_port.lag_port", "LIVE", 20*time.Minute),
+					waitForProvisioningStatus("megaport_lag_port.lag_port", 20*time.Minute),
 				),
 			},
 			{

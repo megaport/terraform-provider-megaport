@@ -103,14 +103,15 @@ func getProductStatus(ctx context.Context, client *megaport.Client, productUID s
 	}
 }
 
-// waitForProvisioningStatus returns a TestCheckFunc that waits for a resource to reach the expected provisioning status.
-// This function polls the Megaport API directly to check the actual provisioning_status until it matches expectedStatus.
+// waitForProvisioningStatus returns a TestCheckFunc that waits for a resource to reach LIVE provisioning status.
+// This function polls the Megaport API directly to check the actual provisioning_status until it reaches LIVE.
 // This is necessary before updating contract terms, as the API requires the resource to be fully provisioned (LIVE status).
 // Based on testing in the Staging API, resources typically take 40-60 seconds to reach LIVE status.
-func waitForProvisioningStatus(resourceName string, expectedStatus string, timeout time.Duration) func(*terraform.State) error {
+func waitForProvisioningStatus(resourceName string, timeout time.Duration) func(*terraform.State) error {
 	return func(s *terraform.State) error {
 		startTime := time.Now()
 		pollInterval := 2 * time.Second
+		expectedStatus := "LIVE"
 
 		// Get the resource from state to extract product_uid and resource type
 		rs, ok := s.RootModule().Resources[resourceName]

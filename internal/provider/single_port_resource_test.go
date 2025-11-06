@@ -190,7 +190,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 				}`, SinglePortTestLocationIDNum, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_port.port", "LIVE", 20*time.Minute),
+					waitForProvisioningStatus("megaport_port.port", 20*time.Minute),
 				),
 			},
 			{
