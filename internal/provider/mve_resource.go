@@ -457,9 +457,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_end_date": schema.StringAttribute{
 				Description: "The contract end date of the MVE.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre of the MVE.",
