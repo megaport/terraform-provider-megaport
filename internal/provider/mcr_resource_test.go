@@ -425,6 +425,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_ContractTermUpdate() {
 				}`, MCRTestLocationIDNum, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "1"),
+					waitForProvisioningStatus("megaport_mcr.mcr", "LIVE", 20*time.Minute),
 				),
 			},
 			{

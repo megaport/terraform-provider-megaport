@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -192,6 +193,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_ContractTermUpdate
 				}`, LagPortTestLocationIDNum, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "1"),
+					waitForProvisioningStatus("megaport_lag_port.lag_port", "LIVE", 20*time.Minute),
 				),
 			},
 			{

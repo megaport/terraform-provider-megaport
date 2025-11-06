@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -41,7 +42,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 				data "megaport_location" "test_location" {
 					id = %d
 				}
-				
+
 				data "megaport_mve_images" "aruba" {
   					vendor_filter = "Aruba"
   					id_filter = 23
@@ -358,6 +359,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 				}`, MVETestLocationIDNum, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					waitForProvisioningStatus("megaport_mve.mve", "LIVE", 20*time.Minute),
 				),
 			},
 			{
@@ -611,7 +613,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                 data "megaport_location" "test_location" {
                     id = %d
                 }
-                
+
                 data "megaport_mve_images" "aruba" {
                       vendor_filter = "Aruba"
                       id_filter = 23
@@ -667,7 +669,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                 data "megaport_location" "test_location" {
                     id = %d
                 }
-                
+
                 data "megaport_mve_images" "aruba" {
                       vendor_filter = "Aruba"
                       id_filter = 23
