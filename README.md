@@ -601,6 +601,58 @@ provider "megaport" {
 - Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
 - If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
 
+## Importing Existing Resources
+
+When importing existing Megaport resources into Terraform, you may notice that certain computed fields appear to change from "unknown" to their actual values on the first `terraform apply` after import. **This is expected behavior and not actual configuration drift.**
+
+### Expected Import Behavior for Computed Fields
+
+The following fields are managed by the Megaport API and will populate from the API during import:
+
+#### Timestamp Fields
+
+- `create_date` - Set when the resource is created
+- `live_date` - Set when the resource becomes active
+- `contract_start_date` - Set when the contract begins
+- `contract_end_date` - Calculated based on contract term
+- `terminate_date` - Set when termination is scheduled
+
+#### Status Fields
+
+- `provisioning_status` - Current lifecycle state (e.g., CONFIGURED, LIVE, DECOMMISSIONED)
+
+### What You'll See After Import
+
+```bash
+# After importing a resource
+terraform import megaport_port.example abc123
+
+# First plan after import may show these fields changing from unknown → actual value
+terraform plan
+```
+
+Example plan output:
+
+```
+# megaport_port.example will be updated in-place
+~ resource "megaport_port" "example" {
+    ~ create_date          = (known after apply) -> "2024-01-15T10:30:00Z"
+    ~ live_date            = (known after apply) -> "2024-01-15T11:00:00Z"
+    ~ provisioning_status  = (known after apply) -> "LIVE"
+    # ... other attributes unchanged
+}
+```
+
+**This is normal!** These fields are being populated from the API for the first time. Run `terraform apply` to update the state, and subsequent plans will show no changes.
+
+### Best Practice for Imports
+
+1. Import the resource
+2. Run `terraform plan` - you'll see computed fields updating
+3. Review the plan to ensure it matches your expectations
+4. Run `terraform apply` to update the state
+5. Run `terraform plan` again - should show no changes
+
 ## Safe Delete Protection
 
 The Megaport Terraform Provider includes automatic **Safe Delete Protection** to prevent accidental deletion of resources that have active dependencies. This feature is always enabled and works at the API level to protect your infrastructure.

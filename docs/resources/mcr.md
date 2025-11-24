@@ -70,12 +70,12 @@ resource "megaport_mcr" "mcr" {
 - `company_uid` (String) Megaport Company UID of the product.
 - `contract_end_date` (String) Contract end date of the product.
 - `contract_start_date` (String) Contract start date of the product.
-- `create_date` (String) Date the product was created.
+- `create_date` (String) The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `created_by` (String) User who created the product.
 - `lag_id` (Number) Numeric ID of the LAG.
 - `lag_primary` (Boolean) Whether the product is a LAG primary.
 - `last_updated` (String) Last updated by the Terraform provider.
-- `live_date` (String) Date the product went live.
+- `live_date` (String) The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `locked` (Boolean) Whether the product is locked.
 - `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
