@@ -171,3 +171,47 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_CostCentreRemoval(
 		},
 	})
 }
+
+func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_ContractTermUpdate() {
+	portName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_lag_port" "lag_port" {
+					product_name  = "%s"
+					port_speed  = 10000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					marketplace_visibility = false
+					lag_count = 1
+				}`, LagPortTestLocationIDNum, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "1"),
+					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_lag_port" "lag_port" {
+					product_name  = "%s"
+					port_speed  = 10000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 12
+					marketplace_visibility = false
+					lag_count = 1
+				}`, LagPortTestLocationIDNum, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
+				),
+			},
+		},
+	})
+}

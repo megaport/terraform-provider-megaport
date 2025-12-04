@@ -169,3 +169,45 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 		},
 	})
 }
+
+func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTermUpdate() {
+	portName := RandomTestName()
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_port" "port" {
+					product_name  = "%s"
+					port_speed  = 1000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 1
+					marketplace_visibility = false
+				}`, SinglePortTestLocationIDNum, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
+					waitForProvisioningStatus("megaport_port.port"),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_port" "port" {
+					product_name  = "%s"
+					port_speed  = 1000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 12
+					marketplace_visibility = false
+				}`, SinglePortTestLocationIDNum, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
+				),
+			},
+		},
+	})
+}
