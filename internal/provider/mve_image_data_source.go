@@ -228,7 +228,6 @@ func (d *mveImageDataSource) Configure(_ context.Context, req datasource.Configu
 			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 

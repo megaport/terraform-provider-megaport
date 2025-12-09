@@ -1008,7 +1008,6 @@ func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest
 			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 

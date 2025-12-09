@@ -50,8 +50,62 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
+
+  # Optional: AWS integration for managing DirectConnect VIFs
+  aws_configuration {
+    aws_region          = "us-east-1"
+    aws_assume_role_arn = "arn:aws:iam::123456789012:role/MegaportRole"
+    aws_external_id     = "your-external-id"  # Optional
+  }
 }
 ```
+
+### AWS Integration
+
+When creating VXCs to AWS, the provider can optionally manage AWS DirectConnect Virtual Interfaces (VIFs) on your behalf. This requires AWS credentials to be configured in the provider:
+
+**Assume Role (Recommended)**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region          = "us-east-1"
+    aws_assume_role_arn = "arn:aws:iam::123456789012:role/MegaportRole"
+    aws_external_id     = "your-external-id"  # Required only if role has external ID condition
+  }
+}
+```
+
+**AWS Profile**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region  = "us-east-1"
+    aws_profile = "your-aws-profile"
+  }
+}
+```
+
+**Static Credentials**
+
+```terraform
+provider "megaport" {
+  # ... other configuration ...
+
+  aws_configuration {
+    aws_region     = "us-east-1"
+    aws_access_key = "your-aws-access-key"
+    aws_secret_key = "your-aws-secret-key"
+  }
+}
+```
+
+All AWS configuration options can also be set using environment variables (`AWS_REGION`, `AWS_ROLE_ARN`, `AWS_EXTERNAL_ID`, `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
 
 ## Terraform MCP Server
 
@@ -110,6 +164,292 @@ resource "megaport_mcr_prefix_filter_list" "allow_private_ipv6" {
     }
   ]
 }
+```
+
+#### ⚠️ Deprecated Inline Approach
+
+```terraform
+# ❌ DEPRECATED: Inline prefix filter lists (will be removed in future version)
+resource "megaport_mcr" "deprecated_example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+
+  # This approach is deprecated and will show warnings
+  prefix_filter_lists = [
+    {
+      description    = "Allow private networks"
+      address_family = "IPv4"
+      entries = [
+        {
+          action = "permit"
+          prefix = "10.0.0.0/8"
+          ge     = 16
+          le     = 24
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Benefits of Standalone Resources
+
+- **Individual Lifecycle Management**: Each prefix filter list has its own Terraform state and lifecycle
+- **Better Error Handling**: Failures in one list don't affect others
+- **Enhanced Reusability**: Lists can be referenced and managed independently
+- **Cleaner State**: Avoid complex nested object handling in Terraform state
+- **Import Support**: Easy migration of existing lists using `terraform import`
+
+### Migration Guide
+
+#### Step 1: Inventory Existing Lists
+
+Use the data source to see what prefix filter lists you currently have:
+
+```terraform
+data "megaport_mcr_prefix_filter_lists" "existing" {
+  mcr_id = "your-mcr-uid-here"
+}
+
+output "current_lists" {
+  value = data.megaport_mcr_prefix_filter_lists.existing.prefix_filter_lists
+}
+```
+
+#### Step 2: Create Standalone Resources
+
+For each existing list, create a corresponding resource:
+
+```terraform
+resource "megaport_mcr_prefix_filter_list" "migrated_list_1" {
+  mcr_id         = "your-mcr-uid-here"
+  description    = "Copy description from existing list"
+  address_family = "IPv4"
+  entries = [
+    # Copy entries from existing configuration
+  ]
+}
+```
+
+#### Step 3: Import Existing Lists
+
+Import each existing list to avoid recreation:
+
+```bash
+terraform import megaport_mcr_prefix_filter_list.migrated_list_1 mcr-uid:prefix-list-id
+```
+
+#### Step 4: Update MCR Resource
+
+Remove the `prefix_filter_lists` attribute from your MCR resource and add a lifecycle rule:
+
+```terraform
+resource "megaport_mcr" "example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+
+  # Remove or comment out the old prefix_filter_lists attribute
+  # prefix_filter_lists = [...]
+
+  # Add lifecycle rule to prevent drift warnings
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+```
+
+#### Step 5: Verify Migration
+
+Run `terraform plan` to ensure no unexpected changes are detected.
+
+### Mixed Usage Prevention
+
+The provider includes validation to prevent managing the same prefix filter lists through both methods simultaneously. If you attempt to use both inline and standalone management for the same MCR, you'll receive warnings about potential conflicts.
+
+### Deprecation Notice
+
+The inline `prefix_filter_lists` attribute in the MCR resource is deprecated and will be removed in a future version. We recommend migrating to standalone `megaport_mcr_prefix_filter_list` resources for better lifecycle management and improved state handling.
+
+### Troubleshooting and Best Practices
+
+#### Common Issues
+
+**MCR Resource Shows Drift with Standalone Resources**
+
+When using standalone `megaport_mcr_prefix_filter_list` resources, you should add a lifecycle rule to your MCR resource to prevent Terraform from detecting drift on the `prefix_filter_lists` attribute. This is necessary because:
+
+1. The standalone prefix filter list resources manage the lists independently
+2. The MCR resource still reads the lists from the API, which can cause Terraform to detect "changes" even though the lists are being managed by the standalone resources
+3. This applies to both newly created MCRs and existing ones - the lifecycle rule tells Terraform to ignore differences in this attribute since it's being managed elsewhere
+
+```terraform
+resource "megaport_mcr" "example" {
+  # ... configuration ...
+
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+```
+
+**Why is this needed for new resources?** Even when creating a new MCR alongside standalone prefix filter list resources, Terraform's refresh cycle will detect that the MCR has prefix filter lists attached (via the standalone resources), and without the lifecycle rule, it may show these as unexpected changes on subsequent plan/apply operations.
+
+**Mixed Usage Warning**
+
+If you see warnings about mixed usage, ensure you're not managing the same prefix filter lists through both inline and standalone methods simultaneously.
+
+**Import Format**
+
+When importing existing prefix filter lists, use the format `mcr_uid:prefix_list_id`:
+
+```bash
+# Get the MCR UID and prefix list ID from the Megaport Portal or API
+terraform import megaport_mcr_prefix_filter_list.example a1b2c3d4-5678-90ef-ghij-klmnopqrstuv:1234
+```
+
+#### Best Practices
+
+- **Use Location IDs**: Always use location IDs instead of names for MCR placement (more stable)
+- **Validate Prefix Ranges**: Ensure ge (greater than or equal) and le (less than or equal) values make sense for your prefix lengths
+- **Group Related Lists**: Create logically grouped prefix filter lists for easier management
+- **Test Migrations**: Always test migrations in a non-production environment first
+- **Document Purposes**: Use descriptive names and descriptions for prefix filter lists
+
+#### Example Production Configuration
+
+```terraform
+# Production MCR with standalone prefix filter lists
+resource "megaport_mcr" "production" {
+  product_name         = "prod-mcr"
+  port_speed          = 2500
+  location_id         = 1  # Use stable location ID
+  contract_term_months = 12
+
+  resource_tags = {
+    Environment = "production"
+    Owner       = "network-team"
+    Purpose     = "multi-cloud-connectivity"
+  }
+
+  lifecycle {
+    ignore_changes = [prefix_filter_lists]
+  }
+}
+
+# Allow internal corporate networks
+resource "megaport_mcr_prefix_filter_list" "corporate_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "Corporate internal networks"
+  address_family = "IPv4"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "10.100.0.0/16"
+      ge     = 24
+      le     = 28
+    },
+    {
+      action = "permit"
+      prefix = "10.200.0.0/16"
+      ge     = 24
+      le     = 28
+    }
+  ]
+}
+
+# Allow cloud provider networks
+resource "megaport_mcr_prefix_filter_list" "cloud_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "AWS and Azure networks"
+  address_family = "IPv4"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "172.16.0.0/12"
+      ge     = 16
+      le     = 24
+    }
+  ]
+}
+
+# IPv6 support for future expansion
+resource "megaport_mcr_prefix_filter_list" "ipv6_networks" {
+  mcr_id         = megaport_mcr.production.product_uid
+  description    = "IPv6 corporate networks"
+  address_family = "IPv6"
+
+  entries = [
+    {
+      action = "permit"
+      prefix = "2001:db8:100::/48"
+      ge     = 56
+      le     = 64
+    }
+  ]
+}
+```
+
+## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
+
+### Enhanced MCR Management with Standalone Resources
+
+The Megaport Terraform Provider now supports managing MCR prefix filter lists as individual resources, providing better lifecycle management and improved state handling compared to the previous inline approach.
+
+#### ✅ New Standalone Approach (Recommended)
+
+```terraform
+# Create MCR without inline prefix filter lists
+resource "megaport_mcr" "example" {
+  product_name         = "my-mcr"
+  port_speed          = 1000
+  location_id         = 5
+  contract_term_months = 12
+}
+
+# Manage prefix filter lists as individual resources
+
+resource "megaport_mcr_prefix_filter_list" "allow_private_ipv4" {
+mcr_id = megaport_mcr.example.product_uid
+description = "Allow private IPv4 networks"
+address_family = "IPv4"
+
+entries = [
+{
+action = "permit"
+prefix = "10.0.0.0/8"
+ge = 16
+le = 24
+},
+{
+action = "permit"
+prefix = "192.168.0.0/16"
+ge = 24
+le = 32
+}
+]
+}
+
+resource "megaport_mcr_prefix_filter_list" "allow_private_ipv6" {
+mcr_id = megaport_mcr.example.product_uid
+description = "Allow private IPv6 networks"
+address_family = "IPv6"
+
+entries = [
+{
+action = "permit"
+prefix = "fd00::/8"
+ge = 48
+le = 64
+}
+]
+}
+
 ```
 
 #### ⚠️ Deprecated Inline Approach
