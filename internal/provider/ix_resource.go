@@ -86,7 +86,6 @@ type ixResourceModel struct {
 	VLAN                types.Int64  `tfsdk:"vlan"`
 	Shutdown            types.Bool   `tfsdk:"shutdown"`
 	PromoCode           types.String `tfsdk:"promo_code"`
-	CostCentre          types.String `tfsdk:"cost_centre"`
 	PublicGraph         types.Bool   `tfsdk:"public_graph"`
 	ReverseDNS          types.String `tfsdk:"reverse_dns"`
 	ProvisioningStatus  types.String `tfsdk:"provisioning_status"`
@@ -355,10 +354,6 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			},
 			"promo_code": schema.StringAttribute{
 				Description: "Promo code to apply to the IX.",
-				Optional:    true,
-			},
-			"cost_centre": schema.StringAttribute{
-				Description: "Cost centre for invoicing purposes.",
 				Optional:    true,
 			},
 			"public_graph": schema.BoolAttribute{

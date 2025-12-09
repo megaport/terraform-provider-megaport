@@ -377,6 +377,196 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "resource_tags.key2updated", "value2updated"),
 				),
 			},
+			// Test data sources - check ports and VXCs
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					id = %d
+				}
+					resource "megaport_port" "port_1" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+				  resource "megaport_port" "port_3" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+                  }
+                  resource "megaport_port" "port_4" {
+                    product_name  = "%s"
+                    port_speed  = 1000
+                    location_id = data.megaport_location.loc.id
+                    contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+                  }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
+			        rate_limit = 600
+					contract_term_months = 24
+					cost_centre = "%s"
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
+
+			        a_end = {
+			            requested_product_uid = megaport_port.port_3.product_uid
+						ordered_vlan = 200
+						inner_vlan = 400
+			        }
+
+			        b_end = {
+			            requested_product_uid = megaport_port.port_4.product_uid
+						ordered_vlan = 201
+						inner_vlan = 401
+			        }
+			      }
+
+				  # Test port data source with name filter
+				  data "megaport_ports" "test_name_filter" {
+					filter {
+					  name = "name"
+					  values = ["%s"]
+					}
+				  }
+
+				  # Test port data source with port-speed filter
+				  data "megaport_ports" "test_speed_filter" {
+					filter {
+					  name = "port-speed"
+					  values = ["1000"]
+					}
+				  }
+
+				  # Test port data source with location-id filter
+				  data "megaport_ports" "test_location_filter" {
+					filter {
+					  name = "location-id"
+					  values = ["%d"]
+					}
+				  }
+
+				  # Test port data source with multiple filters
+				  data "megaport_ports" "test_multi_filter" {
+					filter {
+					  name = "port-speed"
+					  values = ["1000"]
+					}
+					filter {
+					  name = "location-id"
+					  values = ["%d"]
+					}
+				  }
+
+				  # Test port data source with tags
+				  data "megaport_ports" "test_tag_filter" {
+					tags = {
+					  "key1" = "value1"
+					}
+				  }
+
+				  # Test VXC data source with name filter
+				  data "megaport_vxcs" "test_vxc_name_filter" {
+					filter {
+					  name = "name"
+					  values = ["%s"]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with rate-limit filter
+				  data "megaport_vxcs" "test_vxc_rate_filter" {
+					filter {
+					  name = "rate-limit"
+					  values = ["600"]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with aend-uid filter
+				  data "megaport_vxcs" "test_vxc_aend_filter" {
+					filter {
+					  name = "aend-uid"
+					  values = [megaport_port.port_3.product_uid]
+					}
+				  }
+
+				  # Test VXC data source with bend-uid filter
+				  data "megaport_vxcs" "test_vxc_bend_filter" {
+					filter {
+					  name = "bend-uid"
+					  values = [megaport_port.port_4.product_uid]
+					}
+				  }
+
+				  # Test VXC data source with multiple filters
+				  data "megaport_vxcs" "test_vxc_multi_filter" {
+					filter {
+					  name = "rate-limit"
+					  values = ["600"]
+					}
+					filter {
+					  name = "name"
+					  values = [megaport_vxc.vxc.product_name]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with tags
+				  data "megaport_vxcs" "test_vxc_tag_filter" {
+					tags = {
+					  "key1updated" = "value1updated"
+					}
+				  }
+				  `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew,
+					portName3, VXCLocationID1, VXCLocationID1, vxcNameNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Original resource checks
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "600"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "24"),
+
+					// Port data source checks
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_name_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_name_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_speed_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_location_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_location_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_multi_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+
+					// VXC data source checks
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_name_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_name_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_rate_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_rate_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_aend_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_aend_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_bend_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_bend_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_multi_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_multi_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+				),
+			},
 		},
 	})
 }
@@ -763,6 +953,165 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "a_end.vlan"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "-1"),
 					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "b_end.vlan"),
+				),
+			},
+			// Add data sources test step
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "loc" {
+					id = %d
+				}
+					resource "megaport_port" "port_1" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_port" "port_2" {
+			        product_name  = "%s"
+			        port_speed  = 1000
+			        location_id = data.megaport_location.loc.id
+			        contract_term_months        = 12
+					cost_centre = "test"
+					marketplace_visibility = false
+			      }
+			      resource "megaport_vxc" "vxc" {
+			        product_name   = "%s"
+			        rate_limit = 500
+					contract_term_months = 12
+					cost_centre = "%s"
+
+			        a_end = {
+			            requested_product_uid = megaport_port.port_1.product_uid
+						ordered_vlan = -1
+			        }
+
+			        b_end = {
+			            requested_product_uid = megaport_port.port_2.product_uid
+						ordered_vlan = -1
+			        }
+			      }
+
+				  # Test port data source with name filter
+				  data "megaport_ports" "test_name_filter" {
+					filter {
+					  name = "name"
+					  values = ["%s"]
+					}
+					depends_on = [megaport_port.port_1]
+				  }
+
+				  # Test port data source with port-speed filter
+				  data "megaport_ports" "test_speed_filter" {
+					filter {
+					  name = "port-speed"
+					  values = ["1000"]
+					}
+					depends_on = [megaport_port.port_1, megaport_port.port_2]
+				  }
+
+				  # Test port data source with location-id filter
+				  data "megaport_ports" "test_location_filter" {
+					filter {
+					  name = "location-id"
+					  values = ["%d"]
+					}
+					depends_on = [megaport_port.port_1, megaport_port.port_2]
+				  }
+
+				  # Test port data source with multiple filters
+				  data "megaport_ports" "test_multi_filter" {
+					filter {
+					  name = "port-speed"
+					  values = ["1000"]
+					}
+					filter {
+					  name = "location-id"
+					  values = ["%d"]
+					}
+					depends_on = [megaport_port.port_1, megaport_port.port_2]
+				  }
+
+				  # Test VXC data source with name filter
+				  data "megaport_vxcs" "test_vxc_name_filter" {
+					filter {
+					  name = "name"
+					  values = ["%s"]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with rate-limit filter
+				  data "megaport_vxcs" "test_vxc_rate_filter" {
+					filter {
+					  name = "rate-limit"
+					  values = ["500"]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with aend-uid filter
+				  data "megaport_vxcs" "test_vxc_aend_filter" {
+					filter {
+					  name = "aend-uid"
+					  values = [megaport_port.port_1.product_uid]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with bend-uid filter
+				  data "megaport_vxcs" "test_vxc_bend_filter" {
+					filter {
+					  name = "bend-uid"
+					  values = [megaport_port.port_2.product_uid]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+
+				  # Test VXC data source with multiple filters
+				  data "megaport_vxcs" "test_vxc_multi_filter" {
+					filter {
+					  name = "rate-limit"
+					  values = ["500"]
+					}
+					filter {
+					  name = "name"
+					  values = [megaport_vxc.vxc.product_name]
+					}
+					depends_on = [megaport_vxc.vxc]
+				  }
+				  `, VXCLocationID1, portName1, portName2, vxcNameNew, costCentreNew, portName1, VXCLocationID1, VXCLocationID1, vxcNameNew),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Original resource checks
+					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
+					resource.TestCheckResourceAttr("megaport_port.port_2", "product_name", portName2),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcNameNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "rate_limit", "500"),
+
+					// Port data source checks
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_name_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_name_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_speed_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_speed_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_location_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_location_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_ports.test_multi_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_ports.test_multi_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+
+					// VXC data source checks
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_name_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_name_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_rate_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_rate_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_aend_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_aend_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_bend_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_bend_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
+					resource.TestCheckResourceAttrSet("data.megaport_vxcs.test_vxc_multi_filter", "uids.#"),
+					resource.TestMatchResourceAttr("data.megaport_vxcs.test_vxc_multi_filter", "uids.#", regexp.MustCompile("^[1-9][0-9]*$")), // At least 1
 				),
 			},
 		},
