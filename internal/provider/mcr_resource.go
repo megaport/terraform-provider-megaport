@@ -417,7 +417,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"create_date": schema.StringAttribute{
-				Description: "Date the product was created.",
+				Description: "The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -445,7 +445,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "Date the product went live.",
+				Description: "The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"market": schema.StringAttribute{
