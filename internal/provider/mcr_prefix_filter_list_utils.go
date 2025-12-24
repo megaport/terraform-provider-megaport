@@ -88,6 +88,22 @@ func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList 
 			}
 		}
 
+		// Normalize exact matches: when GUI "Exact" checkbox is used, the Megaport API
+		// returns le=32 (IPv4) or le=128 (IPv6) as a default value instead of returning
+		// the exact match value (ge=le). This causes Terraform to detect drift when users
+		// configure exact matches (e.g., ge=24, le=24).
+		// We normalize this by detecting when le is at the maximum value for the address
+		// family AND greater than ge, which semantically represents an exact match.
+		maxPrefixLength := 32
+		if m.AddressFamily.ValueString() == "IPv6" {
+			maxPrefixLength = 128
+		}
+
+		if le == maxPrefixLength && le > ge {
+			// This represents an exact match - normalize le to equal ge
+			le = ge
+		}
+
 		entryModel := &mcrPrefixFilterListEntryResourceModel{
 			Action: types.StringValue(entry.Action),
 			Prefix: types.StringValue(entry.Prefix),
