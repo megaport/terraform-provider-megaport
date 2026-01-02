@@ -733,7 +733,7 @@ func TestFromAPI(t *testing.T) {
 		// NO normalization is applied - the values are returned as-is from the API
 		// This is the correct behavior for import scenarios where we don't have prior config
 		{
-			name: "IPv4 exact match normalization - API returns le=32 for ge=24",
+			name: "IPv4 with le=32 (max) - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1001,
 				Description:   "IPv4 exact match test",
@@ -750,7 +750,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv4 exact match normalization - API returns le=32 for ge=16",
+			name: "IPv4 with le=32 (max) for /16 prefix - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1002,
 				Description:   "IPv4 exact match test /16",
@@ -767,7 +767,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv6 exact match normalization - API returns le=128 for ge=64",
+			name: "IPv6 with le=128 (max) - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1003,
 				Description:   "IPv6 exact match test",
@@ -784,7 +784,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv6 exact match normalization - API returns le=128 for ge=48",
+			name: "IPv6 with le=128 (max) for /48 prefix - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1004,
 				Description:   "IPv6 exact match test /48",
@@ -800,9 +800,9 @@ func TestFromAPI(t *testing.T) {
 			},
 			wantError: false,
 		},
-		// Non-exact match tests - values returned as-is (no normalization in fromAPI)
+		// Range tests - values returned as-is (no normalization in fromAPI)
 		{
-			name: "IPv4 non-exact match with le=32 - should NOT normalize",
+			name: "IPv4 range with le=32 - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1005,
 				Description:   "IPv4 range to max",
@@ -819,7 +819,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv4 non-exact match with intermediate le - should NOT normalize",
+			name: "IPv4 range with intermediate le - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1006,
 				Description:   "IPv4 range",
@@ -836,7 +836,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv6 non-exact match with le=128 - should NOT normalize",
+			name: "IPv6 range with le=128 - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1007,
 				Description:   "IPv6 range to max",
@@ -854,7 +854,7 @@ func TestFromAPI(t *testing.T) {
 		},
 		// Edge case: ge == le == max (true exact match at max length)
 		{
-			name: "IPv4 true exact match at /32 - should NOT normalize (already correct)",
+			name: "IPv4 exact match at /32 - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1008,
 				Description:   "IPv4 exact /32",
@@ -871,7 +871,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "IPv6 true exact match at /128 - should NOT normalize (already correct)",
+			name: "IPv6 exact match at /128 - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1009,
 				Description:   "IPv6 exact /128",
@@ -889,7 +889,7 @@ func TestFromAPI(t *testing.T) {
 		},
 		// Multiple entries - all returned as-is from API (no normalization in fromAPI)
 		{
-			name: "mixed entries - some exact matches, some ranges",
+			name: "mixed entries - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            1010,
 				Description:   "Mixed entries test",
