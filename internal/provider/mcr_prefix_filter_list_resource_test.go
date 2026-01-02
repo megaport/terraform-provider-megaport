@@ -402,3 +402,339 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 		},
 	})
 }
+
+// TestAccMegaportMCRPrefixFilterList_ExactMatch tests the exact match prefix filter entries
+// This specifically tests the normalization fix for when the Megaport API returns le=32 (IPv4)
+// or le=128 (IPv6) instead of the exact match value configured by the user.
+// See PR #308 for details on the bug fix.
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ExactMatch() {
+	mcrName := RandomTestName()
+	prefixFilterNameIPv4 := RandomTestName()
+	prefixFilterNameIPv6 := RandomTestName()
+	costCentreName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create prefix filter lists with exact match entries
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed          = 1000
+					location_id         = data.megaport_location.test_location.id
+					contract_term_months = 12
+					cost_centre         = "%s"
+
+					# Explicitly set empty prefix filter lists since we're using standalone resources
+					prefix_filter_lists = []
+
+					lifecycle {
+						ignore_changes = [prefix_filter_lists]
+					}
+				}
+
+				# IPv4 Exact Match Test - ge=le should not cause drift
+				resource "megaport_mcr_prefix_filter_list" "ipv4_exact" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							action = "permit"
+							prefix = "10.0.0.0/24"
+							ge     = 24
+							le     = 24  # Exact match - should remain 24, not change to 32
+						},
+						{
+							action = "deny"
+							prefix = "192.168.0.0/16"
+							ge     = 16
+							le     = 16  # Exact match - should remain 16, not change to 32
+						},
+						{
+							action = "permit"
+							prefix = "172.16.0.0/12"
+							ge     = 20
+							le     = 20  # Exact match for /20 within /12 - should remain 20
+						}
+					]
+				}
+
+				# IPv6 Exact Match Test - ge=le should not cause drift
+				resource "megaport_mcr_prefix_filter_list" "ipv6_exact" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv6"
+					entries = [
+						{
+							action = "permit"
+							prefix = "2001:db8::/32"
+							ge     = 48
+							le     = 48  # Exact match - should remain 48, not change to 128
+						},
+						{
+							action = "deny"
+							prefix = "2001:db8:1::/48"
+							ge     = 64
+							le     = 64  # Exact match - should remain 64, not change to 128
+						}
+					]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// IPv4 Exact Match Checks - verify ge=le is preserved
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "description", prefixFilterNameIPv4),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "address_family", "IPv4"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.#", "3"),
+
+					// Entry 0: /24 exact match
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.0.prefix", "10.0.0.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.0.le", "24"), // Must stay 24, not become 32
+
+					// Entry 1: /16 exact match
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.1.prefix", "192.168.0.0/16"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.1.ge", "16"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.1.le", "16"), // Must stay 16, not become 32
+
+					// Entry 2: /20 exact match within /12
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.2.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.2.prefix", "172.16.0.0/12"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.2.ge", "20"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.2.le", "20"), // Must stay 20, not become 32
+
+					// IPv6 Exact Match Checks - verify ge=le is preserved
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "description", prefixFilterNameIPv6),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "address_family", "IPv6"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.#", "2"),
+
+					// Entry 0: /48 exact match
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.0.prefix", "2001:db8::/32"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.0.ge", "48"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.0.le", "48"), // Must stay 48, not become 128
+
+					// Entry 1: /64 exact match
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.prefix", "2001:db8:1::/48"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.ge", "64"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.le", "64"), // Must stay 64, not become 128
+				),
+			},
+			// Step 2: Run plan again to ensure no drift is detected (idempotency check)
+			// This is the critical test - if normalization doesn't work, this step will fail
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed          = 1000
+					location_id         = data.megaport_location.test_location.id
+					contract_term_months = 12
+					cost_centre         = "%s"
+
+					# Explicitly set empty prefix filter lists since we're using standalone resources
+					prefix_filter_lists = []
+
+					lifecycle {
+						ignore_changes = [prefix_filter_lists]
+					}
+				}
+
+				# IPv4 Exact Match Test - ge=le should not cause drift
+				resource "megaport_mcr_prefix_filter_list" "ipv4_exact" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							action = "permit"
+							prefix = "10.0.0.0/24"
+							ge     = 24
+							le     = 24  # Exact match - should remain 24, not change to 32
+						},
+						{
+							action = "deny"
+							prefix = "192.168.0.0/16"
+							ge     = 16
+							le     = 16  # Exact match - should remain 16, not change to 32
+						},
+						{
+							action = "permit"
+							prefix = "172.16.0.0/12"
+							ge     = 20
+							le     = 20  # Exact match for /20 within /12 - should remain 20
+						}
+					]
+				}
+
+				# IPv6 Exact Match Test - ge=le should not cause drift
+				resource "megaport_mcr_prefix_filter_list" "ipv6_exact" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv6"
+					entries = [
+						{
+							action = "permit"
+							prefix = "2001:db8::/32"
+							ge     = 48
+							le     = 48  # Exact match - should remain 48, not change to 128
+						},
+						{
+							action = "deny"
+							prefix = "2001:db8:1::/48"
+							ge     = 64
+							le     = 64  # Exact match - should remain 64, not change to 128
+						}
+					]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				// PlanOnly checks that no changes are needed - validates idempotency
+				PlanOnly: true,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Re-verify the values are still correct
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.0.le", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.1.le", "16"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "entries.2.le", "20"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.0.le", "48"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.le", "64"),
+				),
+			},
+			// Step 3: Test import of exact match prefix filter lists
+			// Note: During import, we return raw API values (le=32 for IPv4).
+			// This is intentional - import shows actual API state, and users can
+			// adjust their HCL to match their desired configuration (exact match or range).
+			// After the first apply with user's config, normalization works correctly.
+			{
+				ResourceName:      "megaport_mcr_prefix_filter_list.ipv4_exact",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName1 := "megaport_mcr.mcr"
+					resourceName2 := "megaport_mcr_prefix_filter_list.ipv4_exact"
+					var mcrUID, prefixListID string
+
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName1]; ok {
+								mcrUID = v.Primary.Attributes["product_uid"]
+							}
+							if v, ok := m.Resources[resourceName2]; ok {
+								prefixListID = v.Primary.Attributes["id"]
+							}
+						}
+					}
+					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
+				},
+				// Ignore 'le' fields during import verify because the API returns le=32 (max)
+				// for exact match entries. During normal operation, we normalize this back to
+				// the user's configured value (ge=le). But during import, we can't know the
+				// user's intention, so we return raw API values.
+				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+			},
+		},
+	})
+}
+
+// TestAccMegaportMCRPrefixFilterList_MixedExactAndRange tests a combination of exact match
+// and range-based prefix filter entries to ensure both are handled correctly.
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_MixedExactAndRange() {
+	mcrName := RandomTestName()
+	prefixFilterName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed          = 1000
+					location_id         = data.megaport_location.test_location.id
+					contract_term_months = 12
+					cost_centre         = "%s"
+
+					# Explicitly set empty prefix filter lists since we're using standalone resources
+					prefix_filter_lists = []
+
+					lifecycle {
+						ignore_changes = [prefix_filter_lists]
+					}
+				}
+
+				resource "megaport_mcr_prefix_filter_list" "mixed" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							# Exact match entry - le should stay 24
+							action = "permit"
+							prefix = "10.0.0.0/24"
+							ge     = 24
+							le     = 24
+						},
+						{
+							# Range entry - le should stay 28 (not max)
+							action = "deny"
+							prefix = "192.168.0.0/16"
+							ge     = 24
+							le     = 28
+						},
+						{
+							# Range to max - le=32 is intentional here (full range)
+							action = "permit"
+							prefix = "172.16.0.0/12"
+							ge     = 16
+							le     = 32
+						},
+						{
+							# Another exact match
+							action = "deny"
+							prefix = "10.10.0.0/16"
+							ge     = 20
+							le     = 20
+						}
+					]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "description", prefixFilterName),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.#", "4"),
+
+					// Entry 0: Exact match - must stay 24
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.0.le", "24"),
+
+					// Entry 1: Range - must stay 28
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.le", "28"),
+
+					// Entry 2: Full range to max - user explicitly configured le=32
+					// With the fix, this should NOT be normalized since the plan has le=32
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.ge", "16"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.le", "32"),
+
+					// Entry 3: Exact match - must stay 20
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.3.ge", "20"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.3.le", "20"),
+				),
+			},
+		},
+	})
+}
