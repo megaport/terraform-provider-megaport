@@ -112,14 +112,19 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
 		// define what they expect, and Terraform will handle any drift detection normally.
 		if plannedEntries != nil && i < len(plannedEntries) && le == maxPrefixLength && le > ge {
-			// Check if the plan/state had an exact match (ge=le)
-			plannedGe := int(plannedEntries[i].Ge.ValueInt64())
-			plannedLe := int(plannedEntries[i].Le.ValueInt64())
-			if plannedGe == plannedLe {
-				// Plan had exact match, but API returned le=max, normalize it
-				le = ge
+			plannedEntry := plannedEntries[i]
+			// Ensure we're normalizing the correct entry: prefixes must match between plan/state and API.
+			// This guards against API returning entries in a different order than planned.
+			if plannedEntry.Prefix.ValueString() == entry.Prefix {
+				// Check if the plan/state had an exact match (ge=le)
+				plannedGe := int(plannedEntry.Ge.ValueInt64())
+				plannedLe := int(plannedEntry.Le.ValueInt64())
+				if plannedGe == plannedLe {
+					// Plan had exact match, but API returned le=max, normalize it
+					le = ge
+				}
+				// If plan had le=max explicitly, don't normalize - keep the API value
 			}
-			// If plan had le=max explicitly, don't normalize - keep the API value
 		}
 
 		entryModel := &mcrPrefixFilterListEntryResourceModel{
