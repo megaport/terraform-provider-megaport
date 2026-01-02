@@ -171,7 +171,7 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	// Update state from API response, using existing state for exact match comparison
-	// Pass stateEntries if available (normal read), nil for import (triggers heuristic)
+	// Pass stateEntries for normal read operations to enable exact match normalization, or nil for import to return raw API values
 	fromAPIDiags := state.fromAPIWithPlan(ctx, prefixFilterList, stateEntries)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
