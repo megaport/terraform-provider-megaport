@@ -1133,14 +1133,14 @@ func TestFromAPIExactMatchNormalization(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},  // API returns max
-					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 24}, // Not max
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},   // API returns max
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 24},  // Not max
 					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32}, // API returns max
 				},
 			},
 			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
-				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},  // Exact match
-				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(24)}, // Range
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},   // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(24)},  // Range
 				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
 			},
 			expectedGeLe: []struct{ ge, le int }{
