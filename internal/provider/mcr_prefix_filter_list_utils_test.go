@@ -1149,6 +1149,76 @@ func TestFromAPIExactMatchNormalization(t *testing.T) {
 				{16, 32}, // NOT normalized (plan had le=32)
 			},
 		},
+		// Entry reordering tests - API may return entries in different order than plan
+		{
+			name: "Normal: API returns entries in different order - should still normalize correctly",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            10,
+				Description:   "Reordered test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					// API returns in different order than plan
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32},  // Was second in plan, exact match
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},   // Was first in plan, exact match
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32}, // Was third in plan, range to max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},   // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(16)},  // Exact match
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{16, 16}, // First in API (192.168) normalized - found matching plan entry by prefix
+				{24, 24}, // Second in API (10.0.0.0) normalized - found matching plan entry by prefix
+				{16, 32}, // Third in API (172.16) NOT normalized - plan had le=32
+			},
+		},
+		{
+			name: "Normal: API has entry not in plan - should not normalize unknown entry",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            11,
+				Description:   "Unknown entry test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},  // In plan, exact match
+					{Action: "permit", Prefix: "8.8.8.0/24", Ge: 24, Le: 32},   // NOT in plan - added externally
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32}, // In plan, range to max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},  // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{24, 24}, // Normalized - found in plan
+				{24, 32}, // NOT normalized - no matching prefix in plan, return raw API value
+				{16, 32}, // NOT normalized - plan had le=32
+			},
+		},
+		{
+			name: "Normal: Completely reversed order - all exact matches",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            12,
+				Description:   "Reversed order test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 12, Le: 32},
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32},
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(16)},
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(12), Le: types.Int64Value(12)},
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{12, 12}, // Normalized by prefix match
+				{16, 16}, // Normalized by prefix match
+				{24, 24}, // Normalized by prefix match
+			},
+		},
 	}
 
 	for _, tt := range tests {
