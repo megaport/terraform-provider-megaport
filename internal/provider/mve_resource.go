@@ -349,7 +349,7 @@ func (r *mveResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.",
+		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the `megaport_mve_sizes` data source to query available MVE sizes and the `megaport_mve_images` data source to query available MVE images.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "The last time the MVE was updated by the Terraform Provider.",
@@ -607,7 +607,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Required:    true,
 					},
 					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.",
+						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections. Use the `megaport_mve_sizes` data source to query available sizes dynamically. Common values include SMALL (2 cores), MEDIUM (4 cores), LARGE (8 cores), X_LARGE_16 (16 cores), and X_LARGE_32 (32 cores).",
 						Required:    true,
 					},
 					"mve_label": schema.StringAttribute{

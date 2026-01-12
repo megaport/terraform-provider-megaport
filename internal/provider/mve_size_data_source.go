@@ -37,10 +37,10 @@ type mveSizeModel struct {
 
 // mveSizeDetailsModel is the model for the data source.
 type mveSizeDetailsModel struct {
-	Size         types.String `json:"size"`
-	Label        types.String `json:"label"`
-	CPUCoreCount types.Int64  `json:"cpu_core_count"`
-	RamGB        types.Int64  `json:"ram_gb"`
+	Size         types.String `tfsdk:"size"`
+	Label        types.String `tfsdk:"label"`
+	CPUCoreCount types.Int64  `tfsdk:"cpu_core_count"`
+	RamGB        types.Int64  `tfsdk:"ram_gb"`
 }
 
 // NewMVESizeDataSource is a helper function to simplify the provider implementation.
@@ -75,7 +75,7 @@ func (d *mveSizeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 							Description: "Number of CPU Cores.",
 							Computed:    true,
 						},
-						"ram_gb": schema.StringAttribute{
+						"ram_gb": schema.Int64Attribute{
 							Description: "Amount of RAM in GB.",
 							Computed:    true,
 						},
