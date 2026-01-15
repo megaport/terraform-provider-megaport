@@ -61,12 +61,31 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 }
 
 // fromAPI converts the API response to the Terraform model
+// This version does NOT apply exact match normalization - returns raw API values
+// Use this for import scenarios where we don't have prior configuration to compare
 func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList *megaport.MCRPrefixFilterList) diag.Diagnostics {
+	return m.fromAPIWithPlan(ctx, apiList, nil)
+}
+
+// fromAPIWithPlan converts the API response to the Terraform model with optional plan/state comparison
+// When plannedEntries is provided, it uses the plan/state to determine if exact match normalization should occur
+// When plannedEntries is nil (e.g., during import), NO normalization is applied - raw API values are returned
+//
+// Normalization logic: When the Megaport GUI "Exact" checkbox is used, the API stores and returns
+// le=32 (IPv4) or le=128 (IPv6) instead of the exact match value. This causes Terraform to detect
+// drift when users configure exact matches (ge=le). We normalize by checking if the user's config
+// had an exact match and the API returned le=max, in which case we set le=ge.
+func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, apiList *megaport.MCRPrefixFilterList, plannedEntries []*mcrPrefixFilterListEntryResourceModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
 	m.ID = types.Int64Value(int64(apiList.ID))
 	m.Description = types.StringValue(apiList.Description)
 	m.AddressFamily = types.StringValue(apiList.AddressFamily)
+
+	maxPrefixLength := 32
+	if m.AddressFamily.ValueString() == "IPv6" {
+		maxPrefixLength = 128
+	}
 
 	// Convert entries
 	entriesList := []types.Object{}
@@ -85,6 +104,28 @@ func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList 
 			}
 			if entry.Le == 0 {
 				le = calculatedLe
+			}
+		}
+
+		// Normalize exact matches ONLY when we have plan/state to compare against.
+		// This fixes the "inconsistent state after apply" error when users configure exact matches.
+		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
+		// define what they expect, and Terraform will handle any drift detection normally.
+		if plannedEntries != nil && le == maxPrefixLength && le > ge {
+			// Search for matching planned entry by prefix (not by position) to handle
+			// cases where the API returns entries in a different order than planned.
+			for _, plannedEntry := range plannedEntries {
+				if plannedEntry.Prefix.ValueString() == entry.Prefix {
+					// Check if the plan/state had an exact match (ge=le)
+					plannedGe := int(plannedEntry.Ge.ValueInt64())
+					plannedLe := int(plannedEntry.Le.ValueInt64())
+					if plannedGe == plannedLe {
+						// Plan had exact match, but API returned le=max, normalize it
+						le = ge
+					}
+					// If plan had le=max explicitly, don't normalize - keep the API value
+					break // Found matching prefix, no need to continue searching
+				}
 			}
 		}
 

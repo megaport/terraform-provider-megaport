@@ -729,6 +729,194 @@ func TestFromAPI(t *testing.T) {
 			},
 			wantError: false,
 		},
+		// These tests verify that fromAPI() (without plan) returns raw API values
+		// NO normalization is applied - the values are returned as-is from the API
+		// This is the correct behavior for import scenarios where we don't have prior config
+		{
+			name: "IPv4 with le=32 (max) - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1001,
+				Description:   "IPv4 exact match test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "10.0.0.0/24",
+						Ge:     24, // API values returned as-is (no normalization during import)
+						Le:     32, // API returns max prefix length
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv4 with le=32 (max) for /16 prefix - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1002,
+				Description:   "IPv4 exact match test /16",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "deny",
+						Prefix: "172.16.0.0/16",
+						Ge:     16, // API values returned as-is (no normalization during import)
+						Le:     32, // API returns max prefix length
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv6 with le=128 (max) - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1003,
+				Description:   "IPv6 exact match test",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "2001:db8::/64",
+						Ge:     64,  // API values returned as-is (no normalization during import)
+						Le:     128, // API returns max prefix length
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv6 with le=128 (max) for /48 prefix - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1004,
+				Description:   "IPv6 exact match test /48",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "deny",
+						Prefix: "2001:db8::/48",
+						Ge:     48,  // API values returned as-is (no normalization during import)
+						Le:     128, // API returns max prefix length
+					},
+				},
+			},
+			wantError: false,
+		},
+		// Range tests - values returned as-is (no normalization in fromAPI)
+		{
+			name: "IPv4 range with le=32 - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1005,
+				Description:   "IPv4 range to max",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "10.0.0.0/8",
+						Ge:     8,  // Range from /8 to /32
+						Le:     32, // Returns as-is
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv4 range with intermediate le - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1006,
+				Description:   "IPv4 range",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "10.0.0.0/24",
+						Ge:     24,
+						Le:     28, // Not max, should remain 28
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv6 range with le=128 - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1007,
+				Description:   "IPv6 range to max",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "2001:db8::/32",
+						Ge:     32,  // Range from /32 to /128
+						Le:     128, // Intentionally set to max - NOT an exact match
+					},
+				},
+			},
+			wantError: false,
+		},
+		// Edge case: ge == le == max (true exact match at max length)
+		{
+			name: "IPv4 exact match at /32 - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1008,
+				Description:   "IPv4 exact /32",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "10.0.0.1/32",
+						Ge:     32,
+						Le:     32, // ge == le == max, this is a true exact match
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "IPv6 exact match at /128 - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1009,
+				Description:   "IPv6 exact /128",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "2001:db8::1/128",
+						Ge:     128,
+						Le:     128, // ge == le == max, this is a true exact match
+					},
+				},
+			},
+			wantError: false,
+		},
+		// Multiple entries - all returned as-is from API (no normalization in fromAPI)
+		{
+			name: "mixed entries - returns raw API values",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1010,
+				Description:   "Mixed entries test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "10.0.0.0/24",
+						Ge:     24,
+						Le:     32, // Returned as-is (normalization only with plan)
+					},
+					{
+						Action: "deny",
+						Prefix: "192.168.0.0/16",
+						Ge:     16,
+						Le:     24, // Returned as-is
+					},
+					{
+						Action: "permit",
+						Prefix: "172.16.0.0/12",
+						Ge:     12,
+						Le:     32, // Returned as-is
+					},
+				},
+			},
+			wantError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -793,4 +981,277 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestFromAPIExactMatchNormalization specifically tests the exact match normalization logic
+// This addresses the issue where the Megaport API returns le=32 (IPv4) or le=128 (IPv6)
+// instead of the configured exact match value when the GUI "Exact" checkbox is used.
+// When plannedEntries is nil (import scenario), NO normalization is applied - raw API values returned.
+// When plannedEntries is provided, normalization only occurs if plan had exact match (ge=le).
+func TestFromAPIExactMatchNormalization(t *testing.T) {
+	tests := []struct {
+		name           string
+		apiList        *megaport.MCRPrefixFilterList
+		plannedEntries []*mcrPrefixFilterListEntryResourceModel // nil = import scenario
+		expectedGeLe   []struct{ ge, le int }                   // Expected ge/le values after normalization
+	}{
+		// Import scenarios (plannedEntries = nil) - NO normalization, return raw API values
+		{
+			name: "Import: IPv4 - ge=24, API le=32 should NOT normalize (return raw API values)",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            1,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},
+				},
+			},
+			plannedEntries: nil,                              // Import scenario
+			expectedGeLe:   []struct{ ge, le int }{{24, 32}}, // Raw API values - no normalization
+		},
+		{
+			name: "Import: IPv6 - ge=64, API le=128 should NOT normalize (return raw API values)",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            2,
+				Description:   "Test",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "2001:db8::/64", Ge: 64, Le: 128},
+				},
+			},
+			plannedEntries: nil,                               // Import scenario
+			expectedGeLe:   []struct{ ge, le int }{{64, 128}}, // Raw API values - no normalization
+		},
+		{
+			name: "Import: IPv4 range - ge=25, le=32 should stay as-is",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            100,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.1.0/24", Ge: 25, Le: 32},
+				},
+			},
+			plannedEntries: nil,                              // Import scenario
+			expectedGeLe:   []struct{ ge, le int }{{25, 32}}, // Raw API values
+		},
+		// Normal operation scenarios (plannedEntries provided)
+		{
+			name: "Normal: Plan has exact match (ge=le), API returns le=max - should normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            3,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32}, // API returns max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)}, // Plan has exact match
+			},
+			expectedGeLe: []struct{ ge, le int }{{24, 24}}, // Should normalize
+		},
+		{
+			name: "Normal: Plan has le=max explicitly, API returns le=max - should NOT normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            4,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 25, Le: 32}, // API returns max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(25), Le: types.Int64Value(32)}, // Plan has range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{{25, 32}}, // Should NOT normalize - user wants le=32
+		},
+		{
+			name: "Normal: Plan has intermediate le, API returns same - should NOT normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            5,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 28},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(28)},
+			},
+			expectedGeLe: []struct{ ge, le int }{{24, 28}}, // Should NOT normalize
+		},
+		{
+			name: "Normal: IPv6 plan has le=max, API returns le=max - should NOT normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            6,
+				Description:   "Test",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("2001:db8::/32"), Ge: types.Int64Value(48), Le: types.Int64Value(128)},
+			},
+			expectedGeLe: []struct{ ge, le int }{{48, 128}}, // Should NOT normalize
+		},
+		{
+			name: "Normal: IPv6 plan has exact match, API returns le=max - should normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            7,
+				Description:   "Test",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("2001:db8::/32"), Ge: types.Int64Value(48), Le: types.Int64Value(48)},
+			},
+			expectedGeLe: []struct{ ge, le int }{{48, 48}}, // Should normalize
+		},
+		{
+			name: "Normal: ge=le=max (true exact match at /32) - should stay unchanged",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            8,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.1/32", Ge: 32, Le: 32},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.1/32"), Ge: types.Int64Value(32), Le: types.Int64Value(32)},
+			},
+			expectedGeLe: []struct{ ge, le int }{{32, 32}}, // Already correct
+		},
+		{
+			name: "Normal: Mixed entries - some exact, some ranges",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            9,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},   // API returns max
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 24},  // Not max
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32}, // API returns max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},   // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(24)},  // Range
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{24, 24}, // Normalized (plan had exact match)
+				{16, 24}, // Not normalized (not max)
+				{16, 32}, // NOT normalized (plan had le=32)
+			},
+		},
+		// Entry reordering tests - API may return entries in different order than plan
+		{
+			name: "Normal: API returns entries in different order - should still normalize correctly",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            10,
+				Description:   "Reordered test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					// API returns in different order than plan
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32},  // Was second in plan, exact match
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},   // Was first in plan, exact match
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32}, // Was third in plan, range to max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},   // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(16)},  // Exact match
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{16, 16}, // First in API (192.168) normalized - found matching plan entry by prefix
+				{24, 24}, // Second in API (10.0.0.0) normalized - found matching plan entry by prefix
+				{16, 32}, // Third in API (172.16) NOT normalized - plan had le=32
+			},
+		},
+		{
+			name: "Normal: API has entry not in plan - should not normalize unknown entry",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            11,
+				Description:   "Unknown entry test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},  // In plan, exact match
+					{Action: "permit", Prefix: "8.8.8.0/24", Ge: 24, Le: 32},   // NOT in plan - added externally
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32}, // In plan, range to max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},  // Exact match
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(32)}, // Range to max
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{24, 24}, // Normalized - found in plan
+				{24, 32}, // NOT normalized - no matching prefix in plan, return raw API value
+				{16, 32}, // NOT normalized - plan had le=32
+			},
+		},
+		{
+			name: "Normal: Completely reversed order - all exact matches",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            12,
+				Description:   "Reversed order test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 12, Le: 32},
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 16, Le: 32},
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 24, Le: 32},
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Value(24), Le: types.Int64Value(24)},
+				{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(16), Le: types.Int64Value(16)},
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("172.16.0.0/12"), Ge: types.Int64Value(12), Le: types.Int64Value(12)},
+			},
+			expectedGeLe: []struct{ ge, le int }{
+				{12, 12}, // Normalized by prefix match
+				{16, 16}, // Normalized by prefix match
+				{24, 24}, // Normalized by prefix match
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &mcrPrefixFilterListResourceModel{}
+			diags := model.fromAPIWithPlan(context.Background(), tt.apiList, tt.plannedEntries)
+
+			if diags.HasError() {
+				t.Fatalf("fromAPIWithPlan() returned unexpected error: %v", diags)
+			}
+
+			// Extract entries from the model
+			var entries []*mcrPrefixFilterListEntryResourceModel
+			entriesDiags := model.Entries.ElementsAs(context.Background(), &entries, false)
+			if entriesDiags.HasError() {
+				t.Fatalf("Failed to extract entries: %v", entriesDiags)
+			}
+
+			if len(entries) != len(tt.expectedGeLe) {
+				t.Fatalf("Expected %d entries, got %d", len(tt.expectedGeLe), len(entries))
+			}
+
+			for i, expected := range tt.expectedGeLe {
+				actualGe := int(entries[i].Ge.ValueInt64())
+				actualLe := int(entries[i].Le.ValueInt64())
+
+				if actualGe != expected.ge {
+					t.Errorf("Entry[%d] ge: expected %d, got %d", i, expected.ge, actualGe)
+				}
+				if actualLe != expected.le {
+					t.Errorf("Entry[%d] le: expected %d, got %d", i, expected.le, actualLe)
+				}
+			}
+		})
+	}
 }

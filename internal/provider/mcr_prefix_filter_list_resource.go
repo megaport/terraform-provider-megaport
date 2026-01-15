@@ -104,10 +104,20 @@ func (r *mcrPrefixFilterListResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	// Update the model with API response
+	// Extract planned entries for comparison during API response processing
+	var plannedEntries []*mcrPrefixFilterListEntryResourceModel
+	if !plan.Entries.IsNull() && !plan.Entries.IsUnknown() {
+		entryDiags := plan.Entries.ElementsAs(ctx, &plannedEntries, false)
+		resp.Diagnostics.Append(entryDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// Update the model with API response, using plan for exact match comparison
 	var state mcrPrefixFilterListResourceModel
 	state.MCRID = plan.MCRID // Preserve the MCR ID from the plan
-	fromAPIDiags := state.fromAPI(ctx, createdList)
+	fromAPIDiags := state.fromAPIWithPlan(ctx, createdList, plannedEntries)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -130,6 +140,17 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	// Extract current state entries to use for exact match comparison
+	// This preserves exact match configurations during refresh
+	var stateEntries []*mcrPrefixFilterListEntryResourceModel
+	if !state.Entries.IsNull() && !state.Entries.IsUnknown() {
+		entryDiags := state.Entries.ElementsAs(ctx, &stateEntries, false)
+		resp.Diagnostics.Append(entryDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	// Get the prefix filter list from API
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx,
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
@@ -149,8 +170,9 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Update state from API response
-	fromAPIDiags := state.fromAPI(ctx, prefixFilterList)
+	// Update state from API response, using existing state for exact match comparison
+	// Pass stateEntries for normal read operations to enable exact match normalization, or nil for import to return raw API values
+	fromAPIDiags := state.fromAPIWithPlan(ctx, prefixFilterList, stateEntries)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -202,8 +224,18 @@ func (r *mcrPrefixFilterListResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	// Update state from API response
-	fromAPIDiags := state.fromAPI(ctx, updatedList)
+	// Extract planned entries for comparison during API response processing
+	var plannedEntries []*mcrPrefixFilterListEntryResourceModel
+	if !plan.Entries.IsNull() && !plan.Entries.IsUnknown() {
+		entryDiags := plan.Entries.ElementsAs(ctx, &plannedEntries, false)
+		resp.Diagnostics.Append(entryDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// Update state from API response, using plan for exact match comparison
+	fromAPIDiags := state.fromAPIWithPlan(ctx, updatedList, plannedEntries)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
