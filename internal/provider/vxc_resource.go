@@ -1951,7 +1951,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the VXC info
-	apiDiags := plan.fromAPIVXC(ctx, vxc, tags)
+	// In Create, plan already has correct values, so pass nil
+	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, nil)
 	resp.Diagnostics.Append(apiDiags...)
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -2009,7 +2010,8 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
+	// In Read, state should preserve its own values, so pass nil
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, nil)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -2487,7 +2489,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags)
+	// In Update, pass plan to preserve user-only configuration values
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 
