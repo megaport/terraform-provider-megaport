@@ -3,12 +3,12 @@
 page_title: "megaport_mve Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.
+  Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the megaport_mve_sizes data source to query available MVE sizes and the megaport_mve_images data source to query available MVE images.
 ---
 
 # megaport_mve (Resource)
 
-Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge.
+Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the `megaport_mve_sizes` data source to query available MVE sizes and the `megaport_mve_images` data source to query available MVE images.
 
 ## Example Usage
 
@@ -218,7 +218,7 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
 Required:
 
 - `image_id` (Number) The image ID of the MVE. Indicates the software version.
-- `product_size` (String) The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections.
+- `product_size` (String) The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections. Use the `megaport_mve_sizes` data source to query available sizes dynamically. Common values include SMALL (2 cores), MEDIUM (4 cores), LARGE (8 cores), X_LARGE_16 (16 cores), and X_LARGE_32 (32 cores).
 - `vendor` (String) The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".
 
 Optional:
