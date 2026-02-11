@@ -11,7 +11,12 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
+// fromAPIVXC updates the resource model from API response data.
+// The optional plan parameter allows preserving user-only fields (like requested_product_uid,
+// ordered_vlan, and partner configs) that are not returned by the API. This is particularly
+// important after import or during updates where the plan contains user configuration that
+// would otherwise be lost.
+func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string, plan *vxcResourceModel) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(v.UID)
@@ -57,6 +62,8 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	var aEndOrderedVLAN, bEndOrderedVLAN *int64
 	var aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
+
+	// First, try to get values from existing state
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
 		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
@@ -68,6 +75,26 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
 			vlan := existingAEnd.InnerVLAN.ValueInt64()
+			aEndInnerVLAN = &vlan
+		}
+	}
+
+	// If plan is provided and state values are empty, use plan values.
+	// This handles the import case where state is initially null.
+	if plan != nil && !plan.AEndConfiguration.IsNull() {
+		planAEnd := &vxcEndConfigurationModel{}
+		planDiags := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, planDiags...)
+
+		if aEndRequestedProductUID == "" && !planAEnd.RequestedProductUID.IsNull() {
+			aEndRequestedProductUID = planAEnd.RequestedProductUID.ValueString()
+		}
+		if aEndOrderedVLAN == nil && !planAEnd.OrderedVLAN.IsNull() && !planAEnd.OrderedVLAN.IsUnknown() {
+			vlan := planAEnd.OrderedVLAN.ValueInt64()
+			aEndOrderedVLAN = &vlan
+		}
+		if aEndInnerVLAN == nil && !planAEnd.InnerVLAN.IsNull() && !planAEnd.InnerVLAN.IsUnknown() {
+			vlan := planAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
 		}
 	}
@@ -108,6 +135,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	apiDiags = append(apiDiags, aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
+	// First, try to get B-End values from existing state
 	if !orm.BEndConfiguration.IsNull() {
 		existingBEnd := &vxcEndConfigurationModel{}
 		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
@@ -121,6 +149,25 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			bEndInnerVLAN = &vlan
 		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+	}
+
+	// If plan is provided and state values are empty, use plan values for B-End.
+	if plan != nil && !plan.BEndConfiguration.IsNull() {
+		planBEnd := &vxcEndConfigurationModel{}
+		planDiags := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{})
+		apiDiags = append(apiDiags, planDiags...)
+
+		if bEndRequestedProductUID == "" && !planBEnd.RequestedProductUID.IsNull() {
+			bEndRequestedProductUID = planBEnd.RequestedProductUID.ValueString()
+		}
+		if bEndOrderedVLAN == nil && !planBEnd.OrderedVLAN.IsNull() && !planBEnd.OrderedVLAN.IsUnknown() {
+			vlan := planBEnd.OrderedVLAN.ValueInt64()
+			bEndOrderedVLAN = &vlan
+		}
+		if bEndInnerVLAN == nil && !planBEnd.InnerVLAN.IsNull() && !planBEnd.InnerVLAN.IsUnknown() {
+			vlan := planBEnd.InnerVLAN.ValueInt64()
+			bEndInnerVLAN = &vlan
+		}
 	}
 
 	bEndModel := &vxcEndConfigurationModel{
@@ -187,6 +234,17 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		orm.ResourceTags = resourceTags
 	} else {
 		orm.ResourceTags = types.MapNull(types.StringType)
+	}
+
+	// Preserve partner configs from plan if provided.
+	// Partner configs are user-only values not returned by the API.
+	if plan != nil {
+		if !plan.AEndPartnerConfig.IsNull() {
+			orm.AEndPartnerConfig = plan.AEndPartnerConfig
+		}
+		if !plan.BEndPartnerConfig.IsNull() {
+			orm.BEndPartnerConfig = plan.BEndPartnerConfig
+		}
 	}
 
 	return apiDiags

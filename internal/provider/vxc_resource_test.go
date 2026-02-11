@@ -15,6 +15,7 @@ type VXCCSPProviderTestSuite ProviderTestSuite
 type VXCMVEProviderTestSuite ProviderTestSuite
 type VXCInnerVLANProviderTestSuite ProviderTestSuite
 type VXCMixedProviderTestSuite ProviderTestSuite
+type VXCImportDriftProviderTestSuite ProviderTestSuite
 
 const (
 	VXCLocationOne   = "NextDC M1"
@@ -58,6 +59,11 @@ func TestVXCInnerVLANProviderTestSuite(t *testing.T) {
 func TestVXCMixedProviderTestSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(VXCMixedProviderTestSuite))
+}
+
+func TestVXCImportDriftProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(VXCImportDriftProviderTestSuite))
 }
 
 func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
@@ -3491,12 +3497,12 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     product_name         = "%s"
                     rate_limit           = 100
                     contract_term_months = 1
-                    
+
                     a_end = {
                         requested_product_uid = megaport_port.test_port.product_uid
                         ordered_vlan          = 100
                     }
-                    
+
                     b_end = {
                         requested_product_uid = megaport_mve.test_mve.product_uid
                         vnic_index            = 1  // Changed from 0 to 1
@@ -3512,6 +3518,432 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
 					// Check VXC was updated with new VNIC index
 					resource.TestCheckResourceAttr("megaport_vxc.port_to_mve", "b_end.vnic_index", "1"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ImportDrift_Basic tests that a basic VXC import does not cause
+// drift on subsequent plans. This validates the fix for GitHub Issue #263.
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Basic() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port_2.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, VXCLocationID1, portName1, portName2, vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with user-only fields
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "a_end.requested_product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "b_end.requested_product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Step 2: Import the VXC
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - this reconciles state after import
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "a_end.requested_product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "b_end.requested_product_uid"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift - this is the critical test for the fix
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ImportDrift_WithPartnerConfig tests that a VXC with partner configs
+// does not cause drift after import. This is the scenario from the original bug report
+// where MCR VXCs with vrouter partner configs would continuously show changes.
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithPartnerConfig() {
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 100
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							bgp_connections = [{
+								peer_asn         = 64512
+								local_ip_address = "10.0.0.1"
+								peer_ip_address  = "10.0.0.2"
+								password         = "testPassword123"
+								shutdown         = false
+								description      = "Test BGP Connection"
+								med_in           = 100
+								med_out          = 100
+								bfd_enabled      = false
+								export_policy    = "permit"
+							}]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, VXCLocationID1, mcrName, portName, vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with MCR and vrouter partner config
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Step 2: Import the VXC
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - this reconciles state after import
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift - this validates the fix
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ImportDrift_WithInnerVLAN tests that a VXC with inner_vlan
+// does not cause drift after import.
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithInnerVLAN() {
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 100
+					inner_vlan            = 300
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port_2.product_uid
+					ordered_vlan          = 200
+					inner_vlan            = 400
+				}
+			}
+		`, VXCLocationID1, portName1, portName2, vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with inner_vlan
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "400"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Step 2: Import the VXC
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - this reconciles state after import
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.inner_vlan", "300"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.inner_vlan", "400"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift - this validates the fix
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ImportDrift_AWSHostedConnection tests the exact scenario from
+// GitHub Issue #263: an AWS Hosted Connection VXC with b_end_partner_config continuously
+// shows changes after import. This is the primary bug that was reported.
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWSHostedConnection() {
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			data "megaport_partner" "aws_port" {
+				connect_type = "AWSHC"
+				company_name = "AWS"
+				product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
+				location_id  = data.megaport_location.loc.id
+			}
+
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+
+				b_end = {
+					requested_product_uid = data.megaport_partner.aws_port.product_uid
+				}
+
+				b_end_partner_config = {
+					partner = "aws"
+					aws_config = {
+						name          = "%s"
+						type          = "private"
+						connect_type  = "AWSHC"
+						owner_account = "123456789012"
+					}
+				}
+			}
+		`, VXCLocationID2, portName, vxcName, vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create AWS Hosted Connection VXC
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "aws"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.connect_type", "AWSHC"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Step 2: Import the VXC (simulates the bug scenario)
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - first apply after import
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "aws"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.name", vxcName),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift - THIS IS THE BUG FIX VALIDATION
+			// Before the fix, this would fail because the plan would show changes
+			// for b_end_partner_config even though nothing changed.
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
 			},
 		},
 	})
