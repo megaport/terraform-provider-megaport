@@ -3462,13 +3462,13 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     contract_term_months = 1
                     marketplace_visibility = false
                 }
-                
+
                 // Create an MVE
                 resource "megaport_mve" "test_mve" {
                     product_name         = "%s"
                     location_id          = %d
                     contract_term_months = 1
-                    
+
                     vnics = [
                         {
                             description = "Data Plane"
@@ -3480,7 +3480,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                             description = "Control Plane"
                         }
                     ]
-                    
+
                     vendor_config = {
                         vendor       = "aruba"
                         product_size = "SMALL"
@@ -3491,7 +3491,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                         system_tag   = "Preconfiguration-test-1"
                     }
                 }
-                
+
                 // Connect port to MVE with VXC - updated VNIC index
                 resource "megaport_vxc" "port_to_mve" {
                     product_name         = "%s"
@@ -3518,6 +3518,59 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
 					// Check VXC was updated with new VNIC index
 					resource.TestCheckResourceAttr("megaport_vxc.port_to_mve", "b_end.vnic_index", "1"),
 				),
+			},
+			// Step 3: Plan-only to verify NO drift after VNIC index update.
+			// The API may return stale VNIC index values after an update; the
+			// Update handler must copy the plan value into state so the next
+			// refresh does not detect a spurious change.
+			{
+				Config: providerConfig + fmt.Sprintf(`
+                resource "megaport_port" "test_port" {
+                    product_name         = "%s"
+                    port_speed           = 1000
+                    location_id          = %d
+                    contract_term_months = 1
+                    marketplace_visibility = false
+                }
+                resource "megaport_mve" "test_mve" {
+                    product_name         = "%s"
+                    location_id          = %d
+                    contract_term_months = 1
+                    vnics = [
+                        { description = "Data Plane" },
+                        { description = "Management Plane" },
+                        { description = "Control Plane" }
+                    ]
+                    vendor_config = {
+                        vendor       = "aruba"
+                        product_size = "SMALL"
+                        mve_label    = "MVE 2/8"
+                        image_id     = 23
+                        account_name = "%s-account"
+                        account_key  = "%s-key"
+                        system_tag   = "Preconfiguration-test-1"
+                    }
+                }
+                resource "megaport_vxc" "port_to_mve" {
+                    product_name         = "%s"
+                    rate_limit           = 100
+                    contract_term_months = 1
+                    a_end = {
+                        requested_product_uid = megaport_port.test_port.product_uid
+                        ordered_vlan          = 100
+                    }
+                    b_end = {
+                        requested_product_uid = megaport_mve.test_mve.product_uid
+                        vnic_index            = 1
+                        ordered_vlan          = 101
+                    }
+                }
+                `,
+					portName, VXCLocationID1,
+					mveName, MVETestLocationIDNum,
+					mveName, mveName,
+					vxcName),
+				PlanOnly: true,
 			},
 		},
 	})
@@ -3941,6 +3994,121 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWS
 			// Step 4: Plan-only to verify NO drift - THIS IS THE BUG FIX VALIDATION
 			// Before the fix, this would fail because the plan would show changes
 			// for b_end_partner_config even though nothing changed.
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ImportDrift_WithVnicIndex tests that a VXC connected to an
+// MVE with a vnic_index does not cause drift after import. The API does not
+// return the user-configured vnic_index on read, so the provider must preserve
+// it from state/plan to avoid an infinite update loop.
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithVnicIndex() {
+	portName := RandomTestName()
+	mveName := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = %d
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+
+			resource "megaport_mve" "mve" {
+				product_name         = "%s"
+				location_id          = %d
+				contract_term_months = 1
+
+				vnics = [
+					{ description = "Data Plane" },
+					{ description = "Management Plane" },
+					{ description = "Control Plane" }
+				]
+
+				vendor_config = {
+					vendor       = "aruba"
+					product_size = "SMALL"
+					mve_label    = "MVE 2/8"
+					image_id     = 23
+					account_name = "%s-account"
+					account_key  = "%s-key"
+					system_tag   = "Preconfiguration-drift-test"
+				}
+			}
+
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {
+					requested_product_uid = megaport_mve.mve.product_uid
+					vnic_index            = 1
+					ordered_vlan          = 101
+				}
+			}
+		`, portName, VXCLocationID1,
+			mveName, MVETestLocationIDNum,
+			mveName, mveName,
+			vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create Port, MVE, and VXC with vnic_index
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			// Step 2: Import the VXC (vnic_index will be lost from state)
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - reconciles state after import
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "101"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift on vnic_index
 			{
 				Config:   vxcConfig(),
 				PlanOnly: true,

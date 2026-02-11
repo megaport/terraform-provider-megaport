@@ -61,6 +61,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	}
 	var aEndOrderedVLAN, bEndOrderedVLAN *int64
 	var aEndInnerVLAN, bEndInnerVLAN *int64
+	var aEndVnicIndex, bEndVnicIndex *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 
 	// First, try to get values from existing state
@@ -76,6 +77,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
 			vlan := existingAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
+		}
+		if !existingAEnd.NetworkInterfaceIndex.IsNull() && !existingAEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
+			aEndVnicIndex = &idx
 		}
 	}
 
@@ -97,6 +102,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := planAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
 		}
+		if aEndVnicIndex == nil && !planAEnd.NetworkInterfaceIndex.IsNull() && !planAEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
+			aEndVnicIndex = &idx
+		}
 	}
 
 	aEndModel := &vxcEndConfigurationModel{
@@ -108,6 +117,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		Location:              types.StringValue(v.AEndConfiguration.Location),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	}
+	if aEndVnicIndex != nil {
+		aEndModel.NetworkInterfaceIndex = types.Int64Value(*aEndVnicIndex)
 	}
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
@@ -148,6 +160,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := existingBEnd.InnerVLAN.ValueInt64()
 			bEndInnerVLAN = &vlan
 		}
+		if !existingBEnd.NetworkInterfaceIndex.IsNull() && !existingBEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
+			bEndVnicIndex = &idx
+		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
@@ -168,6 +184,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := planBEnd.InnerVLAN.ValueInt64()
 			bEndInnerVLAN = &vlan
 		}
+		if bEndVnicIndex == nil && !planBEnd.NetworkInterfaceIndex.IsNull() && !planBEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
+			bEndVnicIndex = &idx
+		}
 	}
 
 	bEndModel := &vxcEndConfigurationModel{
@@ -179,6 +199,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		Location:              types.StringValue(v.BEndConfiguration.Location),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
+	}
+	if bEndVnicIndex != nil {
+		bEndModel.NetworkInterfaceIndex = types.Int64Value(*bEndVnicIndex)
 	}
 	if bEndOrderedVLAN != nil {
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)

@@ -2164,6 +2164,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 			}
 		}
+		// Copy plan VNIC index to state to prevent stale API reads from overwriting it
+		aEndState.NetworkInterfaceIndex = aEndPlan.NetworkInterfaceIndex
 	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
@@ -2223,6 +2225,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 			}
 		}
+		// Copy plan VNIC index to state to prevent stale API reads from overwriting it
+		bEndState.NetworkInterfaceIndex = bEndPlan.NetworkInterfaceIndex
 	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
