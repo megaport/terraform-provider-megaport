@@ -1931,14 +1931,34 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdVXC.TechnicalServiceUID
 
-	// get the created VXC
-	vxc, err := r.client.VXCService.GetVXC(ctx, createdID)
+	// Build expected vnic_index values from the plan so we can wait for
+	// the API to propagate them (it updates asynchronously).
+	var expectedAEndVnic, expectedBEndVnic *int
+	if !a.NetworkInterfaceIndex.IsNull() && !a.NetworkInterfaceIndex.IsUnknown() {
+		v := int(a.NetworkInterfaceIndex.ValueInt64())
+		expectedAEndVnic = &v
+	}
+	if !b.NetworkInterfaceIndex.IsNull() && !b.NetworkInterfaceIndex.IsUnknown() {
+		v := int(b.NetworkInterfaceIndex.ValueInt64())
+		expectedBEndVnic = &v
+	}
+
+	// get the created VXC, waiting for vnic_index to propagate if needed
+	vxc, err := r.waitForVnicIndex(ctx, createdID, expectedAEndVnic, expectedBEndVnic, updateTimeout)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading newly created VXC",
-			"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
+		// If the wait timed out we still have a VXC to work with; only
+		// hard errors (API failures) should abort.
+		if vxc == nil {
+			resp.Diagnostics.AddError(
+				"Error reading newly created VXC",
+				"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
+			)
+			return
+		}
+		resp.Diagnostics.AddWarning(
+			"VXC vnic_index Propagation Delay",
+			fmt.Sprintf("VXC created but vnic_index verification timed out: %s. The update may still be propagating.", err.Error()),
 		)
-		return
 	}
 
 	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, createdID)
@@ -2164,8 +2184,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 			}
 		}
-		// Copy plan VNIC index to state to prevent stale API reads from overwriting it
-		aEndState.NetworkInterfaceIndex = aEndPlan.NetworkInterfaceIndex
 	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
@@ -2225,8 +2243,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 			}
 		}
-		// Copy plan VNIC index to state to prevent stale API reads from overwriting it
-		bEndState.NetworkInterfaceIndex = bEndPlan.NetworkInterfaceIndex
 	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
@@ -2438,14 +2454,31 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(bEndStateDiags...)
 	state.BEndConfiguration = bEndStateObj
 
-	// Get refreshed vxc value from API
-	vxc, err := r.client.VXCService.GetVXC(ctx, state.UID.ValueString())
+	// Build expected vnic_index values from the plan for the post-update read.
+	var expectedAEndVnic, expectedBEndVnic *int
+	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.IsUnknown() {
+		v := int(aEndPlan.NetworkInterfaceIndex.ValueInt64())
+		expectedAEndVnic = &v
+	}
+	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.IsUnknown() {
+		v := int(bEndPlan.NetworkInterfaceIndex.ValueInt64())
+		expectedBEndVnic = &v
+	}
+
+	// Get refreshed vxc value from API, waiting for vnic_index to propagate
+	vxc, err := r.waitForVnicIndex(ctx, state.UID.ValueString(), expectedAEndVnic, expectedBEndVnic, updateTimeout)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading VXC",
-			"Could not read VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+		if vxc == nil {
+			resp.Diagnostics.AddError(
+				"Error Reading VXC",
+				"Could not read VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+		resp.Diagnostics.AddWarning(
+			"VXC vnic_index Propagation Delay",
+			fmt.Sprintf("VXC updated but vnic_index verification timed out: %s. The update may still be propagating.", err.Error()),
 		)
-		return
 	}
 
 	// Only show VLAN mismatch warnings if waitForVXCUpdate failed (timed out or errored)

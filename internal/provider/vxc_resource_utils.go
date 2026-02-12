@@ -61,7 +61,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	}
 	var aEndOrderedVLAN, bEndOrderedVLAN *int64
 	var aEndInnerVLAN, bEndInnerVLAN *int64
-	var aEndVnicIndex, bEndVnicIndex *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
 
 	// First, try to get values from existing state
@@ -77,10 +76,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
 			vlan := existingAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
-		}
-		if !existingAEnd.NetworkInterfaceIndex.IsNull() && !existingAEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
-			aEndVnicIndex = &idx
 		}
 	}
 
@@ -102,10 +97,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := planAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
 		}
-		if aEndVnicIndex == nil && !planAEnd.NetworkInterfaceIndex.IsNull() && !planAEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
-			aEndVnicIndex = &idx
-		}
 	}
 
 	aEndModel := &vxcEndConfigurationModel{
@@ -117,9 +108,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		Location:              types.StringValue(v.AEndConfiguration.Location),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
-	}
-	if aEndVnicIndex != nil {
-		aEndModel.NetworkInterfaceIndex = types.Int64Value(*aEndVnicIndex)
 	}
 	if aEndOrderedVLAN != nil {
 		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
@@ -160,10 +148,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := existingBEnd.InnerVLAN.ValueInt64()
 			bEndInnerVLAN = &vlan
 		}
-		if !existingBEnd.NetworkInterfaceIndex.IsNull() && !existingBEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
-			bEndVnicIndex = &idx
-		}
 		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
@@ -184,10 +168,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			vlan := planBEnd.InnerVLAN.ValueInt64()
 			bEndInnerVLAN = &vlan
 		}
-		if bEndVnicIndex == nil && !planBEnd.NetworkInterfaceIndex.IsNull() && !planBEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
-			bEndVnicIndex = &idx
-		}
 	}
 
 	bEndModel := &vxcEndConfigurationModel{
@@ -199,9 +179,6 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		Location:              types.StringValue(v.BEndConfiguration.Location),
 		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
 		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
-	}
-	if bEndVnicIndex != nil {
-		bEndModel.NetworkInterfaceIndex = types.Int64Value(*bEndVnicIndex)
 	}
 	if bEndOrderedVLAN != nil {
 		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
@@ -888,4 +865,62 @@ func (r *vxcResource) verifyUpdateApplied(vxc *megaport.VXC, updateReq *megaport
 	// simpler scalar fields that are more prone to propagation delays.
 
 	return true
+}
+
+// waitForVnicIndex polls the VXC API until the NetworkInterfaceIndex for the
+// A-end and/or B-end matches the expected values. The API updates vnic_index
+// asynchronously, so an immediate read after create/update may return a stale
+// value. This function returns the VXC from the first successful poll so the
+// caller can use it directly without another API call.
+func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expectedAEnd *int, expectedBEnd *int, timeout time.Duration) (*megaport.VXC, error) {
+	if expectedAEnd == nil && expectedBEnd == nil {
+		// Nothing to wait for — just do a normal read.
+		return r.client.VXCService.GetVXC(ctx, uid)
+	}
+
+	deadline := time.Now().Add(timeout)
+	backoff := 2 * time.Second
+	maxBackoff := 10 * time.Second
+
+	// Small initial delay to let the API propagate.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(1 * time.Second):
+	}
+
+	for time.Now().Before(deadline) {
+		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read VXC %s while waiting for vnic_index propagation: %w", uid, err)
+		}
+
+		match := true
+		if expectedAEnd != nil && vxc.AEndConfiguration.NetworkInterfaceIndex != *expectedAEnd {
+			match = false
+		}
+		if expectedBEnd != nil && vxc.BEndConfiguration.NetworkInterfaceIndex != *expectedBEnd {
+			match = false
+		}
+		if match {
+			return vxc, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+			backoff = time.Duration(float64(backoff) * 1.5)
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+
+	// Timed out — return the last read so the caller can still proceed.
+	vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read VXC %s after vnic_index wait timeout: %w", uid, err)
+	}
+	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s", timeout, uid)
 }
