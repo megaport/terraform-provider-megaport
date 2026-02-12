@@ -976,7 +976,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the A-End configuration. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
+						Description: "The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1), int64validator.NoneOf(0)},
@@ -1060,7 +1060,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
+						Description: "The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1), int64validator.NoneOf(0)},
