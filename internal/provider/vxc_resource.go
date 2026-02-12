@@ -27,7 +27,7 @@ import (
 )
 
 // Update Timeout for VXC Update Verification - will be configurable in future release.
-const updateTimeout = 60 * time.Second
+const updateTimeout = 120 * time.Second
 
 // Ensure the implementation satisfies the expected interfaces.
 var (

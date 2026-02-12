@@ -917,10 +917,17 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 		}
 	}
 
-	// Timed out — return the last read so the caller can still proceed.
+	// Timed out — do a final read, patch in the expected values so state
+	// stays consistent with the plan, and warn the caller.
 	vxc, err := r.client.VXCService.GetVXC(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read VXC %s after vnic_index wait timeout: %w", uid, err)
 	}
-	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s", timeout, uid)
+	if expectedAEnd != nil {
+		vxc.AEndConfiguration.NetworkInterfaceIndex = *expectedAEnd
+	}
+	if expectedBEnd != nil {
+		vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
+	}
+	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
 }
