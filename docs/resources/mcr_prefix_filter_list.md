@@ -153,7 +153,7 @@ output "prefix_filter_list_id" {
 Required:
 
 - `action` (String) The action to take for the network address in the filter list. Valid values are 'permit' and 'deny'.
-- `prefix` (String) The network address of the prefix filter list entry in CIDR notation (e.g., '10.0.1.0/24'). Host bits are masked to the network address (e.g., '162.43.146.93/31' becomes '162.43.146.92/31').
+- `prefix` (String) The network address of the prefix filter list entry in CIDR notation (e.g., '10.0.1.0/24'). When sending this value to the Megaport API, any host bits are masked to the network address (e.g., '162.43.146.93/31' becomes '162.43.146.92/31'); however, Terraform configuration and state may preserve the original, non-canonical CIDR string and are not guaranteed to contain the canonical network address.
 
 Optional:
 

@@ -647,7 +647,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 }
 
 // TestAccMegaportMCRPrefixFilterList_CIDRNormalization tests that prefixes with host bits set
-// are normalized to the correct network address by the plan modifier, and that no drift is
+// are normalized to the correct network address by the resource implementation, and that no drift is
 // detected on re-plan. This is the end-to-end test for the fix in issue #317.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_CIDRNormalization() {
 	mcrName := RandomTestName()

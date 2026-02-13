@@ -124,8 +124,10 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 				// Preserve the user's config prefix value to prevent drift
 				prefix = plannedEntry.Prefix.ValueString()
 
-				// Check if the plan/state had an exact match (ge=le) and API returned le=max
-				if le == maxPrefixLength && le > ge {
+				// Only treat as exact match when both ge and le are explicitly set
+				if le == maxPrefixLength && le > ge &&
+					!plannedEntry.Ge.IsNull() && !plannedEntry.Ge.IsUnknown() &&
+					!plannedEntry.Le.IsNull() && !plannedEntry.Le.IsUnknown() {
 					plannedGe := int(plannedEntry.Ge.ValueInt64())
 					plannedLe := int(plannedEntry.Le.ValueInt64())
 					if plannedGe == plannedLe {
