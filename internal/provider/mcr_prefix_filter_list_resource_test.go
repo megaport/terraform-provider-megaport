@@ -646,6 +646,92 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 	})
 }
 
+// TestAccMegaportMCRPrefixFilterList_CIDRNormalization tests that prefixes with host bits set
+// are normalized to the correct network address by the plan modifier, and that no drift is
+// detected on re-plan. This is the end-to-end test for the fix in issue #317.
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_CIDRNormalization() {
+	mcrName := RandomTestName()
+	prefixFilterName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed          = 1000
+					location_id         = data.megaport_location.test_location.id
+					contract_term_months = 12
+					cost_centre         = "%s"
+
+					# Explicitly set empty prefix filter lists since we're using standalone resources
+					prefix_filter_lists = []
+
+					lifecycle {
+						ignore_changes = [prefix_filter_lists]
+					}
+				}
+
+				resource "megaport_mcr_prefix_filter_list" "cidr_norm" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							# Unnormalized prefix: host bits set (192.168.1.100/24 -> 192.168.1.0/24)
+							action = "permit"
+							prefix = "192.168.1.100/24"
+							ge     = 24
+							le     = 24
+						},
+						{
+							# Already canonical prefix - should be unaffected
+							action = "deny"
+							prefix = "10.0.1.0/24"
+							ge     = 24
+							le     = 28
+						}
+					]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName)
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create with unnormalized CIDR prefix
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "description", prefixFilterName),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "address_family", "IPv4"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.#", "2"),
+
+					// Entry 0: Config prefix preserved in state (API normalizes internally, state matches config to prevent drift)
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.0.prefix", "192.168.1.100/24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.0.le", "24"),
+
+					// Entry 1: Already canonical prefix - unchanged
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.1.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.1.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.cidr_norm", "entries.1.le", "28"),
+
+					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.cidr_norm", "id"),
+				),
+			},
+			// Step 2: Idempotency check - same config should produce no changes
+			{
+				Config:   config,
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportMCRPrefixFilterList_MixedExactAndRange tests a combination of exact match
 // and range-based prefix filter entries to ensure both are handled correctly.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_MixedExactAndRange() {

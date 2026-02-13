@@ -74,7 +74,8 @@ func mcrPrefixFilterListResourceSchema() schema.Schema {
 						},
 						"prefix": schema.StringAttribute{
 							Description: "The network address of the prefix filter list entry in CIDR notation " +
-								"(e.g., '10.0.1.0/24').",
+								"(e.g., '10.0.1.0/24'). Host bits are masked to the network address " +
+								"(e.g., '162.43.146.93/31' becomes '162.43.146.92/31').",
 							Required: true,
 						},
 						"ge": schema.Int64Attribute{

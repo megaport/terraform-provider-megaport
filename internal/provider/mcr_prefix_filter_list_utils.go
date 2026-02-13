@@ -107,23 +107,34 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 			}
 		}
 
-		// Normalize exact matches ONLY when we have plan/state to compare against.
+		// Use the API prefix by default; when we have plan/state entries, preserve the
+		// user's config prefix if it normalizes to the same network address as the API value.
+		// This prevents drift when users write non-canonical CIDRs like "192.168.1.100/24"
+		// which the API normalizes to "192.168.1.0/24".
+		prefix := entry.Prefix
+
+		// Normalize exact matches and preserve config prefix ONLY when we have plan/state to compare against.
 		// This fixes the "inconsistent state after apply" error when users configure exact matches.
 		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
 		// define what they expect, and Terraform will handle any drift detection normally.
-		if plannedEntries != nil && le == maxPrefixLength && le > ge {
+		if plannedEntries != nil {
 			// Search for matching planned entry by prefix (not by position) to handle
 			// cases where the API returns entries in a different order than planned.
 			for _, plannedEntry := range plannedEntries {
-				if plannedEntry.Prefix.ValueString() == entry.Prefix {
-					// Check if the plan/state had an exact match (ge=le)
-					plannedGe := int(plannedEntry.Ge.ValueInt64())
-					plannedLe := int(plannedEntry.Le.ValueInt64())
-					if plannedGe == plannedLe {
-						// Plan had exact match, but API returned le=max, normalize it
-						le = ge
+				if normalizeCIDR(plannedEntry.Prefix.ValueString()) == normalizeCIDR(entry.Prefix) {
+					// Preserve the user's config prefix value to prevent drift
+					prefix = plannedEntry.Prefix.ValueString()
+
+					// Check if the plan/state had an exact match (ge=le) and API returned le=max
+					if le == maxPrefixLength && le > ge {
+						plannedGe := int(plannedEntry.Ge.ValueInt64())
+						plannedLe := int(plannedEntry.Le.ValueInt64())
+						if plannedGe == plannedLe {
+							// Plan had exact match, but API returned le=max, normalize it
+							le = ge
+						}
+						// If plan had le=max explicitly, don't normalize - keep the API value
 					}
-					// If plan had le=max explicitly, don't normalize - keep the API value
 					break // Found matching prefix, no need to continue searching
 				}
 			}
@@ -131,7 +142,7 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 
 		entryModel := &mcrPrefixFilterListEntryResourceModel{
 			Action: types.StringValue(entry.Action),
-			Prefix: types.StringValue(entry.Prefix),
+			Prefix: types.StringValue(prefix),
 			Ge:     types.Int64Value(int64(ge)),
 			Le:     types.Int64Value(int64(le)),
 		}
@@ -156,7 +167,7 @@ func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel, addressFami
 
 	apiEntry := &megaport.MCRPrefixListEntry{
 		Action: entry.Action.ValueString(),
-		Prefix: entry.Prefix.ValueString(),
+		Prefix: normalizeCIDR(entry.Prefix.ValueString()),
 	}
 
 	// Handle ge/le values with appropriate defaults
@@ -264,6 +275,19 @@ func calculateGeLeFromPrefix(prefix string, addressFamily string) (int, int, dia
 	// Default ge to the prefix length and le to maximum length
 	return prefixLength, maxLength, diags
 }
+
+// normalizeCIDR returns the canonical network address for a CIDR prefix.
+// For example, "162.43.146.93/31" becomes "162.43.146.92/31" because the
+// network address for a /31 is the even address. Returns the input unchanged
+// if parsing fails (validators catch invalid CIDRs later).
+func normalizeCIDR(prefix string) string {
+	_, network, err := net.ParseCIDR(prefix)
+	if err != nil {
+		return prefix
+	}
+	return network.String()
+}
+
 
 // parseImportID parses an import ID and returns the MCR UID and prefix list ID
 func parseImportID(importID string) (string, int64, error) {
