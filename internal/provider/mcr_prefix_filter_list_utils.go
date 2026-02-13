@@ -117,26 +117,24 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 		// This fixes the "inconsistent state after apply" error when users configure exact matches.
 		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
 		// define what they expect, and Terraform will handle any drift detection normally.
-		if plannedEntries != nil {
-			// Search for matching planned entry by prefix (not by position) to handle
-			// cases where the API returns entries in a different order than planned.
-			for _, plannedEntry := range plannedEntries {
-				if normalizeCIDR(plannedEntry.Prefix.ValueString()) == normalizeCIDR(entry.Prefix) {
-					// Preserve the user's config prefix value to prevent drift
-					prefix = plannedEntry.Prefix.ValueString()
+		// Search for matching planned entry by prefix (not by position) to handle
+		// cases where the API returns entries in a different order than planned.
+		for _, plannedEntry := range plannedEntries {
+			if normalizeCIDR(plannedEntry.Prefix.ValueString()) == normalizeCIDR(entry.Prefix) {
+				// Preserve the user's config prefix value to prevent drift
+				prefix = plannedEntry.Prefix.ValueString()
 
-					// Check if the plan/state had an exact match (ge=le) and API returned le=max
-					if le == maxPrefixLength && le > ge {
-						plannedGe := int(plannedEntry.Ge.ValueInt64())
-						plannedLe := int(plannedEntry.Le.ValueInt64())
-						if plannedGe == plannedLe {
-							// Plan had exact match, but API returned le=max, normalize it
-							le = ge
-						}
-						// If plan had le=max explicitly, don't normalize - keep the API value
+				// Check if the plan/state had an exact match (ge=le) and API returned le=max
+				if le == maxPrefixLength && le > ge {
+					plannedGe := int(plannedEntry.Ge.ValueInt64())
+					plannedLe := int(plannedEntry.Le.ValueInt64())
+					if plannedGe == plannedLe {
+						// Plan had exact match, but API returned le=max, normalize it
+						le = ge
 					}
-					break // Found matching prefix, no need to continue searching
+					// If plan had le=max explicitly, don't normalize - keep the API value
 				}
+				break // Found matching prefix, no need to continue searching
 			}
 		}
 
@@ -287,7 +285,6 @@ func normalizeCIDR(prefix string) string {
 	}
 	return network.String()
 }
-
 
 // parseImportID parses an import ID and returns the MCR UID and prefix list ID
 func parseImportID(importID string) (string, int64, error) {
