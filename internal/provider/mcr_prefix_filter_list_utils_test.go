@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -66,6 +67,89 @@ func TestNormalizeCIDR(t *testing.T) {
 			got := normalizeCIDR(tt.input)
 			if got != tt.want {
 				t.Errorf("normalizeCIDR(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanonicalCIDRValidator(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "canonical IPv4 - no error",
+			input:     "10.0.0.0/8",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv4 /24 - no error",
+			input:     "192.168.1.0/24",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv4 /32 host - no error",
+			input:     "10.0.0.1/32",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv6 - no error",
+			input:     "2001:db8::/32",
+			wantError: false,
+		},
+		{
+			name:      "IPv4 with host bits set",
+			input:     "192.168.1.100/24",
+			wantError: true,
+			errorMsg:  `Use the network address "192.168.1.0/24" instead`,
+		},
+		{
+			name:      "IPv4 /31 with host bits set",
+			input:     "162.43.146.93/31",
+			wantError: true,
+			errorMsg:  `Use the network address "162.43.146.92/31" instead`,
+		},
+		{
+			name:      "IPv6 with host bits set",
+			input:     "2001:db8::1/32",
+			wantError: true,
+			errorMsg:  `Use the network address "2001:db8::/32" instead`,
+		},
+		{
+			name:      "invalid CIDR - no error (let other validators handle it)",
+			input:     "invalid-prefix",
+			wantError: false,
+		},
+	}
+
+	v := canonicalCIDRValidator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validator.StringRequest{
+				ConfigValue: types.StringValue(tt.input),
+			}
+			resp := &validator.StringResponse{}
+			v.ValidateString(context.Background(), req, resp)
+
+			if tt.wantError && !resp.Diagnostics.HasError() {
+				t.Errorf("expected error for %q but got none", tt.input)
+			}
+			if !tt.wantError && resp.Diagnostics.HasError() {
+				t.Errorf("unexpected error for %q: %v", tt.input, resp.Diagnostics)
+			}
+			if tt.wantError && tt.errorMsg != "" {
+				found := false
+				for _, d := range resp.Diagnostics {
+					if contains(d.Detail(), tt.errorMsg) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("error should contain %q, got: %v", tt.errorMsg, resp.Diagnostics)
+				}
 			}
 		})
 	}
@@ -677,10 +761,10 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "prefix with host bits should be normalized",
+			name: "canonical prefix passes through unchanged",
 			entry: mcrPrefixFilterListEntryResourceModel{
 				Action: types.StringValue("permit"),
-				Prefix: types.StringValue("162.43.146.93/31"),
+				Prefix: types.StringValue("162.43.146.92/31"),
 				Ge:     types.Int64Value(31),
 				Le:     types.Int64Value(31),
 			},
@@ -1277,32 +1361,32 @@ func TestFromAPIExactMatchNormalization(t *testing.T) {
 			},
 		},
 		{
-			name: "Normal: Plan has unnormalized prefix, API returns normalized - exact match should normalize (issue #317)",
+			name: "Normal: Plan has canonical prefix, API returns le=max - exact match should normalize (issue #317)",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            13,
 				Description:   "Issue 317 test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "162.43.146.92/31", Ge: 31, Le: 32}, // API normalized prefix and le
+					{Action: "permit", Prefix: "162.43.146.92/31", Ge: 31, Le: 32}, // API returns le=max
 				},
 			},
 			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
-				{Action: types.StringValue("permit"), Prefix: types.StringValue("162.43.146.93/31"), Ge: types.Int64Value(31), Le: types.Int64Value(31)}, // User's raw input
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("162.43.146.92/31"), Ge: types.Int64Value(31), Le: types.Int64Value(31)}, // Canonical prefix with exact match
 			},
-			expectedGeLe: []struct{ ge, le int }{{31, 31}}, // le should normalize because exact match found via CIDR normalization
+			expectedGeLe: []struct{ ge, le int }{{31, 31}}, // le should normalize because exact match
 		},
 		{
-			name: "Normal: Plan has unnormalized IPv6 prefix, API returns normalized - exact match should normalize",
+			name: "Normal: Plan has canonical IPv6 prefix, API returns le=max - exact match should normalize",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            14,
 				Description:   "IPv6 normalization test",
 				AddressFamily: "IPv6",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128}, // API normalized
+					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128}, // API returns le=max
 				},
 			},
 			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
-				{Action: types.StringValue("permit"), Prefix: types.StringValue("2001:db8::1/32"), Ge: types.Int64Value(48), Le: types.Int64Value(48)}, // Unnormalized IPv6
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("2001:db8::/32"), Ge: types.Int64Value(48), Le: types.Int64Value(48)}, // Canonical IPv6
 			},
 			expectedGeLe: []struct{ ge, le int }{{48, 48}}, // Should normalize
 		},

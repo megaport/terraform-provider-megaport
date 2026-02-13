@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -107,23 +108,14 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 			}
 		}
 
-		// Use the API prefix by default; when we have plan/state entries, preserve the
-		// user's config prefix if it normalizes to the same network address as the API value.
-		// This prevents drift when users write non-canonical CIDRs like "192.168.1.100/24"
-		// which the API normalizes to "192.168.1.0/24".
-		prefix := entry.Prefix
-
-		// Normalize exact matches and preserve config prefix ONLY when we have plan/state to compare against.
+		// Normalize exact matches ONLY when we have plan/state to compare against.
 		// This fixes the "inconsistent state after apply" error when users configure exact matches.
 		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
 		// define what they expect, and Terraform will handle any drift detection normally.
 		// Search for matching planned entry by prefix (not by position) to handle
 		// cases where the API returns entries in a different order than planned.
 		for _, plannedEntry := range plannedEntries {
-			if normalizeCIDR(plannedEntry.Prefix.ValueString()) == normalizeCIDR(entry.Prefix) {
-				// Preserve the user's config prefix value to prevent drift
-				prefix = plannedEntry.Prefix.ValueString()
-
+			if plannedEntry.Prefix.ValueString() == entry.Prefix {
 				// Only treat as exact match when both ge and le are explicitly set
 				if le == maxPrefixLength && le > ge &&
 					!plannedEntry.Ge.IsNull() && !plannedEntry.Ge.IsUnknown() &&
@@ -142,7 +134,7 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 
 		entryModel := &mcrPrefixFilterListEntryResourceModel{
 			Action: types.StringValue(entry.Action),
-			Prefix: types.StringValue(prefix),
+			Prefix: types.StringValue(entry.Prefix),
 			Ge:     types.Int64Value(int64(ge)),
 			Le:     types.Int64Value(int64(le)),
 		}
@@ -167,7 +159,7 @@ func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel, addressFami
 
 	apiEntry := &megaport.MCRPrefixListEntry{
 		Action: entry.Action.ValueString(),
-		Prefix: normalizeCIDR(entry.Prefix.ValueString()),
+		Prefix: entry.Prefix.ValueString(),
 	}
 
 	// Handle ge/le values with appropriate defaults
@@ -286,6 +278,40 @@ func normalizeCIDR(prefix string) string {
 		return prefix
 	}
 	return network.String()
+}
+
+// canonicalCIDRValidator validates that a CIDR prefix has no host bits set.
+// If host bits are set, it returns an error with the correct network address.
+type canonicalCIDRValidator struct{}
+
+func (v canonicalCIDRValidator) Description(_ context.Context) string {
+	return "CIDR prefix must not have host bits set"
+}
+
+func (v canonicalCIDRValidator) MarkdownDescription(_ context.Context) string {
+	return "CIDR prefix must not have host bits set"
+}
+
+func (v canonicalCIDRValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	prefix := req.ConfigValue.ValueString()
+	_, network, err := net.ParseCIDR(prefix)
+	if err != nil {
+		// Let the built-in CIDR parsing in calculateGeLe handle invalid format errors
+		return
+	}
+
+	canonical := network.String()
+	if prefix != canonical {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid CIDR prefix",
+			fmt.Sprintf("Prefix %q has host bits set. Use the network address %q instead.", prefix, canonical),
+		)
+	}
 }
 
 // parseImportID parses an import ID and returns the MCR UID and prefix list ID

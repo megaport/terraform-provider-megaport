@@ -74,11 +74,12 @@ func mcrPrefixFilterListResourceSchema() schema.Schema {
 						},
 						"prefix": schema.StringAttribute{
 							Description: "The network address of the prefix filter list entry in CIDR notation " +
-								"(e.g., '10.0.1.0/24'). When sending this value to the Megaport API, any host bits " +
-								"are masked to the network address (e.g., '162.43.146.93/31' becomes '162.43.146.92/31'); " +
-								"however, Terraform configuration and state may preserve the original, non-canonical CIDR " +
-								"string and are not guaranteed to contain the canonical network address.",
+								"(e.g., '10.0.1.0/24'). Must be a valid network address with no host bits set " +
+								"(e.g., use '162.43.146.92/31' instead of '162.43.146.93/31').",
 							Required: true,
+							Validators: []validator.String{
+								canonicalCIDRValidator{},
+							},
 						},
 						"ge": schema.Int64Attribute{
 							Description: "The minimum starting prefix length to be matched. " +
