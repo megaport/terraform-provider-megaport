@@ -298,13 +298,7 @@ func (v canonicalCIDRValidator) ValidateString(_ context.Context, req validator.
 	}
 
 	prefix := req.ConfigValue.ValueString()
-	_, network, err := net.ParseCIDR(prefix)
-	if err != nil {
-		// Let the built-in CIDR parsing in calculateGeLe handle invalid format errors
-		return
-	}
-
-	canonical := network.String()
+	canonical := normalizeCIDR(prefix)
 	if prefix != canonical {
 		resp.Diagnostics.AddAttributeError(
 			req.Path,
