@@ -1771,6 +1771,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			resp.Diagnostics = append(resp.Diagnostics, ifaceDiags...)
 			for _, iface := range ifaceModels {
 				toAppend := megaport.PartnerConfigInterface{}
+				if !iface.IpMtu.IsNull() {
+					toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
+				}
 				if !iface.IPAddresses.IsNull() {
 					ipAddresses := []string{}
 					ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
