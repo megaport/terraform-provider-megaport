@@ -68,15 +68,12 @@ resource "megaport_service_key" "time_limited" {
 ### Read-Only
 
 - `company_id` (Number) The numeric company ID of the service key owner.
-- `company_name` (String) The name of the company that owns the service key.
 - `company_uid` (String) The UID of the company that owns the service key.
 - `create_date` (String) The date and time when the service key was created.
 - `expired` (Boolean) Whether the service key has expired.
 - `key` (String, Sensitive) The service key value. This is the secret key that is shared with the other party.
 - `last_updated` (String) The timestamp of the last Terraform update of the resource.
 - `last_used` (String) The date and time when the service key was last used.
-- `product_name` (String) The name of the parent product.
-- `promo_code` (String) The promo code associated with the service key.
 - `valid` (Boolean) Whether the service key is currently valid.
 
 <a id="nestedatt--valid_for"></a>

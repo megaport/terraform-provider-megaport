@@ -20,15 +20,12 @@ type serviceKeyResourceModel struct {
 	PreApproved types.Bool   `tfsdk:"pre_approved"`
 	ValidFor    types.Object `tfsdk:"valid_for"`
 	Key         types.String `tfsdk:"key"`
-	ProductName types.String `tfsdk:"product_name"`
 	CompanyID   types.Int64  `tfsdk:"company_id"`
 	CompanyUID  types.String `tfsdk:"company_uid"`
-	CompanyName types.String `tfsdk:"company_name"`
 	CreateDate  types.String `tfsdk:"create_date"`
 	LastUsed    types.String `tfsdk:"last_used"`
 	Expired     types.Bool   `tfsdk:"expired"`
 	Valid       types.Bool   `tfsdk:"valid"`
-	PromoCode   types.String `tfsdk:"promo_code"`
 	LastUpdated types.String `tfsdk:"last_updated"`
 }
 
@@ -43,7 +40,6 @@ func (m *serviceKeyResourceModel) fromAPI(ctx context.Context, apiKey *megaport.
 
 	m.Key = types.StringValue(apiKey.Key)
 	m.ProductUID = types.StringValue(apiKey.ProductUID)
-	m.ProductName = types.StringValue(apiKey.ProductName)
 	m.MaxSpeed = types.Int64Value(int64(apiKey.MaxSpeed))
 	m.SingleUse = types.BoolValue(apiKey.SingleUse)
 	m.Active = types.BoolValue(apiKey.Active)
@@ -51,10 +47,8 @@ func (m *serviceKeyResourceModel) fromAPI(ctx context.Context, apiKey *megaport.
 	m.PreApproved = types.BoolValue(apiKey.PreApproved)
 	m.CompanyID = types.Int64Value(int64(apiKey.CompanyID))
 	m.CompanyUID = types.StringValue(apiKey.CompanyUID)
-	m.CompanyName = types.StringValue(apiKey.CompanyName)
 	m.Expired = types.BoolValue(apiKey.Expired)
 	m.Valid = types.BoolValue(apiKey.Valid)
-	m.PromoCode = types.StringValue(apiKey.PromoCode)
 
 	if apiKey.VLAN != 0 {
 		m.VLAN = types.Int64Value(int64(apiKey.VLAN))

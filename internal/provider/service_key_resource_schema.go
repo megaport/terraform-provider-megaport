@@ -101,10 +101,6 @@ func serviceKeyResourceSchema() schema.Schema {
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"product_name": schema.StringAttribute{
-				Description: "The name of the parent product.",
-				Computed:    true,
-			},
 			"company_id": schema.Int64Attribute{
 				Description: "The numeric company ID of the service key owner.",
 				Computed:    true,
@@ -119,13 +115,12 @@ func serviceKeyResourceSchema() schema.Schema {
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"company_name": schema.StringAttribute{
-				Description: "The name of the company that owns the service key.",
-				Computed:    true,
-			},
 			"create_date": schema.StringAttribute{
 				Description: "The date and time when the service key was created.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"last_used": schema.StringAttribute{
 				Description: "The date and time when the service key was last used.",
@@ -138,13 +133,6 @@ func serviceKeyResourceSchema() schema.Schema {
 			"valid": schema.BoolAttribute{
 				Description: "Whether the service key is currently valid.",
 				Computed:    true,
-			},
-			"promo_code": schema.StringAttribute{
-				Description: "The promo code associated with the service key.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"last_updated": schema.StringAttribute{
 				Description: "The timestamp of the last Terraform update of the resource.",
