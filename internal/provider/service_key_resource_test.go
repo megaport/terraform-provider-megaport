@@ -54,8 +54,6 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 					resource.TestCheckResourceAttr("megaport_service_key.test", "single_use", "false"),
 					resource.TestCheckResourceAttr("megaport_service_key.test", "active", "true"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test", "key"),
-					resource.TestCheckResourceAttrSet("megaport_service_key.test", "id"),
-					resource.TestCheckResourceAttrSet("megaport_service_key.test", "product_id"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test", "product_name"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test", "company_id"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test", "company_uid"),
@@ -65,9 +63,10 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 			},
 			// Step 2: Import by key string
 			{
-				ResourceName:      "megaport_service_key.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:                         "megaport_service_key.test",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "key",
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					rs, ok := state.RootModule().Resources["megaport_service_key.test"]
 					if !ok {

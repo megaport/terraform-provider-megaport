@@ -101,20 +101,6 @@ func serviceKeyResourceSchema() schema.Schema {
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"id": schema.StringAttribute{
-				Description: "The service key identifier.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"product_id": schema.Int64Attribute{
-				Description: "The numeric product ID of the parent port.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
 			"product_name": schema.StringAttribute{
 				Description: "The name of the parent product.",
 				Computed:    true,

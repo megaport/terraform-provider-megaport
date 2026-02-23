@@ -11,8 +11,7 @@ import (
 )
 
 type serviceKeyResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	ProductUID  types.String `tfsdk:"product_uid"`
+	ProductUID types.String `tfsdk:"product_uid"`
 	MaxSpeed    types.Int64  `tfsdk:"max_speed"`
 	SingleUse   types.Bool   `tfsdk:"single_use"`
 	Active      types.Bool   `tfsdk:"active"`
@@ -21,7 +20,6 @@ type serviceKeyResourceModel struct {
 	PreApproved types.Bool   `tfsdk:"pre_approved"`
 	ValidFor    types.Object `tfsdk:"valid_for"`
 	Key         types.String `tfsdk:"key"`
-	ProductID   types.Int64  `tfsdk:"product_id"`
 	ProductName types.String `tfsdk:"product_name"`
 	CompanyID   types.Int64  `tfsdk:"company_id"`
 	CompanyUID  types.String `tfsdk:"company_uid"`
@@ -44,9 +42,7 @@ func (m *serviceKeyResourceModel) fromAPI(ctx context.Context, apiKey *megaport.
 	diags := diag.Diagnostics{}
 
 	m.Key = types.StringValue(apiKey.Key)
-	m.ID = types.StringValue(apiKey.Key)
 	m.ProductUID = types.StringValue(apiKey.ProductUID)
-	m.ProductID = types.Int64Value(int64(apiKey.ProductID))
 	m.ProductName = types.StringValue(apiKey.ProductName)
 	m.MaxSpeed = types.Int64Value(int64(apiKey.MaxSpeed))
 	m.SingleUse = types.BoolValue(apiKey.SingleUse)
