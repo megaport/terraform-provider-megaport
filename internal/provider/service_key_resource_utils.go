@@ -69,13 +69,13 @@ func (m *serviceKeyResourceModel) fromAPI(ctx context.Context, apiKey *megaport.
 	if apiKey.CreateDate != nil {
 		m.CreateDate = types.StringValue(apiKey.CreateDate.Time.UTC().Format(time.RFC3339))
 	} else {
-		m.CreateDate = types.StringValue("")
+		m.CreateDate = types.StringNull()
 	}
 
 	if apiKey.LastUsed != nil {
 		m.LastUsed = types.StringValue(apiKey.LastUsed.Time.UTC().Format(time.RFC3339))
 	} else {
-		m.LastUsed = types.StringValue("")
+		m.LastUsed = types.StringNull()
 	}
 
 	if apiKey.ValidFor != nil {
@@ -83,12 +83,12 @@ func (m *serviceKeyResourceModel) fromAPI(ctx context.Context, apiKey *megaport.
 		if apiKey.ValidFor.StartTime != nil {
 			validForModel.StartTime = types.StringValue(apiKey.ValidFor.StartTime.Time.UTC().Format(time.RFC3339))
 		} else {
-			validForModel.StartTime = types.StringValue("")
+			validForModel.StartTime = types.StringNull()
 		}
 		if apiKey.ValidFor.EndTime != nil {
 			validForModel.EndTime = types.StringValue(apiKey.ValidFor.EndTime.Time.UTC().Format(time.RFC3339))
 		} else {
-			validForModel.EndTime = types.StringValue("")
+			validForModel.EndTime = types.StringNull()
 		}
 		validForObj, objDiags := types.ObjectValueFrom(ctx, serviceKeyValidForAttrs, validForModel)
 		diags.Append(objDiags...)
