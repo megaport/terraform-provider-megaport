@@ -11,7 +11,7 @@ import (
 )
 
 type serviceKeyResourceModel struct {
-	ProductUID types.String `tfsdk:"product_uid"`
+	ProductUID  types.String `tfsdk:"product_uid"`
 	MaxSpeed    types.Int64  `tfsdk:"max_speed"`
 	SingleUse   types.Bool   `tfsdk:"single_use"`
 	Active      types.Bool   `tfsdk:"active"`
