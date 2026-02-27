@@ -79,9 +79,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			aEndInnerVLAN = &vlan
 		}
 		// During Read (plan == nil), preserve vnic_index from state because the
-		// API does not reliably return it.  During Create/Update the caller uses
-		// waitForVnicIndex which ensures the VXC already carries the correct
-		// value, so we trust the API response in that path.
+		// API does not reliably return it immediately after changes.
 		if plan == nil && !existingAEnd.NetworkInterfaceIndex.IsNull() && !existingAEnd.NetworkInterfaceIndex.IsUnknown() {
 			idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
 			aEndVnicIndex = &idx
@@ -89,7 +87,8 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	}
 
 	// If plan is provided and state values are empty, use plan values.
-	// This handles the import case where state is initially null.
+	// This handles the import case where state is initially null, and
+	// the Create case where the API may not yet reflect the vnic_index.
 	if plan != nil && !plan.AEndConfiguration.IsNull() {
 		planAEnd := &vxcEndConfigurationModel{}
 		planDiags := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{})
@@ -105,6 +104,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if aEndInnerVLAN == nil && !planAEnd.InnerVLAN.IsNull() && !planAEnd.InnerVLAN.IsUnknown() {
 			vlan := planAEnd.InnerVLAN.ValueInt64()
 			aEndInnerVLAN = &vlan
+		}
+		if aEndVnicIndex == nil && !planAEnd.NetworkInterfaceIndex.IsNull() && !planAEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
+			aEndVnicIndex = &idx
 		}
 	}
 
@@ -161,9 +164,7 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			bEndInnerVLAN = &vlan
 		}
 		// During Read (plan == nil), preserve vnic_index from state because the
-		// API does not reliably return it.  During Create/Update the caller uses
-		// waitForVnicIndex which ensures the VXC already carries the correct
-		// value, so we trust the API response in that path.
+		// API does not reliably return it immediately after changes.
 		if plan == nil && !existingBEnd.NetworkInterfaceIndex.IsNull() && !existingBEnd.NetworkInterfaceIndex.IsUnknown() {
 			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
 			bEndVnicIndex = &idx
@@ -187,6 +188,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if bEndInnerVLAN == nil && !planBEnd.InnerVLAN.IsNull() && !planBEnd.InnerVLAN.IsUnknown() {
 			vlan := planBEnd.InnerVLAN.ValueInt64()
 			bEndInnerVLAN = &vlan
+		}
+		if bEndVnicIndex == nil && !planBEnd.NetworkInterfaceIndex.IsNull() && !planBEnd.NetworkInterfaceIndex.IsUnknown() {
+			idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
+			bEndVnicIndex = &idx
 		}
 	}
 
