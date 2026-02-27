@@ -4,9 +4,156 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
+
+func TestNormalizeCIDR(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "IPv4 with host bits set",
+			input: "162.43.146.93/31",
+			want:  "162.43.146.92/31",
+		},
+		{
+			name:  "IPv4 already canonical",
+			input: "10.0.0.0/8",
+			want:  "10.0.0.0/8",
+		},
+		{
+			name:  "IPv4 /32 host address",
+			input: "10.0.0.1/32",
+			want:  "10.0.0.1/32",
+		},
+		{
+			name:  "IPv4 host bits in /24",
+			input: "192.168.1.100/24",
+			want:  "192.168.1.0/24",
+		},
+		{
+			name:  "IPv6 with host bits set",
+			input: "2001:db8::1/32",
+			want:  "2001:db8::/32",
+		},
+		{
+			name:  "IPv6 already canonical",
+			input: "2001:db8::/32",
+			want:  "2001:db8::/32",
+		},
+		{
+			name:  "IPv6 /128 host address",
+			input: "2001:db8::1/128",
+			want:  "2001:db8::1/128",
+		},
+		{
+			name:  "invalid input returns unchanged",
+			input: "invalid-prefix",
+			want:  "invalid-prefix",
+		},
+		{
+			name:  "empty string returns unchanged",
+			input: "",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeCIDR(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeCIDR(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanonicalCIDRValidator(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "canonical IPv4 - no error",
+			input:     "10.0.0.0/8",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv4 /24 - no error",
+			input:     "192.168.1.0/24",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv4 /32 host - no error",
+			input:     "10.0.0.1/32",
+			wantError: false,
+		},
+		{
+			name:      "canonical IPv6 - no error",
+			input:     "2001:db8::/32",
+			wantError: false,
+		},
+		{
+			name:      "IPv4 with host bits set",
+			input:     "192.168.1.100/24",
+			wantError: true,
+			errorMsg:  `Use the network address "192.168.1.0/24" instead`,
+		},
+		{
+			name:      "IPv4 /31 with host bits set",
+			input:     "162.43.146.93/31",
+			wantError: true,
+			errorMsg:  `Use the network address "162.43.146.92/31" instead`,
+		},
+		{
+			name:      "IPv6 with host bits set",
+			input:     "2001:db8::1/32",
+			wantError: true,
+			errorMsg:  `Use the network address "2001:db8::/32" instead`,
+		},
+		{
+			name:      "invalid CIDR - no error (let other validators handle it)",
+			input:     "invalid-prefix",
+			wantError: false,
+		},
+	}
+
+	v := canonicalCIDRValidator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validator.StringRequest{
+				ConfigValue: types.StringValue(tt.input),
+			}
+			resp := &validator.StringResponse{}
+			v.ValidateString(context.Background(), req, resp)
+
+			if tt.wantError && !resp.Diagnostics.HasError() {
+				t.Errorf("expected error for %q but got none", tt.input)
+			}
+			if !tt.wantError && resp.Diagnostics.HasError() {
+				t.Errorf("unexpected error for %q: %v", tt.input, resp.Diagnostics)
+			}
+			if tt.wantError && tt.errorMsg != "" {
+				found := false
+				for _, d := range resp.Diagnostics {
+					if contains(d.Detail(), tt.errorMsg) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("error should contain %q, got: %v", tt.errorMsg, resp.Diagnostics)
+				}
+			}
+		})
+	}
+}
 
 func TestParseImportID(t *testing.T) {
 	tests := []struct {
@@ -614,6 +761,23 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
+			name: "canonical prefix passes through unchanged",
+			entry: mcrPrefixFilterListEntryResourceModel{
+				Action: types.StringValue("permit"),
+				Prefix: types.StringValue("162.43.146.92/31"),
+				Ge:     types.Int64Value(31),
+				Le:     types.Int64Value(31),
+			},
+			addressFamily: "IPv4",
+			wantEntry: &megaport.MCRPrefixListEntry{
+				Action: "permit",
+				Prefix: "162.43.146.92/31",
+				Ge:     31,
+				Le:     31,
+			},
+			wantError: false,
+		},
+		{
 			name: "invalid prefix",
 			entry: mcrPrefixFilterListEntryResourceModel{
 				Action: types.StringValue("permit"),
@@ -1195,6 +1359,36 @@ func TestFromAPIExactMatchNormalization(t *testing.T) {
 				{24, 32}, // NOT normalized - no matching prefix in plan, return raw API value
 				{16, 32}, // NOT normalized - plan had le=32
 			},
+		},
+		{
+			name: "Normal: Plan has canonical prefix, API returns le=max - exact match should normalize (issue #317)",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            13,
+				Description:   "Issue 317 test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "162.43.146.92/31", Ge: 31, Le: 32}, // API returns le=max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("162.43.146.92/31"), Ge: types.Int64Value(31), Le: types.Int64Value(31)}, // Canonical prefix with exact match
+			},
+			expectedGeLe: []struct{ ge, le int }{{31, 31}}, // le should normalize because exact match
+		},
+		{
+			name: "Normal: Plan has canonical IPv6 prefix, API returns le=max - exact match should normalize",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            14,
+				Description:   "IPv6 normalization test",
+				AddressFamily: "IPv6",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128}, // API returns le=max
+				},
+			},
+			plannedEntries: []*mcrPrefixFilterListEntryResourceModel{
+				{Action: types.StringValue("permit"), Prefix: types.StringValue("2001:db8::/32"), Ge: types.Int64Value(48), Le: types.Int64Value(48)}, // Canonical IPv6
+			},
+			expectedGeLe: []struct{ ge, le int }{{48, 48}}, // Should normalize
 		},
 		{
 			name: "Normal: Completely reversed order - all exact matches",

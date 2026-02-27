@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -111,12 +112,14 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 		// This fixes the "inconsistent state after apply" error when users configure exact matches.
 		// During import (plannedEntries is nil), we return raw API values - the user's HCL will
 		// define what they expect, and Terraform will handle any drift detection normally.
-		if plannedEntries != nil && le == maxPrefixLength && le > ge {
-			// Search for matching planned entry by prefix (not by position) to handle
-			// cases where the API returns entries in a different order than planned.
-			for _, plannedEntry := range plannedEntries {
-				if plannedEntry.Prefix.ValueString() == entry.Prefix {
-					// Check if the plan/state had an exact match (ge=le)
+		// Search for matching planned entry by prefix (not by position) to handle
+		// cases where the API returns entries in a different order than planned.
+		for _, plannedEntry := range plannedEntries {
+			if plannedEntry.Prefix.ValueString() == entry.Prefix {
+				// Only treat as exact match when both ge and le are explicitly set
+				if le == maxPrefixLength && le > ge &&
+					!plannedEntry.Ge.IsNull() && !plannedEntry.Ge.IsUnknown() &&
+					!plannedEntry.Le.IsNull() && !plannedEntry.Le.IsUnknown() {
 					plannedGe := int(plannedEntry.Ge.ValueInt64())
 					plannedLe := int(plannedEntry.Le.ValueInt64())
 					if plannedGe == plannedLe {
@@ -124,8 +127,8 @@ func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, 
 						le = ge
 					}
 					// If plan had le=max explicitly, don't normalize - keep the API value
-					break // Found matching prefix, no need to continue searching
 				}
+				break // Found matching prefix, no need to continue searching
 			}
 		}
 
@@ -263,6 +266,46 @@ func calculateGeLeFromPrefix(prefix string, addressFamily string) (int, int, dia
 
 	// Default ge to the prefix length and le to maximum length
 	return prefixLength, maxLength, diags
+}
+
+// normalizeCIDR returns the canonical network address for a CIDR prefix.
+// For example, "162.43.146.93/31" becomes "162.43.146.92/31" because the
+// network address for a /31 is the even address. Returns the input unchanged
+// if parsing fails (validators catch invalid CIDRs later).
+func normalizeCIDR(prefix string) string {
+	_, network, err := net.ParseCIDR(prefix)
+	if err != nil {
+		return prefix
+	}
+	return network.String()
+}
+
+// canonicalCIDRValidator validates that a CIDR prefix has no host bits set.
+// If host bits are set, it returns an error with the correct network address.
+type canonicalCIDRValidator struct{}
+
+func (v canonicalCIDRValidator) Description(_ context.Context) string {
+	return "CIDR prefix must not have host bits set"
+}
+
+func (v canonicalCIDRValidator) MarkdownDescription(_ context.Context) string {
+	return "CIDR prefix must not have host bits set"
+}
+
+func (v canonicalCIDRValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	prefix := req.ConfigValue.ValueString()
+	canonical := normalizeCIDR(prefix)
+	if prefix != canonical {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid CIDR prefix",
+			fmt.Sprintf("Prefix %q has host bits set. Use the network address %q instead.", prefix, canonical),
+		)
+	}
 }
 
 // parseImportID parses an import ID and returns the MCR UID and prefix list ID

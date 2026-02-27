@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -641,6 +642,58 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				// the user's configured value (ge=le). But during import, we can't know the
 				// user's intention, so we return raw API values.
 				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+			},
+		},
+	})
+}
+
+// TestAccMegaportMCRPrefixFilterList_CIDRValidation tests that prefixes with host bits set
+// are rejected with a descriptive error, and that canonical prefixes work correctly.
+// This is the end-to-end test for the fix in issue #317.
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_CIDRValidation() {
+	mcrName := RandomTestName()
+	prefixFilterName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Non-canonical CIDR prefix should be rejected with a helpful error
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed          = 1000
+					location_id         = data.megaport_location.test_location.id
+					contract_term_months = 12
+					cost_centre         = "%s"
+
+					prefix_filter_lists = []
+
+					lifecycle {
+						ignore_changes = [prefix_filter_lists]
+					}
+				}
+
+				resource "megaport_mcr_prefix_filter_list" "cidr_test" {
+					mcr_id         = megaport_mcr.mcr.product_uid
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							action = "permit"
+							prefix = "192.168.1.100/24"
+							ge     = 24
+							le     = 24
+						}
+					]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				ExpectError: regexp.MustCompile(`(?s)host bits set.*Use the network address.*192\.168\.1\.0/24`),
 			},
 		},
 	})
