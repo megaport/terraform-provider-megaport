@@ -1606,6 +1606,122 @@ func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
 	})
 }
 
+// TestAccMegaportMCRVXC_BEndIpMtu tests that ip_mtu is correctly applied to
+// the B-End vrouter partner config of an MCR-to-MCR VXC (GitHub issue #319).
+func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXC_BEndIpMtu() {
+	mcrNameA := RandomTestName()
+	mcrNameB := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func(ipMtu int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			resource "megaport_mcr" "mcr_a" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+
+			resource "megaport_mcr" "mcr_b" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64556
+			}
+
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr_a.product_uid
+					ordered_vlan          = 100
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							ip_mtu       = %d
+							bgp_connections = [{
+								peer_asn         = 64556
+								local_ip_address = "10.0.0.1"
+								peer_ip_address  = "10.0.0.2"
+								shutdown         = false
+								description      = "A-End BGP"
+								med_in           = 100
+								med_out          = 100
+								bfd_enabled      = false
+								export_policy    = "permit"
+							}]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_mcr.mcr_b.product_uid
+					ordered_vlan          = 200
+				}
+
+				b_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.2/30"]
+							ip_mtu       = %d
+							bgp_connections = [{
+								peer_asn         = 64555
+								local_ip_address = "10.0.0.2"
+								peer_ip_address  = "10.0.0.1"
+								shutdown         = false
+								description      = "B-End BGP"
+								med_in           = 100
+								med_out          = 100
+								bfd_enabled      = false
+								export_policy    = "permit"
+							}]
+						}]
+					}
+				}
+			}
+		`, VXCLocationID1, mcrNameA, mcrNameB, vxcName, ipMtu, ipMtu)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create MCR-to-MCR VXC with ip_mtu 9000 on both ends
+			{
+				Config: vxcConfig(9000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
+				),
+			},
+			// Step 2: Update ip_mtu to 1500 on both ends
+			{
+				Config: vxcConfig(1500),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "1500"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "1500"),
+				),
+			},
+		},
+	})
+}
+
 func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
