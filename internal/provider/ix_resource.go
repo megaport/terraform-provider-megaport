@@ -371,11 +371,11 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Optional:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the IX.",
+				Description: "The provisioning status of the IX. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the IX lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the IX was created.",
+				Description: "The date the IX was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
 			},
 			"term": schema.Int64Attribute{
