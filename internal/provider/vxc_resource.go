@@ -1805,34 +1805,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdVXC.TechnicalServiceUID
 
-	// Build expected vnic_index values from the plan so we can wait for
-	// the API to propagate them (it updates asynchronously).
-	var expectedAEndVnic, expectedBEndVnic *int
-	if !a.NetworkInterfaceIndex.IsNull() && !a.NetworkInterfaceIndex.IsUnknown() {
-		v := int(a.NetworkInterfaceIndex.ValueInt64())
-		expectedAEndVnic = &v
-	}
-	if !b.NetworkInterfaceIndex.IsNull() && !b.NetworkInterfaceIndex.IsUnknown() {
-		v := int(b.NetworkInterfaceIndex.ValueInt64())
-		expectedBEndVnic = &v
-	}
-
-	// get the created VXC, waiting for vnic_index to propagate if needed
-	vxc, err := r.waitForVnicIndex(ctx, createdID, expectedAEndVnic, expectedBEndVnic, updateTimeout)
+	// get the created VXC
+	vxc, err := r.client.VXCService.GetVXC(ctx, createdID)
 	if err != nil {
-		// If the wait timed out we still have a VXC to work with; only
-		// hard errors (API failures) should abort.
-		if vxc == nil {
-			resp.Diagnostics.AddError(
-				"Error reading newly created VXC",
-				"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
-			)
-			return
-		}
-		resp.Diagnostics.AddWarning(
-			"VXC vnic_index Propagation Delay",
-			fmt.Sprintf("VXC created but vnic_index verification timed out: %s. The update may still be propagating.", err.Error()),
+		resp.Diagnostics.AddError(
+			"Error reading newly created VXC",
+			"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
 		)
+		return
 	}
 
 	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, createdID)
@@ -1845,8 +1825,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the VXC info
-	// In Create, plan already has correct values, so pass nil
-	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, nil)
+	// Pass &plan so that user-only fields (ordered_vlan, requested_product_uid,
+	// vnic_index, partner configs) are preserved from the plan — the API may
+	// not return them reliably immediately after create.
+	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, &plan)
 	resp.Diagnostics.Append(apiDiags...)
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
