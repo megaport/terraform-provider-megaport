@@ -866,3 +866,68 @@ func (r *vxcResource) verifyUpdateApplied(vxc *megaport.VXC, updateReq *megaport
 
 	return true
 }
+
+// waitForVnicIndex polls the VXC API until the NetworkInterfaceIndex for the
+// A-end and/or B-end matches the expected values. The API updates vnic_index
+// asynchronously, so an immediate read after create/update may return a stale
+// value. This function returns the VXC from the first successful poll so the
+// caller can use it directly without another API call.
+func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expectedAEnd *int, expectedBEnd *int, timeout time.Duration) (*megaport.VXC, error) {
+	if expectedAEnd == nil && expectedBEnd == nil {
+		// Nothing to wait for — just do a normal read.
+		return r.client.VXCService.GetVXC(ctx, uid)
+	}
+
+	deadline := time.Now().Add(timeout)
+	backoff := 2 * time.Second
+	maxBackoff := 10 * time.Second
+
+	// Small initial delay to let the API propagate.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(1 * time.Second):
+	}
+
+	for time.Now().Before(deadline) {
+		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read VXC %s while waiting for vnic_index propagation: %w", uid, err)
+		}
+
+		match := true
+		if expectedAEnd != nil && vxc.AEndConfiguration.NetworkInterfaceIndex != *expectedAEnd {
+			match = false
+		}
+		if expectedBEnd != nil && vxc.BEndConfiguration.NetworkInterfaceIndex != *expectedBEnd {
+			match = false
+		}
+		if match {
+			return vxc, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+			backoff = time.Duration(float64(backoff) * 1.5)
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+
+	// Timed out — do a final read, patch in the expected values so state
+	// stays consistent with the plan, and warn the caller.
+	vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read VXC %s after vnic_index wait timeout: %w", uid, err)
+	}
+	if expectedAEnd != nil {
+		vxc.AEndConfiguration.NetworkInterfaceIndex = *expectedAEnd
+	}
+	if expectedBEnd != nil {
+		vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
+	}
+	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
+}
