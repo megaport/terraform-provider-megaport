@@ -791,3 +791,391 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 		},
 	})
 }
+
+// TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift tests that importing standalone
+// MCR prefix filter list resources does not cause VXCs (with BGP connections referencing
+// those prefix filter lists) to enter an update loop.
+//
+// This reproduces the GoTo customer issue where:
+// 1. MCR has standalone prefix filter lists managed by megaport_mcr_prefix_filter_list
+// 2. VXC has BGP connections that reference prefix filter lists via import_whitelist
+// 3. After importing the prefix filter list, the VXC should NOT detect changes
+// 4. The MCR should NOT attempt to delete the standalone-managed prefix filter lists
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift() {
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+	prefixFilterListName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	sharedConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+				cost_centre          = "%s"
+
+				# Using standalone prefix filter list resources
+				prefix_filter_lists = []
+
+				lifecycle {
+					ignore_changes = [prefix_filter_lists]
+				}
+			}
+
+			resource "megaport_mcr_prefix_filter_list" "pfl" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [
+					{
+						action = "permit"
+						prefix = "10.0.1.0/24"
+						ge     = 24
+						le     = 32
+					},
+					{
+						action = "deny"
+						prefix = "10.0.2.0/24"
+						ge     = 25
+						le     = 28
+					}
+				]
+			}
+
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 0
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							bgp_connections = [{
+								peer_asn         = 64512
+								local_ip_address = "10.0.0.1"
+								peer_ip_address  = "10.0.0.2"
+								password         = "testPassword123"
+								shutdown         = false
+								description      = "BGP with prefix filter"
+								med_in           = 100
+								med_out          = 100
+								bfd_enabled      = false
+								export_policy    = "permit"
+								import_whitelist = "%s"
+							}]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+				}
+			}
+		`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create MCR + standalone prefix filter list + VXC with BGP referencing it
+			{
+				Config: sharedConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "description", prefixFilterListName),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "entries.#", "2"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+				),
+			},
+			// Step 2: Import the prefix filter list
+			{
+				ResourceName:      "megaport_mcr_prefix_filter_list.pfl",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					var mcrUID, prefixListID string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources["megaport_mcr.mcr"]; ok {
+								mcrUID = v.Primary.Attributes["product_uid"]
+							}
+							if v, ok := m.Resources["megaport_mcr_prefix_filter_list.pfl"]; ok {
+								prefixListID = v.Primary.Attributes["id"]
+							}
+						}
+					}
+					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
+			},
+			// Step 3: Apply the same config after import - reconcile any import differences
+			{
+				Config: sharedConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "description", prefixFilterListName),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift on VXC or MCR after prefix filter list import
+			// This is the critical test - if the import causes VXC/MCR updates, this step fails
+			{
+				Config:   sharedConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift tests that importing multiple
+// standalone prefix filter lists does not trigger updates on VXCs that reference them.
+// This mirrors the GoTo customer pattern of importing multiple prefix filter lists at once.
+func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift() {
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+	pflName1 := RandomTestName()
+	pflName2 := RandomTestName()
+	pflName3 := RandomTestName()
+	costCentreName := RandomTestName()
+
+	sharedConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+				cost_centre          = "%s"
+
+				# Using standalone prefix filter list resources
+				prefix_filter_lists = []
+
+				lifecycle {
+					ignore_changes = [prefix_filter_lists]
+				}
+			}
+
+			resource "megaport_mcr_prefix_filter_list" "pfl_whitelist" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [
+					{
+						action = "permit"
+						prefix = "10.0.1.0/24"
+						ge     = 24
+						le     = 32
+					}
+				]
+			}
+
+			resource "megaport_mcr_prefix_filter_list" "pfl_blacklist" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [
+					{
+						action = "deny"
+						prefix = "10.0.2.0/24"
+						ge     = 24
+						le     = 32
+					}
+				]
+			}
+
+			resource "megaport_mcr_prefix_filter_list" "pfl_export" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [
+					{
+						action = "permit"
+						prefix = "172.16.0.0/12"
+						ge     = 16
+						le     = 24
+					}
+				]
+			}
+
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 0
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							bgp_connections = [{
+								peer_asn         = 64512
+								local_ip_address = "10.0.0.1"
+								peer_ip_address  = "10.0.0.2"
+								password         = "testPassword123"
+								shutdown         = false
+								description      = "BGP with multiple prefix filters"
+								med_in           = 100
+								med_out          = 100
+								bfd_enabled      = false
+								export_policy    = "deny"
+								import_whitelist = "%s"
+								import_blacklist = "%s"
+								export_whitelist = "%s"
+							}]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+				}
+			}
+		`, MCRTestLocationIDNum, mcrName, costCentreName,
+			pflName1, pflName2, pflName3,
+			portName, vxcName,
+			pflName1, pflName2, pflName3)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create everything
+			{
+				Config: sharedConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_whitelist", "description", pflName1),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_blacklist", "description", pflName2),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_export", "description", pflName3),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+				),
+			},
+			// Step 2: Import prefix filter list 1 (whitelist)
+			{
+				ResourceName:      "megaport_mcr_prefix_filter_list.pfl_whitelist",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					var mcrUID, pflID string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources["megaport_mcr.mcr"]; ok {
+								mcrUID = v.Primary.Attributes["product_uid"]
+							}
+							if v, ok := m.Resources["megaport_mcr_prefix_filter_list.pfl_whitelist"]; ok {
+								pflID = v.Primary.Attributes["id"]
+							}
+						}
+					}
+					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
+			},
+			// Step 3: Import prefix filter list 2 (blacklist)
+			{
+				ResourceName:      "megaport_mcr_prefix_filter_list.pfl_blacklist",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					var mcrUID, pflID string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources["megaport_mcr.mcr"]; ok {
+								mcrUID = v.Primary.Attributes["product_uid"]
+							}
+							if v, ok := m.Resources["megaport_mcr_prefix_filter_list.pfl_blacklist"]; ok {
+								pflID = v.Primary.Attributes["id"]
+							}
+						}
+					}
+					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
+			},
+			// Step 4: Import prefix filter list 3 (export)
+			{
+				ResourceName:      "megaport_mcr_prefix_filter_list.pfl_export",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					var mcrUID, pflID string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources["megaport_mcr.mcr"]; ok {
+								mcrUID = v.Primary.Attributes["product_uid"]
+							}
+							if v, ok := m.Resources["megaport_mcr_prefix_filter_list.pfl_export"]; ok {
+								pflID = v.Primary.Attributes["id"]
+							}
+						}
+					}
+					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated"},
+			},
+			// Step 5: Apply same config to reconcile any import state differences
+			{
+				Config: sharedConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_whitelist", "description", pflName1),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_blacklist", "description", pflName2),
+					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_export", "description", pflName3),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+				),
+			},
+			// Step 6: Plan-only to verify NO drift - VXC and MCR must not show changes
+			// This validates that importing prefix filter lists doesn't trigger an update loop
+			{
+				Config:   sharedConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
