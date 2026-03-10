@@ -893,6 +893,8 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				b_end = {
 					requested_product_uid = megaport_port.port.product_uid
 				}
+
+				depends_on = [megaport_mcr_prefix_filter_list.pfl]
 			}
 		`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
 	}
@@ -1074,6 +1076,12 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				b_end = {
 					requested_product_uid = megaport_port.port.product_uid
 				}
+
+				depends_on = [
+					megaport_mcr_prefix_filter_list.pfl_whitelist,
+					megaport_mcr_prefix_filter_list.pfl_blacklist,
+					megaport_mcr_prefix_filter_list.pfl_export,
+				]
 			}
 		`, MCRTestLocationIDNum, mcrName, costCentreName,
 			pflName1, pflName2, pflName3,
