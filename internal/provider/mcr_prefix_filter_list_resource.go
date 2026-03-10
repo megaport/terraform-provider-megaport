@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -258,15 +259,30 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	// Delete the prefix filter list via API
-	_, err := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
-		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
-	if err != nil {
-		// Check if the resource was already deleted
+	// Delete the prefix filter list via API, retrying on 409 Conflict (e.g. when a
+	// VXC with a BGP connection referencing this list is still being deprovisioned).
+	maxRetries := 12
+	retryInterval := 10 * time.Second
+	for attempt := range maxRetries {
+		_, err := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
+			state.MCRID.ValueString(), int(state.ID.ValueInt64()))
+		if err == nil {
+			return
+		}
 		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
 			if apiErr.Response.StatusCode == http.StatusNotFound {
 				// Resource was already deleted, which is fine
 				return
+			}
+			if apiErr.Response.StatusCode == http.StatusConflict && attempt < maxRetries-1 {
+				tflog.Debug(ctx, "Prefix filter list still associated with a BGP connection, retrying delete",
+					map[string]interface{}{
+						"prefix_list_id": state.ID.ValueInt64(),
+						"mcr_id":         state.MCRID.ValueString(),
+						"attempt":        attempt + 1,
+					})
+				time.Sleep(retryInterval)
+				continue
 			}
 		}
 		resp.Diagnostics.AddError(
