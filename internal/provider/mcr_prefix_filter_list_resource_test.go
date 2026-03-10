@@ -1066,7 +1066,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 								bfd_enabled      = false
 								export_policy    = "deny"
 								import_whitelist = "%s"
-								import_blacklist = "%s"
 								export_whitelist = "%s"
 							}]
 						}]
@@ -1086,7 +1085,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 		`, MCRTestLocationIDNum, mcrName, costCentreName,
 			pflName1, pflName2, pflName3,
 			portName, vxcName,
-			pflName1, pflName2, pflName3)
+			pflName1, pflName3)
 	}
 
 	resource.Test(suite.T(), resource.TestCase{
