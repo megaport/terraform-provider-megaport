@@ -1,10 +1,14 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"testing"
 
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/stretchr/testify/suite"
@@ -4231,4 +4235,93 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 			},
 		},
 	})
+}
+
+// nullValueMap returns a map of all attributes in an object type set to null.
+func nullValueMap(objType tftypes.Object) map[string]tftypes.Value {
+	m := make(map[string]tftypes.Value, len(objType.AttributeTypes))
+	for name, attrType := range objType.AttributeTypes {
+		m[name] = tftypes.NewValue(attrType, nil)
+	}
+	return m
+}
+
+// TestVXCModifyPlan_UnknownEndConfiguration verifies that ModifyPlan returns
+// without error when a_end or b_end contains unknown values (e.g. from
+// conditional expressions referencing resources that don't yet exist).
+func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	// Get the schema.
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	// Extract tftypes from the schema.
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+
+	// Find the end configuration object type from the schema.
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+
+	// Build a valid end configuration value (all nulls except requested_product_uid).
+	validEndAttrs := nullValueMap(endObjType)
+	validEndAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	validEndVal := tftypes.NewValue(endObjType, validEndAttrs)
+
+	// Build state: needs non-null product_uid so we enter the code path,
+	// plus valid a_end/b_end objects.
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = validEndVal
+	stateAttrs["b_end"] = validEndVal
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	tests := []struct {
+		name       string
+		unknownEnd string
+	}{
+		{"unknown_a_end", "a_end"},
+		{"unknown_b_end", "b_end"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build plan: set the target end to unknown, other end to valid.
+			planAttrs := nullValueMap(schemaObjType)
+			planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+			planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+			planAttrs["a_end"] = validEndVal
+			planAttrs["b_end"] = validEndVal
+
+			// Override the target end with an unknown value.
+			planAttrs[tc.unknownEnd] = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+
+			planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+			state := tfsdk.State{Schema: s, Raw: stateVal}
+			plan := tfsdk.Plan{Schema: s, Raw: planVal}
+
+			req := fwresource.ModifyPlanRequest{
+				State: state,
+				Plan:  plan,
+			}
+			resp := fwresource.ModifyPlanResponse{
+				Plan: plan,
+			}
+
+			r.ModifyPlan(ctx, req, &resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Errorf("expected no errors, got: %v", resp.Diagnostics.Errors())
+			}
+		})
+	}
 }
