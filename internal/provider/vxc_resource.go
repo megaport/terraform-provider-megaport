@@ -2649,6 +2649,15 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			bEndPlanObj := plan.BEndConfiguration
 			aEndPlanConfig := &vxcEndConfigurationModel{}
 			bEndPlanConfig := &vxcEndConfigurationModel{}
+
+			// If plan end configurations contain unknown values (e.g. from conditional
+			// expressions referencing resources that don't yet exist), skip plan
+			// modification — there is nothing meaningful to reconcile.
+			if aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
+				resp.Diagnostics.Append(diags...)
+				return
+			}
+
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
 			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
 			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
