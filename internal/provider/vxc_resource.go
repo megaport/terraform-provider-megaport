@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -2691,11 +2692,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				}
 			} else if aEndCSP {
 				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-					diags.AddWarning(
-						"Cloud provider port mapping detected",
-						fmt.Sprintf("Different A-End Product UIDs detected for cloud provider endpoint: requested=%s, actual=%s. This is normal - Megaport automatically manages cloud connection port assignments. Your configuration remains unchanged while the connection uses the provider-assigned Product UID. No action needed.",
-							aEndPlanConfig.RequestedProductUID.ValueString(),
-							aEndStateConfig.CurrentProductUID.ValueString()),
+					tflog.Info(ctx, "Cloud provider port mapping detected for A-End",
+						map[string]any{
+							"requested_product_uid": aEndPlanConfig.RequestedProductUID.ValueString(),
+							"current_product_uid":   aEndStateConfig.CurrentProductUID.ValueString(),
+						},
 					)
 				}
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
@@ -2733,12 +2734,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					bEndStateConfig.RequestedProductUID = bEndPlanConfig.RequestedProductUID
 				}
 			} else if bEndCSP {
-				if !bEndPlanConfig.RequestedProductUID.IsNull() && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.CurrentProductUID) {
-					diags.AddWarning(
-						"Cloud provider port mapping detected",
-						fmt.Sprintf("Different B-End Product UIDs detected for cloud provider endpoint: requested=%s, actual=%s. This is normal - Megaport automatically manages cloud connection port assignments. Your configuration remains unchanged while the connection uses the provider-assigned Product UID. No action needed.",
-							bEndPlanConfig.RequestedProductUID.ValueString(),
-							bEndStateConfig.CurrentProductUID.ValueString()),
+				if !bEndPlanConfig.RequestedProductUID.IsNull() && bEndPlanConfig.RequestedProductUID.ValueString() != "" && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.RequestedProductUID) {
+					tflog.Info(ctx, "Cloud provider port mapping detected for B-End",
+						map[string]any{
+							"requested_product_uid": bEndPlanConfig.RequestedProductUID.ValueString(),
+							"current_product_uid":   bEndStateConfig.CurrentProductUID.ValueString(),
+						},
 					)
 				}
 				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
