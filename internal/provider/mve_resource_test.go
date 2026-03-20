@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	MVETestLocation      = "Internap Seattle (SEA1)"
-	MVETestLocationIDNum = 58  // "Internap Seattle (SEA1)"
-	MVEArubaImageIDMVE   = 152 // Aruba MVE image ID
+	MVEArubaTestLocationIDNum = 59  // Los Angeles "Equinix LA1" (lax-eq1)
+	MVEVersaTestLocationIDNum = 70  // Chicago "CyrusOne Aurora (CHI2)" (chi-tx2)
+	MVEArubaImageIDMVE        = 152 // Aruba MVE image ID
 )
 
 type MVEArubaProviderTestSuite ProviderTestSuite
@@ -83,7 +83,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -170,7 +170,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
+                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -262,7 +262,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
+				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreName),
 				),
@@ -306,7 +306,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", ""),
 				),
@@ -356,7 +356,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					waitForProvisioningStatus("megaport_mve.mve"),
@@ -397,7 +397,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "12"),
 				),
@@ -462,7 +462,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocationIDNum, mveName, costCentre),
+                  }`, MVEVersaTestLocationIDNum, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -553,7 +553,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVETestLocationIDNum, mveNameNew, costCentreNew),
+                  }`, MVEVersaTestLocationIDNum, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -637,8 +637,11 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
 
                     vnics = [{
                         description = "Data Plane"
+                    },
+                    {
+                        description = "Control Plane"
                     }]
-                }`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName),
 				),
@@ -693,12 +696,15 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
 
                     vnics = [{
                         description = "Data Plane"
+                    },
+                    {
+                        description = "Control Plane"
                     }]
 
                     lifecycle {
                         ignore_changes = [vendor_config]
                     }
-                }`, MVETestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName+"-updated"),
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "cost_centre", costCentre+"-updated"),

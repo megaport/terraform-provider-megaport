@@ -34,7 +34,9 @@ const (
 	AzurePartnerPortName   = "Sydney Secondary"
 	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 
-	MVEArubaImageID = 152
+	MVEArubaImageID              = 152
+	VXCMVETestLocationIDNum      = 58 // Seattle "Internap Seattle (SEA1)" (sea-in1)
+	VXCMixedMVETestLocationIDNum = 50 // Perth "NEXTDC P1" (per-nxt1)
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -3057,7 +3059,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 `,
 					portName, VXCLocationID1,
 					mcrName, MCRTestLocationIDNum,
-					mveName, MVETestLocationIDNum, MVEArubaImageID,
+					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcPortToMCRName, vxcMCRToMVEName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3165,7 +3167,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 `,
 					portName, VXCLocationID1,
 					mcrName, MCRTestLocationIDNum,
-					mveName, MVETestLocationIDNum, MVEArubaImageID,
+					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
@@ -3312,10 +3314,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, MVETestLocationIDNum, mveName1, mveName1,
-					mveName2, MVETestLocationIDNum, mveName2, mveName2,
-					mveName3, MVETestLocationIDNum, mveName3, mveName3,
-					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
+					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
+					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
+					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs
@@ -3457,10 +3459,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, MVETestLocationIDNum, mveName1, mveName1,
-					mveName2, MVETestLocationIDNum, mveName2, mveName2,
-					mveName3, MVETestLocationIDNum, mveName3, mveName3,
-					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
+					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
+					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
+					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs still exist
@@ -3558,7 +3560,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum, MVEArubaImageID,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3631,7 +3633,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum, MVEArubaImageID,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3687,7 +3689,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum, MVEArubaImageID,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				PlanOnly: true,
@@ -4180,7 +4182,7 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 				}
 			}
 		`, portName, VXCLocationID1,
-			mveName, MVETestLocationIDNum, MVEArubaImageID,
+			mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 			mveName, mveName,
 			vxcName)
 	}
