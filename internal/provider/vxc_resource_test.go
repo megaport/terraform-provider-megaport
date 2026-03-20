@@ -26,13 +26,17 @@ const (
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 
-	AzureServiceKey        = "1b2329a5-56dc-45d0-8a0d-87b706297777"
-	GooglePairingKey       = "27325c3a-b640-4b69-a2d5-cdcca797a151/us-west2/1"
-	GooglePartnerPortName  = "Denver (den-zone1-389)"
+	AzureServiceKey        = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
+	GooglePairingKey       = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
+	GooglePartnerPortName  = "Singapore (sin-zone1-388)"
 	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
 	OraclePartnerPortName  = "OCI (us-luke-1) (BMC)"
-	AzurePartnerPortName   = "Washington DC Secondary"
-	AzurePartnerPortUID    = "07ab0ee6-7f77-41ac-bbe6-335e3ee6d182" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
+	AzurePartnerPortName   = "Sydney Secondary"
+	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
+
+	MVEArubaImageID              = 152
+	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
+	VXCMixedMVETestLocationIDNum = 146 // Seattle "Westin Building Exchange" (sea-wbx) - 12 test_demo_cores
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -2100,7 +2104,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					  vendor        = "aruba"
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
-					  image_id      = 23
+					  image_id      = %d
 					  account_name  = "%s"
 					  account_key   = "%s"
 					  system_tag    = "Preconfiguration-aruba-test-1"
@@ -2125,7 +2129,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					  partner = "transit"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, transitVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
@@ -2232,7 +2236,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  vendor        = "aruba"
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
-					  image_id      = 23
+					  image_id      = %d
 					  account_name  = "%s"
 					  account_key   = "%s"
 					  system_tag    = "Preconfiguration-aruba-test-1"
@@ -2305,7 +2309,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreName, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCAEndInnerVLAN)),
@@ -2434,7 +2438,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  vendor        = "aruba"
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
-					  image_id      = 23
+					  image_id      = %d
 					  account_name  = "%s"
 					  account_key   = "%s"
 					  system_tag    = "Preconfiguration-aruba-test-1"
@@ -2507,7 +2511,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreNameNew, mveName, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreNameNew, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCAEndInnerVLANNew)),
@@ -2579,7 +2583,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
                         vendor = "aruba"
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
-                        image_id = 23
+                        image_id = %d
 						account_name = "%s"
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
@@ -2619,7 +2623,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2693,7 +2697,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
                         vendor = "aruba"
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
-                        image_id = 23
+                        image_id = %d
 						account_name = "%s"
 						account_key = "%s"
 						system_tag = "Preconfiguration-aruba-test-1"
@@ -2732,7 +2736,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, mveName, mveName, awsVXCName, awsVXCName),
+                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -3011,7 +3015,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                         vendor       = "aruba"
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
-                        image_id     = 23
+                        image_id     = %d
                         account_name = "%s-account"
                         account_key  = "%s-key"
                         system_tag   = "Preconfiguration-test-1"
@@ -3055,7 +3059,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 `,
 					portName, VXCLocationID1,
 					mcrName, MCRTestLocationIDNum,
-					mveName, MVETestLocationIDNum,
+					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcPortToMCRName, vxcMCRToMVEName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3154,7 +3158,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                         vendor       = "aruba"
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
-                        image_id     = 23
+                        image_id     = %d
                         account_name = "%s-account"
                         account_key  = "%s-key"
                         system_tag   = "Preconfiguration-test-1"
@@ -3163,7 +3167,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 `,
 					portName, VXCLocationID1,
 					mcrName, MCRTestLocationIDNum,
-					mveName, MVETestLocationIDNum,
+					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
@@ -3193,7 +3197,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
 				Config: providerConfig + fmt.Sprintf(`
                 data "megaport_mve_images" "aruba" {
                     vendor_filter = "Aruba"
-                    id_filter = 23
+                    id_filter = %d
                 }
                 resource "megaport_mve" "mve_1" {
                     product_name         = "%s"
@@ -3309,10 +3313,11 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     }
                 }
                 `,
-					mveName1, MVETestLocationIDNum, mveName1, mveName1,
-					mveName2, MVETestLocationIDNum, mveName2, mveName2,
-					mveName3, MVETestLocationIDNum, mveName3, mveName3,
-					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					MVEArubaImageID,
+					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
+					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
+					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
+					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs
@@ -3337,7 +3342,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
 				Config: providerConfig + fmt.Sprintf(`
                 data "megaport_mve_images" "aruba" {
                     vendor_filter = "Aruba"
-                    id_filter = 23
+                    id_filter = %d
                 }
                 resource "megaport_mve" "mve_1" {
                     product_name         = "%s"
@@ -3453,10 +3458,11 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                     }
                 }
                 `,
-					mveName1, MVETestLocationIDNum, mveName1, mveName1,
-					mveName2, MVETestLocationIDNum, mveName2, mveName2,
-					mveName3, MVETestLocationIDNum, mveName3, mveName3,
-					mveName4, MVETestLocationIDNum, mveName4, mveName4,
+					MVEArubaImageID,
+					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
+					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
+					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
+					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs still exist
@@ -3528,7 +3534,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                         vendor       = "aruba"
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
-                        image_id     = 23
+                        image_id     = %d
                         account_name = "%s-account"
                         account_key  = "%s-key"
                         system_tag   = "Preconfiguration-test-1"
@@ -3554,7 +3560,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3601,7 +3607,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                         vendor       = "aruba"
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
-                        image_id     = 23
+                        image_id     = %d
                         account_name = "%s-account"
                         account_key  = "%s-key"
                         system_tag   = "Preconfiguration-test-1"
@@ -3627,7 +3633,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3661,7 +3667,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                         vendor       = "aruba"
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
-                        image_id     = 23
+                        image_id     = %d
                         account_name = "%s-account"
                         account_key  = "%s-key"
                         system_tag   = "Preconfiguration-test-1"
@@ -3683,7 +3689,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, MVETestLocationIDNum,
+					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				PlanOnly: true,
@@ -4152,7 +4158,7 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 					vendor       = "aruba"
 					product_size = "SMALL"
 					mve_label    = "MVE 2/8"
-					image_id     = 23
+					image_id     = %d
 					account_name = "%s-account"
 					account_key  = "%s-key"
 					system_tag   = "Preconfiguration-drift-test"
@@ -4176,7 +4182,7 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 				}
 			}
 		`, portName, VXCLocationID1,
-			mveName, MVETestLocationIDNum,
+			mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
 			mveName, mveName,
 			vxcName)
 	}
