@@ -624,6 +624,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     location_id = data.megaport_location.test_location.id
                     contract_term_months = 1
                     cost_centre = "%s"
+                    diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "aruba"
@@ -683,6 +684,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     location_id = data.megaport_location.test_location.id
                     contract_term_months = 1
                     cost_centre = "%s-updated"
+                    diversity_zone = "red"
 
                     vendor_config = {
                         vendor = "aruba"
