@@ -17,6 +17,94 @@ Before you begin, ensure you have the following set up and configured:
 
 ---
 
+## Quick Start: Connect Your AI Client to the Terraform MCP Server
+
+The fastest way to get started is to run the Terraform MCP Server as a Docker container. No API tokens are required for browsing provider documentation in the Terraform Registry.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed and running.
+- An AI client that supports MCP (see configurations below).
+
+### Configure Your AI Client
+
+Choose your AI client and add the corresponding configuration.
+
+#### Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server:0.4.0"]
+    }
+  }
+}
+```
+
+#### VS Code
+
+Add to `.vscode/settings.json` or your user settings:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "terraform": {
+        "command": "docker",
+        "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server:0.4.0"]
+      }
+    }
+  }
+}
+```
+
+#### Cursor
+
+Add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server:0.4.0"]
+    }
+  }
+}
+```
+
+#### Claude Code CLI
+
+Run the following command:
+
+```bash
+claude mcp add terraform -- docker run -i --rm hashicorp/terraform-mcp-server:0.4.0
+```
+
+### Verify It Works
+
+Open your AI client and ask:
+
+> "What resources are available in the megaport/megaport provider?"
+
+The agent should return a list of Megaport resources (`megaport_port`, `megaport_mcr`, `megaport_vxc`, etc.) by querying the Terraform Registry through the MCP server.
+
+### Optional: StreamableHTTP Transport for Remote/Team Deployments
+
+For shared or remote environments, you can run the MCP server with StreamableHTTP transport instead of stdio:
+
+```bash
+docker run -p 8080:8080 -e TRANSPORT_MODE=streamable-http hashicorp/terraform-mcp-server:0.4.0
+```
+
+Point your AI client at `http://localhost:8080` (or your deployed host) to connect.
+
+---
+
 ## Part 1: Building Resources Individually
 
 Let's start by generating the configuration for each resource separately. This approach is useful when you want to build your infrastructure piece by piece. For each step, you will provide a new prompt to the AI agent.
