@@ -35,8 +35,8 @@ const (
 	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 
 	MVEArubaImageID              = 152
-	VXCMVETestLocationIDNum      = 58 // Seattle "Internap Seattle (SEA1)" (sea-in1)
-	VXCMixedMVETestLocationIDNum = 50 // Perth "NEXTDC P1" (per-nxt1)
+	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
+	VXCMixedMVETestLocationIDNum = 146 // Seattle "Westin Building Exchange" (sea-wbx) - 12 test_demo_cores
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
