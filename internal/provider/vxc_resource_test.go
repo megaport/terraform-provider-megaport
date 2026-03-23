@@ -26,12 +26,12 @@ const (
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 
-	AzureServiceKey        = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
+	AzureServiceKey           = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
 	GooglePairingKeyCSPs      = "36ac9f72-c8e5-473f-a4b7-537a2502e446/australia-southeast1/1"
 	GooglePairingKeyGCPTest   = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
 	GooglePairingKeyEcosystem = "c0c9b06c-b4e2-4c71-a3ad-86e1cd671928/asia-northeast1/1"
-	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
-	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
+	OracleVirtualCircuitID    = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
+	AzurePartnerPortUID       = "13f28165-de96-484e-8f99-babb24650e6a"                                                      // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 
 	MVEArubaImageID              = 152
 	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
