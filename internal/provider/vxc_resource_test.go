@@ -36,7 +36,7 @@ const (
 
 	MVEArubaImageID              = 152
 	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
-	VXCMixedMVETestLocationIDNum = 146 // Seattle "Westin Building Exchange" (sea-wbx) - 12 test_demo_cores
+	VXCMixedMVETestLocationIDNum = 321 // Denver "Iron Mountain DEN-1" (den-irm) - 8 test_demo_cores
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
