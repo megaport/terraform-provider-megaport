@@ -2998,6 +2998,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     product_name         = "%s"
                     location_id          = %d
                     contract_term_months = 1
+                    diversity_zone       = "blue"
 
                     vnics = [
                         {
@@ -3141,6 +3142,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     product_name         = "%s"
                     location_id          = %d
                     contract_term_months = 1
+                    diversity_zone       = "blue"
 
                     vnics = [
                         {
@@ -3590,6 +3592,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     product_name         = "%s"
                     location_id          = %d
                     contract_term_months = 1
+                    diversity_zone       = "blue"
 
                     vnics = [
                         {
