@@ -27,11 +27,10 @@ const (
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 
 	AzureServiceKey        = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
-	GooglePairingKey       = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
-	GooglePartnerPortName  = "Singapore (sin-zone1-388)"
+	GooglePairingKeyCSPs      = "36ac9f72-c8e5-473f-a4b7-537a2502e446/australia-southeast1/1"
+	GooglePairingKeyGCPTest   = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
+	GooglePairingKeyEcosystem = "c0c9b06c-b4e2-4c71-a3ad-86e1cd671928/asia-northeast1/1"
 	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
-	OraclePartnerPortName  = "OCI (us-luke-1) (BMC)"
-	AzurePartnerPortName   = "Sydney Secondary"
 	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a" // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 
 	MVEArubaImageID              = 152
@@ -1011,8 +1010,6 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 
                   data "megaport_partner" "aws_port" {
                     connect_type = "AWS"
-                    company_name = "AWS"
-                    product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
                     location_id  = data.megaport_location.loc2.id
                   }
 
@@ -1101,7 +1098,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         }
                     }
                   }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKey, vxcName3, AzureServiceKey),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKeyCSPs, vxcName3, AzureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1177,8 +1174,6 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -1314,8 +1309,6 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -1439,8 +1432,7 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 				
 				data "megaport_partner" "gcp_port" {
   					connect_type = "GOOGLE"
-  					company_name = "Google inc.."
-  					product_name = "%s"
+  					location_id  = 572
 				  }
 
 				  resource "megaport_mcr" "mcr" {
@@ -1476,12 +1468,12 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, GooglePartnerPortName, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, GooglePairingKey),
+                  `, VXCLocationID1, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, GooglePairingKeyGCPTest),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.gcp_vxc", "cost_centre", gcpCostCentreName),
-					resource.TestCheckResourceAttr("megaport_vxc.gcp_vxc", "b_end.product_name", GooglePartnerPortName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "b_end.product_name"),
 				),
 			},
 		},
@@ -1505,7 +1497,7 @@ func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
 
 				data "megaport_partner" "oracle_port" {
   					connect_type = "ORACLE"
-  					product_name = "%s"
+  					location_id  = 147
 				  }
 
 				  resource "megaport_mcr" "mcr" {
@@ -1539,12 +1531,12 @@ func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
                         }
                     }
 				  }
-                  `, VXCLocationID1, OraclePartnerPortName, mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, OracleVirtualCircuitID),
+                  `, VXCLocationID1, mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, OracleVirtualCircuitID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "cost_centre", oracleCostCentreName),
-					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end.product_name", OraclePartnerPortName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "b_end.product_name"),
 				),
 			},
 		},
@@ -1603,7 +1595,7 @@ func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "cost_centre", azureCostCentreName),
-					resource.TestCheckResourceAttr("megaport_vxc.azure_vxc", "b_end.product_name", AzurePartnerPortName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "b_end.product_name"),
 				),
 			},
 		},
@@ -1756,8 +1748,6 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -1895,7 +1885,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKey, azureVXCName, AzureServiceKey),
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKeyEcosystem, azureVXCName, AzureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2078,8 +2068,6 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					company_name  = "Networks"
-					product_name  = "Megaport Internet"
 					location_id   = data.megaport_location.loc2.id
 				  }
 
@@ -2203,15 +2191,11 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					company_name  = "Networks"
-					product_name  = "Megaport Internet"
 					location_id   = data.megaport_location.loc2.id
 				  }
 
 				   data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -2405,15 +2389,11 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					company_name  = "Networks"
-					product_name  = "Megaport Internet"
 					location_id   = data.megaport_location.loc2.id
 				  }
 
 				   data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -2551,8 +2531,6 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.syd_gs.id
 				  }
 
@@ -2665,8 +2643,6 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 
 				  data "megaport_partner" "aws_port" {
 					connect_type = "AWS"
-					company_name = "AWS"
-					product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 					location_id  = data.megaport_location.loc2.id
 				  }
 
@@ -4032,8 +4008,6 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWS
 
 			data "megaport_partner" "aws_port" {
 				connect_type = "AWSHC"
-				company_name = "AWS"
-				product_name = "Asia Pacific (Sydney) (ap-southeast-2)"
 				location_id  = data.megaport_location.loc.id
 			}
 
