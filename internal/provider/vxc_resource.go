@@ -341,7 +341,7 @@ type vxcPartnerConfig interface {
 
 // vxcPartnerConfigAWSModel maps the partner configuration schema data for AWS.
 type vxcPartnerConfigAWSModel struct {
-	vxcPartnerConfig
+	vxcPartnerConfig  `tfsdk:"-"`
 	ConnectType       types.String `tfsdk:"connect_type"`
 	Type              types.String `tfsdk:"type"`
 	OwnerAccount      types.String `tfsdk:"owner_account"`
@@ -356,10 +356,10 @@ type vxcPartnerConfigAWSModel struct {
 
 // vxcPartnerConfigAzureModel maps the partner configuration schema data for Azure.
 type vxcPartnerConfigAzureModel struct {
-	vxcPartnerConfig
-	ServiceKey types.String `tfsdk:"service_key"`
-	PortChoice types.String `tfsdk:"port_choice"`
-	Peers      types.List   `tfsdk:"peers"`
+	vxcPartnerConfig `tfsdk:"-"`
+	ServiceKey       types.String `tfsdk:"service_key"`
+	PortChoice       types.String `tfsdk:"port_choice"`
+	Peers            types.List   `tfsdk:"peers"`
 }
 
 type partnerOrderAzurePeeringConfigModel struct {
@@ -374,30 +374,30 @@ type partnerOrderAzurePeeringConfigModel struct {
 
 // vxcPartnerConfigGoogleModel maps the partner configuration schema data for Google.
 type vxcPartnerConfigGoogleModel struct {
-	vxcPartnerConfig
-	PairingKey types.String `tfsdk:"pairing_key"`
+	vxcPartnerConfig `tfsdk:"-"`
+	PairingKey       types.String `tfsdk:"pairing_key"`
 }
 
 // vxcPartnerConfigOracleModel maps the partner configuration schema data for Oracle.
 type vxcPartnerConfigOracleModel struct {
-	vxcPartnerConfig
+	vxcPartnerConfig `tfsdk:"-"`
 	VirtualCircuitId types.String `tfsdk:"virtual_circuit_id"`
 }
 
 // vxcPartnerConfigVrouterModel maps the partner configuration schema data for a vrouter configuration.
 type vxcPartnerConfigVrouterModel struct {
-	vxcPartnerConfig
-	Interfaces types.List `tfsdk:"interfaces"`
+	vxcPartnerConfig `tfsdk:"-"`
+	Interfaces       types.List `tfsdk:"interfaces"`
 }
 
 // vxcPartnerConfigAEndModel maps the partner configuration schema data for an A end.
 type vxcPartnerConfigAEndModel struct {
-	vxcPartnerConfig
-	Interfaces types.List `tfsdk:"interfaces"`
+	vxcPartnerConfig `tfsdk:"-"`
+	Interfaces       types.List `tfsdk:"interfaces"`
 }
 
 type vxcPartnerConfigIbmModel struct {
-	vxcPartnerConfig
+	vxcPartnerConfig  `tfsdk:"-"`
 	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Acount ID.  32 Hexadecimal Characters. REQUIRED
 	CustomerASN       types.Int64  `tfsdk:"customer_asn"`        // Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
 	Name              types.String `tfsdk:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".

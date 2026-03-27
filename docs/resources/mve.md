@@ -263,6 +263,8 @@ Read-Only:
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 # Order can be imported by specifying the Product UID.
 terraform import megaport_mve.example "<PRODUCT_UID>"
