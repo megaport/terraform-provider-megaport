@@ -1915,19 +1915,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	var aEndPartnerChange, bEndPartnerChange bool
 
-	// If Imported, AEndPartnerConfig will be null. Set the partner config to the existing one in the plan.
-
-	if state.AEndPartnerConfig.IsNull() {
-		state.AEndPartnerConfig = plan.AEndPartnerConfig
-	}
+	// Detect changes BEFORE normalizing null state values, otherwise adding
+	// partner config to a VXC that didn't have one is silently ignored.
 	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
 		aEndPartnerChange = true
 	}
-	if state.BEndPartnerConfig.IsNull() {
-		state.BEndPartnerConfig = plan.BEndPartnerConfig
-	}
 	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
 		bEndPartnerChange = true
+	}
+
+	// If imported, partner config will be null in state. Copy plan values
+	// so downstream deserialization (.As()) does not fail on null objects.
+	if state.AEndPartnerConfig.IsNull() {
+		state.AEndPartnerConfig = plan.AEndPartnerConfig
+	}
+	if state.BEndPartnerConfig.IsNull() {
+		state.BEndPartnerConfig = plan.BEndPartnerConfig
 	}
 
 	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
@@ -2229,7 +2232,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				return
 			}
 			state.BEndPartnerConfig = partnerConfigObj
-			updateReq.AEndPartnerConfig = transitPartnerConfig
+			updateReq.BEndPartnerConfig = transitPartnerConfig
 		case "vrouter":
 			if bEndPartnerPlan.VrouterPartnerConfig.IsNull() {
 				resp.Diagnostics.AddError(
