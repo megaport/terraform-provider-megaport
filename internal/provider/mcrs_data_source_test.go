@@ -1059,7 +1059,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			Type:                  "MCR2",
 			ProvisioningStatus:    "LIVE",
 			CreatedBy:             "user@example.com",
-			CostCentre:           "CC-001",
+			CostCentre:            "CC-001",
 			PortSpeed:             5000,
 			Market:                "Sydney",
 			LocationID:            65,
@@ -1126,9 +1126,9 @@ func TestFromAPIMCRDetail(t *testing.T) {
 
 	t.Run("Nil time fields produce empty strings", func(t *testing.T) {
 		mcr := &megaport.MCR{
-			UID:        "mcr-nil-times",
-			CreateDate: nil,
-			LiveDate:   nil,
+			UID:               "mcr-nil-times",
+			CreateDate:        nil,
+			LiveDate:          nil,
 			TerminateDate:     nil,
 			ContractStartDate: nil,
 			ContractEndDate:   nil,
