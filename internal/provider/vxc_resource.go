@@ -2236,8 +2236,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		case "vrouter":
 			if bEndPartnerPlan.VrouterPartnerConfig.IsNull() {
 				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
+					"Error updating VXC",
+					"Could not update VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
 				)
 				return
 			}
