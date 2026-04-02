@@ -904,7 +904,7 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 	diags.Append(ifaceDiags...)
 	for _, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
-		if !iface.IpMtu.IsNull() {
+		if !iface.IpMtu.IsNull() && !iface.IpMtu.IsUnknown() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
 		}
 		if !iface.Description.IsNull() {
@@ -919,13 +919,13 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 		if !iface.PacketFilterOut.IsNull() {
 			toAppend.PacketFilterOut = megaport.PtrTo(iface.PacketFilterOut.ValueInt64())
 		}
-		if !iface.IPAddresses.IsNull() {
+		if !iface.IPAddresses.IsNull() && !iface.IPAddresses.IsUnknown() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
 			diags.Append(ipDiags...)
 			toAppend.IpAddresses = ipAddresses
 		}
-		if !iface.IPRoutes.IsNull() {
+		if !iface.IPRoutes.IsNull() && !iface.IPRoutes.IsUnknown() {
 			ipRoutes := []*ipRouteModel{}
 			ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
 			diags.Append(ipRouteDiags...)
@@ -937,13 +937,13 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 				})
 			}
 		}
-		if !iface.NatIPAddresses.IsNull() {
+		if !iface.NatIPAddresses.IsNull() && !iface.NatIPAddresses.IsUnknown() {
 			natIPAddresses := []string{}
 			natDiags := iface.NatIPAddresses.ElementsAs(ctx, &natIPAddresses, true)
 			diags.Append(natDiags...)
 			toAppend.NatIpAddresses = natIPAddresses
 		}
-		if !iface.Bfd.IsNull() {
+		if !iface.Bfd.IsNull() && !iface.Bfd.IsUnknown() {
 			bfd := &bfdConfigModel{}
 			bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
 			diags.Append(bfdDiags...)
@@ -953,10 +953,10 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 				Multiplier: int(bfd.Multiplier.ValueInt64()),
 			}
 		}
-		if !iface.VLAN.IsNull() {
+		if !iface.VLAN.IsNull() && !iface.VLAN.IsUnknown() {
 			toAppend.VLAN = int(iface.VLAN.ValueInt64())
 		}
-		if !iface.BgpConnections.IsNull() {
+		if !iface.BgpConnections.IsNull() && !iface.BgpConnections.IsUnknown() {
 			bgpConnections := []*bgpConnectionConfigModel{}
 			bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 			diags.Append(bgpDiags...)
@@ -975,37 +975,37 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 					PeerType:           bgpConnection.PeerType.ValueString(),
 				}
-				if !bgpConnection.LocalAsn.IsNull() {
+				if !bgpConnection.LocalAsn.IsNull() && !bgpConnection.LocalAsn.IsUnknown() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
-				if !bgpConnection.ImportWhitelist.IsNull() {
+				if !bgpConnection.ImportWhitelist.IsNull() && !bgpConnection.ImportWhitelist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
 					diags.Append(d...)
 					bgpToAppend.ImportWhitelist = id
 				}
-				if !bgpConnection.ImportBlacklist.IsNull() {
+				if !bgpConnection.ImportBlacklist.IsNull() && !bgpConnection.ImportBlacklist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
 					diags.Append(d...)
 					bgpToAppend.ImportBlacklist = id
 				}
-				if !bgpConnection.ExportWhitelist.IsNull() {
+				if !bgpConnection.ExportWhitelist.IsNull() && !bgpConnection.ExportWhitelist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
 					diags.Append(d...)
 					bgpToAppend.ExportWhitelist = id
 				}
-				if !bgpConnection.ExportBlacklist.IsNull() {
+				if !bgpConnection.ExportBlacklist.IsNull() && !bgpConnection.ExportBlacklist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
 					diags.Append(d...)
 					bgpToAppend.ExportBlacklist = id
 				}
-				if !bgpConnection.PermitExportTo.IsNull() {
+				if !bgpConnection.PermitExportTo.IsNull() && !bgpConnection.PermitExportTo.IsUnknown() {
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
 					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
-				if !bgpConnection.DenyExportTo.IsNull() {
+				if !bgpConnection.DenyExportTo.IsNull() && !bgpConnection.DenyExportTo.IsUnknown() {
 					denyExportTo := []string{}
 					denyDiags := bgpConnection.DenyExportTo.ElementsAs(ctx, &denyExportTo, true)
 					diags.Append(denyDiags...)
@@ -1047,16 +1047,16 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 	diags.Append(ifaceDiags...)
 	for _, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
-		if !iface.IpMtu.IsNull() {
+		if !iface.IpMtu.IsNull() && !iface.IpMtu.IsUnknown() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
 		}
-		if !iface.IPAddresses.IsNull() {
+		if !iface.IPAddresses.IsNull() && !iface.IPAddresses.IsUnknown() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
 			diags.Append(ipDiags...)
 			toAppend.IpAddresses = ipAddresses
 		}
-		if !iface.IPRoutes.IsNull() {
+		if !iface.IPRoutes.IsNull() && !iface.IPRoutes.IsUnknown() {
 			ipRoutes := []*ipRouteModel{}
 			ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
 			diags.Append(ipRouteDiags...)
@@ -1068,13 +1068,13 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 				})
 			}
 		}
-		if !iface.NatIPAddresses.IsNull() {
+		if !iface.NatIPAddresses.IsNull() && !iface.NatIPAddresses.IsUnknown() {
 			natIPAddresses := []string{}
 			natDiags := iface.NatIPAddresses.ElementsAs(ctx, &natIPAddresses, true)
 			diags.Append(natDiags...)
 			toAppend.NatIpAddresses = natIPAddresses
 		}
-		if !iface.Bfd.IsNull() {
+		if !iface.Bfd.IsNull() && !iface.Bfd.IsUnknown() {
 			bfd := &bfdConfigModel{}
 			bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
 			diags.Append(bfdDiags...)
@@ -1084,7 +1084,7 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 				Multiplier: int(bfd.Multiplier.ValueInt64()),
 			}
 		}
-		if !iface.BgpConnections.IsNull() {
+		if !iface.BgpConnections.IsNull() && !iface.BgpConnections.IsUnknown() {
 			bgpConnections := []*bgpConnectionConfigModel{}
 			bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 			diags.Append(bgpDiags...)
@@ -1102,37 +1102,37 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 					ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 					AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 				}
-				if !bgpConnection.LocalAsn.IsNull() {
+				if !bgpConnection.LocalAsn.IsNull() && !bgpConnection.LocalAsn.IsUnknown() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
-				if !bgpConnection.ImportWhitelist.IsNull() {
+				if !bgpConnection.ImportWhitelist.IsNull() && !bgpConnection.ImportWhitelist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
 					diags.Append(d...)
 					bgpToAppend.ImportWhitelist = id
 				}
-				if !bgpConnection.ImportBlacklist.IsNull() {
+				if !bgpConnection.ImportBlacklist.IsNull() && !bgpConnection.ImportBlacklist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
 					diags.Append(d...)
 					bgpToAppend.ImportBlacklist = id
 				}
-				if !bgpConnection.ExportWhitelist.IsNull() {
+				if !bgpConnection.ExportWhitelist.IsNull() && !bgpConnection.ExportWhitelist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
 					diags.Append(d...)
 					bgpToAppend.ExportWhitelist = id
 				}
-				if !bgpConnection.ExportBlacklist.IsNull() {
+				if !bgpConnection.ExportBlacklist.IsNull() && !bgpConnection.ExportBlacklist.IsUnknown() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
 					diags.Append(d...)
 					bgpToAppend.ExportBlacklist = id
 				}
-				if !bgpConnection.PermitExportTo.IsNull() {
+				if !bgpConnection.PermitExportTo.IsNull() && !bgpConnection.PermitExportTo.IsUnknown() {
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
 					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
-				if !bgpConnection.DenyExportTo.IsNull() {
+				if !bgpConnection.DenyExportTo.IsNull() && !bgpConnection.DenyExportTo.IsUnknown() {
 					denyExportTo := []string{}
 					denyDiags := bgpConnection.DenyExportTo.ElementsAs(ctx, &denyExportTo, true)
 					diags.Append(denyDiags...)
