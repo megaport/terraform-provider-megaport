@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -282,12 +283,14 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 
 	// During Create/Update, preserve partner configs from the plan.
 	// The API may not have fully populated CSP connection data yet.
+	// Resolve any unknown values to null since Terraform requires all
+	// values to be known after apply.
 	if plan != nil {
 		if !plan.AEndPartnerConfig.IsNull() {
-			orm.AEndPartnerConfig = plan.AEndPartnerConfig
+			orm.AEndPartnerConfig = resolveUnknownsInObject(plan.AEndPartnerConfig)
 		}
 		if !plan.BEndPartnerConfig.IsNull() {
-			orm.BEndPartnerConfig = plan.BEndPartnerConfig
+			orm.BEndPartnerConfig = resolveUnknownsInObject(plan.BEndPartnerConfig)
 		}
 		return diags
 	}
@@ -651,6 +654,81 @@ func prefixFilterIDToName(id int, pflMap map[int]string) basetypes.StringValue {
 		return types.StringValue(name)
 	}
 	return types.StringNull()
+}
+
+// resolveUnknownsInObject recursively walks a types.Object and replaces any
+// unknown values with null. This is needed when preserving plan values during
+// Create, since Terraform marks unset Optional+Computed fields as unknown
+// during planning, but requires all values to be known after apply.
+func resolveUnknownsInObject(obj basetypes.ObjectValue) basetypes.ObjectValue {
+	if obj.IsNull() || obj.IsUnknown() {
+		return types.ObjectNull(obj.AttributeTypes(context.Background()))
+	}
+
+	attrs := obj.Attributes()
+	resolved := make(map[string]attr.Value, len(attrs))
+
+	for k, v := range attrs {
+		resolved[k] = resolveUnknownValue(v)
+	}
+
+	newObj, _ := types.ObjectValue(obj.AttributeTypes(context.Background()), resolved)
+	return newObj
+}
+
+// resolveUnknownValue recursively resolves unknown values to null.
+func resolveUnknownValue(val attr.Value) attr.Value {
+	if val.IsUnknown() {
+		return makeNull(val)
+	}
+	if val.IsNull() {
+		return val
+	}
+
+	switch v := val.(type) {
+	case basetypes.ObjectValue:
+		return resolveUnknownsInObject(v)
+	case basetypes.ListValue:
+		return resolveUnknownsInList(v)
+	default:
+		return val
+	}
+}
+
+// resolveUnknownsInList recursively resolves unknowns within a list value.
+func resolveUnknownsInList(list basetypes.ListValue) basetypes.ListValue {
+	if list.IsNull() || list.IsUnknown() {
+		return types.ListNull(list.ElementType(context.Background()))
+	}
+
+	elems := list.Elements()
+	resolved := make([]attr.Value, len(elems))
+	for i, e := range elems {
+		resolved[i] = resolveUnknownValue(e)
+	}
+
+	newList, _ := types.ListValue(list.ElementType(context.Background()), resolved)
+	return newList
+}
+
+// makeNull creates a null value of the same type as the input.
+func makeNull(val attr.Value) attr.Value {
+	switch v := val.(type) {
+	case basetypes.StringValue:
+		return types.StringNull()
+	case basetypes.Int64Value:
+		return types.Int64Null()
+	case basetypes.BoolValue:
+		return types.BoolNull()
+	case basetypes.ObjectValue:
+		return types.ObjectNull(v.AttributeTypes(context.Background()))
+	case basetypes.ListValue:
+		return types.ListNull(v.ElementType(context.Background()))
+	case basetypes.MapValue:
+		return types.MapNull(v.ElementType(context.Background()))
+	default:
+		return val
+	}
 }
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -995,6 +996,179 @@ func TestReconcilePartnerConfigs_PreservesNonVrouterFromPlan(t *testing.T) {
 	if partnerType != "aws" {
 		t.Errorf("expected partner type 'aws', got %q", partnerType)
 	}
+}
+
+func TestResolveUnknownsInObject(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("known values are preserved", func(t *testing.T) {
+		attrTypes := map[string]attr.Type{
+			"name": types.StringType,
+			"age":  types.Int64Type,
+		}
+		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"name": types.StringValue("test"),
+			"age":  types.Int64Value(42),
+		})
+		if diags.HasError() {
+			t.Fatal(diags.Errors())
+		}
+
+		result := resolveUnknownsInObject(obj)
+		attrs := result.Attributes()
+		nameVal, ok := attrs["name"].(basetypes.StringValue)
+		if !ok || nameVal.ValueString() != "test" {
+			t.Errorf("expected name 'test', got %v", attrs["name"])
+		}
+		ageVal, ok := attrs["age"].(basetypes.Int64Value)
+		if !ok || ageVal.ValueInt64() != 42 {
+			t.Errorf("expected age 42, got %v", attrs["age"])
+		}
+	})
+
+	t.Run("unknown values become null", func(t *testing.T) {
+		attrTypes := map[string]attr.Type{
+			"name":  types.StringType,
+			"count": types.Int64Type,
+			"flag":  types.BoolType,
+		}
+		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"name":  types.StringValue("known"),
+			"count": types.Int64Unknown(),
+			"flag":  types.BoolUnknown(),
+		})
+		if diags.HasError() {
+			t.Fatal(diags.Errors())
+		}
+
+		result := resolveUnknownsInObject(obj)
+		attrs := result.Attributes()
+
+		nameVal, ok := attrs["name"].(basetypes.StringValue)
+		if !ok || nameVal.ValueString() != "known" {
+			t.Error("expected name to remain 'known'")
+		}
+		countVal, ok := attrs["count"].(basetypes.Int64Value)
+		if !ok || !countVal.IsNull() {
+			t.Error("expected count to be null after resolving unknown")
+		}
+		flagVal, ok := attrs["flag"].(basetypes.BoolValue)
+		if !ok || !flagVal.IsNull() {
+			t.Error("expected flag to be null after resolving unknown")
+		}
+	})
+
+	t.Run("nested unknown objects become null", func(t *testing.T) {
+		innerType := types.ObjectType{}.WithAttributeTypes(map[string]attr.Type{
+			"value": types.StringType,
+		})
+		attrTypes := map[string]attr.Type{
+			"name":  types.StringType,
+			"inner": innerType,
+		}
+		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"name":  types.StringValue("test"),
+			"inner": types.ObjectUnknown(map[string]attr.Type{"value": types.StringType}),
+		})
+		if diags.HasError() {
+			t.Fatal(diags.Errors())
+		}
+
+		result := resolveUnknownsInObject(obj)
+		attrs := result.Attributes()
+
+		innerVal, ok := attrs["inner"].(basetypes.ObjectValue)
+		if !ok || !innerVal.IsNull() {
+			t.Error("expected unknown inner object to become null")
+		}
+	})
+
+	t.Run("unknown list becomes null", func(t *testing.T) {
+		attrTypes := map[string]attr.Type{
+			"items": types.ListType{ElemType: types.StringType},
+		}
+		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"items": types.ListUnknown(types.StringType),
+		})
+		if diags.HasError() {
+			t.Fatal(diags.Errors())
+		}
+
+		result := resolveUnknownsInObject(obj)
+		attrs := result.Attributes()
+
+		itemsVal, ok := attrs["items"].(basetypes.ListValue)
+		if !ok || !itemsVal.IsNull() {
+			t.Error("expected unknown list to become null")
+		}
+	})
+
+	t.Run("null object stays null", func(t *testing.T) {
+		nullObj := types.ObjectNull(map[string]attr.Type{"name": types.StringType})
+		result := resolveUnknownsInObject(nullObj)
+		if !result.IsNull() {
+			t.Error("expected null object to stay null")
+		}
+	})
+
+	t.Run("resolves unknowns in real partner config structure", func(t *testing.T) {
+		// Build a partner config with some unknowns (simulating plan state)
+		bgpModel := bgpConnectionConfigModel{
+			PeerAsn:            types.Int64Value(64512),
+			LocalAsn:           types.Int64Unknown(),  // unset by user, marked unknown
+			PeerType:           types.StringUnknown(), // unset by user, marked unknown
+			LocalIPAddress:     types.StringValue("10.0.0.1"),
+			PeerIPAddress:      types.StringValue("10.0.0.2"),
+			Password:           types.StringValue("secret"),
+			Shutdown:           types.BoolValue(false),
+			Description:        types.StringValue("test"),
+			MedIn:              types.Int64Value(100),
+			MedOut:             types.Int64Value(100),
+			BfdEnabled:         types.BoolValue(false),
+			ExportPolicy:       types.StringValue("permit"),
+			PermitExportTo:     types.ListNull(types.StringType),
+			DenyExportTo:       types.ListUnknown(types.StringType), // unset, marked unknown
+			ImportWhitelist:    types.StringUnknown(),               // unset, marked unknown
+			ImportBlacklist:    types.StringNull(),
+			ExportWhitelist:    types.StringNull(),
+			ExportBlacklist:    types.StringNull(),
+			AsPathPrependCount: types.Int64Value(0),
+		}
+
+		obj := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{bgpModel})
+		resolved := resolveUnknownsInObject(obj)
+
+		// Verify the resolved object has no unknowns - extract BGP and check
+		partnerModel := &vxcPartnerConfigurationModel{}
+		resolved.As(ctx, partnerModel, basetypes.ObjectAsOptions{})
+		vrouterModel := &vxcPartnerConfigVrouterModel{}
+		partnerModel.VrouterPartnerConfig.As(ctx, vrouterModel, basetypes.ObjectAsOptions{})
+		ifaceModels := []*vxcPartnerConfigInterfaceModel{}
+		vrouterModel.Interfaces.ElementsAs(ctx, &ifaceModels, false)
+		bgpConns := []*bgpConnectionConfigModel{}
+		ifaceModels[0].BgpConnections.ElementsAs(ctx, &bgpConns, false)
+
+		bgp := bgpConns[0]
+		// Known values should be preserved
+		assertInt64(t, "peer_asn", bgp.PeerAsn, 64512)
+		assertString(t, "local_ip_address", bgp.LocalIPAddress, "10.0.0.1")
+		assertString(t, "password", bgp.Password, "secret")
+		assertInt64(t, "med_in", bgp.MedIn, 100)
+
+		// Unknown values should now be null
+		if !bgp.LocalAsn.IsNull() {
+			t.Errorf("expected LocalAsn to be null after resolving unknown, got %v", bgp.LocalAsn)
+		}
+		if !bgp.PeerType.IsNull() {
+			t.Errorf("expected PeerType to be null after resolving unknown, got %v", bgp.PeerType)
+		}
+		if !bgp.DenyExportTo.IsNull() {
+			t.Errorf("expected DenyExportTo to be null after resolving unknown, got %v", bgp.DenyExportTo)
+		}
+		if !bgp.ImportWhitelist.IsNull() {
+			t.Errorf("expected ImportWhitelist to be null after resolving unknown, got %v", bgp.ImportWhitelist)
+		}
+	})
 }
 
 // --- Test helpers ---
