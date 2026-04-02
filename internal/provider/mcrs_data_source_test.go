@@ -18,14 +18,32 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-type MCRsDataSourceProviderTestSuite ProviderTestSuite
+type MCRsDataSourceBasicProviderTestSuite ProviderTestSuite
+type MCRsDataSourceCombinedFiltersProviderTestSuite ProviderTestSuite
+type MCRsDataSourceTagsProviderTestSuite ProviderTestSuite
+type MCRsDataSourceNoMatchProviderTestSuite ProviderTestSuite
 
-func TestMCRsDataSourceProviderTestSuite(t *testing.T) {
+func TestMCRsDataSourceBasicProviderTestSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRsDataSourceProviderTestSuite))
+	suite.Run(t, new(MCRsDataSourceBasicProviderTestSuite))
 }
 
-func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_BasicAndDetails() {
+func TestMCRsDataSourceCombinedFiltersProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRsDataSourceCombinedFiltersProviderTestSuite))
+}
+
+func TestMCRsDataSourceTagsProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRsDataSourceTagsProviderTestSuite))
+}
+
+func TestMCRsDataSourceNoMatchProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRsDataSourceNoMatchProviderTestSuite))
+}
+
+func (suite *MCRsDataSourceBasicProviderTestSuite) TestAccMegaportMCRsDataSource_BasicAndDetails() {
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
@@ -98,7 +116,7 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Basi
 	})
 }
 
-func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_CombinedFilters() {
+func (suite *MCRsDataSourceCombinedFiltersProviderTestSuite) TestAccMegaportMCRsDataSource_CombinedFilters() {
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
@@ -209,7 +227,7 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Comb
 	})
 }
 
-func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_TagsAndCombined() {
+func (suite *MCRsDataSourceTagsProviderTestSuite) TestAccMegaportMCRsDataSource_TagsAndCombined() {
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 	tagValue := RandomTestName()
@@ -306,7 +324,7 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Tags
 	})
 }
 
-func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_NoMatch() {
+func (suite *MCRsDataSourceNoMatchProviderTestSuite) TestAccMegaportMCRsDataSource_NoMatch() {
 	mcrName := RandomTestName()
 
 	resource.Test(suite.T(), resource.TestCase{
