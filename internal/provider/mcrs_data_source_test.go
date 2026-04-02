@@ -25,7 +25,8 @@ func TestMCRsDataSourceProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(MCRsDataSourceProviderTestSuite))
 }
 
-func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Basic() {
+func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_BasicAndDetails() {
+	suite.T().Parallel()
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
@@ -57,31 +58,307 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Basi
 					}
 					depends_on = [megaport_mcr.mcr]
 				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, mcrName, mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// uids: exactly 1 result matching our MCR
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "uids.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "uids.0", "megaport_mcr.mcr", "product_uid"),
+					// mcrs: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.#", "1"),
+					// Cross-reference all detail fields against the resource
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_id", "megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_type", "megaport_mcr.mcr", "product_type"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.provisioning_status", "megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.create_date", "megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.created_by", "megaport_mcr.mcr", "created_by"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.location_id", "megaport_mcr.mcr", "location_id"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.market", "megaport_mcr.mcr", "market"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.company_uid", "megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.company_name", "megaport_mcr.mcr", "company_name"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.diversity_zone", "megaport_mcr.mcr", "diversity_zone"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.secondary_name", "megaport_mcr.mcr", "secondary_name"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.vxc_permitted", "megaport_mcr.mcr", "vxc_permitted"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.vxc_auto_approval", "megaport_mcr.mcr", "vxc_auto_approval"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.marketplace_visibility", "megaport_mcr.mcr", "marketplace_visibility"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.asn", "megaport_mcr.mcr", "asn"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.virtual", "megaport_mcr.mcr", "virtual"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.locked", "megaport_mcr.mcr", "locked"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.admin_locked", "megaport_mcr.mcr", "admin_locked"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.cancelable", "megaport_mcr.mcr", "cancelable"),
+					// Exact value checks for fields we control
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.product_name", mcrName),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.port_speed", "1000"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.contract_term_months", "1"),
+					// Resource tags populated
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.resource_tags.acc-test-key", mcrName),
+				),
+			},
+		},
+	})
+}
 
-				data "megaport_mcrs" "by_speed" {
+func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_CombinedFilters() {
+	suite.T().Parallel()
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed           = 1000
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+				}
+
+				# Multiple filters (AND logic) — name + speed + cost-centre
+				data "megaport_mcrs" "combined" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
 					filter {
 						name   = "port-speed"
 						values = ["1000"]
 					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				data "megaport_mcrs" "by_tags" {
-					tags = {
-						"acc-test-key" = "%s"
+					filter {
+						name   = "cost-centre"
+						values = ["%s"]
 					}
 					depends_on = [megaport_mcr.mcr]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, mcrName, mcrName, mcrName),
+
+				# Filter by location-id
+				data "megaport_mcrs" "by_location" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
+					filter {
+						name   = "location-id"
+						values = ["%d"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Filter by contract-term-months
+				data "megaport_mcrs" "by_contract" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
+					filter {
+						name   = "contract-term-months"
+						values = ["1"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Multiple values (OR logic) — port-speed = 1000 or 10000
+				data "megaport_mcrs" "or_speed" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
+					filter {
+						name   = "port-speed"
+						values = ["1000", "10000"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName,
+					mcrName, costCentreName,
+					mcrName, MCRTestLocationIDNum,
+					mcrName,
+					mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					// name filter: exactly 1 result matching our MCR
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "uids.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "uids.0", "megaport_mcr.mcr", "product_uid"),
-					// port-speed filter: at least our MCR is present
-					resource.TestCheckResourceAttrSet("data.megaport_mcrs.by_speed", "uids.0"),
-					// tag filter: exactly 1 result matching our MCR
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_tags", "uids.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_tags", "uids.0", "megaport_mcr.mcr", "product_uid"),
+					// Combined AND filters: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.combined", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.product_name", mcrName),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.port_speed", "1000"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.cost_centre", costCentreName),
+
+					// Location filter: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_location", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "mcrs.0.location_id", fmt.Sprintf("%d", MCRTestLocationIDNum)),
+
+					// Contract term filter: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "mcrs.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "mcrs.0.contract_term_months", "1"),
+
+					// OR logic on speed: also matches our MCR (speed=1000 is in the list)
+					resource.TestCheckResourceAttr("data.megaport_mcrs.or_speed", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.or_speed", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.or_speed", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_TagsAndCombined() {
+	suite.T().Parallel()
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+	tagValue := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed           = 1000
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+
+					resource_tags = {
+						"acc-test-env"  = "%s"
+						"acc-test-team" = "platform"
+					}
+				}
+
+				# Filter by single tag
+				data "megaport_mcrs" "by_single_tag" {
+					tags = {
+						"acc-test-env" = "%s"
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Filter by multiple tags (AND — all must match)
+				data "megaport_mcrs" "by_multi_tag" {
+					tags = {
+						"acc-test-env"  = "%s"
+						"acc-test-team" = "platform"
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Combined: filter + tags
+				data "megaport_mcrs" "filter_and_tags" {
+					filter {
+						name   = "port-speed"
+						values = ["1000"]
+					}
+					tags = {
+						"acc-test-env" = "%s"
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Tag that doesn't match anything
+				data "megaport_mcrs" "no_tag_match" {
+					tags = {
+						"acc-test-env" = "nonexistent-value-that-wont-match"
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName,
+					tagValue,
+					tagValue,
+					tagValue,
+					tagValue),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Single tag filter: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_single_tag", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.product_name", mcrName),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.resource_tags.acc-test-env", tagValue),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.resource_tags.acc-test-team", "platform"),
+
+					// Multi-tag filter: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_multi_tag", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_multi_tag", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_multi_tag", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+
+					// Combined filter + tags: exactly 1 result
+					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "uids.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "mcrs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.filter_and_tags", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "mcrs.0.port_speed", "1000"),
+
+					// No match: empty results
+					resource.TestCheckResourceAttr("data.megaport_mcrs.no_tag_match", "uids.#", "0"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.no_tag_match", "mcrs.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_NoMatch() {
+	suite.T().Parallel()
+	mcrName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed           = 1000
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+				}
+
+				# Name that won't match any MCR
+				data "megaport_mcrs" "no_name_match" {
+					filter {
+						name   = "name"
+						values = ["nonexistent-mcr-name-that-wont-match-anything"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				# Contradictory filters — name matches but speed doesn't
+				data "megaport_mcrs" "contradictory" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
+					filter {
+						name   = "port-speed"
+						values = ["99999"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+				`, MCRTestLocationIDNum, mcrName, mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// No name match: empty
+					resource.TestCheckResourceAttr("data.megaport_mcrs.no_name_match", "uids.#", "0"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.no_name_match", "mcrs.#", "0"),
+
+					// Contradictory AND filters: empty
+					resource.TestCheckResourceAttr("data.megaport_mcrs.contradictory", "uids.#", "0"),
+					resource.TestCheckResourceAttr("data.megaport_mcrs.contradictory", "mcrs.#", "0"),
 				),
 			},
 		},
@@ -183,15 +460,25 @@ func TestFilterMCRs(t *testing.T) {
 	// Create sample MCRs for testing
 	mcrs := []*megaport.MCR{
 		{
-			UID:                "mcr-1",
-			Name:               "Test MCR 1",
-			PortSpeed:          10000,
-			LocationID:         123,
-			ProvisioningStatus: "LIVE",
-			Market:             "Sydney",
-			CompanyName:        "Company A",
-			VXCPermitted:       true,
-			DiversityZone:      "zone-a",
+			UID:                   "mcr-1",
+			Name:                  "Test MCR 1",
+			Type:                  "MCR2",
+			PortSpeed:             10000,
+			LocationID:            123,
+			ProvisioningStatus:    "LIVE",
+			Market:                "Sydney",
+			CompanyName:           "Company A",
+			CompanyUID:            "company-uid-a",
+			VXCPermitted:          true,
+			VXCAutoApproval:       true,
+			MarketplaceVisibility: true,
+			DiversityZone:         "zone-a",
+			SecondaryName:         "Secondary 1",
+			ContractTermMonths:    12,
+			Virtual:               true,
+			Locked:                false,
+			AdminLocked:           false,
+			Cancelable:            true,
 			Resources: megaport.MCRResources{
 				VirtualRouter: megaport.MCRVirtualRouter{
 					ASN: 64512,
@@ -199,15 +486,25 @@ func TestFilterMCRs(t *testing.T) {
 			},
 		},
 		{
-			UID:                "mcr-2",
-			Name:               "Test MCR 2",
-			PortSpeed:          1000,
-			LocationID:         456,
-			ProvisioningStatus: "CONFIGURED",
-			Market:             "Melbourne",
-			CompanyName:        "Company B",
-			VXCPermitted:       true,
-			DiversityZone:      "zone-b",
+			UID:                   "mcr-2",
+			Name:                  "Test MCR 2",
+			Type:                  "MCR2",
+			PortSpeed:             1000,
+			LocationID:            456,
+			ProvisioningStatus:    "CONFIGURED",
+			Market:                "Melbourne",
+			CompanyName:           "Company B",
+			CompanyUID:            "company-uid-b",
+			VXCPermitted:          true,
+			VXCAutoApproval:       false,
+			MarketplaceVisibility: false,
+			DiversityZone:         "zone-b",
+			SecondaryName:         "Secondary 2",
+			ContractTermMonths:    24,
+			Virtual:               true,
+			Locked:                true,
+			AdminLocked:           false,
+			Cancelable:            true,
 			Resources: megaport.MCRResources{
 				VirtualRouter: megaport.MCRVirtualRouter{
 					ASN: 64513,
@@ -215,15 +512,25 @@ func TestFilterMCRs(t *testing.T) {
 			},
 		},
 		{
-			UID:                "mcr-3",
-			Name:               "Inactive MCR",
-			PortSpeed:          10000,
-			LocationID:         123,
-			ProvisioningStatus: "DECOMMISSIONED",
-			Market:             "Sydney",
-			CompanyName:        "Company A",
-			VXCPermitted:       false,
-			DiversityZone:      "zone-a",
+			UID:                   "mcr-3",
+			Name:                  "Inactive MCR",
+			Type:                  "MCR1",
+			PortSpeed:             10000,
+			LocationID:            123,
+			ProvisioningStatus:    "DECOMMISSIONED",
+			Market:                "Sydney",
+			CompanyName:           "Company A",
+			CompanyUID:            "company-uid-a",
+			VXCPermitted:          false,
+			VXCAutoApproval:       false,
+			MarketplaceVisibility: false,
+			DiversityZone:         "zone-a",
+			SecondaryName:         "Secondary 1",
+			ContractTermMonths:    36,
+			Virtual:               false,
+			Locked:                false,
+			AdminLocked:           true,
+			Cancelable:            false,
 			Resources: megaport.MCRResources{
 				VirtualRouter: megaport.MCRVirtualRouter{
 					ASN: 64514,
@@ -435,6 +742,116 @@ func TestFilterMCRs(t *testing.T) {
 			expectedMCRs: []string{"mcr-1", "mcr-3"},
 		},
 		{
+			name: "Filter by company-uid",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("company-uid"),
+					Values: listValueMust(t, types.StringType, []string{"company-uid-b"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-2"},
+		},
+		{
+			name: "Filter by product-type",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("product-type"),
+					Values: listValueMust(t, types.StringType, []string{"MCR2"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-1", "mcr-2"},
+		},
+		{
+			name: "Filter by contract-term-months",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("contract-term-months"),
+					Values: listValueMust(t, types.StringType, []string{"12"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-1"},
+		},
+		{
+			name: "Filter by vxc-auto-approval",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("vxc-auto-approval"),
+					Values: listValueMust(t, types.StringType, []string{"true"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-1"},
+		},
+		{
+			name: "Filter by marketplace-visibility",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("marketplace-visibility"),
+					Values: listValueMust(t, types.StringType, []string{"true"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-1"},
+		},
+		{
+			name: "Filter by locked",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("locked"),
+					Values: listValueMust(t, types.StringType, []string{"true"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-2"},
+		},
+		{
+			name: "Filter by admin-locked",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("admin-locked"),
+					Values: listValueMust(t, types.StringType, []string{"true"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-3"},
+		},
+		{
+			name: "Filter by cancelable",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("cancelable"),
+					Values: listValueMust(t, types.StringType, []string{"false"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-3"},
+		},
+		{
+			name: "Filter by virtual",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("virtual"),
+					Values: listValueMust(t, types.StringType, []string{"true"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-1", "mcr-2"},
+		},
+		{
+			name: "Filter by secondary-name pattern",
+			filters: []filterModel{
+				{
+					Name:   types.StringValue("secondary-name"),
+					Values: listValueMust(t, types.StringType, []string{"Secondary 2"}),
+				},
+			},
+			tags:         nil,
+			expectedMCRs: []string{"mcr-2"},
+		},
+		{
 			name: "Unknown filter - should not filter out MCRs",
 			filters: []filterModel{
 				{
@@ -630,6 +1047,123 @@ func TestReadWithErrorsMCRs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFromAPIMCRDetail tests the fromAPIMCRDetail mapping function
+func TestFromAPIMCRDetail(t *testing.T) {
+	t.Run("Maps all fields correctly", func(t *testing.T) {
+		mcr := &megaport.MCR{
+			ID:                    42,
+			UID:                   "mcr-abc-123",
+			Name:                  "My Test MCR",
+			Type:                  "MCR2",
+			ProvisioningStatus:    "LIVE",
+			CreatedBy:             "user@example.com",
+			CostCentre:           "CC-001",
+			PortSpeed:             5000,
+			Market:                "Sydney",
+			LocationID:            65,
+			CompanyUID:            "company-abc",
+			CompanyName:           "Acme Corp",
+			ContractTermMonths:    12,
+			DiversityZone:         "zone-a",
+			SecondaryName:         "Secondary MCR",
+			VXCPermitted:          true,
+			VXCAutoApproval:       false,
+			MarketplaceVisibility: true,
+			Virtual:               true,
+			Locked:                false,
+			AdminLocked:           true,
+			Cancelable:            true,
+			AttributeTags: map[string]string{
+				"tag1": "val1",
+				"tag2": "val2",
+			},
+			Resources: megaport.MCRResources{
+				VirtualRouter: megaport.MCRVirtualRouter{
+					ASN: 64512,
+				},
+			},
+		}
+
+		tags := map[string]string{
+			"env":   "production",
+			"owner": "team-a",
+		}
+
+		detail := fromAPIMCRDetail(mcr, tags)
+
+		assert.Equal(t, "mcr-abc-123", detail.UID.ValueString())
+		assert.Equal(t, int64(42), detail.ID.ValueInt64())
+		assert.Equal(t, "My Test MCR", detail.Name.ValueString())
+		assert.Equal(t, "MCR2", detail.Type.ValueString())
+		assert.Equal(t, "LIVE", detail.ProvisioningStatus.ValueString())
+		assert.Equal(t, "user@example.com", detail.CreatedBy.ValueString())
+		assert.Equal(t, "CC-001", detail.CostCentre.ValueString())
+		assert.Equal(t, int64(5000), detail.PortSpeed.ValueInt64())
+		assert.Equal(t, "Sydney", detail.Market.ValueString())
+		assert.Equal(t, int64(65), detail.LocationID.ValueInt64())
+		assert.Equal(t, "company-abc", detail.CompanyUID.ValueString())
+		assert.Equal(t, "Acme Corp", detail.CompanyName.ValueString())
+		assert.Equal(t, int64(12), detail.ContractTermMonths.ValueInt64())
+		assert.Equal(t, "zone-a", detail.DiversityZone.ValueString())
+		assert.Equal(t, "Secondary MCR", detail.SecondaryName.ValueString())
+		assert.Equal(t, true, detail.VXCPermitted.ValueBool())
+		assert.Equal(t, false, detail.VXCAutoApproval.ValueBool())
+		assert.Equal(t, true, detail.MarketplaceVisibility.ValueBool())
+		assert.Equal(t, int64(64512), detail.ASN.ValueInt64())
+		assert.Equal(t, true, detail.Virtual.ValueBool())
+		assert.Equal(t, false, detail.Locked.ValueBool())
+		assert.Equal(t, true, detail.AdminLocked.ValueBool())
+		assert.Equal(t, true, detail.Cancelable.ValueBool())
+
+		// Attribute tags populated
+		assert.False(t, detail.AttributeTags.IsNull())
+
+		// Resource tags populated
+		assert.False(t, detail.ResourceTags.IsNull())
+	})
+
+	t.Run("Nil time fields produce empty strings", func(t *testing.T) {
+		mcr := &megaport.MCR{
+			UID:        "mcr-nil-times",
+			CreateDate: nil,
+			LiveDate:   nil,
+			TerminateDate:     nil,
+			ContractStartDate: nil,
+			ContractEndDate:   nil,
+		}
+
+		detail := fromAPIMCRDetail(mcr, nil)
+
+		assert.Equal(t, "", detail.CreateDate.ValueString())
+		assert.Equal(t, "", detail.LiveDate.ValueString())
+		assert.Equal(t, "", detail.TerminateDate.ValueString())
+		assert.Equal(t, "", detail.ContractStartDate.ValueString())
+		assert.Equal(t, "", detail.ContractEndDate.ValueString())
+	})
+
+	t.Run("Nil tags produce null maps", func(t *testing.T) {
+		mcr := &megaport.MCR{
+			UID:           "mcr-nil-tags",
+			AttributeTags: nil,
+		}
+
+		detail := fromAPIMCRDetail(mcr, nil)
+
+		assert.True(t, detail.AttributeTags.IsNull())
+		assert.True(t, detail.ResourceTags.IsNull())
+	})
+
+	t.Run("Empty resource tags produce null map", func(t *testing.T) {
+		mcr := &megaport.MCR{
+			UID: "mcr-empty-tags",
+		}
+
+		detail := fromAPIMCRDetail(mcr, map[string]string{})
+
+		assert.True(t, detail.ResourceTags.IsNull())
+	})
 }
 
 // listValueMust creates a types.List for testing, failing the test on error.

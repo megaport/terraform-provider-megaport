@@ -3,12 +3,12 @@
 page_title: "megaport_mcrs Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Provides a list of MCR UIDs matching the specified filters.
+  Provides a list of MCRs matching the specified filters, with detailed information about each MCR.
 ---
 
 # megaport_mcrs (Data Source)
 
-Provides a list of MCR UIDs matching the specified filters.
+Provides a list of MCRs matching the specified filters, with detailed information about each MCR.
 
 
 
@@ -22,6 +22,7 @@ Provides a list of MCR UIDs matching the specified filters.
 
 ### Read-Only
 
+- `mcrs` (Attributes List) List of MCRs matching the specified criteria with detailed information. (see [below for nested schema](#nestedatt--mcrs))
 - `uids` (List of String) List of MCR UIDs that match the specified criteria.
 
 <a id="nestedblock--filter"></a>
@@ -29,5 +30,42 @@ Provides a list of MCR UIDs matching the specified filters.
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, vxc-permitted, asn, diversity-zone.
+- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, product-type, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable, virtual.
 - `values` (List of String) Set of values that are accepted for the given field.
+
+
+<a id="nestedatt--mcrs"></a>
+### Nested Schema for `mcrs`
+
+Read-Only:
+
+- `admin_locked` (Boolean) Whether the MCR is admin locked.
+- `asn` (Number) The Autonomous System Number (ASN) of the MCR.
+- `attribute_tags` (Map of String) The attribute tags of the MCR.
+- `cancelable` (Boolean) Whether the MCR can be cancelled.
+- `company_name` (String) The name of the company that owns the MCR.
+- `company_uid` (String) The Megaport Company UID of the MCR owner.
+- `contract_end_date` (String) The contract end date of the MCR.
+- `contract_start_date` (String) The contract start date of the MCR.
+- `contract_term_months` (Number) The contract term of the MCR in months.
+- `cost_centre` (String) The cost centre of the MCR for billing purposes.
+- `create_date` (String) The date the MCR was created.
+- `created_by` (String) The user who created the MCR.
+- `diversity_zone` (String) The diversity zone of the MCR.
+- `live_date` (String) The date the MCR went live.
+- `location_id` (Number) The numeric location ID of the MCR.
+- `locked` (Boolean) Whether the MCR is locked.
+- `market` (String) The market the MCR is in.
+- `marketplace_visibility` (Boolean) Whether the MCR is visible in the Marketplace.
+- `port_speed` (Number) The bandwidth speed of the MCR in Mbps.
+- `product_id` (Number) The numeric ID of the MCR.
+- `product_name` (String) The name of the MCR.
+- `product_type` (String) The type of the product.
+- `product_uid` (String) The unique identifier of the MCR.
+- `provisioning_status` (String) The provisioning status of the MCR.
+- `resource_tags` (Map of String) The resource tags associated with the MCR.
+- `secondary_name` (String) The secondary name of the MCR.
+- `terminate_date` (String) The date the MCR will be terminated.
+- `virtual` (Boolean) Whether the MCR is a virtual product.
+- `vxc_auto_approval` (Boolean) Whether VXC connections are auto-approved on this MCR.
+- `vxc_permitted` (Boolean) Whether VXC connections are permitted on this MCR.
