@@ -3882,6 +3882,16 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					// Verify BGP attributes are readable from state after import reconciliation
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_asn", "64512"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.local_ip_address", "10.0.0.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_ip_address", "10.0.0.2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.shutdown", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.description", "Test BGP Connection"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_in", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_out", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.bfd_enabled", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.export_policy", "permit"),
 				),
 			},
 			// Step 4: Plan-only to verify NO drift - this validates the fix
@@ -4208,6 +4218,145 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 				),
 			},
 			// Step 4: Plan-only to verify NO drift on vnic_index
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_BGPDriftDetection tests that BGP session parameters configured
+// via Terraform are correctly read back from the API, enabling drift detection when
+// BGP settings are changed outside of Terraform (e.g., via the Megaport Portal).
+func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_BGPDriftDetection() {
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 100
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							bgp_connections = [{
+								peer_asn            = 64512
+								local_ip_address    = "10.0.0.1"
+								peer_ip_address     = "10.0.0.2"
+								password            = "testPassword123"
+								shutdown            = false
+								description         = "BGP Drift Test"
+								med_in              = 100
+								med_out             = 100
+								bfd_enabled         = false
+								export_policy       = "permit"
+								as_path_prepend_count = 2
+							}]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, VXCLocationID1, mcrName, portName, vxcName)
+	}
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create VXC with MCR and BGP configuration
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					// Verify BGP attributes are in state after create
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_asn", "64512"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.local_ip_address", "10.0.0.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_ip_address", "10.0.0.2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.shutdown", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.description", "BGP Drift Test"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_in", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_out", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.bfd_enabled", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.export_policy", "permit"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.as_path_prepend_count", "2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.0", "10.0.0.1/30"),
+				),
+			},
+			// Step 2: Import the VXC
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Apply the same config - reconciles state and verifies BGP attributes
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					// Verify BGP attributes are correctly read from the API after import reconciliation
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_asn", "64512"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.local_ip_address", "10.0.0.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_ip_address", "10.0.0.2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.shutdown", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.description", "BGP Drift Test"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_in", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.med_out", "100"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.bfd_enabled", "false"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.export_policy", "permit"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.as_path_prepend_count", "2"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.0", "10.0.0.1/30"),
+				),
+			},
+			// Step 4: Plan-only to verify NO drift - confirms API state matches Terraform config
 			{
 				Config:   vxcConfig(),
 				PlanOnly: true,

@@ -165,6 +165,7 @@ var (
 	vrouterPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The partner configuration of the virtual router configuration.",
 		Optional:    true,
+		Computed:    true,
 		Attributes: map[string]schema.Attribute{
 			"interfaces": schema.ListNestedAttribute{
 				Description: "The interfaces of the partner configuration.",
@@ -174,6 +175,7 @@ var (
 						"ip_mtu": schema.Int64Attribute{
 							Description: "The IP MTU of the partner configuration interface. Defaults to 1500.",
 							Optional:    true,
+							Computed:    true,
 							Validators: []validator.Int64{
 								int64validator.Between(68, 9074),
 							},
@@ -181,24 +183,29 @@ var (
 						"ip_addresses": schema.ListAttribute{
 							Description: "The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., \"169.254.100.6/29\").",
 							Optional:    true,
+							Computed:    true,
 							ElementType: types.StringType,
 						},
 						"ip_routes": schema.ListNestedAttribute{
 							Description: "The IP routes of the partner configuration.",
 							Optional:    true,
+							Computed:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"prefix": schema.StringAttribute{
 										Description: "The prefix of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"description": schema.StringAttribute{
 										Description: "The description of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"next_hop": schema.StringAttribute{
 										Description: "The next hop of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 								},
 							},
@@ -206,46 +213,56 @@ var (
 						"nat_ip_addresses": schema.ListAttribute{
 							Description: "The NAT IP addresses of the partner configuration.",
 							Optional:    true,
+							Computed:    true,
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
 							Description: "The BFD of the partner configuration interface.",
 							Optional:    true,
+							Computed:    true,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
 									Description: "The transmit interval of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 								"rx_interval": schema.Int64Attribute{
 									Description: "The receive interval of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 								"multiplier": schema.Int64Attribute{
 									Description: "The multiplier of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 							},
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
 							Optional:    true,
+							Computed:    true,
 						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
+							Computed:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"peer_asn": schema.Int64Attribute{
 										Description: "The peer ASN of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"local_asn": schema.Int64Attribute{
 										Description: "The local ASN of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"peer_type": schema.StringAttribute{
 										Description: "Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.",
 										Optional:    true,
+										Computed:    true,
 										Validators: []validator.String{
 											stringvalidator.OneOf("NON_CLOUD", "PRIV_CLOUD", "PUB_CLOUD"),
 										},
@@ -253,10 +270,12 @@ var (
 									"local_ip_address": schema.StringAttribute{
 										Description: "The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.6\").",
 										Optional:    true,
+										Computed:    true,
 									},
 									"peer_ip_address": schema.StringAttribute{
 										Description: "The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.1\").",
 										Optional:    true,
+										Computed:    true,
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
@@ -265,56 +284,69 @@ var (
 									"shutdown": schema.BoolAttribute{
 										Description: "Whether the BGP connection is shut down.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"description": schema.StringAttribute{
 										Description: "The description of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"med_in": schema.Int64Attribute{
 										Description: "The MED in of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"med_out": schema.Int64Attribute{
 										Description: "The MED out of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"bfd_enabled": schema.BoolAttribute{
 										Description: "Whether BFD is enabled for the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_policy": schema.StringAttribute{
 										Description: "The export policy of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"permit_export_to": schema.ListAttribute{
 										Description: "The permitted export to of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 										ElementType: types.StringType,
 									},
 									"deny_export_to": schema.ListAttribute{
 										Description: "The denied export to of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
 										Description: "The import whitelist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
 										Description: "The import blacklist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
 										Description: "The export whitelist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
 										Description: "The export blacklist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{
 										Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
 										Optional:    true,
+										Computed:    true,
 										Validators:  []validator.Int64{int64validator.Between(0, 10)},
 									},
 								},
@@ -338,24 +370,29 @@ var (
 						"ip_addresses": schema.ListAttribute{
 							Description: "The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., \"169.254.100.6/29\").",
 							Optional:    true,
+							Computed:    true,
 							ElementType: types.StringType,
 						},
 						"ip_routes": schema.ListNestedAttribute{
 							Description: "The IP routes of the partner configuration.",
 							Optional:    true,
+							Computed:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"prefix": schema.StringAttribute{
 										Description: "The prefix of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"description": schema.StringAttribute{
 										Description: "The description of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"next_hop": schema.StringAttribute{
 										Description: "The next hop of the IP route.",
 										Optional:    true,
+										Computed:    true,
 									},
 								},
 							},
@@ -363,46 +400,56 @@ var (
 						"nat_ip_addresses": schema.ListAttribute{
 							Description: "The NAT IP addresses of the partner configuration.",
 							Optional:    true,
+							Computed:    true,
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
 							Description: "The BFD of the partner configuration interface.",
 							Optional:    true,
+							Computed:    true,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
 									Description: "The transmit interval of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 								"rx_interval": schema.Int64Attribute{
 									Description: "The receive interval of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 								"multiplier": schema.Int64Attribute{
 									Description: "The multiplier of the BFD.",
 									Optional:    true,
+									Computed:    true,
 								},
 							},
 						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
+							Computed:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"peer_asn": schema.Int64Attribute{
 										Description: "The peer ASN of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"local_asn": schema.Int64Attribute{
 										Description: "The local ASN of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"local_ip_address": schema.StringAttribute{
 										Description: "The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.6\").",
 										Optional:    true,
+										Computed:    true,
 									},
 									"peer_ip_address": schema.StringAttribute{
 										Description: "The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., \"169.254.100.1\").",
 										Optional:    true,
+										Computed:    true,
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
@@ -411,56 +458,69 @@ var (
 									"shutdown": schema.BoolAttribute{
 										Description: "Whether the BGP connection is shut down.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"description": schema.StringAttribute{
 										Description: "The description of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"med_in": schema.Int64Attribute{
 										Description: "The MED in of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"med_out": schema.Int64Attribute{
 										Description: "The MED out of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"bfd_enabled": schema.BoolAttribute{
 										Description: "Whether BFD is enabled for the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_policy": schema.StringAttribute{
 										Description: "The export policy of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"permit_export_to": schema.ListAttribute{
 										Description: "The permitted export to of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 										ElementType: types.StringType,
 									},
 									"deny_export_to": schema.ListAttribute{
 										Description: "The denied export to of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
 										Description: "The import whitelist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
 										Description: "The import blacklist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
 										Description: "The export whitelist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
 										Description: "The export blacklist of the BGP connection.",
 										Optional:    true,
+										Computed:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{
 										Description: "The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.",
 										Optional:    true,
+										Computed:    true,
 										Validators:  []validator.Int64{int64validator.Between(0, 10)},
 									},
 								},

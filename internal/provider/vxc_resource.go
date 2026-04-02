@@ -1829,7 +1829,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Pass &plan so that user-only fields (ordered_vlan, requested_product_uid,
 	// vnic_index, partner configs) are preserved from the plan — the API may
 	// not return them reliably immediately after create.
-	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, &plan)
+	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, &plan, r.client)
 	resp.Diagnostics.Append(apiDiags...)
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -1888,7 +1888,7 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	// In Read, state should preserve its own values, so pass nil
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags, nil)
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, nil, r.client)
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -2387,7 +2387,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// In Update, pass plan to preserve user-only configuration values
-	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
+	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan, r.client)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 
