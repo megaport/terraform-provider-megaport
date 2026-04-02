@@ -3,17 +3,90 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	megaport "github.com/megaport/megaportgo"
 )
+
+type MCRsDataSourceProviderTestSuite ProviderTestSuite
+
+func TestMCRsDataSourceProviderTestSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(MCRsDataSourceProviderTestSuite))
+}
+
+func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Basic() {
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	resource.Test(suite.T(), resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				resource "megaport_mcr" "mcr" {
+					product_name         = "%s"
+					port_speed           = 1000
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+
+					resource_tags = {
+						"acc-test-key" = "%s"
+					}
+				}
+
+				data "megaport_mcrs" "by_name" {
+					filter {
+						name   = "name"
+						values = ["%s"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				data "megaport_mcrs" "by_speed" {
+					filter {
+						name   = "port-speed"
+						values = ["1000"]
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+
+				data "megaport_mcrs" "by_tags" {
+					tags = {
+						"acc-test-key" = "%s"
+					}
+					depends_on = [megaport_mcr.mcr]
+				}
+				`, MCRTestLocationIDNum, mcrName, costCentreName, mcrName, mcrName, mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// name filter: exactly 1 result matching our MCR
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "uids.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "uids.0", "megaport_mcr.mcr", "product_uid"),
+					// port-speed filter: at least our MCR is present
+					resource.TestCheckResourceAttrSet("data.megaport_mcrs.by_speed", "uids.0"),
+					// tag filter: exactly 1 result matching our MCR
+					resource.TestCheckResourceAttr("data.megaport_mcrs.by_tags", "uids.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_tags", "uids.0", "megaport_mcr.mcr", "product_uid"),
+				),
+			},
+		},
+	})
+}
 
 // MockMCRService is a mock of the MCR service for testing
 type MockMCRService struct {
