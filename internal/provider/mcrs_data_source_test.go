@@ -26,7 +26,6 @@ func TestMCRsDataSourceProviderTestSuite(t *testing.T) {
 }
 
 func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_BasicAndDetails() {
-	suite.T().Parallel()
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
@@ -100,7 +99,6 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Basi
 }
 
 func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_CombinedFilters() {
-	suite.T().Parallel()
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
@@ -212,7 +210,6 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Comb
 }
 
 func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_TagsAndCombined() {
-	suite.T().Parallel()
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 	tagValue := RandomTestName()
@@ -310,7 +307,6 @@ func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_Tags
 }
 
 func (suite *MCRsDataSourceProviderTestSuite) TestAccMegaportMCRsDataSource_NoMatch() {
-	suite.T().Parallel()
 	mcrName := RandomTestName()
 
 	resource.Test(suite.T(), resource.TestCase{
