@@ -274,10 +274,26 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 }
 
 // reconcilePartnerConfigs reconstructs vrouter partner configs from API CSP connection
-// data to enable drift detection. For non-vrouter partner types (AWS, Azure, etc.),
-// it preserves configs from the plan since those are order-time-only values.
+// data to enable drift detection during Read. During Create/Update (plan != nil),
+// partner configs are preserved from the plan since the API may not have fully
+// populated CSP connection data immediately after the operation.
 func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel, client *megaport.Client) diag.Diagnostics {
 	diags := diag.Diagnostics{}
+
+	// During Create/Update, preserve partner configs from the plan.
+	// The API may not have fully populated CSP connection data yet.
+	if plan != nil {
+		if !plan.AEndPartnerConfig.IsNull() {
+			orm.AEndPartnerConfig = plan.AEndPartnerConfig
+		}
+		if !plan.BEndPartnerConfig.IsNull() {
+			orm.BEndPartnerConfig = plan.BEndPartnerConfig
+		}
+		return diags
+	}
+
+	// During Read (plan == nil), reconstruct vrouter partner configs from
+	// API CSP connection data to enable drift detection.
 
 	// Find VirtualRouter CSP connections from the API response
 	var vrouterCSPConns []megaport.CSPConnectionVirtualRouter
@@ -289,42 +305,22 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 		}
 	}
 
-	// Determine the source for partner config (plan during Create/Update, state during Read)
-	source := plan
-	if source == nil {
-		source = orm
-	}
-
 	// Handle A-End partner config
-	aEndHandled := false
-	if source != nil && !source.AEndPartnerConfig.IsNull() {
-		partnerType := getPartnerType(ctx, source.AEndPartnerConfig)
-		if partnerType == "vrouter" || partnerType == "a-end" {
-			if len(vrouterCSPConns) > 0 {
-				mcrUID := v.AEndConfiguration.UID
-				reconstructed, reconDiags := reconstructVrouterPartnerConfig(ctx, vrouterCSPConns[0], source.AEndPartnerConfig, mcrUID, client, partnerType)
-				diags.Append(reconDiags...)
-				if !reconstructed.IsNull() {
-					orm.AEndPartnerConfig = reconstructed
-					aEndHandled = true
-				}
+	if !orm.AEndPartnerConfig.IsNull() {
+		partnerType := getPartnerType(ctx, orm.AEndPartnerConfig)
+		if (partnerType == "vrouter" || partnerType == "a-end") && len(vrouterCSPConns) > 0 {
+			mcrUID := v.AEndConfiguration.UID
+			reconstructed, reconDiags := reconstructVrouterPartnerConfig(ctx, vrouterCSPConns[0], orm.AEndPartnerConfig, mcrUID, client, partnerType)
+			diags.Append(reconDiags...)
+			if !reconstructed.IsNull() {
+				orm.AEndPartnerConfig = reconstructed
 			}
 		}
-		// For non-vrouter types, preserve from plan
-		if !aEndHandled && plan != nil && !plan.AEndPartnerConfig.IsNull() {
-			orm.AEndPartnerConfig = plan.AEndPartnerConfig
-			aEndHandled = true
-		}
-	} else if plan != nil && !plan.AEndPartnerConfig.IsNull() {
-		orm.AEndPartnerConfig = plan.AEndPartnerConfig
-		aEndHandled = true
 	}
-	_ = aEndHandled
 
 	// Handle B-End partner config
-	bEndHandled := false
-	if source != nil && !source.BEndPartnerConfig.IsNull() {
-		partnerType := getPartnerType(ctx, source.BEndPartnerConfig)
+	if !orm.BEndPartnerConfig.IsNull() {
+		partnerType := getPartnerType(ctx, orm.BEndPartnerConfig)
 		if partnerType == "vrouter" || partnerType == "a-end" {
 			// For B-end vrouter, use the last CSP connection if multiple exist (MCR-to-MCR case)
 			vrIdx := 0
@@ -333,24 +329,14 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 			}
 			if len(vrouterCSPConns) > vrIdx {
 				mcrUID := v.BEndConfiguration.UID
-				reconstructed, reconDiags := reconstructVrouterPartnerConfig(ctx, vrouterCSPConns[vrIdx], source.BEndPartnerConfig, mcrUID, client, partnerType)
+				reconstructed, reconDiags := reconstructVrouterPartnerConfig(ctx, vrouterCSPConns[vrIdx], orm.BEndPartnerConfig, mcrUID, client, partnerType)
 				diags.Append(reconDiags...)
 				if !reconstructed.IsNull() {
 					orm.BEndPartnerConfig = reconstructed
-					bEndHandled = true
 				}
 			}
 		}
-		// For non-vrouter types, preserve from plan
-		if !bEndHandled && plan != nil && !plan.BEndPartnerConfig.IsNull() {
-			orm.BEndPartnerConfig = plan.BEndPartnerConfig
-			bEndHandled = true
-		}
-	} else if plan != nil && !plan.BEndPartnerConfig.IsNull() {
-		orm.BEndPartnerConfig = plan.BEndPartnerConfig
-		bEndHandled = true
 	}
-	_ = bEndHandled
 
 	return diags
 }
