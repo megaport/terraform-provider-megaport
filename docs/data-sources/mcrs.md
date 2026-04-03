@@ -23,14 +23,13 @@ Provides a list of MCRs matching the specified filters, with detailed informatio
 ### Read-Only
 
 - `mcrs` (Attributes List) List of MCRs matching the specified criteria with detailed information. (see [below for nested schema](#nestedatt--mcrs))
-- `uids` (List of String) List of MCR UIDs that match the specified criteria.
 
 <a id="nestedblock--filter"></a>
 ### Nested Schema for `filter`
 
 Required:
 
-- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, product-type, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable, virtual.
+- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable.
 - `values` (List of String) Set of values that are accepted for the given field.
 
 
@@ -58,14 +57,11 @@ Read-Only:
 - `market` (String) The market the MCR is in.
 - `marketplace_visibility` (Boolean) Whether the MCR is visible in the Marketplace.
 - `port_speed` (Number) The bandwidth speed of the MCR in Mbps.
-- `product_id` (Number) The numeric ID of the MCR.
 - `product_name` (String) The name of the MCR.
-- `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier of the MCR.
 - `provisioning_status` (String) The provisioning status of the MCR.
 - `resource_tags` (Map of String) The resource tags associated with the MCR.
 - `secondary_name` (String) The secondary name of the MCR.
 - `terminate_date` (String) The date the MCR will be terminated.
-- `virtual` (Boolean) Whether the MCR is a virtual product.
 - `vxc_auto_approval` (Boolean) Whether VXC connections are auto-approved on this MCR.
 - `vxc_permitted` (Boolean) Whether VXC connections are permitted on this MCR.
