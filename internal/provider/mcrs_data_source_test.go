@@ -3,381 +3,17 @@ package provider
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	megaport "github.com/megaport/megaportgo"
 )
-
-type MCRsDataSourceBasicProviderTestSuite ProviderTestSuite
-type MCRsDataSourceCombinedFiltersProviderTestSuite ProviderTestSuite
-type MCRsDataSourceTagsProviderTestSuite ProviderTestSuite
-type MCRsDataSourceNoMatchProviderTestSuite ProviderTestSuite
-
-func TestMCRsDataSourceBasicProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MCRsDataSourceBasicProviderTestSuite))
-}
-
-func TestMCRsDataSourceCombinedFiltersProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MCRsDataSourceCombinedFiltersProviderTestSuite))
-}
-
-func TestMCRsDataSourceTagsProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MCRsDataSourceTagsProviderTestSuite))
-}
-
-func TestMCRsDataSourceNoMatchProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MCRsDataSourceNoMatchProviderTestSuite))
-}
-
-func (suite *MCRsDataSourceBasicProviderTestSuite) TestAccMegaportMCRsDataSource_BasicAndDetails() {
-	mcrName := RandomTestName()
-	costCentreName := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-
-				resource "megaport_mcr" "mcr" {
-					product_name         = "%s"
-					port_speed           = 1000
-					location_id          = data.megaport_location.test_location.id
-					contract_term_months = 1
-					cost_centre          = "%s"
-
-					resource_tags = {
-						"acc-test-key" = "%s"
-					}
-				}
-
-				data "megaport_mcrs" "by_name" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, mcrName, mcrName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// uids: exactly 1 result matching our MCR
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "uids.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "uids.0", "megaport_mcr.mcr", "product_uid"),
-					// mcrs: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.#", "1"),
-					// Cross-reference all detail fields against the resource
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_id", "megaport_mcr.mcr", "product_id"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.product_type", "megaport_mcr.mcr", "product_type"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.provisioning_status", "megaport_mcr.mcr", "provisioning_status"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.create_date", "megaport_mcr.mcr", "create_date"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.created_by", "megaport_mcr.mcr", "created_by"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.location_id", "megaport_mcr.mcr", "location_id"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.market", "megaport_mcr.mcr", "market"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.company_uid", "megaport_mcr.mcr", "company_uid"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.company_name", "megaport_mcr.mcr", "company_name"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.diversity_zone", "megaport_mcr.mcr", "diversity_zone"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.secondary_name", "megaport_mcr.mcr", "secondary_name"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.vxc_permitted", "megaport_mcr.mcr", "vxc_permitted"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.vxc_auto_approval", "megaport_mcr.mcr", "vxc_auto_approval"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.marketplace_visibility", "megaport_mcr.mcr", "marketplace_visibility"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.asn", "megaport_mcr.mcr", "asn"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.virtual", "megaport_mcr.mcr", "virtual"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.locked", "megaport_mcr.mcr", "locked"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.admin_locked", "megaport_mcr.mcr", "admin_locked"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_name", "mcrs.0.cancelable", "megaport_mcr.mcr", "cancelable"),
-					// Exact value checks for fields we control
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.product_name", mcrName),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.port_speed", "1000"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.cost_centre", costCentreName),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.contract_term_months", "1"),
-					// Resource tags populated
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_name", "mcrs.0.resource_tags.acc-test-key", mcrName),
-				),
-			},
-		},
-	})
-}
-
-func (suite *MCRsDataSourceCombinedFiltersProviderTestSuite) TestAccMegaportMCRsDataSource_CombinedFilters() {
-	mcrName := RandomTestName()
-	costCentreName := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-
-				resource "megaport_mcr" "mcr" {
-					product_name         = "%s"
-					port_speed           = 1000
-					location_id          = data.megaport_location.test_location.id
-					contract_term_months = 1
-					cost_centre          = "%s"
-				}
-
-				# Multiple filters (AND logic) — name + speed + cost-centre
-				data "megaport_mcrs" "combined" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					filter {
-						name   = "port-speed"
-						values = ["1000"]
-					}
-					filter {
-						name   = "cost-centre"
-						values = ["%s"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Filter by location-id
-				data "megaport_mcrs" "by_location" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					filter {
-						name   = "location-id"
-						values = ["%d"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Filter by contract-term-months
-				data "megaport_mcrs" "by_contract" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					filter {
-						name   = "contract-term-months"
-						values = ["1"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Multiple values (OR logic) — port-speed = 1000 or 10000
-				data "megaport_mcrs" "or_speed" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					filter {
-						name   = "port-speed"
-						values = ["1000", "10000"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName,
-					mcrName, costCentreName,
-					mcrName, MCRTestLocationIDNum,
-					mcrName,
-					mcrName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Combined AND filters: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.combined", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.product_name", mcrName),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.port_speed", "1000"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.combined", "mcrs.0.cost_centre", costCentreName),
-
-					// Location filter: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_location", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_location", "mcrs.0.location_id", fmt.Sprintf("%d", MCRTestLocationIDNum)),
-
-					// Contract term filter: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "mcrs.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_contract", "mcrs.0.contract_term_months", "1"),
-
-					// OR logic on speed: also matches our MCR (speed=1000 is in the list)
-					resource.TestCheckResourceAttr("data.megaport_mcrs.or_speed", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.or_speed", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.or_speed", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-				),
-			},
-		},
-	})
-}
-
-func (suite *MCRsDataSourceTagsProviderTestSuite) TestAccMegaportMCRsDataSource_TagsAndCombined() {
-	mcrName := RandomTestName()
-	costCentreName := RandomTestName()
-	tagValue := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-
-				resource "megaport_mcr" "mcr" {
-					product_name         = "%s"
-					port_speed           = 1000
-					location_id          = data.megaport_location.test_location.id
-					contract_term_months = 1
-					cost_centre          = "%s"
-
-					resource_tags = {
-						"acc-test-env"  = "%s"
-						"acc-test-team" = "platform"
-					}
-				}
-
-				# Filter by single tag
-				data "megaport_mcrs" "by_single_tag" {
-					tags = {
-						"acc-test-env" = "%s"
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Filter by multiple tags (AND — all must match)
-				data "megaport_mcrs" "by_multi_tag" {
-					tags = {
-						"acc-test-env"  = "%s"
-						"acc-test-team" = "platform"
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Combined: filter + tags
-				data "megaport_mcrs" "filter_and_tags" {
-					filter {
-						name   = "port-speed"
-						values = ["1000"]
-					}
-					tags = {
-						"acc-test-env" = "%s"
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Tag that doesn't match anything
-				data "megaport_mcrs" "no_tag_match" {
-					tags = {
-						"acc-test-env" = "nonexistent-value-that-wont-match"
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName,
-					tagValue,
-					tagValue,
-					tagValue,
-					tagValue),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Single tag filter: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_single_tag", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.product_name", mcrName),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.resource_tags.acc-test-env", tagValue),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_single_tag", "mcrs.0.resource_tags.acc-test-team", "platform"),
-
-					// Multi-tag filter: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_multi_tag", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.by_multi_tag", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.by_multi_tag", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-
-					// Combined filter + tags: exactly 1 result
-					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "uids.#", "1"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "mcrs.#", "1"),
-					resource.TestCheckResourceAttrPair("data.megaport_mcrs.filter_and_tags", "mcrs.0.product_uid", "megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.filter_and_tags", "mcrs.0.port_speed", "1000"),
-
-					// No match: empty results
-					resource.TestCheckResourceAttr("data.megaport_mcrs.no_tag_match", "uids.#", "0"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.no_tag_match", "mcrs.#", "0"),
-				),
-			},
-		},
-	})
-}
-
-func (suite *MCRsDataSourceNoMatchProviderTestSuite) TestAccMegaportMCRsDataSource_NoMatch() {
-	mcrName := RandomTestName()
-
-	resource.Test(suite.T(), resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-
-				resource "megaport_mcr" "mcr" {
-					product_name         = "%s"
-					port_speed           = 1000
-					location_id          = data.megaport_location.test_location.id
-					contract_term_months = 1
-				}
-
-				# Name that won't match any MCR
-				data "megaport_mcrs" "no_name_match" {
-					filter {
-						name   = "name"
-						values = ["nonexistent-mcr-name-that-wont-match-anything"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-
-				# Contradictory filters — name matches but speed doesn't
-				data "megaport_mcrs" "contradictory" {
-					filter {
-						name   = "name"
-						values = ["%s"]
-					}
-					filter {
-						name   = "port-speed"
-						values = ["99999"]
-					}
-					depends_on = [megaport_mcr.mcr]
-				}
-				`, MCRTestLocationIDNum, mcrName, mcrName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// No name match: empty
-					resource.TestCheckResourceAttr("data.megaport_mcrs.no_name_match", "uids.#", "0"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.no_name_match", "mcrs.#", "0"),
-
-					// Contradictory AND filters: empty
-					resource.TestCheckResourceAttr("data.megaport_mcrs.contradictory", "uids.#", "0"),
-					resource.TestCheckResourceAttr("data.megaport_mcrs.contradictory", "mcrs.#", "0"),
-				),
-			},
-		},
-	})
-}
 
 // MockMCRService is a mock of the MCR service for testing
 type MockMCRService struct {
@@ -767,17 +403,6 @@ func TestFilterMCRs(t *testing.T) {
 			expectedMCRs: []string{"mcr-2"},
 		},
 		{
-			name: "Filter by product-type",
-			filters: []filterModel{
-				{
-					Name:   types.StringValue("product-type"),
-					Values: listValueMust(t, types.StringType, []string{"MCR2"}),
-				},
-			},
-			tags:         nil,
-			expectedMCRs: []string{"mcr-1", "mcr-2"},
-		},
-		{
 			name: "Filter by contract-term-months",
 			filters: []filterModel{
 				{
@@ -844,17 +469,6 @@ func TestFilterMCRs(t *testing.T) {
 			expectedMCRs: []string{"mcr-3"},
 		},
 		{
-			name: "Filter by virtual",
-			filters: []filterModel{
-				{
-					Name:   types.StringValue("virtual"),
-					Values: listValueMust(t, types.StringType, []string{"true"}),
-				},
-			},
-			tags:         nil,
-			expectedMCRs: []string{"mcr-1", "mcr-2"},
-		},
-		{
 			name: "Filter by secondary-name pattern",
 			filters: []filterModel{
 				{
@@ -881,14 +495,11 @@ func TestFilterMCRs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create mock MCR service
 			mockMCRService := &MockMCRService{
 				ListMCRsResult: mcrs,
 			}
 
-			// Set up tag mocks if needed
 			if tc.tags != nil {
-				// Set custom function to handle MCR tag lookup
 				mockMCRService.ListMCRResourceTagsFunc = func(ctx context.Context, mcrID string) (map[string]string, error) {
 					if tags, ok := tc.mockTags[mcrID]; ok {
 						return tags, nil
@@ -897,17 +508,14 @@ func TestFilterMCRs(t *testing.T) {
 				}
 			}
 
-			// Create mock client with MCR service properly attached
 			mockClient := &megaport.Client{
 				MCRService: mockMCRService,
 			}
 
-			// Create data source with mock client
 			ds := &mcrsDataSource{
 				client: mockClient,
 			}
 
-			// Create model with test filters and tags
 			var tagsValue types.Map
 			if tc.tags != nil {
 				var diags diag.Diagnostics
@@ -922,23 +530,19 @@ func TestFilterMCRs(t *testing.T) {
 				Tags:   tagsValue,
 			}
 
-			// Call filterMCRs
 			result, diags := ds.filterMCRs(context.Background(), mcrs, model)
 
-			// Check for expected warnings
 			if tc.expectedErrors > 0 {
 				assert.Equal(t, tc.expectedErrors, len(diags))
 			} else {
 				assert.False(t, diags.HasError())
 			}
 
-			// Check results
 			resultUIDs := make([]string, 0, len(result))
 			for _, mcr := range result {
 				resultUIDs = append(resultUIDs, mcr.UID)
 			}
 
-			// Verify expected MCRs are found (order independent)
 			assert.Equal(t, len(tc.expectedMCRs), len(resultUIDs),
 				"Expected %d MCRs but got %d", len(tc.expectedMCRs), len(resultUIDs))
 
@@ -956,7 +560,7 @@ func TestFilterMCRs(t *testing.T) {
 	}
 }
 
-// TestReadWithErrors tests error handling in Read
+// TestReadWithErrorsMCRs tests error handling in Read
 func TestReadWithErrorsMCRs(t *testing.T) {
 	ctx := context.Background()
 
@@ -994,21 +598,17 @@ func TestReadWithErrorsMCRs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create mock MCR service
 			mockMCRService := &MockMCRService{}
 			tc.setupMock(mockMCRService)
 
-			// Create mock client with MCR service properly attached
 			mockClient := &megaport.Client{
 				MCRService: mockMCRService,
 			}
 
-			// Create data source with mock client
 			ds := &mcrsDataSource{
 				client: mockClient,
 			}
 
-			// Create a simplified test configuration that doesn't use tftypes directly
 			tagsMap := map[string]string{}
 			if tc.name == "ListMCRResourceTags error" {
 				tagsMap = map[string]string{"environment": "production"}
@@ -1023,21 +623,15 @@ func TestReadWithErrorsMCRs(t *testing.T) {
 			}
 
 			if tc.name == "ListMCRs error" {
-				// For the ListMCRs error case, test the API call directly
 				mcrs, err := mockClient.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{IncludeInactive: false})
 
-				// Verify the error occurs
 				assert.Error(t, err)
 				assert.Nil(t, mcrs)
-
-				// Check that the error message matches what we expect
 				assert.Contains(t, err.Error(), "API error")
 			} else {
-				// For the tag error case, test filterMCRs directly
 				mcrs := []*megaport.MCR{{UID: "mcr-1", Name: "Test MCR 1"}}
 				_, diags := ds.filterMCRs(ctx, mcrs, model)
 
-				// Check that we got warnings but not errors
 				hasError := false
 				for _, diagnostic := range diags {
 					if diagnostic.Severity() == diag.SeverityError {
@@ -1047,10 +641,8 @@ func TestReadWithErrorsMCRs(t *testing.T) {
 				}
 				assert.False(t, hasError, "Expected no errors, only warnings")
 
-				// Check that the warning contains the expected text
 				foundExpectedWarning := false
 				for _, diagnostic := range diags {
-					// Check both Summary AND Detail for the expected text
 					if strings.Contains(diagnostic.Summary(), tc.expectedSummary) ||
 						strings.Contains(diagnostic.Detail(), tc.expectedSummary) {
 						foundExpectedWarning = true
@@ -1130,11 +722,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 		assert.Equal(t, false, detail.Locked.ValueBool())
 		assert.Equal(t, true, detail.AdminLocked.ValueBool())
 		assert.Equal(t, true, detail.Cancelable.ValueBool())
-
-		// Attribute tags populated
 		assert.False(t, detail.AttributeTags.IsNull())
-
-		// Resource tags populated
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
 

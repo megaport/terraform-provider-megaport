@@ -18,9 +18,7 @@ var (
 
 	mcrDetailAttrs = map[string]attr.Type{
 		"product_uid":            types.StringType,
-		"product_id":             types.Int64Type,
 		"product_name":           types.StringType,
-		"product_type":           types.StringType,
 		"provisioning_status":    types.StringType,
 		"create_date":            types.StringType,
 		"created_by":             types.StringType,
@@ -41,7 +39,6 @@ var (
 		"vxc_auto_approval":      types.BoolType,
 		"marketplace_visibility": types.BoolType,
 		"asn":                    types.Int64Type,
-		"virtual":                types.BoolType,
 		"locked":                 types.BoolType,
 		"admin_locked":           types.BoolType,
 		"cancelable":             types.BoolType,
@@ -66,9 +63,7 @@ type mcrsModel struct {
 // mcrDetailModel maps individual MCR detail attributes.
 type mcrDetailModel struct {
 	UID                   types.String `tfsdk:"product_uid"`
-	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
-	Type                  types.String `tfsdk:"product_type"`
 	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
 	CreateDate            types.String `tfsdk:"create_date"`
 	CreatedBy             types.String `tfsdk:"created_by"`
@@ -89,7 +84,6 @@ type mcrDetailModel struct {
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
 	ASN                   types.Int64  `tfsdk:"asn"`
-	Virtual               types.Bool   `tfsdk:"virtual"`
 	Locked                types.Bool   `tfsdk:"locked"`
 	AdminLocked           types.Bool   `tfsdk:"admin_locked"`
 	Cancelable            types.Bool   `tfsdk:"cancelable"`
@@ -126,16 +120,8 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 							Description: "The unique identifier of the MCR.",
 							Computed:    true,
 						},
-						"product_id": schema.Int64Attribute{
-							Description: "The numeric ID of the MCR.",
-							Computed:    true,
-						},
 						"product_name": schema.StringAttribute{
 							Description: "The name of the MCR.",
-							Computed:    true,
-						},
-						"product_type": schema.StringAttribute{
-							Description: "The type of the product.",
 							Computed:    true,
 						},
 						"provisioning_status": schema.StringAttribute{
@@ -218,10 +204,6 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 							Description: "The Autonomous System Number (ASN) of the MCR.",
 							Computed:    true,
 						},
-						"virtual": schema.BoolAttribute{
-							Description: "Whether the MCR is a virtual product.",
-							Computed:    true,
-						},
 						"locked": schema.BoolAttribute{
 							Description: "Whether the MCR is locked.",
 							Computed:    true,
@@ -260,7 +242,7 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, product-type, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable, virtual.",
+							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable.",
 						},
 						"values": schema.ListAttribute{
 							ElementType: types.StringType,
@@ -453,8 +435,6 @@ func matchesMCRFilters(ctx context.Context, mcr *megaport.MCR, filters []filterM
 			match = containsString(filterValues, mcr.CompanyName)
 		case "company-uid":
 			match = containsString(filterValues, mcr.CompanyUID)
-		case "product-type":
-			match = containsString(filterValues, mcr.Type)
 		case "contract-term-months":
 			match = containsInt(filterValues, mcr.ContractTermMonths)
 		case "vxc-permitted":
@@ -477,8 +457,6 @@ func matchesMCRFilters(ctx context.Context, mcr *megaport.MCR, filters []filterM
 			match = containsBool(filterValues, mcr.AdminLocked)
 		case "cancelable":
 			match = containsBool(filterValues, mcr.Cancelable)
-		case "virtual":
-			match = containsBool(filterValues, mcr.Virtual)
 		default:
 			diags.AddWarning(
 				"Unknown filter",
@@ -500,9 +478,7 @@ func matchesMCRFilters(ctx context.Context, mcr *megaport.MCR, filters []filterM
 func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 	detail := mcrDetailModel{
 		UID:                   types.StringValue(m.UID),
-		ID:                    types.Int64Value(int64(m.ID)),
 		Name:                  types.StringValue(m.Name),
-		Type:                  types.StringValue(m.Type),
 		ProvisioningStatus:    types.StringValue(m.ProvisioningStatus),
 		CreatedBy:             types.StringValue(m.CreatedBy),
 		PortSpeed:             types.Int64Value(int64(m.PortSpeed)),
@@ -518,7 +494,6 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		VXCAutoApproval:       types.BoolValue(m.VXCAutoApproval),
 		MarketplaceVisibility: types.BoolValue(m.MarketplaceVisibility),
 		ASN:                   types.Int64Value(int64(m.Resources.VirtualRouter.ASN)),
-		Virtual:               types.BoolValue(m.Virtual),
 		Locked:                types.BoolValue(m.Locked),
 		AdminLocked:           types.BoolValue(m.AdminLocked),
 		Cancelable:            types.BoolValue(m.Cancelable),
