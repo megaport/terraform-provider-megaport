@@ -617,7 +617,6 @@ func TestReadWithErrorsMCRs(t *testing.T) {
 			tagsValue, _ := types.MapValueFrom(ctx, types.StringType, tagsMap)
 
 			model := mcrsModel{
-				UIDs:   types.ListNull(types.StringType),
 				Filter: []filterModel{},
 				Tags:   tagsValue,
 			}

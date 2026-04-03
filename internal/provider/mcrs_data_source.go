@@ -54,7 +54,6 @@ type mcrsDataSource struct {
 
 // mcrsModel maps the data source schema data.
 type mcrsModel struct {
-	UIDs   types.List    `tfsdk:"uids"`
 	MCRs   types.List    `tfsdk:"mcrs"`
 	Filter []filterModel `tfsdk:"filter"`
 	Tags   types.Map     `tfsdk:"tags"`
@@ -106,11 +105,6 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "Provides a list of MCRs matching the specified filters, with detailed information about each MCR.",
 		Attributes: map[string]schema.Attribute{
-			"uids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
-				Description: "List of MCR UIDs that match the specified criteria.",
-			},
 			"mcrs": schema.ListNestedAttribute{
 				Description: "List of MCRs matching the specified criteria with detailed information.",
 				Computed:    true,
@@ -306,13 +300,10 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	// Extract MCR UIDs and build detail objects
-	mcrUIDs := make([]string, 0, len(filteredMCRs))
+	// Build detail objects
 	mcrObjects := make([]types.Object, 0, len(filteredMCRs))
 
 	for _, mcr := range filteredMCRs {
-		mcrUIDs = append(mcrUIDs, mcr.UID)
-
 		// Fetch resource tags for each MCR
 		tags, err := d.client.MCRService.ListMCRResourceTags(ctx, mcr.UID)
 		if err != nil {
@@ -331,14 +322,6 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		}
 		mcrObjects = append(mcrObjects, obj)
 	}
-
-	// Set the MCR UIDs in the model
-	mcrUIDsList, diags := types.ListValueFrom(ctx, types.StringType, mcrUIDs)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	data.UIDs = mcrUIDsList
 
 	// Set the MCR details in the model
 	mcrsList, mcrsDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: mcrDetailAttrs}, mcrObjects)
