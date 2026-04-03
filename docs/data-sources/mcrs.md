@@ -3,12 +3,12 @@
 page_title: "megaport_mcrs Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Provides a list of MCRs matching the specified filters, with detailed information about each MCR.
+  Looks up MCRs in the Megaport API. Optionally filter by product_uid to retrieve a specific MCR.
 ---
 
 # megaport_mcrs (Data Source)
 
-Provides a list of MCRs matching the specified filters, with detailed information about each MCR.
+Looks up MCRs in the Megaport API. Optionally filter by product_uid to retrieve a specific MCR.
 
 
 
@@ -17,21 +17,11 @@ Provides a list of MCRs matching the specified filters, with detailed informatio
 
 ### Optional
 
-- `filter` (Block List) Custom filter block to select MCRs. (see [below for nested schema](#nestedblock--filter))
-- `tags` (Map of String) Map of resource tags, each pair of which must exactly match a pair on the desired MCRs.
+- `product_uid` (String) The unique identifier of a specific MCR to look up. If not provided, all active MCRs are returned.
 
 ### Read-Only
 
-- `mcrs` (Attributes List) List of MCRs matching the specified criteria with detailed information. (see [below for nested schema](#nestedatt--mcrs))
-
-<a id="nestedblock--filter"></a>
-### Nested Schema for `filter`
-
-Required:
-
-- `name` (String) Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable.
-- `values` (List of String) Set of values that are accepted for the given field.
-
+- `mcrs` (Attributes List) List of MCRs with detailed information. (see [below for nested schema](#nestedatt--mcrs))
 
 <a id="nestedatt--mcrs"></a>
 ### Nested Schema for `mcrs`
