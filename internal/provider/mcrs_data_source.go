@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -54,9 +53,8 @@ type mcrsDataSource struct {
 
 // mcrsModel maps the data source schema data.
 type mcrsModel struct {
-	MCRs   types.List    `tfsdk:"mcrs"`
-	Filter []filterModel `tfsdk:"filter"`
-	Tags   types.Map     `tfsdk:"tags"`
+	ProductUID types.String `tfsdk:"product_uid"`
+	MCRs       types.List   `tfsdk:"mcrs"`
 }
 
 // mcrDetailModel maps individual MCR detail attributes.
@@ -103,10 +101,14 @@ func (d *mcrsDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 // Schema defines the schema for the data source.
 func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Provides a list of MCRs matching the specified filters, with detailed information about each MCR.",
+		Description: "Looks up MCRs in the Megaport API. Optionally filter by product_uid to retrieve a specific MCR.",
 		Attributes: map[string]schema.Attribute{
+			"product_uid": schema.StringAttribute{
+				Optional:    true,
+				Description: "The unique identifier of a specific MCR to look up. If not provided, all active MCRs are returned.",
+			},
 			"mcrs": schema.ListNestedAttribute{
-				Description: "List of MCRs matching the specified criteria with detailed information.",
+				Description: "List of MCRs with detailed information.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -223,29 +225,6 @@ func (d *mcrsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					},
 				},
 			},
-			"tags": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Description: "Map of resource tags, each pair of which must exactly match a pair on the desired MCRs.",
-			},
-		},
-		Blocks: map[string]schema.Block{
-			"filter": schema.ListNestedBlock{
-				Description: "Custom filter block to select MCRs.",
-				NestedObject: schema.NestedBlockObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Required:    true,
-							Description: "Name of the field to filter by. Available filters: name, port-speed, location-id, cost-centre, provisioning-status, market, company-name, company-uid, contract-term-months, vxc-permitted, vxc-auto-approval, marketplace-visibility, asn, diversity-zone, secondary-name, locked, admin-locked, cancelable.",
-						},
-						"values": schema.ListAttribute{
-							ElementType: types.StringType,
-							Required:    true,
-							Description: "Set of values that are accepted for the given field.",
-						},
-					},
-				},
-			},
 		},
 	}
 }
@@ -266,45 +245,50 @@ func (d *mcrsDataSource) Configure(ctx context.Context, req datasource.Configure
 		return
 	}
 
-	client := data.client
-
-	d.client = client
+	d.client = data.client
 }
 
 // Read refreshes the Terraform state with the latest data.
 func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data mcrsModel
 
-	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Get all MCRs from the API
-	mcrs, err := d.client.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{
-		IncludeInactive: false,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error listing MCRs",
-			fmt.Sprintf("Unable to list MCRs: %v", err),
-		)
-		return
-	}
+	var mcrs []*megaport.MCR
 
-	// Apply filtering
-	filteredMCRs, filterDiags := d.filterMCRs(ctx, mcrs, data)
-	resp.Diagnostics.Append(filterDiags...)
-	if resp.Diagnostics.HasError() {
-		return
+	if !data.ProductUID.IsNull() && !data.ProductUID.IsUnknown() {
+		// Look up a specific MCR by UID
+		mcr, err := d.client.MCRService.GetMCR(ctx, data.ProductUID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading MCR",
+				fmt.Sprintf("Unable to read MCR %s: %v", data.ProductUID.ValueString(), err),
+			)
+			return
+		}
+		mcrs = []*megaport.MCR{mcr}
+	} else {
+		// List all MCRs
+		var err error
+		mcrs, err = d.client.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{
+			IncludeInactive: false,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error listing MCRs",
+				fmt.Sprintf("Unable to list MCRs: %v", err),
+			)
+			return
+		}
 	}
 
 	// Build detail objects
-	mcrObjects := make([]types.Object, 0, len(filteredMCRs))
+	mcrObjects := make([]types.Object, 0, len(mcrs))
 
-	for _, mcr := range filteredMCRs {
-		// Fetch resource tags for each MCR
+	for _, mcr := range mcrs {
 		tags, err := d.client.MCRService.ListMCRResourceTags(ctx, mcr.UID)
 		if err != nil {
 			resp.Diagnostics.AddWarning(
@@ -323,7 +307,6 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		mcrObjects = append(mcrObjects, obj)
 	}
 
-	// Set the MCR details in the model
 	mcrsList, mcrsDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: mcrDetailAttrs}, mcrObjects)
 	resp.Diagnostics.Append(mcrsDiags...)
 	if resp.Diagnostics.HasError() {
@@ -331,130 +314,7 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	data.MCRs = mcrsList
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-// filterMCRs applies filters to the list of MCRs.
-func (d *mcrsDataSource) filterMCRs(ctx context.Context, mcrs []*megaport.MCR, data mcrsModel) ([]*megaport.MCR, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// If no filters or tags are provided, return all MCRs
-	if len(data.Filter) == 0 && data.Tags.IsNull() {
-		return mcrs, diags
-	}
-
-	var filteredMCRs []*megaport.MCR
-
-	// Handle tag filtering
-	var tagFilters map[string]string
-	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
-		diags.Append(data.Tags.ElementsAs(ctx, &tagFilters, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
-	}
-
-	// Process each MCR
-	for _, mcr := range mcrs {
-		// Check tag filters if any
-		if len(tagFilters) > 0 {
-			// Get MCR tags
-			mcrTags, err := d.client.MCRService.ListMCRResourceTags(ctx, mcr.UID)
-			if err != nil {
-				diags.AddWarning(
-					"Error fetching MCR tags",
-					fmt.Sprintf("Unable to fetch tags for MCR %s: %v", mcr.UID, err),
-				)
-				continue
-			}
-
-			// Check if MCR matches all tag filters
-			if !matchesTags(mcrTags, tagFilters) {
-				continue
-			}
-		}
-
-		// Check custom filters
-		match, filterDiags := matchesMCRFilters(ctx, mcr, data.Filter)
-		diags.Append(filterDiags...)
-		if !match {
-			continue
-		}
-
-		filteredMCRs = append(filteredMCRs, mcr)
-	}
-
-	return filteredMCRs, diags
-}
-
-// matchesMCRFilters checks if an MCR matches the custom filters.
-func matchesMCRFilters(ctx context.Context, mcr *megaport.MCR, filters []filterModel) (bool, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	for _, filter := range filters {
-		var filterValues []string
-		valDiags := filter.Values.ElementsAs(ctx, &filterValues, false)
-		diags.Append(valDiags...)
-		if diags.HasError() {
-			return false, diags
-		}
-
-		name := filter.Name.ValueString()
-		match := false
-
-		switch name {
-		case "name":
-			match = matchesNamePattern(filterValues, mcr.Name)
-		case "port-speed":
-			match = containsInt(filterValues, mcr.PortSpeed)
-		case "location-id":
-			match = containsInt(filterValues, mcr.LocationID)
-		case "provisioning-status":
-			match = containsString(filterValues, mcr.ProvisioningStatus)
-		case "market":
-			match = containsString(filterValues, mcr.Market)
-		case "company-name":
-			match = containsString(filterValues, mcr.CompanyName)
-		case "company-uid":
-			match = containsString(filterValues, mcr.CompanyUID)
-		case "contract-term-months":
-			match = containsInt(filterValues, mcr.ContractTermMonths)
-		case "vxc-permitted":
-			match = containsBool(filterValues, mcr.VXCPermitted)
-		case "vxc-auto-approval":
-			match = containsBool(filterValues, mcr.VXCAutoApproval)
-		case "marketplace-visibility":
-			match = containsBool(filterValues, mcr.MarketplaceVisibility)
-		case "diversity-zone":
-			match = containsString(filterValues, mcr.DiversityZone)
-		case "secondary-name":
-			match = matchesNamePattern(filterValues, mcr.SecondaryName)
-		case "cost-centre":
-			match = containsString(filterValues, mcr.CostCentre)
-		case "asn":
-			match = containsInt(filterValues, mcr.Resources.VirtualRouter.ASN)
-		case "locked":
-			match = containsBool(filterValues, mcr.Locked)
-		case "admin-locked":
-			match = containsBool(filterValues, mcr.AdminLocked)
-		case "cancelable":
-			match = containsBool(filterValues, mcr.Cancelable)
-		default:
-			diags.AddWarning(
-				"Unknown filter",
-				fmt.Sprintf("Filter name '%s' is not supported", name),
-			)
-			// Don't reject the MCR based on unknown filter
-			match = true
-		}
-
-		if !match {
-			return false, diags
-		}
-	}
-
-	return true, diags
 }
 
 // fromAPIMCRDetail maps an API MCR and its resource tags to an mcrDetailModel.
