@@ -1,4 +1,4 @@
-module github.com/megaport/terraform-provider-megaport
+module github.com/megaport/terraform-provider-megaport/v2
 
 go 1.24.0
 
