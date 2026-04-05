@@ -57,10 +57,6 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
 				),
@@ -83,7 +79,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "resources"},
 			},
 			// Update Testing
 			{
@@ -114,10 +110,6 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
 				),
