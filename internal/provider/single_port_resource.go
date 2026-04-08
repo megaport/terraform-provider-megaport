@@ -280,7 +280,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if len(createdPort.TechnicalServiceUIDs) != 1 {
 		resp.Diagnostics.AddError(
 			"Unexpected number of ports created",
-			fmt.Sprintf("Expected 1 port, got: %d. The IDs were: %v Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs), createdPort.TechnicalServiceUIDs),
+			fmt.Sprintf("Expected 1 port, got: %d. Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs)),
 		)
 		return
 	}
@@ -333,7 +333,7 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	port, err := r.client.PortService.GetPort(ctx, state.UID.ValueString())
 	if err != nil {
 		// Port has been deleted or is not found
-		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response != nil {
 			if mpErr.Response.StatusCode == http.StatusNotFound ||
 				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
 				resp.State.RemoveResource(ctx)
@@ -405,7 +405,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		contractTermMonths = &months
 	}
 
-	_, modifyErr := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
+	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
@@ -414,19 +414,19 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
-	if modifyErr != nil {
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating port",
-			"Could not update port with ID "+plan.UID.ValueString()+": "+modifyErr.Error(),
+			"Error updating port",
+			"Could not update port with ID "+plan.UID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
-	if portErr != nil {
+	port, err := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading port",
-			"Could not read port with ID "+plan.UID.ValueString()+": "+portErr.Error(),
+			"Error reading port",
+			"Could not read port with ID "+plan.UID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
@@ -458,7 +458,11 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update the state
-	state.fromAPIPort(ctx, port, tags)
+	apiDiags := state.fromAPIPort(ctx, port, tags)
+	resp.Diagnostics.Append(apiDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -510,12 +514,7 @@ func (r *portResource) fetchResourceTags(ctx context.Context, uid string) (map[s
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 func fromAPIPortInterface(ctx context.Context, p *megaport.PortInterface) (types.Object, diag.Diagnostics) {

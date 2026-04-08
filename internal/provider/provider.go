@@ -80,6 +80,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"access_key": schema.StringAttribute{
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The API access key. Can also be set using the environment variable MEGAPORT_ACCESS_KEY",
 			},
 			"secret_key": schema.StringAttribute{
@@ -202,7 +203,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
 	ctx = tflog.SetField(ctx, "wait_time", waitTime)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key", "access_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
 
