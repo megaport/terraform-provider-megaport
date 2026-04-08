@@ -193,6 +193,9 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	resp.Diagnostics.Append(plan.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

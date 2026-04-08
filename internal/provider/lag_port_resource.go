@@ -214,6 +214,9 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	resp.Diagnostics.Append(plan.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	lagPortUIDs, lagDiags := lagPortUIDsList(createdPort.TechnicalServiceUIDs)
 	resp.Diagnostics.Append(lagDiags...)
