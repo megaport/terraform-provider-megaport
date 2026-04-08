@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -254,7 +255,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create MCR",
-			"Validation error while attempting to create MCR with name "+plan.Name.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Validation error while attempting to create MCR with name %s: %s", plan.Name.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -263,7 +264,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating MCR",
-			"Could not create MCR with name "+plan.Name.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not create MCR with name %s: %s", plan.Name.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -274,8 +275,8 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	mcr, err := r.client.MCRService.GetMCR(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created mcr",
-			"Could not read newly created mcr with ID "+createdID+": "+err.Error(),
+			"Error reading newly created MCR",
+			fmt.Sprintf("Could not read newly created MCR with ID %s: %s", createdID, err.Error()),
 		)
 		return
 	}
@@ -284,7 +285,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
-			"Could not read resource tags for MCR with ID "+createdID+": "+err.Error(),
+			fmt.Sprintf("Could not read resource tags for MCR with ID %s: %s", createdID, err.Error()),
 		)
 		return
 	}
@@ -292,6 +293,9 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// update the plan with the MCR info
 	apiDiags := plan.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -326,8 +330,8 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		}
 
 		resp.Diagnostics.AddError(
-			"Error Reading MCR",
-			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Error reading MCR",
+			fmt.Sprintf("Could not read MCR with ID %s: %s", state.UID.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -342,7 +346,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
-			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read resource tags for MCR with ID %s: %s", state.UID.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -368,35 +372,14 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Check on changes
-	var name, costCentre string
-	var marketplaceVisibility bool
-	var contractTermMonths *int
-	if !plan.Name.IsNull() && !plan.Name.Equal(state.Name) {
-		name = plan.Name.ValueString()
-	} else {
-		name = state.Name.ValueString()
-	}
-	if !plan.CostCentre.IsNull() && !plan.CostCentre.Equal(state.CostCentre) {
-		costCentre = plan.CostCentre.ValueString()
-	} else {
-		costCentre = state.CostCentre.ValueString()
-	}
-	if !plan.MarketplaceVisibility.IsNull() && !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
-		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
-	} else {
-		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
-	}
-	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		months := int(plan.ContractTermMonths.ValueInt64())
-		contractTermMonths = &months
-	}
+	name := plan.Name.ValueString()
+	costCentre := plan.CostCentre.ValueString()
+	marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
 
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
-		ContractTermMonths:    contractTermMonths,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
@@ -405,7 +388,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating MCR",
-			"Could not update MCR, unexpected error: "+err.Error(),
+			fmt.Sprintf("Could not update MCR, unexpected error: %s", err.Error()),
 		)
 		return
 	}
@@ -414,14 +397,15 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	mcr, err := r.client.MCRService.GetMCR(ctx, state.UID.ValueString())
 	if err != nil {
 		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response != nil {
-			if mpErr.Response.StatusCode == http.StatusNotFound {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
 				resp.State.RemoveResource(ctx)
 				return
 			}
 		}
 		resp.Diagnostics.AddError(
 			"Error reading MCR after update",
-			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read MCR with ID %s: %s", state.UID.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -436,8 +420,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		err := r.client.MCRService.UpdateMCRResourceTags(ctx, plan.UID.ValueString(), tagMap)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error Updating mcr resource tags",
-				"Could not update mcr resource tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+				"Error updating MCR resource tags",
+				fmt.Sprintf("Could not update MCR resource tags with ID %s: %s", plan.UID.ValueString(), err.Error()),
 			)
 			return
 		}
@@ -447,7 +431,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
-			"Could not read resource tags for MCR with ID "+state.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read resource tags for MCR with ID %s: %s", state.UID.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -484,7 +468,7 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting MCR",
-			"Could not delete MCR, unexpected error: "+err.Error(),
+			fmt.Sprintf("Could not delete MCR, unexpected error: %s", err.Error()),
 		)
 		return
 	}

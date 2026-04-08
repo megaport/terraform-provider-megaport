@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -145,9 +146,9 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx,
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
 	if err != nil {
-		// Check if the resource was deleted
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
+		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
+			if apiErr.Response.StatusCode == http.StatusNotFound ||
+				(apiErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(apiErr.Message, "Could not find")) {
 				resp.State.RemoveResource(ctx)
 				return
 			}

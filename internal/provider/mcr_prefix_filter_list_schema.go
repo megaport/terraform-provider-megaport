@@ -50,8 +50,11 @@ func mcrPrefixFilterListResourceSchema() schema.Schema {
 			},
 			"address_family": schema.StringAttribute{
 				Description: "The IP address standard of the IP network addresses in the prefix filter list. " +
-					"Valid values are 'IPv4' and 'IPv6' (case-insensitive).",
+					"Valid values are 'IPv4' and 'IPv6' (case-insensitive). Changing this value requires replacement.",
 				Required: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				Validators: []validator.String{
 					stringvalidator.OneOfCaseInsensitive("IPv4", "IPv6"),
 				},
