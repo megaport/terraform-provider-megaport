@@ -3,11 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -260,7 +258,7 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 		if err == nil {
 			return
 		}
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
+		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
 			if apiErr.Response.StatusCode == http.StatusNotFound {
 				// Resource was already deleted, which is fine
 				return
@@ -340,59 +338,3 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// validatePrefixListEntry validates a single prefix list entry
-func (r *mcrPrefixFilterListResource) validatePrefixListEntry(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string, index int) diag.Diagnostics {
-	diags := diag.Diagnostics{}
-
-	// Validate prefix format
-	_, network, err := net.ParseCIDR(entry.Prefix.ValueString())
-	if err != nil {
-		diags.AddError(
-			fmt.Sprintf("Invalid prefix in entry %d", index),
-			fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix.ValueString(), err.Error()),
-		)
-		return diags
-	}
-
-	// Validate address family matches prefix type
-	isIPv4 := network.IP.To4() != nil
-	expectedIPv4 := addressFamily == "IPv4"
-
-	if isIPv4 != expectedIPv4 {
-		diags.AddError(
-			fmt.Sprintf("Address family mismatch in entry %d", index),
-			fmt.Sprintf("Prefix %s is %s but address family is set to %s",
-				entry.Prefix.ValueString(),
-				map[bool]string{true: "IPv4", false: "IPv6"}[isIPv4],
-				addressFamily),
-		)
-	}
-
-	// Validate ge/le ranges based on address family
-	maxLength := 32
-	if addressFamily == "IPv6" {
-		maxLength = 128
-	}
-
-	if !entry.Ge.IsNull() {
-		ge := entry.Ge.ValueInt64()
-		if ge < 0 || ge > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid ge value in entry %d", index),
-				fmt.Sprintf("ge must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	if !entry.Le.IsNull() {
-		le := entry.Le.ValueInt64()
-		if le < 0 || le > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid le value in entry %d", index),
-				fmt.Sprintf("le must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	return diags
-}

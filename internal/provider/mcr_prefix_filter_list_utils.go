@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -78,6 +79,11 @@ func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList 
 // had an exact match and the API returned le=max, in which case we set le=ge.
 func (m *mcrPrefixFilterListResourceModel) fromAPIWithPlan(ctx context.Context, apiList *megaport.MCRPrefixFilterList, plannedEntries []*mcrPrefixFilterListEntryResourceModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
+
+	if apiList == nil {
+		diags.AddError("Nil API response", "Received nil prefix filter list from API")
+		return diags
+	}
 
 	m.ID = types.Int64Value(int64(apiList.ID))
 	m.Description = types.StringValue(apiList.Description)
@@ -310,42 +316,19 @@ func (v canonicalCIDRValidator) ValidateString(_ context.Context, req validator.
 
 // parseImportID parses an import ID and returns the MCR UID and prefix list ID
 func parseImportID(importID string) (string, int64, error) {
-	parts := make([]string, 0, 2)
-
-	// Find the colon separator
-	colonIndex := -1
-	for i, char := range importID {
-		if char == ':' {
-			colonIndex = i
-			break
-		}
-	}
-
-	if colonIndex == -1 {
+	parts := strings.SplitN(importID, ":", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", 0, fmt.Errorf("invalid import ID format, expected 'mcr_uid:prefix_list_id', got '%s'", importID)
 	}
 
-	parts = append(parts, importID[:colonIndex], importID[colonIndex+1:])
-
-	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("invalid import ID format, expected 'mcr_uid:prefix_list_id', got '%s'", importID)
-	}
-
-	mcrUID := parts[0]
-	prefixListIDStr := parts[1]
-
-	if mcrUID == "" || prefixListIDStr == "" {
-		return "", 0, fmt.Errorf("invalid import ID format, MCR UID and prefix list ID cannot be empty")
-	}
-
-	prefixListID, err := strconv.ParseInt(prefixListIDStr, 10, 64)
+	prefixListID, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid prefix list ID '%s': %w", prefixListIDStr, err)
+		return "", 0, fmt.Errorf("invalid prefix list ID '%s': %w", parts[1], err)
 	}
 
 	if prefixListID <= 0 {
-		return "", 0, fmt.Errorf("invalid prefix list ID '%s': must be a positive integer", prefixListIDStr)
+		return "", 0, fmt.Errorf("invalid prefix list ID '%s': must be a positive integer", parts[1])
 	}
 
-	return mcrUID, prefixListID, nil
+	return parts[0], prefixListID, nil
 }

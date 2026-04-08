@@ -53,9 +53,10 @@ type mcrResourceModel struct {
 func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
 
-	asn := m.Resources.VirtualRouter.ASN
-	if asn != 0 {
-		orm.ASN = types.Int64Value(int64(asn))
+	if m.Resources.VirtualRouter.ASN != 0 {
+		orm.ASN = types.Int64Value(int64(m.Resources.VirtualRouter.ASN))
+	} else {
+		orm.ASN = types.Int64Null()
 	}
 
 	orm.UID = types.StringValue(m.UID)
@@ -73,9 +74,9 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 		for k, v := range m.AttributeTags {
 			attributeTags[k] = types.StringValue(v)
 		}
-		tags, tagDiags := types.MapValue(types.StringType, attributeTags)
+		attributeTagsValue, tagDiags := types.MapValue(types.StringType, attributeTags)
 		apiDiags = append(apiDiags, tagDiags...)
-		orm.AttributeTags = tags
+		orm.AttributeTags = attributeTagsValue
 	}
 
 	if len(tags) > 0 {
@@ -261,8 +262,8 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating mcr",
-			"Could not mcr with name "+plan.Name.ValueString()+": "+err.Error(),
+			"Error creating MCR",
+			"Could not create MCR with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
 	}
@@ -316,7 +317,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	mcr, err := r.client.MCRService.GetMCR(ctx, state.UID.ValueString())
 	if err != nil {
 		// MCR has been deleted or is not found
-		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response != nil {
 			if mpErr.Response.StatusCode == http.StatusNotFound ||
 				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
 				resp.State.RemoveResource(ctx)
@@ -412,8 +413,14 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Get refreshed mcr value from API
 	mcr, err := r.client.MCRService.GetMCR(ctx, state.UID.ValueString())
 	if err != nil {
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response != nil {
+			if mpErr.Response.StatusCode == http.StatusNotFound {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
 		resp.Diagnostics.AddError(
-			"Error Reading MCR",
+			"Error reading MCR after update",
 			"Could not read MCR with ID "+state.UID.ValueString()+": "+err.Error(),
 		)
 		return
