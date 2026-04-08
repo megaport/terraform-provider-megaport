@@ -192,6 +192,7 @@ func (d *vxcCSPConnectionDataSource) Schema(_ context.Context, _ datasource.Sche
 						"auth_key": schema.StringAttribute{
 							Description: "The authentication key of the CSP connection.",
 							Computed:    true,
+							Sensitive:   true,
 						},
 						"customer_address": schema.StringAttribute{
 							Description: "The customer address of the CSP connection.",
@@ -224,6 +225,7 @@ func (d *vxcCSPConnectionDataSource) Schema(_ context.Context, _ datasource.Sche
 						"service_key": schema.StringAttribute{
 							Description: "The Azure service key of the CSP connection.",
 							Computed:    true,
+							Sensitive:   true,
 						},
 						"csp_name": schema.StringAttribute{
 							Description: "The name of the CSP connection.",

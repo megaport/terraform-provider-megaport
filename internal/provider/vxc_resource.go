@@ -34,87 +34,7 @@ var (
 	_ resource.ResourceWithConfigure   = &vxcResource{}
 	_ resource.ResourceWithImportState = &vxcResource{}
 
-	vxcAEndConfigAttrs = map[string]attr.Type{
-		"product_uid":          types.StringType,
-		"assigned_product_uid": types.StringType,
-		"vlan":                 types.Int64Type,
-		"inner_vlan":           types.Int64Type,
-		"vnic_index":           types.Int64Type,
-		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
-	}
-
-	vxcBEndConfigAttrs = map[string]attr.Type{
-		"product_uid":          types.StringType,
-		"assigned_product_uid": types.StringType,
-		"vlan":                 types.Int64Type,
-		"inner_vlan":           types.Int64Type,
-		"vnic_index":           types.Int64Type,
-		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
-		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
-		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
-		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
-		"ibm_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigIbmAttrs),
-		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
-		"transit":              types.BoolType,
-	}
-
-	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
-		"connect_type":        types.StringType,
-		"type":                types.StringType,
-		"owner_account":       types.StringType,
-		"asn":                 types.Int64Type,
-		"amazon_asn":          types.Int64Type,
-		"auth_key":            types.StringType,
-		"prefixes":            types.StringType,
-		"customer_ip_address": types.StringType,
-		"amazon_ip_address":   types.StringType,
-		"name":                types.StringType,
-	}
-
-	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
-		"service_key": types.StringType,
-		"peers":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs)),
-	}
-
-	partnerOrderAzurePeeringConfigAttrs = map[string]attr.Type{
-		"type":             types.StringType,
-		"peer_asn":         types.StringType,
-		"primary_subnet":   types.StringType,
-		"secondary_subnet": types.StringType,
-		"prefixes":         types.StringType,
-		"shared_key":       types.StringType,
-		"vlan":             types.Int64Type,
-	}
-
-	vxcPartnerConfigGoogleAttrs = map[string]attr.Type{
-		"pairing_key": types.StringType,
-	}
-
-	vxcPartnerConfigOracleAttrs = map[string]attr.Type{
-		"virtual_circuit_id": types.StringType,
-	}
-
-	vxcPartnerConfigIbmAttrs = map[string]attr.Type{
-		"account_id":          types.StringType,
-		"customer_asn":        types.Int64Type,
-		"name":                types.StringType,
-		"customer_ip_address": types.StringType,
-		"provider_ip_address": types.StringType,
-	}
-
-	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs)),
-	}
-
-	vxcVrouterInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":           types.Int64Type,
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"vlan":             types.Int64Type,
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
-	}
+	// Leaf attr maps (no references to other maps) must be declared first.
 
 	ipRouteAttrs = map[string]attr.Type{
 		"prefix":      types.StringType,
@@ -148,6 +68,90 @@ var (
 		"export_whitelist":      types.StringType,
 		"export_blacklist":      types.StringType,
 		"as_path_prepend_count": types.Int64Type,
+	}
+
+	vxcVrouterInterfaceAttrs = map[string]attr.Type{
+		"ip_mtu":           types.Int64Type,
+		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
+		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":             types.Int64Type,
+		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+	}
+
+	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs)),
+	}
+
+	partnerOrderAzurePeeringConfigAttrs = map[string]attr.Type{
+		"type":             types.StringType,
+		"peer_asn":         types.StringType,
+		"primary_subnet":   types.StringType,
+		"secondary_subnet": types.StringType,
+		"prefixes":         types.StringType,
+		"shared_key":       types.StringType,
+		"vlan":             types.Int64Type,
+	}
+
+	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
+		"connect_type":        types.StringType,
+		"type":                types.StringType,
+		"owner_account":       types.StringType,
+		"asn":                 types.Int64Type,
+		"amazon_asn":          types.Int64Type,
+		"auth_key":            types.StringType,
+		"prefixes":            types.StringType,
+		"customer_ip_address": types.StringType,
+		"amazon_ip_address":   types.StringType,
+		"name":                types.StringType,
+	}
+
+	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
+		"service_key": types.StringType,
+		"peers":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs)),
+	}
+
+	vxcPartnerConfigGoogleAttrs = map[string]attr.Type{
+		"pairing_key": types.StringType,
+	}
+
+	vxcPartnerConfigOracleAttrs = map[string]attr.Type{
+		"virtual_circuit_id": types.StringType,
+	}
+
+	vxcPartnerConfigIbmAttrs = map[string]attr.Type{
+		"account_id":          types.StringType,
+		"customer_asn":        types.Int64Type,
+		"name":                types.StringType,
+		"customer_ip_address": types.StringType,
+		"provider_ip_address": types.StringType,
+	}
+
+	// Composite attr maps (reference leaf maps) declared after their dependencies.
+
+	vxcAEndConfigAttrs = map[string]attr.Type{
+		"product_uid":          types.StringType,
+		"assigned_product_uid": types.StringType,
+		"vlan":                 types.Int64Type,
+		"inner_vlan":           types.Int64Type,
+		"vnic_index":           types.Int64Type,
+		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
+	}
+
+	vxcBEndConfigAttrs = map[string]attr.Type{
+		"product_uid":          types.StringType,
+		"assigned_product_uid": types.StringType,
+		"vlan":                 types.Int64Type,
+		"inner_vlan":           types.Int64Type,
+		"vnic_index":           types.Int64Type,
+		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
+		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
+		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
+		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
+		"ibm_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigIbmAttrs),
+		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
+		"transit":              types.BoolType,
 	}
 )
 
@@ -634,7 +638,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Check product type - if MVE, require VNIC Index
 	productType, _ := r.client.ProductService.GetProductType(ctx, a.ProductUID.ValueString())
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
+		if a.NetworkInterfaceIndex.IsNull() || a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
@@ -709,7 +713,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Check product type - if MVE, require VNIC Index
 	productType, _ = r.client.ProductService.GetProductType(ctx, b.ProductUID.ValueString())
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
+		if b.NetworkInterfaceIndex.IsNull() || b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
@@ -1128,6 +1132,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
 	}
 
+	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
+		updateReq.Shutdown = megaport.PtrTo(plan.Shutdown.ValueBool())
+	}
+
 	// Always use the planned cost centre value, even if it's empty/null
 	costCentre := plan.CostCentre.ValueString()
 	updateReq.CostCentre = &costCentre
@@ -1167,7 +1175,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if !plan.AEndConfiguration.Equal(state.AEndConfiguration) {
 		aEndPlanVrouter := aEndPlan.VrouterPartnerConfig
 		aEndStateVrouter := aEndState.VrouterPartnerConfig
-		if !aEndPlanVrouter.Equal(aEndStateVrouter) && !aEndPlanVrouter.IsNull() {
+		// Normalize passwords (WriteOnly, nullified in state post-apply) before comparing.
+		aEndPlanVrouterNorm := nullifyVrouterPasswords(ctx, aEndPlanVrouter)
+		if !aEndPlanVrouterNorm.Equal(aEndStateVrouter) && !aEndPlanVrouter.IsNull() {
 			var partnerConfigAEnd vxcPartnerConfigVrouterModel
 			vrouterDiags := aEndPlanVrouter.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
 			resp.Diagnostics.Append(vrouterDiags...)
@@ -1216,7 +1226,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			updateReq.BEndPartnerConfig = vrouterPartnerConfig
 		}
 	} else if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "transit" && !bEndCSP {
-		if !bEndStateConfig.Transit.IsNull() && !bEndPlanConfig.Transit.Equal(bEndStateConfig.Transit) {
+		if !bEndPlanConfig.Transit.IsNull() && bEndPlanConfig.Transit.ValueBool() {
 			updateReq.BEndPartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
 		}
 	}
@@ -1442,8 +1452,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			// Handle CSP partner config replace detection for B-End
 			if bEndCSP {
 				// Check if the b_end_config partner config changed
-				planBEndCSPObj := extractBEndCSPObj(bEndPlanConfig)
-				stateBEndCSPObj := extractBEndCSPObj(bEndStateConfig)
+				planBEndCSPObj := extractBEndCSPObjForCompare(ctx, bEndPlanConfig)
+				stateBEndCSPObj := extractBEndCSPObjForCompare(ctx, bEndStateConfig)
 				if !planBEndCSPObj.Equal(stateBEndCSPObj) {
 					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_config"))
 				}
@@ -1492,7 +1502,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			state.AEndConfiguration = newStateAEndObj
 			state.BEndConfiguration = newStateBEndObj
 
-			req.Plan.Set(ctx, &plan)
+			planDiags := req.Plan.Set(ctx, &plan)
+			diags = append(diags, planDiags...)
 			resp.Plan.Set(ctx, &plan)
 			stateDiags2 := req.State.Set(ctx, &state)
 			diags = append(diags, stateDiags2...)
@@ -1505,23 +1516,85 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	}
 }
 
-// extractBEndCSPObj extracts the non-null CSP partner config object from a b-end config model
-// for comparison purposes (to detect if the CSP config changed).
-func extractBEndCSPObj(cfg *vxcBEndConfigModel) types.Object {
-	if !cfg.AWSPartnerConfig.IsNull() {
+// extractBEndCSPObjForCompare extracts the active CSP partner config from a b-end config model,
+// with WriteOnly fields (auth_key, service_key) nullified so plan/state comparisons are stable
+// across applies. Without this, the framework's nullification of WriteOnly fields in state would
+// cause the objects to never compare equal, triggering spurious RequiresReplace on every plan.
+func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) types.Object {
+	if !cfg.AWSPartnerConfig.IsNull() && !cfg.AWSPartnerConfig.IsUnknown() {
+		var awsCfg vxcPartnerConfigAWSModel
+		if diags := cfg.AWSPartnerConfig.As(ctx, &awsCfg, basetypes.ObjectAsOptions{}); !diags.HasError() {
+			awsCfg.AuthKey = types.StringNull() // WriteOnly — always null in state post-apply
+			if obj, d := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, &awsCfg); !d.HasError() {
+				return obj
+			}
+		}
 		return cfg.AWSPartnerConfig
 	}
-	if !cfg.AzurePartnerConfig.IsNull() {
+	if !cfg.AzurePartnerConfig.IsNull() && !cfg.AzurePartnerConfig.IsUnknown() {
+		var azureCfg vxcPartnerConfigAzureModel
+		if diags := cfg.AzurePartnerConfig.As(ctx, &azureCfg, basetypes.ObjectAsOptions{}); !diags.HasError() {
+			azureCfg.ServiceKey = types.StringNull() // WriteOnly — always null in state post-apply
+			if obj, d := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, &azureCfg); !d.HasError() {
+				return obj
+			}
+		}
 		return cfg.AzurePartnerConfig
 	}
-	if !cfg.GooglePartnerConfig.IsNull() {
+	if !cfg.GooglePartnerConfig.IsNull() && !cfg.GooglePartnerConfig.IsUnknown() {
 		return cfg.GooglePartnerConfig
 	}
-	if !cfg.OraclePartnerConfig.IsNull() {
+	if !cfg.OraclePartnerConfig.IsNull() && !cfg.OraclePartnerConfig.IsUnknown() {
 		return cfg.OraclePartnerConfig
 	}
-	if !cfg.IBMPartnerConfig.IsNull() {
+	if !cfg.IBMPartnerConfig.IsNull() && !cfg.IBMPartnerConfig.IsUnknown() {
 		return cfg.IBMPartnerConfig
 	}
 	return types.ObjectNull(nil)
+}
+
+// nullifyVrouterPasswords returns a copy of the vrouter config object with all bgp_connection
+// passwords set to null. Used before plan/state comparison so that the WriteOnly password field
+// (always null in state after apply) does not cause spurious update API calls on every apply.
+func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types.Object {
+	if vrouterObj.IsNull() || vrouterObj.IsUnknown() {
+		return vrouterObj
+	}
+	var m vxcPartnerConfigVrouterModel
+	if diags := vrouterObj.As(ctx, &m, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return vrouterObj
+	}
+	if m.Interfaces.IsNull() || m.Interfaces.IsUnknown() {
+		return vrouterObj
+	}
+	var ifaces []*vxcPartnerConfigInterfaceModel
+	if diags := m.Interfaces.ElementsAs(ctx, &ifaces, false); diags.HasError() {
+		return vrouterObj
+	}
+	for _, iface := range ifaces {
+		if iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+			continue
+		}
+		var bgpConns []*bgpConnectionConfigModel
+		if diags := iface.BgpConnections.ElementsAs(ctx, &bgpConns, false); diags.HasError() {
+			continue
+		}
+		for _, conn := range bgpConns {
+			conn.Password = types.StringNull()
+		}
+		newBgpList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), bgpConns)
+		if !diags.HasError() {
+			iface.BgpConnections = newBgpList
+		}
+	}
+	newIfaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), ifaces)
+	if diags.HasError() {
+		return vrouterObj
+	}
+	m.Interfaces = newIfaceList
+	normalized, diags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, &m)
+	if diags.HasError() {
+		return vrouterObj
+	}
+	return normalized
 }

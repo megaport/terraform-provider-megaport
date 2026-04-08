@@ -99,6 +99,7 @@ var (
 						"shared_key": schema.StringAttribute{
 							Description: "The shared key of the peer.",
 							Optional:    true,
+							Sensitive:   true,
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the peer.",

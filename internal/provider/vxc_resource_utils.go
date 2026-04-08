@@ -423,7 +423,6 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
 					LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 					PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
-					Password:           bgpConnection.Password.ValueString(),
 					Shutdown:           bgpConnection.Shutdown.ValueBool(),
 					Description:        bgpConnection.Description.ValueString(),
 					MedIn:              int(bgpConnection.MedIn.ValueInt64()),
@@ -432,6 +431,11 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 					AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 					PeerType:           bgpConnection.PeerType.ValueString(),
+				}
+				// Only send password if provided — avoids clearing BGP auth post-import
+				// when the user has not supplied the WriteOnly field in their config.
+				if !bgpConnection.Password.IsNull() {
+					bgpToAppend.Password = bgpConnection.Password.ValueString()
 				}
 				if !bgpConnection.LocalAsn.IsNull() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
