@@ -339,6 +339,9 @@ func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, dia
 	return tags, diags
 }
 
+// configureMegaportResource extracts the Megaport client and provider config from the
+// provider data passed to a resource's Configure method. Returns false if the provider
+// data is nil or wrong type (diagnostics already populated in that case).
 func configureMegaportResource(req resource.ConfigureRequest, resp *resource.ConfigureResponse) (*megaportProviderData, bool) {
 	if req.ProviderData == nil {
 		return nil, false
