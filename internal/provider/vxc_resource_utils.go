@@ -58,6 +58,7 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 	aEndProductUID := ""
 	var aEndVnicIndex *int64
 	var aEndVLAN *int64
+	var aEndPlanVLAN *int64
 	var aEndInnerVLAN *int64
 
 	if !orm.AEndConfiguration.IsNull() {
@@ -95,6 +96,7 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 			if isPresent(planAEnd.VLAN) {
 				vlan := planAEnd.VLAN.ValueInt64()
 				aEndVLAN = &vlan
+				aEndPlanVLAN = &vlan
 			}
 			if isPresent(planAEnd.InnerVLAN) {
 				vlan := planAEnd.InnerVLAN.ValueInt64()
@@ -111,8 +113,13 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 
 	aEndModel.ProductUID = types.StringValue(aEndProductUID)
 
-	// VLAN: prefer API value; fall back to plan/state if API returns 0.
-	if v.AEndConfiguration.VLAN != 0 {
+	// VLAN priority: explicit plan value > API value > state fallback > null.
+	// When plan has a specific non-auto VLAN, preserve it immediately after create/update
+	// to avoid "inconsistent result after apply" if the API propagates the value slowly.
+	// During Read (plan==nil, aEndPlanVLAN==nil), API value is always used for drift detection.
+	if aEndPlanVLAN != nil && *aEndPlanVLAN != 0 {
+		aEndModel.VLAN = types.Int64Value(*aEndPlanVLAN)
+	} else if v.AEndConfiguration.VLAN != 0 {
 		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
 	} else if aEndVLAN != nil {
 		aEndModel.VLAN = types.Int64Value(*aEndVLAN)
@@ -160,6 +167,7 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 	bEndProductUID := ""
 	var bEndVnicIndex *int64
 	var bEndVLAN *int64
+	var bEndPlanVLAN *int64
 	var bEndInnerVLAN *int64
 
 	if !orm.BEndConfiguration.IsNull() {
@@ -196,6 +204,7 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 			if isPresent(planBEnd.VLAN) {
 				vlan := planBEnd.VLAN.ValueInt64()
 				bEndVLAN = &vlan
+				bEndPlanVLAN = &vlan
 			}
 			if isPresent(planBEnd.InnerVLAN) {
 				vlan := planBEnd.InnerVLAN.ValueInt64()
@@ -227,7 +236,13 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 
 	bEndModel.ProductUID = types.StringValue(bEndProductUID)
 
-	if v.BEndConfiguration.VLAN != 0 {
+	// VLAN priority: explicit plan value > API value > state fallback > null.
+	// When plan has a specific non-auto VLAN, preserve it immediately after create/update
+	// to avoid "inconsistent result after apply" if the API propagates the value slowly.
+	// During Read (plan==nil, bEndPlanVLAN==nil), API value is always used for drift detection.
+	if bEndPlanVLAN != nil && *bEndPlanVLAN != 0 {
+		bEndModel.VLAN = types.Int64Value(*bEndPlanVLAN)
+	} else if v.BEndConfiguration.VLAN != 0 {
 		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
 	} else if bEndVLAN != nil {
 		bEndModel.VLAN = types.Int64Value(*bEndVLAN)
