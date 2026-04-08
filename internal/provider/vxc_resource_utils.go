@@ -78,6 +78,10 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 				vlan := existingAEnd.InnerVLAN.ValueInt64()
 				aEndInnerVLAN = &vlan
 			}
+			// Preserve vrouter_config from state during Read (plan == nil).
+			if plan == nil && isPresent(existingAEnd.VrouterPartnerConfig) {
+				aEndModel.VrouterPartnerConfig = existingAEnd.VrouterPartnerConfig
+			}
 		} else {
 			diags.Append(ds...)
 		}
@@ -113,15 +117,20 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 
 	aEndModel.ProductUID = types.StringValue(aEndProductUID)
 
-	// VLAN priority: explicit plan/state value > API value > null.
-	// When a non-zero VLAN is present in plan (create/update) or state (read), preserve it.
-	// This mirrors the old ordered_vlan semantics: the configured VLAN is authoritative.
-	// Auto-assign (vlan=0) defers to the API-assigned value.
-	// During Read (plan==nil), aEndPlanVLAN is nil — aEndVLAN (from state) is used instead,
-	// which prevents drift from the API overwriting a user-configured VLAN each refresh.
-	if aEndPlanVLAN != nil && *aEndPlanVLAN != 0 {
+	// VLAN priority:
+	//   1. Plan value (Create/Update): always authoritative, including vlan=0 (auto-assign).
+	//      vlan=0 is stored as 0 in state — not replaced with the API-assigned value.
+	//      This avoids "planned value does not match config value" framework errors that
+	//      arise when plan modifiers try to convert a known config value to Unknown.
+	//   2. State value (Read, plan==nil): preserve whatever the user configured in state.
+	//      The API can assign a different VLAN than requested (e.g. assigns 1691 for vlan=200),
+	//      so the configured value is authoritative — we never overwrite state from the API.
+	//   3. API value (non-zero): only used when state has no VLAN (import or first-time read).
+	//   4. Null: no VLAN configured and API returned 0.
+	if aEndPlanVLAN != nil {
 		aEndModel.VLAN = types.Int64Value(*aEndPlanVLAN)
-	} else if aEndVLAN != nil && *aEndVLAN != 0 {
+	} else if aEndVLAN != nil {
+		// Preserve configured VLAN from state (including 0 for auto-assign).
 		aEndModel.VLAN = types.Int64Value(*aEndVLAN)
 	} else if v.AEndConfiguration.VLAN != 0 {
 		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
@@ -188,6 +197,27 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 				vlan := existingBEnd.InnerVLAN.ValueInt64()
 				bEndInnerVLAN = &vlan
 			}
+			// Preserve partner configs from state during Read (plan == nil).
+			if plan == nil {
+				for _, pair := range []struct {
+					src *types.Object
+					dst *types.Object
+				}{
+					{&existingBEnd.AWSPartnerConfig, &bEndModel.AWSPartnerConfig},
+					{&existingBEnd.AzurePartnerConfig, &bEndModel.AzurePartnerConfig},
+					{&existingBEnd.GooglePartnerConfig, &bEndModel.GooglePartnerConfig},
+					{&existingBEnd.OraclePartnerConfig, &bEndModel.OraclePartnerConfig},
+					{&existingBEnd.IBMPartnerConfig, &bEndModel.IBMPartnerConfig},
+					{&existingBEnd.VrouterPartnerConfig, &bEndModel.VrouterPartnerConfig},
+				} {
+					if isPresent(*pair.src) {
+						*pair.dst = *pair.src
+					}
+				}
+				if isPresent(existingBEnd.Transit) {
+					bEndModel.Transit = existingBEnd.Transit
+				}
+			}
 		} else {
 			diags.Append(ds...)
 		}
@@ -238,15 +268,10 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 
 	bEndModel.ProductUID = types.StringValue(bEndProductUID)
 
-	// VLAN priority: explicit plan/state value > API value > null.
-	// When a non-zero VLAN is present in plan (create/update) or state (read), preserve it.
-	// This mirrors the old ordered_vlan semantics: the configured VLAN is authoritative.
-	// Auto-assign (vlan=0) defers to the API-assigned value.
-	// During Read (plan==nil), bEndPlanVLAN is nil — bEndVLAN (from state) is used instead,
-	// which prevents drift from the API overwriting a user-configured VLAN each refresh.
-	if bEndPlanVLAN != nil && *bEndPlanVLAN != 0 {
+	// VLAN priority: same logic as A-End above.
+	if bEndPlanVLAN != nil {
 		bEndModel.VLAN = types.Int64Value(*bEndPlanVLAN)
-	} else if bEndVLAN != nil && *bEndVLAN != 0 {
+	} else if bEndVLAN != nil {
 		bEndModel.VLAN = types.Int64Value(*bEndVLAN)
 	} else if v.BEndConfiguration.VLAN != 0 {
 		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))

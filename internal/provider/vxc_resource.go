@@ -156,25 +156,6 @@ var (
 )
 
 
-// vlanAutoAssignModifier converts an explicit vlan=0 (auto-assign sentinel) to
-// Unknown during planning. This prevents "inconsistent result after apply" when
-// the API assigns a different VLAN than 0. UseStateForUnknown then fills the
-// Unknown value from state on subsequent plans, so no spurious update is proposed.
-type vlanAutoAssignModifier struct{}
-
-func (m vlanAutoAssignModifier) Description(_ context.Context) string {
-	return "Converts vlan=0 to (known after apply) so the API-assigned VLAN is accepted"
-}
-
-func (m vlanAutoAssignModifier) MarkdownDescription(_ context.Context) string {
-	return "Converts vlan=0 to (known after apply) so the API-assigned VLAN is accepted"
-}
-
-func (m vlanAutoAssignModifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
-	if !req.ConfigValue.IsNull() && !req.ConfigValue.IsUnknown() && req.ConfigValue.ValueInt64() == 0 {
-		resp.PlanValue = types.Int64Unknown()
-	}
-}
 
 // vxcResourceModel maps the resource schema data.
 type vxcResourceModel struct {
@@ -477,7 +458,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 						PlanModifiers: []planmodifier.Int64{
-							vlanAutoAssignModifier{},
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
@@ -521,7 +501,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 						PlanModifiers: []planmodifier.Int64{
-							vlanAutoAssignModifier{},
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
