@@ -53,6 +53,29 @@ var (
 	}
 )
 
+// convertBandwidths converts a slice of int bandwidths from the API into a Terraform list value.
+func convertBandwidths(ctx context.Context, src []int) (types.List, diag.Diagnostics) {
+	vals := make([]int64, len(src))
+	for i, v := range src {
+		vals[i] = int64(v)
+	}
+	return types.ListValueFrom(ctx, types.Int64Type, vals)
+}
+
+// convertStringList converts a slice of strings into a Terraform list value.
+func convertStringList(ctx context.Context, src []string) (types.List, diag.Diagnostics) {
+	return types.ListValueFrom(ctx, types.StringType, src)
+}
+
+// newCSPConnectionModel returns a cspConnectionModel with list fields pre-initialised to null,
+// so individual case handlers only need to set the fields relevant to their CSP type.
+func newCSPConnectionModel() cspConnectionModel {
+	return cspConnectionModel{
+		Bandwidths:  types.ListNull(types.Int64Type),
+		IPAddresses: types.ListNull(types.StringType),
+	}
+}
+
 // NewVXCCSPConnectionDataSource is a helper function to simplify the provider implementation.
 func NewVXCCSPConnectionDataSource() datasource.DataSource {
 	return &vxcCSPConnectionDataSource{}
@@ -323,160 +346,102 @@ func (d *vxcCSPConnectionDataSource) Read(ctx context.Context, req datasource.Re
 
 func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
+	m := newCSPConnectionModel()
+
 	switch provider := c.(type) {
 	case megaport.CSPConnectionAWS:
-		awsModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			VLAN:              types.Int64Value(int64(provider.VLAN)),
-			Account:           types.StringValue(provider.Account),
-			AmazonAddress:     types.StringValue(provider.AmazonAddress),
-			ASN:               types.Int64Value(int64(provider.ASN)),
-			AuthKey:           types.StringValue(provider.AuthKey),
-			CustomerAddress:   types.StringValue(provider.CustomerAddress),
-			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
-			ID:                types.Int64Value(int64(provider.ID)),
-			Name:              types.StringValue(provider.Name),
-			OwnerAccount:      types.StringValue(provider.OwnerAccount),
-			PeerASN:           types.Int64Value(int64(provider.PeerASN)),
-			Type:              types.StringValue(provider.Type),
-			VIFID:             types.StringValue(provider.VIFID),
-		}
-		awsModel.Bandwidths = types.ListNull(types.Int64Type)
-		awsModel.IPAddresses = types.ListNull(types.StringType)
-		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
-		apiDiags = append(apiDiags, awsDiags...)
-		return awsObject, apiDiags
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.VLAN = types.Int64Value(int64(provider.VLAN))
+		m.Account = types.StringValue(provider.Account)
+		m.AmazonAddress = types.StringValue(provider.AmazonAddress)
+		m.ASN = types.Int64Value(int64(provider.ASN))
+		m.AuthKey = types.StringValue(provider.AuthKey)
+		m.CustomerAddress = types.StringValue(provider.CustomerAddress)
+		m.CustomerIPAddress = types.StringValue(provider.CustomerIPAddress)
+		m.ID = types.Int64Value(int64(provider.ID))
+		m.Name = types.StringValue(provider.Name)
+		m.OwnerAccount = types.StringValue(provider.OwnerAccount)
+		m.PeerASN = types.Int64Value(int64(provider.PeerASN))
+		m.Type = types.StringValue(provider.Type)
+		m.VIFID = types.StringValue(provider.VIFID)
 	case megaport.CSPConnectionAWSHC:
-		awsHCModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			Name:         types.StringValue(provider.Name),
-			OwnerAccount: types.StringValue(provider.OwnerAccount),
-			ConnectionID: types.StringValue(provider.ConnectionID),
-		}
-		bandwidths := []int64{}
-		for _, b := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(b))
-		}
-		bandwidthList, bandwidthDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.Bandwidth = types.Int64Value(int64(provider.Bandwidth))
+		m.Name = types.StringValue(provider.Name)
+		m.OwnerAccount = types.StringValue(provider.OwnerAccount)
+		m.ConnectionID = types.StringValue(provider.ConnectionID)
+		bandwidthList, bandwidthDiags := convertBandwidths(ctx, provider.Bandwidths)
 		apiDiags = append(apiDiags, bandwidthDiags...)
-		awsHCModel.Bandwidths = bandwidthList
-		awsHCModel.IPAddresses = types.ListNull(types.StringType)
-		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
-		apiDiags = append(apiDiags, awsHCDiags...)
-		return awsHCObject, apiDiags
+		m.Bandwidths = bandwidthList
 	case megaport.CSPConnectionAzure:
-		azureModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			Managed:      types.BoolValue(provider.Managed),
-			ServiceKey:   types.StringValue(provider.ServiceKey),
-			VLAN:         types.Int64Value(int64(provider.VLAN)),
-		}
-		azureModel.Bandwidths = types.ListNull(types.Int64Type)
-		azureModel.IPAddresses = types.ListNull(types.StringType)
-		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
-		apiDiags = append(apiDiags, azureObjDiags...)
-		return azureObject, apiDiags
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.Bandwidth = types.Int64Value(int64(provider.Bandwidth))
+		m.Managed = types.BoolValue(provider.Managed)
+		m.ServiceKey = types.StringValue(provider.ServiceKey)
+		m.VLAN = types.Int64Value(int64(provider.VLAN))
 	case megaport.CSPConnectionGoogle:
-		googleModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			CSPName:      types.StringValue(provider.CSPName),
-			PairingKey:   types.StringValue(provider.PairingKey),
-		}
-		bandwidths := []int64{}
-		for _, b := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(b))
-		}
-		googleModel.IPAddresses = types.ListNull(types.StringType)
-		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.Bandwidth = types.Int64Value(int64(provider.Bandwidth))
+		m.CSPName = types.StringValue(provider.CSPName)
+		m.PairingKey = types.StringValue(provider.PairingKey)
+		bandwidthList, bwListDiags := convertBandwidths(ctx, provider.Bandwidths)
 		apiDiags = append(apiDiags, bwListDiags...)
-		googleModel.Bandwidths = bandwidthList
-		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
-		apiDiags = append(apiDiags, googleObjDiags...)
-		return googleObject, apiDiags
+		m.Bandwidths = bandwidthList
 	case megaport.CSPConnectionVirtualRouter:
-		virtualRouterModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			VLAN:              types.Int64Value(int64(provider.VLAN)),
-			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
-		}
-		virtualRouterModel.Bandwidths = types.ListNull(types.Int64Type)
-		ipAddresses := []string{}
-		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.VLAN = types.Int64Value(int64(provider.VLAN))
+		m.VirtualRouterName = types.StringValue(provider.VirtualRouterName)
+		ipList, ipListDiags := convertStringList(ctx, []string{})
 		apiDiags = append(apiDiags, ipListDiags...)
-		virtualRouterModel.IPAddresses = ipList
-		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
-		apiDiags = append(apiDiags, vrObjDiags...)
-		return virtualRouterObject, apiDiags
+		m.IPAddresses = ipList
 	case megaport.CSPConnectionTransit:
-		transitModel := &cspConnectionModel{
-			ConnectType:        types.StringValue(provider.ConnectType),
-			ResourceName:       types.StringValue(provider.ResourceName),
-			ResourceType:       types.StringValue(provider.ResourceType),
-			CustomerIP4Address: types.StringValue(provider.CustomerIP4Address),
-			CustomerIP6Network: types.StringValue(provider.CustomerIP6Network),
-			IPv4GatewayAddress: types.StringValue(provider.IPv4GatewayAddress),
-			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
-		}
-		transitModel.Bandwidths = types.ListNull(types.Int64Type)
-		transitModel.IPAddresses = types.ListNull(types.StringType)
-		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
-		apiDiags = append(apiDiags, transitObjectDiags...)
-		return transitObject, apiDiags
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.CustomerIP4Address = types.StringValue(provider.CustomerIP4Address)
+		m.CustomerIP6Network = types.StringValue(provider.CustomerIP6Network)
+		m.IPv4GatewayAddress = types.StringValue(provider.IPv4GatewayAddress)
+		m.IPv6GatewayAddress = types.StringValue(provider.IPv6GatewayAddress)
 	case megaport.CSPConnectionOracle:
-		oracleModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			CSPName:      types.StringValue(provider.CSPName),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-		}
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.CSPName = types.StringValue(provider.CSPName)
+		m.Bandwidth = types.Int64Value(int64(provider.Bandwidth))
 		if provider.VirtualCircuitId != "" {
-			oracleModel.ConnectionID = types.StringValue(provider.VirtualCircuitId)
+			m.ConnectionID = types.StringValue(provider.VirtualCircuitId)
 		} else {
-			oracleModel.ConnectionID = types.StringNull()
+			m.ConnectionID = types.StringNull()
 		}
-		oracleModel.Bandwidths = types.ListNull(types.Int64Type)
-		oracleModel.IPAddresses = types.ListNull(types.StringType)
-		oracleObj, oracleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, oracleModel)
-		apiDiags = append(apiDiags, oracleObjDiags...)
-		return oracleObj, apiDiags
 	case megaport.CSPConnectionIBM:
-		ibmModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			AccountID:         types.StringValue(provider.AccountID),
-			CustomerASN:       types.Int64Value(int64(provider.CustomerASN)),
-			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
-			ProviderIPAddress: types.StringValue(provider.ProviderIPAddress),
-			Bandwidth:         types.Int64Value(int64(provider.Bandwidth)),
-			CSPName:           types.StringValue(provider.CSPName),
-		}
-		bandwidths := []int64{}
-		for _, bandwidth := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(bandwidth))
-		}
-		bandwidthList, bandwidthListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
+		m.ConnectType = types.StringValue(provider.ConnectType)
+		m.ResourceName = types.StringValue(provider.ResourceName)
+		m.ResourceType = types.StringValue(provider.ResourceType)
+		m.AccountID = types.StringValue(provider.AccountID)
+		m.CustomerASN = types.Int64Value(int64(provider.CustomerASN))
+		m.CustomerIPAddress = types.StringValue(provider.CustomerIPAddress)
+		m.ProviderIPAddress = types.StringValue(provider.ProviderIPAddress)
+		m.Bandwidth = types.Int64Value(int64(provider.Bandwidth))
+		m.CSPName = types.StringValue(provider.CSPName)
+		bandwidthList, bandwidthListDiags := convertBandwidths(ctx, provider.Bandwidths)
 		apiDiags = append(apiDiags, bandwidthListDiags...)
-		ibmModel.Bandwidths = bandwidthList
-		ibmModel.IPAddresses = types.ListNull(types.StringType)
-		ibmObject, ibmObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
-		apiDiags = append(apiDiags, ibmObjectDiags...)
-		return ibmObject, apiDiags
+		m.Bandwidths = bandwidthList
+	default:
+		apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
+		return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 	}
-	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+
+	obj, objDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, &m)
+	apiDiags = append(apiDiags, objDiags...)
+	return obj, apiDiags
 }

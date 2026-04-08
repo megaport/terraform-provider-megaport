@@ -537,25 +537,25 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 
 // inferBEndPartnerType determines the partner type from the b-end config model.
 func inferBEndPartnerType(endConfig *vxcBEndConfigModel) string {
-	if !endConfig.AWSPartnerConfig.IsNull() && !endConfig.AWSPartnerConfig.IsUnknown() {
+	if isPresent(endConfig.AWSPartnerConfig) {
 		return "aws"
 	}
-	if !endConfig.AzurePartnerConfig.IsNull() && !endConfig.AzurePartnerConfig.IsUnknown() {
+	if isPresent(endConfig.AzurePartnerConfig) {
 		return "azure"
 	}
-	if !endConfig.GooglePartnerConfig.IsNull() && !endConfig.GooglePartnerConfig.IsUnknown() {
+	if isPresent(endConfig.GooglePartnerConfig) {
 		return "google"
 	}
-	if !endConfig.OraclePartnerConfig.IsNull() && !endConfig.OraclePartnerConfig.IsUnknown() {
+	if isPresent(endConfig.OraclePartnerConfig) {
 		return "oracle"
 	}
-	if !endConfig.IBMPartnerConfig.IsNull() && !endConfig.IBMPartnerConfig.IsUnknown() {
+	if isPresent(endConfig.IBMPartnerConfig) {
 		return "ibm"
 	}
-	if !endConfig.VrouterPartnerConfig.IsNull() && !endConfig.VrouterPartnerConfig.IsUnknown() {
+	if isPresent(endConfig.VrouterPartnerConfig) {
 		return "vrouter"
 	}
-	if !endConfig.Transit.IsNull() && !endConfig.Transit.IsUnknown() && endConfig.Transit.ValueBool() {
+	if isPresent(endConfig.Transit) && endConfig.Transit.ValueBool() {
 		return "transit"
 	}
 	return ""
@@ -584,7 +584,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	var serviceKeyBEndUID string
-	if !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown() {
+	if isPresent(plan.ServiceKey) {
 		// If a service key is provided, look up the product UID pertaining to that service key
 		serviceKeyRes, err := r.client.ServiceKeyService.GetServiceKey(ctx, plan.ServiceKey.ValueString())
 		if err != nil {
@@ -629,16 +629,22 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	buyReq.PortUID = a.ProductUID.ValueString()
 
-	if !a.VLAN.IsNull() && !a.VLAN.IsUnknown() {
+	if isPresent(a.VLAN) {
 		aEndConfig.VLAN = int(a.VLAN.ValueInt64())
 	} else {
 		aEndConfig.VLAN = 0
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ := r.client.ProductService.GetProductType(ctx, a.ProductUID.ValueString())
+	productType, err := r.client.ProductService.GetProductType(ctx, a.ProductUID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Could not determine product type",
+			"Proceeding without product type validation for "+a.ProductUID.ValueString()+": "+err.Error(),
+		)
+	}
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if a.NetworkInterfaceIndex.IsNull() || a.NetworkInterfaceIndex.IsUnknown() {
+		if !isPresent(a.NetworkInterfaceIndex) {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
@@ -659,7 +665,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// A-End vrouter partner config
-	if !a.VrouterPartnerConfig.IsNull() && !a.VrouterPartnerConfig.IsUnknown() {
+	if isPresent(a.VrouterPartnerConfig) {
 		var partnerConfigAEnd vxcPartnerConfigVrouterModel
 		vrouterDiags := a.VrouterPartnerConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
 		if vrouterDiags.HasError() {
@@ -704,16 +710,22 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 		bEndConfig.ProductUID = serviceKeyBEndUID
 	}
-	if !b.VLAN.IsNull() && !b.VLAN.IsUnknown() {
+	if isPresent(b.VLAN) {
 		bEndConfig.VLAN = int(b.VLAN.ValueInt64())
 	} else {
 		bEndConfig.VLAN = 0
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ = r.client.ProductService.GetProductType(ctx, b.ProductUID.ValueString())
+	productType, err = r.client.ProductService.GetProductType(ctx, b.ProductUID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Could not determine product type",
+			"Proceeding without product type validation for "+b.ProductUID.ValueString()+": "+err.Error(),
+		)
+	}
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if b.NetworkInterfaceIndex.IsNull() || b.NetworkInterfaceIndex.IsUnknown() {
+		if !isPresent(b.NetworkInterfaceIndex) {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
@@ -875,7 +887,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.BEndConfiguration = *bEndConfig
 
-	err := r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
+	err = r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create VXC",
@@ -1030,8 +1042,20 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, aEndPlan.ProductUID.ValueString())
-	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, bEndPlan.ProductUID.ValueString())
+	aEndProductType, err := r.client.ProductService.GetProductType(ctx, aEndPlan.ProductUID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Could not determine product type",
+			"Proceeding without product type validation for "+aEndPlan.ProductUID.ValueString()+": "+err.Error(),
+		)
+	}
+	bEndProductType, err2 := r.client.ProductService.GetProductType(ctx, bEndPlan.ProductUID.ValueString())
+	if err2 != nil {
+		resp.Diagnostics.AddWarning(
+			"Could not determine product type",
+			"Proceeding without product type validation for "+bEndPlan.ProductUID.ValueString()+": "+err2.Error(),
+		)
+	}
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
@@ -1047,85 +1071,16 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	})
 	bEndPartnerType := inferBEndPartnerType(&bEndPlanConfig)
 
-	// If VLAN is different from state VLAN, attempt to change it.
-	if !aEndPlan.VLAN.IsUnknown() && !aEndPlan.VLAN.IsNull() &&
-		!aEndPlan.VLAN.Equal(aEndState.VLAN) &&
-		supportVLANUpdates(aEndPartnerType) {
-		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
-	}
-
-	// Check VNIC index for A End
-	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) {
-		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
-
-		if supportVLANUpdates(aEndPartnerType) &&
-			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
-			if !aEndPlan.VLAN.IsNull() &&
-				!aEndPlan.VLAN.Equal(aEndState.VLAN) {
-				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
-			} else if !aEndState.VLAN.IsNull() &&
-				updateReq.AEndVLAN == nil {
-				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
-			}
-		}
-	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
+	// Populate VLAN/VNIC fields for A-End and B-End.
+	aEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &aEndPlan, &aEndState, aEndProductType, aEndPartnerType, true, updateReq, plan.Name.ValueString())
+	resp.Diagnostics.Append(aEndDiags2...)
+	if resp.Diagnostics.HasError() {
 		return
-	} else {
-		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
-
-	// If VLAN is different from state VLAN, attempt to change it.
-	if !bEndPlan.VLAN.IsUnknown() && !bEndPlan.VLAN.IsNull() &&
-		!bEndPlan.VLAN.Equal(bEndState.VLAN) &&
-		supportVLANUpdates(bEndPartnerType) {
-		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
-	}
-
-	// Prevent setting inner_vlan during updates for partners that don't support VLAN changes
-	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() &&
-		!aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) &&
-		supportVLANUpdates(aEndPartnerType) {
-		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
-	}
-	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.IsUnknown() && aEndPlan.InnerVLAN.ValueInt64() == -1 {
-		aEndState.InnerVLAN = types.Int64Value(-1)
-	}
-
-	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
-		!bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) &&
-		supportVLANUpdates(bEndPartnerType) {
-		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
-	}
-	if !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.IsUnknown() && bEndPlan.InnerVLAN.ValueInt64() == -1 {
-		bEndState.InnerVLAN = types.Int64Value(-1)
-	}
-
-	// Check VNIC index for B End
-	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
-		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
-
-		if supportVLANUpdates(bEndPartnerType) &&
-			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
-			if !bEndPlan.VLAN.IsNull() &&
-				!bEndPlan.VLAN.Equal(bEndState.VLAN) {
-				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
-			} else if !bEndState.VLAN.IsNull() &&
-				updateReq.BEndVLAN == nil {
-				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
-			}
-		}
-	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
+	bEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &bEndPlan, &bEndState, bEndProductType, bEndPartnerType, false, updateReq, plan.Name.ValueString())
+	resp.Diagnostics.Append(bEndDiags2...)
+	if resp.Diagnostics.HasError() {
 		return
-	} else {
-		bEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
@@ -1137,8 +1092,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Always use the planned cost centre value, even if it's empty/null
-	costCentre := plan.CostCentre.ValueString()
-	updateReq.CostCentre = &costCentre
+	updateReq.CostCentre = megaport.PtrTo(plan.CostCentre.ValueString())
 
 	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		updateReq.Term = megaport.PtrTo(int(plan.ContractTermMonths.ValueInt64()))
@@ -1273,11 +1227,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// Build expected vnic_index values from the plan for the post-update read.
 	var expectedAEndVnic, expectedBEndVnic *int
-	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && !aEndPlan.NetworkInterfaceIndex.IsNull() && !aEndPlan.NetworkInterfaceIndex.IsUnknown() {
+	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && isPresent(aEndPlan.NetworkInterfaceIndex) {
 		v := int(aEndPlan.NetworkInterfaceIndex.ValueInt64())
 		expectedAEndVnic = &v
 	}
-	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && !bEndPlan.NetworkInterfaceIndex.IsNull() && !bEndPlan.NetworkInterfaceIndex.IsUnknown() {
+	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && isPresent(bEndPlan.NetworkInterfaceIndex) {
 		v := int(bEndPlan.NetworkInterfaceIndex.ValueInt64())
 		expectedBEndVnic = &v
 	}
@@ -1405,6 +1359,85 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
 
+// buildEndVLANVnicUpdates populates VLAN and VNIC-related fields in the update request
+// for a single endpoint (A or B). The endPlan and endState are always typed vxcAEndConfigModel
+// because B-end uses the same simplified model for VLAN/VNIC purposes.
+// When isAEnd is true the A-end fields of updateReq are populated; otherwise B-end fields.
+// It also mutates endState.InnerVLAN and endState.NetworkInterfaceIndex as needed.
+// Returns a diag.Diagnostics with any errors encountered.
+func (r *vxcResource) buildEndVLANVnicUpdates(
+	ctx context.Context,
+	endPlan, endState *vxcAEndConfigModel,
+	productType string,
+	partnerType string,
+	isAEnd bool,
+	updateReq *megaport.UpdateVXCRequest,
+	planName string,
+) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	// Helper closures to set the right endpoint fields.
+	setVLAN := func(v int) {
+		if isAEnd {
+			updateReq.AEndVLAN = megaport.PtrTo(v)
+		} else {
+			updateReq.BEndVLAN = megaport.PtrTo(v)
+		}
+	}
+	getVLANPtr := func() *int {
+		if isAEnd {
+			return updateReq.AEndVLAN
+		}
+		return updateReq.BEndVLAN
+	}
+	setInnerVLAN := func(v int) {
+		if isAEnd {
+			updateReq.AEndInnerVLAN = megaport.PtrTo(v)
+		} else {
+			updateReq.BEndInnerVLAN = megaport.PtrTo(v)
+		}
+	}
+	setVnicIndex := func(v int) {
+		if isAEnd {
+			updateReq.AVnicIndex = megaport.PtrTo(v)
+		} else {
+			updateReq.BVnicIndex = megaport.PtrTo(v)
+		}
+	}
+
+	// VLAN: if changed, attempt to update.
+	if isPresent(endPlan.VLAN) && !endPlan.VLAN.Equal(endState.VLAN) && supportVLANUpdates(partnerType) {
+		setVLAN(int(endPlan.VLAN.ValueInt64()))
+	}
+
+	// VNIC index: required when endpoint is MVE.
+	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
+		setVnicIndex(int(endPlan.NetworkInterfaceIndex.ValueInt64()))
+
+		if supportVLANUpdates(partnerType) && !endPlan.NetworkInterfaceIndex.Equal(endState.NetworkInterfaceIndex) {
+			if !endPlan.VLAN.IsNull() && !endPlan.VLAN.Equal(endState.VLAN) {
+				setVLAN(int(endPlan.VLAN.ValueInt64()))
+			} else if !endState.VLAN.IsNull() && getVLANPtr() == nil {
+				setVLAN(int(endState.VLAN.ValueInt64()))
+			}
+		}
+	} else {
+		endState.NetworkInterfaceIndex = types.Int64Null()
+	}
+
+	// Inner VLAN: if changed, attempt to update.
+	if isPresent(endPlan.InnerVLAN) && !endPlan.InnerVLAN.Equal(endState.InnerVLAN) && supportVLANUpdates(partnerType) {
+		setInnerVLAN(int(endPlan.InnerVLAN.ValueInt64()))
+	}
+	// Preserve -1 (untagged) in state.
+	if isPresent(endPlan.InnerVLAN) && endPlan.InnerVLAN.ValueInt64() == -1 {
+		endState.InnerVLAN = types.Int64Value(-1)
+	}
+
+	_ = planName // available for future error messages
+	return diags
+}
+
 func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	var plan, state vxcResourceModel
 	diags := diag.Diagnostics{}
@@ -1521,7 +1554,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 // across applies. Without this, the framework's nullification of WriteOnly fields in state would
 // cause the objects to never compare equal, triggering spurious RequiresReplace on every plan.
 func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) types.Object {
-	if !cfg.AWSPartnerConfig.IsNull() && !cfg.AWSPartnerConfig.IsUnknown() {
+	if isPresent(cfg.AWSPartnerConfig) {
 		var awsCfg vxcPartnerConfigAWSModel
 		if diags := cfg.AWSPartnerConfig.As(ctx, &awsCfg, basetypes.ObjectAsOptions{}); !diags.HasError() {
 			awsCfg.AuthKey = types.StringNull() // WriteOnly — always null in state post-apply
@@ -1531,7 +1564,7 @@ func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) t
 		}
 		return cfg.AWSPartnerConfig
 	}
-	if !cfg.AzurePartnerConfig.IsNull() && !cfg.AzurePartnerConfig.IsUnknown() {
+	if isPresent(cfg.AzurePartnerConfig) {
 		var azureCfg vxcPartnerConfigAzureModel
 		if diags := cfg.AzurePartnerConfig.As(ctx, &azureCfg, basetypes.ObjectAsOptions{}); !diags.HasError() {
 			azureCfg.ServiceKey = types.StringNull() // WriteOnly — always null in state post-apply
@@ -1541,13 +1574,13 @@ func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) t
 		}
 		return cfg.AzurePartnerConfig
 	}
-	if !cfg.GooglePartnerConfig.IsNull() && !cfg.GooglePartnerConfig.IsUnknown() {
+	if isPresent(cfg.GooglePartnerConfig) {
 		return cfg.GooglePartnerConfig
 	}
-	if !cfg.OraclePartnerConfig.IsNull() && !cfg.OraclePartnerConfig.IsUnknown() {
+	if isPresent(cfg.OraclePartnerConfig) {
 		return cfg.OraclePartnerConfig
 	}
-	if !cfg.IBMPartnerConfig.IsNull() && !cfg.IBMPartnerConfig.IsUnknown() {
+	if isPresent(cfg.IBMPartnerConfig) {
 		return cfg.IBMPartnerConfig
 	}
 	return types.ObjectNull(nil)
@@ -1557,14 +1590,14 @@ func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) t
 // passwords set to null. Used before plan/state comparison so that the WriteOnly password field
 // (always null in state after apply) does not cause spurious update API calls on every apply.
 func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types.Object {
-	if vrouterObj.IsNull() || vrouterObj.IsUnknown() {
+	if !isPresent(vrouterObj) {
 		return vrouterObj
 	}
 	var m vxcPartnerConfigVrouterModel
 	if diags := vrouterObj.As(ctx, &m, basetypes.ObjectAsOptions{}); diags.HasError() {
 		return vrouterObj
 	}
-	if m.Interfaces.IsNull() || m.Interfaces.IsUnknown() {
+	if !isPresent(m.Interfaces) {
 		return vrouterObj
 	}
 	var ifaces []*vxcPartnerConfigInterfaceModel
@@ -1572,7 +1605,7 @@ func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types
 		return vrouterObj
 	}
 	for _, iface := range ifaces {
-		if iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+		if !isPresent(iface.BgpConnections) {
 			continue
 		}
 		var bgpConns []*bgpConnectionConfigModel

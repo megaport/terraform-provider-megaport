@@ -5,11 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// isPresent reports whether a Terraform attribute value has been set (i.e., it is
+// neither null nor unknown). Use this instead of the verbose !v.IsNull() && !v.IsUnknown()
+// pattern which is scattered throughout the codebase.
+func isPresent(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
+}
 
 // fromAPIVXC updates the resource model from API response data.
 // The optional plan parameter allows preserving user-only fields (like product_uid,
@@ -17,7 +25,7 @@ import (
 // important after import or during updates where the plan contains user configuration that
 // would otherwise be lost.
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string, plan *vxcResourceModel) diag.Diagnostics {
-	apiDiags := diag.Diagnostics{}
+	var diags diag.Diagnostics
 
 	orm.UID = types.StringValue(v.UID)
 	orm.Name = types.StringValue(v.Name)
@@ -30,8 +38,18 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	orm.Shutdown = types.BoolValue(v.Shutdown)
 	orm.CostCentre = types.StringValue(v.CostCentre)
 
-	// Build A-End config from API, supplementing with plan/state values that
-	// the API does not return.
+	diags.Append(orm.buildAEndConfig(ctx, v, plan)...)
+	diags.Append(orm.buildBEndConfig(ctx, v, plan)...)
+	diags.Append(orm.mapVXCTags(ctx, v, tags)...)
+
+	return diags
+}
+
+// buildAEndConfig constructs the A-End configuration model from API data, supplementing
+// with plan/state values that the API does not return.
+func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	aEndModel := &vxcAEndConfigModel{
 		AssignedProductUID: types.StringValue(v.AEndConfiguration.UID),
 	}
@@ -47,47 +65,47 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		if ds := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
 			aEndProductUID = existingAEnd.ProductUID.ValueString()
 			// Preserve vnic_index from state during Read (plan == nil).
-			if plan == nil && !existingAEnd.NetworkInterfaceIndex.IsNull() && !existingAEnd.NetworkInterfaceIndex.IsUnknown() {
+			if plan == nil && isPresent(existingAEnd.NetworkInterfaceIndex) {
 				idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
 				aEndVnicIndex = &idx
 			}
-			if !existingAEnd.VLAN.IsNull() && !existingAEnd.VLAN.IsUnknown() {
+			if isPresent(existingAEnd.VLAN) {
 				vlan := existingAEnd.VLAN.ValueInt64()
 				aEndVLAN = &vlan
 			}
-			if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
+			if isPresent(existingAEnd.InnerVLAN) {
 				vlan := existingAEnd.InnerVLAN.ValueInt64()
 				aEndInnerVLAN = &vlan
 			}
 		} else {
-			apiDiags.Append(ds...)
+			diags.Append(ds...)
 		}
 	}
 
 	if plan != nil && !plan.AEndConfiguration.IsNull() {
 		planAEnd := &vxcAEndConfigModel{}
 		if ds := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
-			if !planAEnd.ProductUID.IsNull() && !planAEnd.ProductUID.IsUnknown() {
+			if isPresent(planAEnd.ProductUID) {
 				aEndProductUID = planAEnd.ProductUID.ValueString()
 			}
-			if aEndVnicIndex == nil && !planAEnd.NetworkInterfaceIndex.IsNull() && !planAEnd.NetworkInterfaceIndex.IsUnknown() {
+			if aEndVnicIndex == nil && isPresent(planAEnd.NetworkInterfaceIndex) {
 				idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
 				aEndVnicIndex = &idx
 			}
-			if !planAEnd.VLAN.IsNull() && !planAEnd.VLAN.IsUnknown() {
+			if isPresent(planAEnd.VLAN) {
 				vlan := planAEnd.VLAN.ValueInt64()
 				aEndVLAN = &vlan
 			}
-			if !planAEnd.InnerVLAN.IsNull() && !planAEnd.InnerVLAN.IsUnknown() {
+			if isPresent(planAEnd.InnerVLAN) {
 				vlan := planAEnd.InnerVLAN.ValueInt64()
 				aEndInnerVLAN = &vlan
 			}
 			// Preserve vrouter_config from plan (not returned by API).
-			if !planAEnd.VrouterPartnerConfig.IsNull() && !planAEnd.VrouterPartnerConfig.IsUnknown() {
+			if isPresent(planAEnd.VrouterPartnerConfig) {
 				aEndModel.VrouterPartnerConfig = planAEnd.VrouterPartnerConfig
 			}
 		} else {
-			apiDiags.Append(ds...)
+			diags.Append(ds...)
 		}
 	}
 
@@ -124,10 +142,17 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	}
 
 	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcAEndConfigAttrs, aEndModel)
-	apiDiags = append(apiDiags, aEndDiags...)
+	diags.Append(aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
-	// Build B-End config.
+	return diags
+}
+
+// buildBEndConfig constructs the B-End configuration model from API data, supplementing
+// with plan/state values that the API does not return.
+func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	bEndModel := &vxcBEndConfigModel{
 		AssignedProductUID: types.StringValue(v.BEndConfiguration.UID),
 	}
@@ -141,65 +166,62 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		existingBEnd := &vxcBEndConfigModel{}
 		if ds := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
 			bEndProductUID = existingBEnd.ProductUID.ValueString()
-			if plan == nil && !existingBEnd.NetworkInterfaceIndex.IsNull() && !existingBEnd.NetworkInterfaceIndex.IsUnknown() {
+			if plan == nil && isPresent(existingBEnd.NetworkInterfaceIndex) {
 				idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
 				bEndVnicIndex = &idx
 			}
-			if !existingBEnd.VLAN.IsNull() && !existingBEnd.VLAN.IsUnknown() {
+			if isPresent(existingBEnd.VLAN) {
 				vlan := existingBEnd.VLAN.ValueInt64()
 				bEndVLAN = &vlan
 			}
-			if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
+			if isPresent(existingBEnd.InnerVLAN) {
 				vlan := existingBEnd.InnerVLAN.ValueInt64()
 				bEndInnerVLAN = &vlan
 			}
 		} else {
-			apiDiags.Append(ds...)
+			diags.Append(ds...)
 		}
 	}
 
 	if plan != nil && !plan.BEndConfiguration.IsNull() {
 		planBEnd := &vxcBEndConfigModel{}
 		if ds := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
-			if !planBEnd.ProductUID.IsNull() && !planBEnd.ProductUID.IsUnknown() {
+			if isPresent(planBEnd.ProductUID) {
 				bEndProductUID = planBEnd.ProductUID.ValueString()
 			}
-			if bEndVnicIndex == nil && !planBEnd.NetworkInterfaceIndex.IsNull() && !planBEnd.NetworkInterfaceIndex.IsUnknown() {
+			if bEndVnicIndex == nil && isPresent(planBEnd.NetworkInterfaceIndex) {
 				idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
 				bEndVnicIndex = &idx
 			}
-			if !planBEnd.VLAN.IsNull() && !planBEnd.VLAN.IsUnknown() {
+			if isPresent(planBEnd.VLAN) {
 				vlan := planBEnd.VLAN.ValueInt64()
 				bEndVLAN = &vlan
 			}
-			if !planBEnd.InnerVLAN.IsNull() && !planBEnd.InnerVLAN.IsUnknown() {
+			if isPresent(planBEnd.InnerVLAN) {
 				vlan := planBEnd.InnerVLAN.ValueInt64()
 				bEndInnerVLAN = &vlan
 			}
-			// Preserve partner configs from plan (not returned by API).
-			if !planBEnd.AWSPartnerConfig.IsNull() && !planBEnd.AWSPartnerConfig.IsUnknown() {
-				bEndModel.AWSPartnerConfig = planBEnd.AWSPartnerConfig
+			// Preserve partner configs from plan — the API does not return them on read.
+			for _, pair := range []struct {
+				src *types.Object
+				dst *types.Object
+			}{
+				{&planBEnd.AWSPartnerConfig, &bEndModel.AWSPartnerConfig},
+				{&planBEnd.AzurePartnerConfig, &bEndModel.AzurePartnerConfig},
+				{&planBEnd.GooglePartnerConfig, &bEndModel.GooglePartnerConfig},
+				{&planBEnd.OraclePartnerConfig, &bEndModel.OraclePartnerConfig},
+				{&planBEnd.IBMPartnerConfig, &bEndModel.IBMPartnerConfig},
+				{&planBEnd.VrouterPartnerConfig, &bEndModel.VrouterPartnerConfig},
+			} {
+				if isPresent(*pair.src) {
+					*pair.dst = *pair.src
+				}
 			}
-			if !planBEnd.AzurePartnerConfig.IsNull() && !planBEnd.AzurePartnerConfig.IsUnknown() {
-				bEndModel.AzurePartnerConfig = planBEnd.AzurePartnerConfig
-			}
-			if !planBEnd.GooglePartnerConfig.IsNull() && !planBEnd.GooglePartnerConfig.IsUnknown() {
-				bEndModel.GooglePartnerConfig = planBEnd.GooglePartnerConfig
-			}
-			if !planBEnd.OraclePartnerConfig.IsNull() && !planBEnd.OraclePartnerConfig.IsUnknown() {
-				bEndModel.OraclePartnerConfig = planBEnd.OraclePartnerConfig
-			}
-			if !planBEnd.IBMPartnerConfig.IsNull() && !planBEnd.IBMPartnerConfig.IsUnknown() {
-				bEndModel.IBMPartnerConfig = planBEnd.IBMPartnerConfig
-			}
-			if !planBEnd.VrouterPartnerConfig.IsNull() && !planBEnd.VrouterPartnerConfig.IsUnknown() {
-				bEndModel.VrouterPartnerConfig = planBEnd.VrouterPartnerConfig
-			}
-			if !planBEnd.Transit.IsNull() && !planBEnd.Transit.IsUnknown() {
+			if isPresent(planBEnd.Transit) {
 				bEndModel.Transit = planBEnd.Transit
 			}
 		} else {
-			apiDiags.Append(ds...)
+			diags.Append(ds...)
 		}
 	}
 
@@ -228,35 +250,39 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	}
 
 	// Initialise any partner config fields to null if not set from plan.
-	if bEndModel.AWSPartnerConfig.IsUnknown() || bEndModel.AWSPartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.AWSPartnerConfig = types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	}
-	if bEndModel.AzurePartnerConfig.IsUnknown() || bEndModel.AzurePartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.AzurePartnerConfig = types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	}
-	if bEndModel.GooglePartnerConfig.IsUnknown() || bEndModel.GooglePartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.GooglePartnerConfig = types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	}
-	if bEndModel.OraclePartnerConfig.IsUnknown() || bEndModel.OraclePartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.OraclePartnerConfig = types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	}
-	if bEndModel.IBMPartnerConfig.IsUnknown() || bEndModel.IBMPartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.IBMPartnerConfig = types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	}
-	if bEndModel.VrouterPartnerConfig.IsUnknown() || bEndModel.VrouterPartnerConfig.AttributeTypes(ctx) == nil {
-		bEndModel.VrouterPartnerConfig = types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+	for _, pair := range []struct {
+		field *types.Object
+		attrs map[string]attr.Type
+	}{
+		{&bEndModel.AWSPartnerConfig, vxcPartnerConfigAWSAttrs},
+		{&bEndModel.AzurePartnerConfig, vxcPartnerConfigAzureAttrs},
+		{&bEndModel.GooglePartnerConfig, vxcPartnerConfigGoogleAttrs},
+		{&bEndModel.OraclePartnerConfig, vxcPartnerConfigOracleAttrs},
+		{&bEndModel.IBMPartnerConfig, vxcPartnerConfigIbmAttrs},
+		{&bEndModel.VrouterPartnerConfig, vxcPartnerConfigVrouterAttrs},
+	} {
+		if !isPresent(*pair.field) {
+			*pair.field = types.ObjectNull(pair.attrs)
+		}
 	}
 	if bEndModel.Transit.IsUnknown() {
 		bEndModel.Transit = types.BoolNull()
 	}
 
 	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcBEndConfigAttrs, bEndModel)
-	apiDiags = append(apiDiags, bEndDiags...)
+	diags.Append(bEndDiags...)
 	orm.BEndConfiguration = bEnd
+
+	return diags
+}
+
+// mapVXCTags maps attribute tags and resource tags from API response data into the model.
+func (orm *vxcResourceModel) mapVXCTags(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
+	var diags diag.Diagnostics
 
 	if v.AttributeTags != nil {
 		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
-		apiDiags = append(apiDiags, attributeDiags...)
+		diags.Append(attributeDiags...)
 		orm.AttributeTags = attributeTags
 	} else {
 		orm.AttributeTags = types.MapNull(types.StringType)
@@ -264,13 +290,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 
 	if len(tags) > 0 {
 		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
-		apiDiags = append(apiDiags, tagDiags...)
+		diags.Append(tagDiags...)
 		orm.ResourceTags = resourceTags
 	} else {
 		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	return apiDiags
+	return diags
 }
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.
