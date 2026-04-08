@@ -1486,6 +1486,16 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				}
 			}
 
+			// Transit is creation-time-only — any explicit change requires replace.
+			// Only trigger replace when state had transit=true and plan no longer does (or vice versa).
+			// Null-in-state after import with true-in-plan is NOT treated as a change here;
+			// that case is handled by simply not sending transit partner config on Update.
+			planTransit := isPresent(bEndPlanConfig.Transit) && bEndPlanConfig.Transit.ValueBool()
+			stateTransit := isPresent(bEndStateConfig.Transit) && bEndStateConfig.Transit.ValueBool()
+			if planTransit != stateTransit && isPresent(bEndStateConfig.Transit) {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_config"))
+			}
+
 			// Handle product UID reconciliation for CSP connections
 			if aEndStateConfig.ProductUID.IsNull() {
 				if aEndPlanConfig.ProductUID.IsNull() {
@@ -1706,9 +1716,7 @@ func (r *vxcResource) applyBEndPartnerUpdate(
 			}
 			updateReq.BEndPartnerConfig = vrouterPartnerConfig
 		}
-	} else if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "transit" && !bEndCSP {
-		if !bEndPlanConfig.Transit.IsNull() && bEndPlanConfig.Transit.ValueBool() {
-			updateReq.BEndPartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
-		}
 	}
+	// Transit is a creation-time-only property — the API rejects transit partner config on Update.
+	// Changes to transit (e.g. true → false) are handled by RequiresReplace in ModifyPlan.
 }
