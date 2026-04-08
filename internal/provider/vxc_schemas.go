@@ -22,24 +22,8 @@ func requiredString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{Description: desc, Required: true}
 }
 
-func computedString(desc string) schema.StringAttribute {
-	return schema.StringAttribute{Description: desc, Computed: true}
-}
-
-func optionalComputedString(desc string) schema.StringAttribute {
-	return schema.StringAttribute{Description: desc, Optional: true, Computed: true}
-}
-
 func optionalBool(desc string) schema.BoolAttribute {
 	return schema.BoolAttribute{Description: desc, Optional: true}
-}
-
-func computedBool(desc string) schema.BoolAttribute {
-	return schema.BoolAttribute{Description: desc, Computed: true}
-}
-
-func computedInt64(desc string) schema.Int64Attribute {
-	return schema.Int64Attribute{Description: desc, Computed: true}
 }
 
 var (
@@ -61,9 +45,9 @@ var (
 					stringvalidator.OneOf("private", "public", "transit"),
 				},
 			},
-			"owner_account":       requiredString("The owner AWS account of the partner configuration. Required for AWS partner configurations."),
-			"asn":                 optionalInt64("The ASN of the partner configuration."),
-			"amazon_asn":          optionalInt64("The Amazon ASN of the partner configuration."),
+			"owner_account": requiredString("The owner AWS account of the partner configuration. Required for AWS partner configurations."),
+			"asn":           optionalInt64("The ASN of the partner configuration."),
+			"amazon_asn":    optionalInt64("The Amazon ASN of the partner configuration."),
 			"auth_key": schema.StringAttribute{
 				Description: "The authentication key of the partner configuration.",
 				Optional:    true,

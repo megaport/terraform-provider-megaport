@@ -155,8 +155,6 @@ var (
 	}
 )
 
-
-
 // vxcResourceModel maps the resource schema data.
 type vxcResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
@@ -1102,11 +1100,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	bEndPartnerType := inferBEndPartnerType(&bEndPlanConfig)
 
 	// Populate VLAN/VNIC fields for A-End and B-End.
-	aEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &aEndPlan, &aEndState, aEndProductType, aEndPartnerType, true, updateReq, plan.Name.ValueString())
-	resp.Diagnostics.Append(aEndDiags2...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	r.buildEndVLANVnicUpdates(&aEndPlan, &aEndState, aEndProductType, aEndPartnerType, true, updateReq, plan.Name.ValueString())
 	// buildEndVLANVnicUpdates requires *vxcAEndConfigModel; adapt B-end for the call.
 	bEndPlanBase := vxcAEndConfigModel{
 		ProductUID: bEndPlan.ProductUID, AssignedProductUID: bEndPlan.AssignedProductUID,
@@ -1116,11 +1110,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		ProductUID: bEndState.ProductUID, AssignedProductUID: bEndState.AssignedProductUID,
 		VLAN: bEndState.VLAN, InnerVLAN: bEndState.InnerVLAN, NetworkInterfaceIndex: bEndState.NetworkInterfaceIndex,
 	}
-	bEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &bEndPlanBase, &bEndStateBase, bEndProductType, bEndPartnerType, false, updateReq, plan.Name.ValueString())
-	resp.Diagnostics.Append(bEndDiags2...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	r.buildEndVLANVnicUpdates(&bEndPlanBase, &bEndStateBase, bEndProductType, bEndPartnerType, false, updateReq, plan.Name.ValueString())
 	// Sync mutations from the adapter back to bEndState.
 	bEndState.NetworkInterfaceIndex = bEndStateBase.NetworkInterfaceIndex
 	bEndState.InnerVLAN = bEndStateBase.InnerVLAN
@@ -1358,18 +1348,14 @@ func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateR
 // because B-end uses the same simplified model for VLAN/VNIC purposes.
 // When isAEnd is true the A-end fields of updateReq are populated; otherwise B-end fields.
 // It also mutates endState.InnerVLAN and endState.NetworkInterfaceIndex as needed.
-// Returns a diag.Diagnostics with any errors encountered.
 func (r *vxcResource) buildEndVLANVnicUpdates(
-	ctx context.Context,
 	endPlan, endState *vxcAEndConfigModel,
 	productType string,
 	partnerType string,
 	isAEnd bool,
 	updateReq *megaport.UpdateVXCRequest,
 	planName string,
-) diag.Diagnostics {
-	var diags diag.Diagnostics
-
+) {
 	// Helper closures to set the right endpoint fields.
 	setVLAN := func(v int) {
 		if isAEnd {
@@ -1429,7 +1415,6 @@ func (r *vxcResource) buildEndVLANVnicUpdates(
 	}
 
 	_ = planName // available for future error messages
-	return diags
 }
 
 func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {

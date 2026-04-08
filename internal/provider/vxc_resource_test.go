@@ -824,7 +824,6 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 // 					  product_uid = data.megaport_partner.aws_port.product_uid
 // 					}
 
-
 // 				  }
 //                   `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
 // 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -894,7 +893,6 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 // 					  product_uid = data.megaport_partner.aws_port.product_uid
 // 					}
 
-
 // 				  }
 //                   `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
 // 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -943,7 +941,6 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 // 					b_end = {
 // 					  product_uid = data.megaport_partner.aws_port.product_uid
 // 					}
-
 
 // 				  }
 //                   `, VXCLocationID1, VXCLocationID2, portName, costCentreName, awsVXCName, awsVXCName),
