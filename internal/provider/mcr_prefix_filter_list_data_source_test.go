@@ -37,12 +37,6 @@ func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRP
 					contract_term_months = 12
 					cost_centre         = "%s"
 					
-					# Explicitly set empty prefix filter lists to avoid conflicts
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {

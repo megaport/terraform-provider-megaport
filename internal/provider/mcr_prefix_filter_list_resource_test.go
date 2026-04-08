@@ -51,12 +51,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2" = "value2"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -184,12 +178,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -299,12 +287,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_single" {
@@ -357,12 +339,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "ipv6_list" {
@@ -431,12 +407,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -544,12 +514,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -672,11 +636,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "cidr_test" {
@@ -722,12 +681,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "mixed" {
@@ -822,12 +775,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl" {
@@ -981,12 +928,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl_whitelist" {
