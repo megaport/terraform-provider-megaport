@@ -747,6 +747,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		bEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
+	// Read B-end config from req.Config to access WriteOnly fields (auth_key, service_key)
+	// that are stripped from the plan by the framework.
+	var bFromConfig vxcBEndConfigModel
+	{
+		var cfgModel vxcResourceModel
+		if cfgDiags := req.Config.Get(ctx, &cfgModel); !cfgDiags.HasError() {
+			cfgModel.BEndConfiguration.As(ctx, &bFromConfig, basetypes.ObjectAsOptions{}) // diagnostics ignored: bFromConfig stays zero on error, WriteOnly injection is skipped
+		}
+	}
+
 	// B-End partner configs
 	bEndPartnerType := inferBEndPartnerType(&b)
 	switch bEndPartnerType {
@@ -756,6 +766,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		if awsDiags.HasError() {
 			resp.Diagnostics.Append(awsDiags...)
 			return
+		}
+		// auth_key is WriteOnly — stripped from plan, inject from config
+		if isPresent(bFromConfig.AWSPartnerConfig) {
+			var awsCfg vxcPartnerConfigAWSModel
+			if d := bFromConfig.AWSPartnerConfig.As(ctx, &awsCfg, basetypes.ObjectAsOptions{}); !d.HasError() {
+				awsConfig.AuthKey = awsCfg.AuthKey
+			}
 		}
 		if awsConfig.ConnectType.ValueString() == "AWS" {
 			if awsConfig.Type.ValueString() != "public" && awsConfig.Type.ValueString() != "private" && awsConfig.Type.ValueString() != "transit" {
@@ -778,6 +795,13 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		if azureDiags.HasError() {
 			resp.Diagnostics.Append(azureDiags...)
 			return
+		}
+		// service_key is WriteOnly — stripped from plan, inject from config
+		if isPresent(bFromConfig.AzurePartnerConfig) {
+			var azureCfg vxcPartnerConfigAzureModel
+			if d := bFromConfig.AzurePartnerConfig.As(ctx, &azureCfg, basetypes.ObjectAsOptions{}); !d.HasError() {
+				azureConfig.ServiceKey = azureCfg.ServiceKey
+			}
 		}
 		azureDiags2, azurePartnerConfig, _ := createAzurePartnerConfig(ctx, azureConfig)
 		if azureDiags2.HasError() {

@@ -981,6 +981,11 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                     location_id  = data.megaport_location.loc2.id
                   }
 
+                  data "megaport_partner" "gcp_port" {
+                    connect_type = "GOOGLE"
+                    location_id  = 572
+                  }
+
                   resource "megaport_mcr" "mcr" {
                     product_name    = "%s"
                     location_id = data.megaport_location.loc1.id
@@ -1001,7 +1006,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 
                     b_end_config = {
                         product_uid = data.megaport_partner.aws_port.product_uid
-                    
+
                         aws_config = {
                             name = "%s"
                             asn = 64550
@@ -1031,6 +1036,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                     }
 
                     b_end_config = {
+                        product_uid = data.megaport_partner.gcp_port.product_uid
                         google_config = {
                             pairing_key = "%s"
                         }
@@ -1063,7 +1069,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 
 
                   }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKeyCSPs, vxcName3, AzurePartnerPortUID, AzureServiceKey),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKeyGCPTest, vxcName3, AzurePartnerPortUID, AzureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_config.aws_config.name", vxcName1),
