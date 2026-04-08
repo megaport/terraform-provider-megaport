@@ -155,6 +155,27 @@ var (
 	}
 )
 
+
+// vlanAutoAssignModifier converts an explicit vlan=0 (auto-assign sentinel) to
+// Unknown during planning. This prevents "inconsistent result after apply" when
+// the API assigns a different VLAN than 0. UseStateForUnknown then fills the
+// Unknown value from state on subsequent plans, so no spurious update is proposed.
+type vlanAutoAssignModifier struct{}
+
+func (m vlanAutoAssignModifier) Description(_ context.Context) string {
+	return "Converts vlan=0 to (known after apply) so the API-assigned VLAN is accepted"
+}
+
+func (m vlanAutoAssignModifier) MarkdownDescription(_ context.Context) string {
+	return "Converts vlan=0 to (known after apply) so the API-assigned VLAN is accepted"
+}
+
+func (m vlanAutoAssignModifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	if !req.ConfigValue.IsNull() && !req.ConfigValue.IsUnknown() && req.ConfigValue.ValueInt64() == 0 {
+		resp.PlanValue = types.Int64Unknown()
+	}
+}
+
 // vxcResourceModel maps the resource schema data.
 type vxcResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
@@ -456,6 +477,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 						PlanModifiers: []planmodifier.Int64{
+							vlanAutoAssignModifier{},
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
@@ -499,6 +521,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
 						PlanModifiers: []planmodifier.Int64{
+							vlanAutoAssignModifier{},
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
@@ -1004,8 +1027,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var aEndPlan, bEndPlan, aEndState, bEndState vxcAEndConfigModel
-	var bEndPlanConfig, bEndStateConfig vxcBEndConfigModel
+	var aEndPlan, aEndState vxcAEndConfigModel
+	var bEndPlan, bEndPlanConfig, bEndStateConfig vxcBEndConfigModel
+	var bEndState vxcBEndConfigModel
 
 	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
 	resp.Diagnostics.Append(aEndPlanDiags...)
@@ -1080,11 +1104,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	bEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &bEndPlan, &bEndState, bEndProductType, bEndPartnerType, false, updateReq, plan.Name.ValueString())
+	// buildEndVLANVnicUpdates requires *vxcAEndConfigModel; adapt B-end for the call.
+	bEndPlanBase := vxcAEndConfigModel{
+		ProductUID: bEndPlan.ProductUID, AssignedProductUID: bEndPlan.AssignedProductUID,
+		VLAN: bEndPlan.VLAN, InnerVLAN: bEndPlan.InnerVLAN, NetworkInterfaceIndex: bEndPlan.NetworkInterfaceIndex,
+	}
+	bEndStateBase := vxcAEndConfigModel{
+		ProductUID: bEndState.ProductUID, AssignedProductUID: bEndState.AssignedProductUID,
+		VLAN: bEndState.VLAN, InnerVLAN: bEndState.InnerVLAN, NetworkInterfaceIndex: bEndState.NetworkInterfaceIndex,
+	}
+	bEndDiags2 := r.buildEndVLANVnicUpdates(ctx, &bEndPlanBase, &bEndStateBase, bEndProductType, bEndPartnerType, false, updateReq, plan.Name.ValueString())
 	resp.Diagnostics.Append(bEndDiags2...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	// Sync mutations from the adapter back to bEndState.
+	bEndState.NetworkInterfaceIndex = bEndStateBase.NetworkInterfaceIndex
+	bEndState.InnerVLAN = bEndStateBase.InnerVLAN
 
 	if !plan.RateLimit.IsNull() && !plan.RateLimit.Equal(state.RateLimit) {
 		updateReq.RateLimit = megaport.PtrTo(int(plan.RateLimit.ValueInt64()))
@@ -1637,7 +1673,7 @@ func (r *vxcResource) applyBEndPartnerUpdate(
 	ctx context.Context,
 	plan, state vxcResourceModel,
 	bEndPlanConfig vxcBEndConfigModel,
-	bEndState vxcAEndConfigModel,
+	bEndState vxcBEndConfigModel,
 	bEndPartnerType string,
 	bEndCSP bool,
 	updateReq *megaport.UpdateVXCRequest,
