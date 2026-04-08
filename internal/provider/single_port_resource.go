@@ -3,20 +3,15 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
@@ -27,15 +22,6 @@ var (
 	_ resource.Resource                = &portResource{}
 	_ resource.ResourceWithConfigure   = &portResource{}
 	_ resource.ResourceWithImportState = &portResource{}
-
-	portResourcesAttrs = map[string]attr.Type{
-		"interface": types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),
-	}
-
-	portInterfaceAttrs = map[string]attr.Type{
-		"demarcation": types.StringType,
-		"up":          types.Int64Type,
-	}
 )
 
 // singlePortResourceModel maps the resource schema data.
@@ -53,19 +39,8 @@ type singlePortResourceModel struct {
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 
-	Resources types.Object `tfsdk:"resources"`
-
-	ResourceTags types.Map `tfsdk:"resource_tags"`
-}
-
-type portResourcesModel struct {
-	Interface types.Object `tfsdk:"interface"`
-}
-
-// portInterfaceModel represents a port interface
-type portInterfaceModel struct {
-	Demarcation types.String `tfsdk:"demarcation"`
-	Up          types.Int64  `tfsdk:"up"`
+	Resources    types.Object `tfsdk:"resources"`
+	ResourceTags types.Map    `tfsdk:"resource_tags"`
 }
 
 func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags map[string]string) diag.Diagnostics {
@@ -117,122 +92,35 @@ func (r *portResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 // Schema defines the schema for the resource.
 func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization’s Port is the physical point of connection between your organization’s network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.",
-		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
-			"product_uid": schema.StringAttribute{
-				Description: "The unique identifier for the resource.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"product_name": schema.StringAttribute{
-				Description: "The name of the product. Specify a name for the Port that is easily identifiable, particularly if you plan on having more than one Port.",
-				Required:    true,
-			},
-			"port_speed": schema.Int64Attribute{
-				Description: "The speed of the port in Mbps. Can be 1000(1g), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available.",
-				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
-				Validators: []validator.Int64{
-					int64validator.OneOf(1000, 10000, 100000, 400000),
-				},
-			},
-			"location_id": schema.Int64Attribute{
-				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
-				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
-			},
-			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
-				Required:    true,
-				Validators: []validator.Int64{
-					int64validator.OneOf(1, 12, 24, 36, 48, 60),
-				},
-			},
-			"company_uid": schema.StringAttribute{
-				Description: "The unique identifier of the company.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the Port is not automatically updated with the Port service level reference number.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"promo_code": schema.StringAttribute{
-				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.",
-				Required:    true,
-			},
-			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the product.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"resources": schema.SingleNestedAttribute{
-				Description: "Resources attached to port.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"interface": schema.SingleNestedAttribute{
-						Description: "Port interface details.",
-						Optional:    true,
-						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"demarcation": schema.StringAttribute{
-								Description: "The demarcation of the interface.",
-								Computed:    true,
-							},
-							"up": schema.Int64Attribute{
-								Description: "The up status of the interface.",
-								Computed:    true,
-							},
-						},
-					},
-				},
-			},
-			"resource_tags": schema.MapAttribute{
-				Description: "The resource tags associated with the product.",
-				Optional:    true,
-				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
-				},
-			},
+	attrs := commonPortSchemaAttrs()
+	attrs["product_name"] = schema.StringAttribute{
+		Description: "The name of the port. Specify a name that is easily identifiable, particularly if you plan on having more than one port.",
+		Required:    true,
+	}
+	attrs["port_speed"] = schema.Int64Attribute{
+		Description: "The speed of the port in Mbps. Can be 1000 (1G), 10000 (10G), 100000 (100G), or 400000 (400G) where available.",
+		Required:    true,
+		PlanModifiers: []planmodifier.Int64{
+			int64planmodifier.RequiresReplace(),
 		},
+		Validators: []validator.Int64{
+			int64validator.OneOf(1000, 10000, 100000, 400000),
+		},
+	}
+	attrs["marketplace_visibility"] = schema.BoolAttribute{
+		Description: "Whether the port is visible in the Megaport Marketplace. When false, the port is private to your organisation. When true, it is publicly searchable and available for inbound connection requests.",
+		Required:    true,
+	}
+	resp.Schema = schema.Schema{
+		Description: "Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization's Port is the physical point of connection between your organization's network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.",
+		Attributes:  attrs,
 	}
 }
 
 // Create a new resource.
 func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Retrieve values from plan
 	var plan singlePortResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -259,11 +147,10 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		buyPortReq.ResourceTags = tagMap
 	}
 
-	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
-	if err != nil {
+	if err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq); err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create port",
-			"Validation error while attempting to create port with name "+plan.Name.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not validate port %q: %s", plan.Name.ValueString(), err),
 		)
 		return
 	}
@@ -271,8 +158,8 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error buying port",
-			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
+			"Error creating port",
+			fmt.Sprintf("Could not create port %q: %s", plan.Name.ValueString(), err),
 		)
 		return
 	}
@@ -280,19 +167,18 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if len(createdPort.TechnicalServiceUIDs) != 1 {
 		resp.Diagnostics.AddError(
 			"Unexpected number of ports created",
-			fmt.Sprintf("Expected 1 port, got: %d. Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs)),
+			fmt.Sprintf("Expected 1 port, got %d. Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs)),
 		)
 		return
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
 
-	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created port",
-			"Could not read newly created port with ID "+createdID+": "+err.Error(),
+			"Error reading created port",
+			fmt.Sprintf("Could not read created port %s: %s", createdID, err),
 		)
 		return
 	}
@@ -300,55 +186,38 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created port tags",
-			"Could not read newly created port tags with ID "+createdID+": "+err.Error(),
+			"Error reading created port tags",
+			fmt.Sprintf("Could not read tags for created port %s: %s", createdID, err),
 		)
 		return
 	}
 
-	// update the plan with the port info
-	apiDiags := plan.fromAPIPort(ctx, port, tags)
-	resp.Diagnostics.Append(apiDiags...)
+	resp.Diagnostics.Append(plan.fromAPIPort(ctx, port, tags)...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 // Read resource information.
 func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	// Get current state
 	var state singlePortResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Get refreshed port value from API
 	port, err := r.client.PortService.GetPort(ctx, state.UID.ValueString())
 	if err != nil {
-		// Port has been deleted or is not found
-		if mpErr, ok := err.(*megaport.ErrorResponse); ok && mpErr.Response != nil {
-			if mpErr.Response.StatusCode == http.StatusNotFound ||
-				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		if isPortNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
-
 		resp.Diagnostics.AddError(
-			"Error Reading port",
-			"Could not read port with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Error reading port",
+			fmt.Sprintf("Could not read port %s: %s", state.UID.ValueString(), err),
 		)
 		return
 	}
 
-	// If the port has been deleted
 	if port.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 		resp.State.RemoveResource(ctx)
 		return
@@ -358,66 +227,43 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
-			"Could not read port tags with ID "+state.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read tags for port %s: %s", state.UID.ValueString(), err),
 		)
 		return
 	}
 
-	apiDiags := state.fromAPIPort(ctx, port, tags)
-	resp.Diagnostics.Append(apiDiags...)
-
-	// Set refreshed state
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state singlePortResourceModel
-
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Check on changes
-	var name, costCentre string
-	var marketplaceVisibility bool
-	var contractTermMonths *int
-	if !plan.Name.Equal(state.Name) {
-		name = plan.Name.ValueString()
-	} else {
-		name = state.Name.ValueString()
-	}
-	// Always use the planned cost centre value, even if it's empty/null
-	costCentre = plan.CostCentre.ValueString()
-	if !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
-		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
-	} else {
-		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
-	}
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		months := int(plan.ContractTermMonths.ValueInt64())
-		contractTermMonths = &months
-	}
+	params := resolvePortModifyParams(
+		plan.Name, state.Name,
+		plan.MarketplaceVisibility, state.MarketplaceVisibility,
+		plan.CostCentre,
+		plan.ContractTermMonths, state.ContractTermMonths,
+	)
 
 	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
-		Name:                  name,
-		MarketplaceVisibility: &marketplaceVisibility,
-		ContractTermMonths:    contractTermMonths,
-		CostCentre:            costCentre,
+		Name:                  params.name,
+		MarketplaceVisibility: &params.marketplaceVisibility,
+		ContractTermMonths:    params.contractTermMonths,
+		CostCentre:            params.costCentre,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating port",
-			"Could not update port with ID "+plan.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not update port %s: %s", plan.UID.ValueString(), err),
 		)
 		return
 	}
@@ -426,65 +272,41 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port",
-			"Could not read port with ID "+plan.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read port %s: %s", plan.UID.ValueString(), err),
 		)
 		return
 	}
 
-	// If change in resource tags from state
-	if !plan.ResourceTags.Equal(state.ResourceTags) {
-		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
-		resp.Diagnostics.Append(tagDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		err := r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Updating port resource tags",
-				"Could not update port resource tags with ID "+plan.UID.ValueString()+": "+err.Error(),
-			)
-			return
-		}
+	resp.Diagnostics.Append(syncPortResourceTags(ctx, plan.ResourceTags, state.ResourceTags, plan.UID.ValueString(), r.client)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	tags, err := r.fetchResourceTags(ctx, plan.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
-			"Could not read port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read tags for port %s: %s", plan.UID.ValueString(), err),
 		)
 		return
 	}
 
-	// Update the state
-	apiDiags := state.fromAPIPort(ctx, port, tags)
-	resp.Diagnostics.Append(apiDiags...)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Set state to fully populated data
-	diags := resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
-	// Retrieve values from state
 	var state singlePortResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete existing order
 	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
 		PortID:     state.UID.ValueString(),
 		DeleteNow:  !r.cancelAtEndOfTerm,
@@ -492,10 +314,9 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting port",
-			"Could not delete port, unexpected error: "+err.Error(),
+			"Error deleting port",
+			fmt.Sprintf("Could not delete port %s: %s", state.UID.ValueString(), err),
 		)
-		return
 	}
 }
 
@@ -515,13 +336,4 @@ func (r *portResource) fetchResourceTags(ctx context.Context, uid string) (map[s
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
-}
-
-func fromAPIPortInterface(ctx context.Context, p *megaport.PortInterface) (types.Object, diag.Diagnostics) {
-	portInterfaceModel := &portInterfaceModel{
-		Demarcation: types.StringValue(p.Demarcation),
-		Up:          types.Int64Value(int64(p.Up)),
-	}
-	portInterfaceObject, diags := types.ObjectValueFrom(ctx, portInterfaceAttrs, portInterfaceModel)
-	return portInterfaceObject, diags
 }
