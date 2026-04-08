@@ -297,7 +297,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, createdID)
+	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading newly created port tags",
@@ -354,7 +354,7 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
@@ -448,7 +448,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		}
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, plan.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, plan.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
@@ -497,24 +497,16 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 // Configure adds the provider configured client to the resource.
 func (r *portResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
+}
+
+func (r *portResource) fetchResourceTags(ctx context.Context, uid string) (map[string]string, error) {
+	return r.client.PortService.ListPortResourceTags(ctx, uid)
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

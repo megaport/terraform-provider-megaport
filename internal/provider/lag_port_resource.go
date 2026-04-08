@@ -299,7 +299,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, createdID)
+	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading newly created port tags",
@@ -364,7 +364,7 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
@@ -478,11 +478,11 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 	}
 
-	tags, tagErr := r.client.PortService.ListPortResourceTags(ctx, plan.UID.ValueString())
-	if tagErr != nil {
+	tags, err := r.fetchResourceTags(ctx, plan.UID.ValueString())
+	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
-			"Could not read port tags with ID "+plan.UID.ValueString()+": "+tagErr.Error(),
+			"Could not read port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
@@ -526,25 +526,16 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 // Configure adds the provider configured client to the resource.
 func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
+}
 
+func (r *lagPortResource) fetchResourceTags(ctx context.Context, uid string) (map[string]string, error) {
+	return r.client.PortService.ListPortResourceTags(ctx, uid)
 }
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
