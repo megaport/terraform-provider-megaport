@@ -113,16 +113,18 @@ func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VX
 
 	aEndModel.ProductUID = types.StringValue(aEndProductUID)
 
-	// VLAN priority: explicit plan value > API value > state fallback > null.
-	// When plan has a specific non-auto VLAN, preserve it immediately after create/update
-	// to avoid "inconsistent result after apply" if the API propagates the value slowly.
-	// During Read (plan==nil, aEndPlanVLAN==nil), API value is always used for drift detection.
+	// VLAN priority: explicit plan/state value > API value > null.
+	// When a non-zero VLAN is present in plan (create/update) or state (read), preserve it.
+	// This mirrors the old ordered_vlan semantics: the configured VLAN is authoritative.
+	// Auto-assign (vlan=0) defers to the API-assigned value.
+	// During Read (plan==nil), aEndPlanVLAN is nil — aEndVLAN (from state) is used instead,
+	// which prevents drift from the API overwriting a user-configured VLAN each refresh.
 	if aEndPlanVLAN != nil && *aEndPlanVLAN != 0 {
 		aEndModel.VLAN = types.Int64Value(*aEndPlanVLAN)
+	} else if aEndVLAN != nil && *aEndVLAN != 0 {
+		aEndModel.VLAN = types.Int64Value(*aEndVLAN)
 	} else if v.AEndConfiguration.VLAN != 0 {
 		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
-	} else if aEndVLAN != nil {
-		aEndModel.VLAN = types.Int64Value(*aEndVLAN)
 	} else {
 		aEndModel.VLAN = types.Int64Null()
 	}
@@ -236,16 +238,18 @@ func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VX
 
 	bEndModel.ProductUID = types.StringValue(bEndProductUID)
 
-	// VLAN priority: explicit plan value > API value > state fallback > null.
-	// When plan has a specific non-auto VLAN, preserve it immediately after create/update
-	// to avoid "inconsistent result after apply" if the API propagates the value slowly.
-	// During Read (plan==nil, bEndPlanVLAN==nil), API value is always used for drift detection.
+	// VLAN priority: explicit plan/state value > API value > null.
+	// When a non-zero VLAN is present in plan (create/update) or state (read), preserve it.
+	// This mirrors the old ordered_vlan semantics: the configured VLAN is authoritative.
+	// Auto-assign (vlan=0) defers to the API-assigned value.
+	// During Read (plan==nil), bEndPlanVLAN is nil — bEndVLAN (from state) is used instead,
+	// which prevents drift from the API overwriting a user-configured VLAN each refresh.
 	if bEndPlanVLAN != nil && *bEndPlanVLAN != 0 {
 		bEndModel.VLAN = types.Int64Value(*bEndPlanVLAN)
+	} else if bEndVLAN != nil && *bEndVLAN != 0 {
+		bEndModel.VLAN = types.Int64Value(*bEndVLAN)
 	} else if v.BEndConfiguration.VLAN != 0 {
 		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
-	} else if bEndVLAN != nil {
-		bEndModel.VLAN = types.Int64Value(*bEndVLAN)
 	} else {
 		bEndModel.VLAN = types.Int64Null()
 	}
