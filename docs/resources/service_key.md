@@ -88,6 +88,8 @@ Optional:
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 # Import a service key by its key value
 terraform import megaport_service_key.example "e19de6a6-5354-4b9a-a957-3a4e0caa1513"
