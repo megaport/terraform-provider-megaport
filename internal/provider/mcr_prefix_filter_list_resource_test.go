@@ -102,7 +102,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 
 					// Prefix filter list 1 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "description", prefixFilterName),

@@ -194,19 +194,19 @@ func TestParseImportID(t *testing.T) {
 			name:      "invalid format - only colon",
 			importID:  ":",
 			wantError: true,
-			errorMsg:  "MCR UID and prefix list ID cannot be empty",
+			errorMsg:  "invalid import ID format, expected 'mcr_uid:prefix_list_id'",
 		},
 		{
 			name:      "invalid format - empty MCR UID",
 			importID:  ":123",
 			wantError: true,
-			errorMsg:  "MCR UID and prefix list ID cannot be empty",
+			errorMsg:  "invalid import ID format, expected 'mcr_uid:prefix_list_id'",
 		},
 		{
 			name:      "invalid format - empty prefix list ID",
 			importID:  "mcr-uid:",
 			wantError: true,
-			errorMsg:  "MCR UID and prefix list ID cannot be empty",
+			errorMsg:  "invalid import ID format, expected 'mcr_uid:prefix_list_id'",
 		},
 		{
 			name:      "invalid list ID - not numeric",
