@@ -795,7 +795,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, createdID)
+	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for newly created MVE",
@@ -853,7 +853,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	// Get tags
-	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for MVE",
@@ -947,7 +947,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for updated MVE",
@@ -998,23 +998,15 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 // Configure adds the provider configured client to the resource.
 func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	providerData, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
+	r.client = providerData.client
+}
 
-	client := data.client
-
-	r.client = client
+func (r *mveResource) fetchResourceTags(ctx context.Context, id string) (map[string]string, error) {
+	return r.client.MVEService.ListMVEResourceTags(ctx, id)
 }
 
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

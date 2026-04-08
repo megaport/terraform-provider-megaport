@@ -357,6 +357,7 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 // Configure adds the provider configured client to the resource.
 func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+<<<<<<< HEAD
 	data, ok := configureMegaportResource(req, resp)
 	if !ok {
 		return

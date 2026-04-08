@@ -1042,6 +1042,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	// Safe fallback: productType will be empty string, EqualFold checks will return false,
+	// and MVE-specific validation (vnic_index requirement) will be skipped. VLAN updates
+	// proceed normally for non-MVE endpoints.
 	aEndProductType, err := r.client.ProductService.GetProductType(ctx, aEndPlan.ProductUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddWarning(
@@ -1126,63 +1129,15 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Detect A-End vrouter partner change
-	if !plan.AEndConfiguration.Equal(state.AEndConfiguration) {
-		aEndPlanVrouter := aEndPlan.VrouterPartnerConfig
-		aEndStateVrouter := aEndState.VrouterPartnerConfig
-		// Normalize passwords (WriteOnly, nullified in state post-apply) before comparing.
-		aEndPlanVrouterNorm := nullifyVrouterPasswords(ctx, aEndPlanVrouter)
-		if !aEndPlanVrouterNorm.Equal(aEndStateVrouter) && !aEndPlanVrouter.IsNull() {
-			var partnerConfigAEnd vxcPartnerConfigVrouterModel
-			vrouterDiags := aEndPlanVrouter.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(vrouterDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.ProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
-			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
-			if vrouterDiags2.HasError() {
-				resp.Diagnostics.Append(vrouterDiags2...)
-				return
-			}
-			updateReq.AEndPartnerConfig = vrouterPartnerConfig
-		}
+	r.applyAEndPartnerUpdate(ctx, plan, state, aEndPlan, aEndState, updateReq, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	// Detect B-End vrouter partner change (only vrouter is updatable)
-	if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "vrouter" && !bEndCSP {
-		if !bEndPlanConfig.VrouterPartnerConfig.IsNull() {
-			var vrouterModel vxcPartnerConfigVrouterModel
-			vrouterDiags := bEndPlanConfig.VrouterPartnerConfig.As(ctx, &vrouterModel, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(vrouterDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.ProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
-			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
-			if vrouterDiags2.HasError() {
-				resp.Diagnostics.Append(vrouterDiags2...)
-				return
-			}
-			updateReq.BEndPartnerConfig = vrouterPartnerConfig
-		}
-	} else if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "transit" && !bEndCSP {
-		if !bEndPlanConfig.Transit.IsNull() && bEndPlanConfig.Transit.ValueBool() {
-			updateReq.BEndPartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
-		}
+	// Detect B-End vrouter/transit partner change
+	r.applyBEndPartnerUpdate(ctx, plan, state, bEndPlanConfig, bEndState, bEndPartnerType, bEndCSP, updateReq, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// Only send API call if there are changes to the VXC in the Update Request
@@ -1342,7 +1297,7 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 	data, ok := req.ProviderData.(*megaportProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
+			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
@@ -1553,6 +1508,10 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 // with WriteOnly fields (auth_key, service_key) nullified so plan/state comparisons are stable
 // across applies. Without this, the framework's nullification of WriteOnly fields in state would
 // cause the objects to never compare equal, triggering spurious RequiresReplace on every plan.
+//
+// WriteOnly fields nullified here (must be updated if new WriteOnly fields are added to partner configs):
+//   - vxcPartnerConfigAWSModel.AuthKey    (vxc_schemas.go: aws_config.auth_key)
+//   - vxcPartnerConfigAzureModel.ServiceKey (vxc_schemas.go: azure_config.service_key)
 func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) types.Object {
 	if isPresent(cfg.AWSPartnerConfig) {
 		var awsCfg vxcPartnerConfigAWSModel
@@ -1589,6 +1548,9 @@ func extractBEndCSPObjForCompare(ctx context.Context, cfg *vxcBEndConfigModel) t
 // nullifyVrouterPasswords returns a copy of the vrouter config object with all bgp_connection
 // passwords set to null. Used before plan/state comparison so that the WriteOnly password field
 // (always null in state after apply) does not cause spurious update API calls on every apply.
+//
+// WriteOnly fields nullified here (must be updated if new WriteOnly fields are added to vrouter_config):
+//   - bgpConnectionConfigModel.Password  (vxc_schemas.go: bgp_connections[].password)
 func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types.Object {
 	if !isPresent(vrouterObj) {
 		return vrouterObj
@@ -1630,4 +1592,84 @@ func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types
 		return vrouterObj
 	}
 	return normalized
+}
+
+// applyAEndPartnerUpdate detects A-end partner config changes and populates updateReq.AEndPartnerConfig.
+func (r *vxcResource) applyAEndPartnerUpdate(
+	ctx context.Context,
+	plan, state vxcResourceModel,
+	aEndPlan, aEndState vxcAEndConfigModel,
+	updateReq *megaport.UpdateVXCRequest,
+	diags *diag.Diagnostics,
+) {
+	if !plan.AEndConfiguration.Equal(state.AEndConfiguration) {
+		aEndPlanVrouter := aEndPlan.VrouterPartnerConfig
+		aEndStateVrouter := aEndState.VrouterPartnerConfig
+		// Normalize passwords (WriteOnly, nullified in state post-apply) before comparing.
+		aEndPlanVrouterNorm := nullifyVrouterPasswords(ctx, aEndPlanVrouter)
+		if !aEndPlanVrouterNorm.Equal(aEndStateVrouter) && !aEndPlanVrouter.IsNull() {
+			var partnerConfigAEnd vxcPartnerConfigVrouterModel
+			vrouterDiags := aEndPlanVrouter.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			diags.Append(vrouterDiags...)
+			if diags.HasError() {
+				return
+			}
+			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.ProductUID.ValueString())
+			if err != nil {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			if vrouterDiags2.HasError() {
+				diags.Append(vrouterDiags2...)
+				return
+			}
+			updateReq.AEndPartnerConfig = vrouterPartnerConfig
+		}
+	}
+}
+
+// applyBEndPartnerUpdate detects B-end partner config changes and populates updateReq.BEndPartnerConfig.
+func (r *vxcResource) applyBEndPartnerUpdate(
+	ctx context.Context,
+	plan, state vxcResourceModel,
+	bEndPlanConfig vxcBEndConfigModel,
+	bEndState vxcAEndConfigModel,
+	bEndPartnerType string,
+	bEndCSP bool,
+	updateReq *megaport.UpdateVXCRequest,
+	diags *diag.Diagnostics,
+) {
+	// Detect B-End vrouter partner change (only vrouter is updatable)
+	if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "vrouter" && !bEndCSP {
+		if !bEndPlanConfig.VrouterPartnerConfig.IsNull() {
+			var vrouterModel vxcPartnerConfigVrouterModel
+			vrouterDiags := bEndPlanConfig.VrouterPartnerConfig.As(ctx, &vrouterModel, basetypes.ObjectAsOptions{})
+			diags.Append(vrouterDiags...)
+			if diags.HasError() {
+				return
+			}
+			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.ProductUID.ValueString())
+			if err != nil {
+				diags.AddError(
+					"Error updating VXC",
+					"Could not update VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+				)
+				return
+			}
+			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
+			if vrouterDiags2.HasError() {
+				diags.Append(vrouterDiags2...)
+				return
+			}
+			updateReq.BEndPartnerConfig = vrouterPartnerConfig
+		}
+	} else if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "transit" && !bEndCSP {
+		if !bEndPlanConfig.Transit.IsNull() && bEndPlanConfig.Transit.ValueBool() {
+			updateReq.BEndPartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
+		}
+	}
 }
