@@ -44,20 +44,11 @@ func (r *mcrPrefixFilterListResource) Schema(_ context.Context, _ resource.Schem
 
 // Configure adds the provider configured client to the resource.
 func (r *mcrPrefixFilterListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*megaportProviderData)
+	providerData, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
 		return
 	}
-
-	r.client = client.client
+	r.client = providerData.client
 }
 
 // Create creates the resource and sets the initial Terraform state.

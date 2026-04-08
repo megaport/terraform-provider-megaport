@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -280,7 +279,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, createdID)
+	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
@@ -338,7 +337,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
@@ -437,7 +436,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	tags, err := r.client.MCRService.ListMCRResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading resource tags",
@@ -486,23 +485,15 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 // Configure adds the provider configured client to the resource.
 func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	providerData, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
+	r.client = providerData.client
+}
 
-	client := data.client
-
-	r.client = client
+func (r *mcrResource) fetchResourceTags(ctx context.Context, id string) (map[string]string, error) {
+	return r.client.MCRService.ListMCRResourceTags(ctx, id)
 }
 
 func (r *mcrResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
