@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -36,64 +34,28 @@ var (
 	_ resource.ResourceWithConfigure   = &vxcResource{}
 	_ resource.ResourceWithImportState = &vxcResource{}
 
-	vxcEndConfigurationAttrs = map[string]attr.Type{
-		"owner_uid":             types.StringType,
-		"requested_product_uid": types.StringType,
-		"current_product_uid":   types.StringType,
-		"product_name":          types.StringType,
-		"location_id":           types.Int64Type,
-		"location":              types.StringType,
-		"ordered_vlan":          types.Int64Type,
-		"vlan":                  types.Int64Type,
-		"inner_vlan":            types.Int64Type,
-		"vnic_index":            types.Int64Type,
-		"secondary_name":        types.StringType,
-	}
-
-	cspConnectionFullAttrs = map[string]attr.Type{
-		"connect_type":         types.StringType,
-		"resource_name":        types.StringType,
-		"resource_type":        types.StringType,
+	vxcAEndConfigAttrs = map[string]attr.Type{
+		"product_uid":          types.StringType,
+		"assigned_product_uid": types.StringType,
 		"vlan":                 types.Int64Type,
-		"account":              types.StringType,
-		"account_id":           types.StringType,
-		"amazon_address":       types.StringType,
-		"asn":                  types.Int64Type,
-		"customer_asn":         types.Int64Type,
-		"auth_key":             types.StringType,
-		"customer_address":     types.StringType,
-		"customer_ip_address":  types.StringType,
-		"provider_ip_address":  types.StringType,
-		"customer_ip4_address": types.StringType,
-		"id":                   types.Int64Type,
-		"name":                 types.StringType,
-		"owner_account":        types.StringType,
-		"peer_asn":             types.Int64Type,
-		"type":                 types.StringType,
-		"vif_id":               types.StringType,
-		"bandwidth":            types.Int64Type,
-		"bandwidths":           types.ListType{}.WithElementType(types.Int64Type),
-		"connection_id":        types.StringType,
-		"managed":              types.BoolType,
-		"service_key":          types.StringType,
-		"csp_name":             types.StringType,
-		"pairing_key":          types.StringType,
-		"customer_ip6_network": types.StringType,
-		"ipv4_gateway_address": types.StringType,
-		"ipv6_gateway_address": types.StringType,
-		"ip_addresses":         types.ListType{}.WithElementType(types.StringType),
-		"virtual_router_name":  types.StringType,
+		"inner_vlan":           types.Int64Type,
+		"vnic_index":           types.Int64Type,
+		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
 	}
 
-	vxcPartnerConfigAttrs = map[string]attr.Type{
-		"partner":              types.StringType,
+	vxcBEndConfigAttrs = map[string]attr.Type{
+		"product_uid":          types.StringType,
+		"assigned_product_uid": types.StringType,
+		"vlan":                 types.Int64Type,
+		"inner_vlan":           types.Int64Type,
+		"vnic_index":           types.Int64Type,
 		"aws_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAWSAttrs),
 		"azure_config":         types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAzureAttrs),
 		"google_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigGoogleAttrs),
 		"oracle_config":        types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigOracleAttrs),
-		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
-		"partner_a_end_config": types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndAttrs),
 		"ibm_config":           types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigIbmAttrs),
+		"vrouter_config":       types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigVrouterAttrs),
+		"transit":              types.BoolType,
 	}
 
 	vxcPartnerConfigAWSAttrs = map[string]attr.Type{
@@ -111,7 +73,6 @@ var (
 
 	vxcPartnerConfigAzureAttrs = map[string]attr.Type{
 		"service_key": types.StringType,
-		"port_choice": types.StringType,
 		"peers":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs)),
 	}
 
@@ -139,45 +100,6 @@ var (
 		"name":                types.StringType,
 		"customer_ip_address": types.StringType,
 		"provider_ip_address": types.StringType,
-	}
-
-	// the below structs are deprecated, but need to be here and different than the vrouter_partner_config, because we would need
-	// to keep the schema updated for both if they used the same structs.
-
-	// deprecated
-	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs)),
-	}
-
-	// deprecated
-	vxcInterfaceAttrs = map[string]attr.Type{
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
-	}
-
-	// deprecated
-	bgpConnectionConfig = map[string]attr.Type{
-		"peer_asn":              types.Int64Type,
-		"local_asn":             types.Int64Type,
-		"local_ip_address":      types.StringType,
-		"peer_ip_address":       types.StringType,
-		"password":              types.StringType,
-		"shutdown":              types.BoolType,
-		"description":           types.StringType,
-		"med_in":                types.Int64Type,
-		"med_out":               types.Int64Type,
-		"bfd_enabled":           types.BoolType,
-		"export_policy":         types.StringType,
-		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
-		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
-		"import_whitelist":      types.StringType,
-		"import_blacklist":      types.StringType,
-		"export_whitelist":      types.StringType,
-		"export_blacklist":      types.StringType,
-		"as_path_prepend_count": types.Int64Type,
 	}
 
 	vxcPartnerConfigVrouterAttrs = map[string]attr.Type{
@@ -233,106 +155,50 @@ var (
 type vxcResourceModel struct {
 	LastUpdated types.String `tfsdk:"last_updated"`
 
-	ID                 types.Int64  `tfsdk:"product_id"`
 	UID                types.String `tfsdk:"product_uid"`
 	ServiceID          types.Int64  `tfsdk:"service_id"`
 	Name               types.String `tfsdk:"product_name"`
-	Type               types.String `tfsdk:"product_type"`
 	RateLimit          types.Int64  `tfsdk:"rate_limit"`
 	DistanceBand       types.String `tfsdk:"distance_band"`
-	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
 	PromoCode          types.String `tfsdk:"promo_code"`
 	ServiceKey         types.String `tfsdk:"service_key"`
-
-	SecondaryName  types.String `tfsdk:"secondary_name"`
-	UsageAlgorithm types.String `tfsdk:"usage_algorithm"`
-	CreatedBy      types.String `tfsdk:"created_by"`
-
+	CreatedBy          types.String `tfsdk:"created_by"`
 	ContractTermMonths types.Int64  `tfsdk:"contract_term_months"`
 	CompanyUID         types.String `tfsdk:"company_uid"`
-	CompanyName        types.String `tfsdk:"company_name"`
-	Locked             types.Bool   `tfsdk:"locked"`
-	AdminLocked        types.Bool   `tfsdk:"admin_locked"`
 	AttributeTags      types.Map    `tfsdk:"attribute_tags"`
-	Cancelable         types.Bool   `tfsdk:"cancelable"`
 	CostCentre         types.String `tfsdk:"cost_centre"`
+	Shutdown           types.Bool   `tfsdk:"shutdown"`
 
-	LiveDate          types.String `tfsdk:"live_date"`
-	CreateDate        types.String `tfsdk:"create_date"`
-	ContractStartDate types.String `tfsdk:"contract_start_date"`
-	ContractEndDate   types.String `tfsdk:"contract_end_date"`
-	Shutdown          types.Bool   `tfsdk:"shutdown"`
-
-	AEndConfiguration types.Object `tfsdk:"a_end"`
-	BEndConfiguration types.Object `tfsdk:"b_end"`
-
-	AEndPartnerConfig types.Object `tfsdk:"a_end_partner_config"`
-	BEndPartnerConfig types.Object `tfsdk:"b_end_partner_config"`
-
-	CSPConnections types.List `tfsdk:"csp_connections"`
+	AEndConfiguration types.Object `tfsdk:"a_end_config"`
+	BEndConfiguration types.Object `tfsdk:"b_end_config"`
 
 	ResourceTags types.Map `tfsdk:"resource_tags"`
 }
 
-type cspConnectionModel struct {
-	ConnectType        types.String `tfsdk:"connect_type"`
-	ResourceName       types.String `tfsdk:"resource_name"`
-	ResourceType       types.String `tfsdk:"resource_type"`
-	VLAN               types.Int64  `tfsdk:"vlan"`
-	Account            types.String `tfsdk:"account"`
-	AmazonAddress      types.String `tfsdk:"amazon_address"`
-	AccountID          types.String `tfsdk:"account_id"`
-	CustomerASN        types.Int64  `tfsdk:"customer_asn"`
-	ASN                types.Int64  `tfsdk:"asn"`
-	AuthKey            types.String `tfsdk:"auth_key"`
-	CustomerAddress    types.String `tfsdk:"customer_address"`
-	CustomerIPAddress  types.String `tfsdk:"customer_ip_address"`
-	ProviderIPAddress  types.String `tfsdk:"provider_ip_address"`
-	ID                 types.Int64  `tfsdk:"id"`
-	Name               types.String `tfsdk:"name"`
-	OwnerAccount       types.String `tfsdk:"owner_account"`
-	PeerASN            types.Int64  `tfsdk:"peer_asn"`
-	Type               types.String `tfsdk:"type"`
-	VIFID              types.String `tfsdk:"vif_id"`
-	Bandwidth          types.Int64  `tfsdk:"bandwidth"`
-	Bandwidths         types.List   `tfsdk:"bandwidths"`
-	ConnectionID       types.String `tfsdk:"connection_id"`
-	IPAddresses        types.List   `tfsdk:"ip_addresses"`
-	VirtualRouterName  types.String `tfsdk:"virtual_router_name"`
-	Managed            types.Bool   `tfsdk:"managed"`
-	ServiceKey         types.String `tfsdk:"service_key"`
-	CSPName            types.String `tfsdk:"csp_name"`
-	PairingKey         types.String `tfsdk:"pairing_key"`
-	CustomerIP4Address types.String `tfsdk:"customer_ip4_address"`
-	CustomerIP6Network types.String `tfsdk:"customer_ip6_network"`
-	IPv4GatewayAddress types.String `tfsdk:"ipv4_gateway_address"`
-	IPv6GatewayAddress types.String `tfsdk:"ipv6_gateway_address"`
-}
-
-// vxcEndConfigurationModel maps the end configuration schema data.
-type vxcEndConfigurationModel struct {
-	OwnerUID              types.String `tfsdk:"owner_uid"`
-	RequestedProductUID   types.String `tfsdk:"requested_product_uid"`
-	CurrentProductUID     types.String `tfsdk:"current_product_uid"`
-	Name                  types.String `tfsdk:"product_name"`
-	LocationID            types.Int64  `tfsdk:"location_id"`
-	Location              types.String `tfsdk:"location"`
-	OrderedVLAN           types.Int64  `tfsdk:"ordered_vlan"`
+// vxcAEndConfigModel maps the A-End configuration schema data.
+type vxcAEndConfigModel struct {
+	ProductUID            types.String `tfsdk:"product_uid"`
+	AssignedProductUID    types.String `tfsdk:"assigned_product_uid"`
 	VLAN                  types.Int64  `tfsdk:"vlan"`
 	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
 	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
-	SecondaryName         types.String `tfsdk:"secondary_name"`
+	VrouterPartnerConfig  types.Object `tfsdk:"vrouter_config"`
 }
 
-type vxcPartnerConfigurationModel struct {
-	Partner              types.String `tfsdk:"partner"`
-	AWSPartnerConfig     types.Object `tfsdk:"aws_config"`
-	AzurePartnerConfig   types.Object `tfsdk:"azure_config"`
-	GooglePartnerConfig  types.Object `tfsdk:"google_config"`
-	OraclePartnerConfig  types.Object `tfsdk:"oracle_config"`
-	VrouterPartnerConfig types.Object `tfsdk:"vrouter_config"`
-	IBMPartnerConfig     types.Object `tfsdk:"ibm_config"`
-	PartnerAEndConfig    types.Object `tfsdk:"partner_a_end_config"` // DEPRECATED: Use vrouter_config instead.
+// vxcBEndConfigModel maps the B-End configuration schema data.
+type vxcBEndConfigModel struct {
+	ProductUID            types.String `tfsdk:"product_uid"`
+	AssignedProductUID    types.String `tfsdk:"assigned_product_uid"`
+	VLAN                  types.Int64  `tfsdk:"vlan"`
+	InnerVLAN             types.Int64  `tfsdk:"inner_vlan"`
+	NetworkInterfaceIndex types.Int64  `tfsdk:"vnic_index"`
+	AWSPartnerConfig      types.Object `tfsdk:"aws_config"`
+	AzurePartnerConfig    types.Object `tfsdk:"azure_config"`
+	GooglePartnerConfig   types.Object `tfsdk:"google_config"`
+	OraclePartnerConfig   types.Object `tfsdk:"oracle_config"`
+	IBMPartnerConfig      types.Object `tfsdk:"ibm_config"`
+	VrouterPartnerConfig  types.Object `tfsdk:"vrouter_config"`
+	Transit               types.Bool   `tfsdk:"transit"`
 }
 
 type vxcPartnerConfig interface {
@@ -358,7 +224,6 @@ type vxcPartnerConfigAWSModel struct {
 type vxcPartnerConfigAzureModel struct {
 	vxcPartnerConfig `tfsdk:"-"`
 	ServiceKey       types.String `tfsdk:"service_key"`
-	PortChoice       types.String `tfsdk:"port_choice"`
 	Peers            types.List   `tfsdk:"peers"`
 }
 
@@ -386,12 +251,6 @@ type vxcPartnerConfigOracleModel struct {
 
 // vxcPartnerConfigVrouterModel maps the partner configuration schema data for a vrouter configuration.
 type vxcPartnerConfigVrouterModel struct {
-	vxcPartnerConfig `tfsdk:"-"`
-	Interfaces       types.List `tfsdk:"interfaces"`
-}
-
-// vxcPartnerConfigAEndModel maps the partner configuration schema data for an A end.
-type vxcPartnerConfigAEndModel struct {
 	vxcPartnerConfig `tfsdk:"-"`
 	Interfaces       types.List `tfsdk:"interfaces"`
 }
@@ -484,13 +343,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
 			"service_key": schema.StringAttribute{
 				Description: "The service key of the VXC.",
 				Optional:    true,
@@ -514,33 +366,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The rate limit of the product.",
 				Required:    true,
 			},
-			"product_type": schema.StringAttribute{
-				Description: "The type of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"distance_band": schema.StringAttribute{
 				Description: "The distance band of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
-			},
-			"secondary_name": schema.StringAttribute{
-				Description: "The secondary name of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm of the product.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -559,14 +386,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-			},
-			"live_date": schema.StringAttribute{
-				Description: "The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.",
-				Computed:    true,
-			},
-			"create_date": schema.StringAttribute{
-				Description: "The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
 			},
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
@@ -591,275 +410,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"csp_connections": schema.ListNestedAttribute{
-				Description: "The Cloud Service Provider (CSP) connections associated with the VXC.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"connect_type": schema.StringAttribute{
-							Description: "The connection type of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"resource_name": schema.StringAttribute{
-							Description: "The resource name of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"resource_type": schema.StringAttribute{
-							Description: "The resource type of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"customer_asn": schema.Int64Attribute{
-							Description: "The customer ASN of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"vlan": schema.Int64Attribute{
-							Description: "The VLAN of the CSP connection.",
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"name": schema.StringAttribute{
-							Description: "The name of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"owner_account": schema.StringAttribute{
-							Description: "The owner's AWS account of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"account_id": schema.StringAttribute{
-							Description: "The account ID of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"bandwidth": schema.Int64Attribute{
-							Description: "The bandwidth of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"bandwidths": schema.ListAttribute{
-							Description: "The bandwidths of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							ElementType: types.Int64Type,
-							PlanModifiers: []planmodifier.List{
-								listplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"customer_ip_address": schema.StringAttribute{
-							Description: "The customer IP address of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"provider_ip_address": schema.StringAttribute{
-							Description: "The provider IP address of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"customer_ip4_address": schema.StringAttribute{
-							Description: "The customer IPv4 address of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"account": schema.StringAttribute{
-							Description: "The account of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"amazon_address": schema.StringAttribute{
-							Description: "The Amazon address of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"asn": schema.Int64Attribute{
-							Description: "The ASN of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"auth_key": schema.StringAttribute{
-							Description: "The authentication key of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"customer_address": schema.StringAttribute{
-							Description: "The customer address of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"id": schema.Int64Attribute{
-							Description: "The ID of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"peer_asn": schema.Int64Attribute{
-							Description: "The peer ASN of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
-						},
-						"type": schema.StringAttribute{
-							Description: "The type of the AWS Virtual Interface.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"vif_id": schema.StringAttribute{
-							Description: "The ID of the AWS Virtual Interface.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"connection_id": schema.StringAttribute{
-							Description: "The hosted connection ID of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"managed": schema.BoolAttribute{
-							Description: "Whether the CSP connection is managed.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.Bool{
-								boolplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"service_key": schema.StringAttribute{
-							Description: "The Azure service key of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							Sensitive:   true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"csp_name": schema.StringAttribute{
-							Description: "The name of the CSP connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"pairing_key": schema.StringAttribute{
-							Description: "The pairing key of the Google Cloud connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"ip_addresses": schema.ListAttribute{
-							Description: "The IP addresses of the Virtual Router.",
-							Optional:    true,
-							Computed:    true,
-							ElementType: types.StringType,
-							PlanModifiers: []planmodifier.List{
-								listplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"virtual_router_name": schema.StringAttribute{
-							Description: "The name of the Virtual Router.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"customer_ip6_network": schema.StringAttribute{
-							Description: "The customer IPv6 network of the Transit VXC connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"ipv4_gateway_address": schema.StringAttribute{
-							Description: "The IPv4 gateway address of the Transit VXC connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"ipv6_gateway_address": schema.StringAttribute{
-							Description: "The IPv6 gateway address of the Transit VXC connection.",
-							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-					},
-				},
-			},
 			"resource_tags": schema.MapAttribute{
 				Description: "The resource tags associated with the product.",
 				Optional:    true,
@@ -868,40 +418,11 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
 			"company_uid": schema.StringAttribute{
 				Description: "The UID of the company the product is associated with.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"company_name": schema.StringAttribute{
-				Description: "The name of the company the product is associated with.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the product is admin locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"attribute_tags": schema.MapAttribute{
@@ -912,59 +433,21 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"a_end": schema.SingleNestedAttribute{
-				Description: "The current A-End configuration of the VXC.",
+			"a_end_config": schema.SingleNestedAttribute{
+				Description: "The A-End configuration of the VXC.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
-					"owner_uid": schema.StringAttribute{
-						Description: "The owner UID of the A-End configuration.",
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the A-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
+					"product_uid": schema.StringAttribute{
+						Description: "The Product UID for the A-End configuration.",
 						Required:    true,
-						// PlanModifiers: []planmodifier.String{
-						// 	stringplanmodifier.RequiresReplaceIf(
-						// 		func(ctx context.Context, sr planmodifier.StringRequest, rrifr *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-						// 			if sr.PlanValue.IsUnknown() {
-						// 				rrifr.RequiresReplace = true
-						// 			}
-						// 		},
-						// 		"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
-						// 		"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
-						// 	),
-						// 	stringplanmodifier.UseStateForUnknown(),
-						// },
 					},
-					"current_product_uid": schema.StringAttribute{
-						Description: "The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.",
+					"assigned_product_uid": schema.StringAttribute{
+						Description: "The assigned product UID of the A-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.",
 						Optional:    true,
 						Computed:    true,
 					},
-					"product_name": schema.StringAttribute{
-						Description: "The product name of the A-End configuration.",
-						Computed:    true,
-					},
-					"location_id": schema.Int64Attribute{
-						Description: "The location ID of the A-End configuration.",
-						Computed:    true,
-					},
-					"location": schema.StringAttribute{
-						Description: "The location of the A-End configuration.",
-						Computed:    true,
-					},
-					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the A-End configuration. Values can range from 2 to 4093. Set to 0 for auto-assignment. Set to -1 for untagged. If not set, the Megaport system allocates a valid VLAN.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -972,12 +455,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
-					"vlan": schema.Int64Attribute{
-						Description: "The current VLAN of the A-End configuration. May be different from the A-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the A-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the A-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
-						Computed:    true,
-					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
+						Description: "The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1), int64validator.NoneOf(0)},
@@ -993,62 +472,25 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
-					"secondary_name": schema.StringAttribute{
-						Description: "The secondary name of the A-End configuration.",
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
+					"vrouter_config": vrouterPartnerConfigSchema,
 				},
 			},
-			"b_end": schema.SingleNestedAttribute{
-				Description: "The current B-End configuration of the VXC.",
+			"b_end_config": schema.SingleNestedAttribute{
+				Description: "The B-End configuration of the VXC.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
-					"owner_uid": schema.StringAttribute{
-						Description: "The owner UID of the B-End configuration.",
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
-						Optional:    true,
-						Computed:    true,
-						// PlanModifiers: []planmodifier.String{
-						// 	stringplanmodifier.RequiresReplaceIf(
-						// 		func(ctx context.Context, sr planmodifier.StringRequest, rrifr *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-						// 			if sr.PlanValue.IsUnknown() {
-						// 				rrifr.RequiresReplace = true
-						// 			}
-						// 		},
-						// 		"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
-						// 		"This modifier will replace the VXC if the new `requested_product_uid` is unknown. This allows the provider to better handle situations when the connected product (Port, MVE, MCR) is being replaced. To avoid replacement, make sure the new `requested_product_uid` is a known value (i.e. an existing product in the state).",
-						// 	),
-						// 	stringplanmodifier.UseStateForUnknown(),
-						// },
-					},
-					"current_product_uid": schema.StringAttribute{
-						Description: "The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.",
+					"product_uid": schema.StringAttribute{
+						Description: "The Product UID for the B-End configuration.",
 						Optional:    true,
 						Computed:    true,
 					},
-					"product_name": schema.StringAttribute{
-						Description: "The product name of the B-End configuration.",
+					"assigned_product_uid": schema.StringAttribute{
+						Description: "The assigned product UID of the B-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.",
+						Optional:    true,
 						Computed:    true,
 					},
-					"location_id": schema.Int64Attribute{
-						Description: "The location ID of the B-End configuration.",
-						Computed:    true,
-					},
-					"location": schema.StringAttribute{
-						Description: "The location of the B-End configuration.",
-						Computed:    true,
-					},
-					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+					"vlan": schema.Int64Attribute{
+						Description: "The VLAN of the B-End configuration. Values can range from 2 to 4093. Set to 0 for auto-assignment. Set to -1 for untagged. If not set, the Megaport system allocates a valid VLAN.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1056,12 +498,8 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
-					"vlan": schema.Int64Attribute{
-						Description: "The current VLAN of the B-End configuration. May be different from the B-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the B-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the B-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.",
-						Computed:    true,
-					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
+						Description: "The inner VLAN of the B-End configuration. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1), int64validator.NoneOf(0)},
@@ -1077,57 +515,46 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
-					"secondary_name": schema.StringAttribute{
-						Description: "The secondary name of the B-End configuration.",
-						Computed:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
+					"aws_config":     awsPartnerConfigSchema,
+					"azure_config":   azurePartnerConfigSchema,
+					"google_config":  googlePartnerConfigSchema,
+					"ibm_config":     ibmPartnerConfigSchema,
+					"oracle_config":  oraclePartnerConfigSchema,
+					"vrouter_config": vrouterPartnerConfigSchema,
+					"transit": schema.BoolAttribute{
+						Description: "Whether this is a transit VXC connection.",
+						Optional:    true,
 					},
-				},
-			},
-			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
-				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"partner": schema.StringAttribute{
-						Description: "The partner of the partner configuration.",
-						Required:    true,
-						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "ibm", "vrouter", "transit", "a-end"),
-						},
-					},
-					"aws_config":           awsPartnerConfigSchema,
-					"azure_config":         azurePartnerConfigSchema,
-					"google_config":        googlePartnerConfigSchema,
-					"ibm_config":           ibmPartnerConfigSchema,
-					"oracle_config":        oraclePartnerConfigSchema,
-					"vrouter_config":       vrouterPartnerConfigSchema,
-					"partner_a_end_config": aEndPartnerConfigSchema,
-				},
-			},
-			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
-				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"partner": schema.StringAttribute{
-						Description: "The partner of the partner configuration.",
-						Required:    true,
-						Validators: []validator.String{
-							stringvalidator.OneOf("aws", "azure", "google", "oracle", "ibm", "transit", "vrouter"),
-						},
-					},
-					"aws_config":           awsPartnerConfigSchema,
-					"azure_config":         azurePartnerConfigSchema,
-					"google_config":        googlePartnerConfigSchema,
-					"ibm_config":           ibmPartnerConfigSchema,
-					"oracle_config":        oraclePartnerConfigSchema,
-					"vrouter_config":       vrouterPartnerConfigSchema,
-					"partner_a_end_config": aEndPartnerConfigSchema,
 				},
 			},
 		},
 	}
+}
+
+// inferBEndPartnerType determines the partner type from the b-end config model.
+func inferBEndPartnerType(endConfig *vxcBEndConfigModel) string {
+	if !endConfig.AWSPartnerConfig.IsNull() && !endConfig.AWSPartnerConfig.IsUnknown() {
+		return "aws"
+	}
+	if !endConfig.AzurePartnerConfig.IsNull() && !endConfig.AzurePartnerConfig.IsUnknown() {
+		return "azure"
+	}
+	if !endConfig.GooglePartnerConfig.IsNull() && !endConfig.GooglePartnerConfig.IsUnknown() {
+		return "google"
+	}
+	if !endConfig.OraclePartnerConfig.IsNull() && !endConfig.OraclePartnerConfig.IsUnknown() {
+		return "oracle"
+	}
+	if !endConfig.IBMPartnerConfig.IsNull() && !endConfig.IBMPartnerConfig.IsUnknown() {
+		return "ibm"
+	}
+	if !endConfig.VrouterPartnerConfig.IsNull() && !endConfig.VrouterPartnerConfig.IsUnknown() {
+		return "vrouter"
+	}
+	if !endConfig.Transit.IsNull() && !endConfig.Transit.IsUnknown() && endConfig.Transit.ValueBool() {
+		return "transit"
+	}
+	return ""
 }
 
 // Create a new resource.
@@ -1154,7 +581,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	var serviceKeyBEndUID string
 	if !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown() {
-		// If a service key is provided, we should look up the product UID pertaining to that service key and use that B-End Product UID
+		// If a service key is provided, look up the product UID pertaining to that service key
 		serviceKeyRes, err := r.client.ServiceKeyService.GetServiceKey(ctx, plan.ServiceKey.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -1186,29 +613,26 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.ResourceTags = tagMap
 	}
 
-	aEndObj := plan.AEndConfiguration
-	bEndObj := plan.BEndConfiguration
-
-	var a vxcEndConfigurationModel
-	aEndDiags := aEndObj.As(ctx, &a, basetypes.ObjectAsOptions{})
+	// A-End config
+	var a vxcAEndConfigModel
+	aEndDiags := plan.AEndConfiguration.As(ctx, &a, basetypes.ObjectAsOptions{})
 	if aEndDiags.HasError() {
 		resp.Diagnostics.Append(aEndDiags...)
 		return
 	}
 	aEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: a.RequestedProductUID.ValueString(),
-		VLAN:       int(a.VLAN.ValueInt64()),
+		ProductUID: a.ProductUID.ValueString(),
 	}
-	buyReq.PortUID = a.RequestedProductUID.ValueString()
+	buyReq.PortUID = a.ProductUID.ValueString()
 
-	if !a.OrderedVLAN.IsNull() {
-		aEndConfig.VLAN = int(a.OrderedVLAN.ValueInt64())
+	if !a.VLAN.IsNull() && !a.VLAN.IsUnknown() {
+		aEndConfig.VLAN = int(a.VLAN.ValueInt64())
 	} else {
 		aEndConfig.VLAN = 0
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
+	productType, _ := r.client.ProductService.GetProductType(ctx, a.ProductUID.ValueString())
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
 		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
@@ -1230,301 +654,60 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
 
-	if !plan.AEndPartnerConfig.IsNull() {
-		var aPartnerConfig vxcPartnerConfigurationModel
-		aPartnerDiags := plan.AEndPartnerConfig.As(ctx, &aPartnerConfig, basetypes.ObjectAsOptions{
-			UnhandledNullAsEmpty:    true,
-			UnhandledUnknownAsEmpty: true,
-		})
-		resp.Diagnostics.Append(aPartnerDiags...)
-		switch aPartnerConfig.Partner.ValueString() {
-		case "aws":
-			if aPartnerConfig.AWSPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": AWS Partner configuration is required",
-				)
-				return
-			}
-			var awsConfig vxcPartnerConfigAWSModel
-			awsDiags := aPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
-			if awsDiags.HasError() {
-				resp.Diagnostics.Append(awsDiags...)
-				return
-			}
-			if awsConfig.ConnectType.ValueString() == "AWS" {
-				// Only allow type of "public", "private", or "transit" for AWS VIFs
-				if awsConfig.Type.ValueString() != "public" && awsConfig.Type.ValueString() != "private" && awsConfig.Type.ValueString() != "transit" {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						"Could not create VXC with name "+plan.Name.ValueString()+": AWS Connect Type must be public, private, or transit",
-					)
-					return
-				}
-			}
-			awsDiags, partnerConfig, partnerConfigObj := createAWSPartnerConfig(ctx, awsConfig)
-			if awsDiags.HasError() {
-				resp.Diagnostics.Append(awsDiags...)
-				return
-			}
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = partnerConfig
-		case "azure":
-			if aPartnerConfig.AzurePartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Azure Partner configuration is required",
-				)
-				return
-			}
-			var azureConfig vxcPartnerConfigAzureModel
-			azureDiags := aPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
-			if azureDiags.HasError() {
-				resp.Diagnostics.Append(azureDiags...)
-				return
-			}
-			azureDiags, azurePartnerConfig, partnerConfigObj := createAzurePartnerConfig(ctx, azureConfig)
-			if azureDiags.HasError() {
-				resp.Diagnostics.Append(azureDiags...)
-				return
-			}
-			if aEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.ListPartnerPortsRequest{
-					Key:     azureConfig.ServiceKey.ValueString(),
-					Partner: "AZURE",
-				}
-				partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				// find primary or secondary port
-				for _, port := range partnerPortRes.Data.Megaports {
-					p := &port
-					if p.Type == azureConfig.PortChoice.ValueString() {
-						aEndConfig.ProductUID = p.ProductUID
-					}
-				}
-				if aEndConfig.ProductUID == "" {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
-					)
-					return
-				}
-			}
-
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = azurePartnerConfig
-		case "google":
-			if aPartnerConfig.GooglePartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Google Partner configuration is required",
-				)
-				return
-			}
-			var googleConfig vxcPartnerConfigGoogleModel
-			googleDiags := aPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
-			if googleDiags.HasError() {
-				resp.Diagnostics.Append(googleDiags...)
-				return
-			}
-			googleDiags, googlePartnerConfig, partnerConfigObj := createGooglePartnerConfig(ctx, googleConfig)
-			if googleDiags.HasError() {
-				resp.Diagnostics.Append(googleDiags...)
-				return
-			}
-			if aEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.LookupPartnerPortsRequest{
-					Key:       googleConfig.PairingKey.ValueString(),
-					PortSpeed: int(plan.RateLimit.ValueInt64()),
-					Partner:   "GOOGLE",
-				}
-				partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				aEndConfig.ProductUID = partnerPortRes.ProductUID
-			}
-
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = googlePartnerConfig
-		case "oracle":
-			if aPartnerConfig.OraclePartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Oracle Partner configuration is required",
-				)
-				return
-			}
-			var oracleConfig vxcPartnerConfigOracleModel
-			oracleDiags := aPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
-			if oracleDiags.HasError() {
-				resp.Diagnostics.Append(oracleDiags...)
-				return
-			}
-			oracleDiags, oraclePartnerConfig, partnerConfigObj := createOraclePartnerConfig(ctx, oracleConfig)
-			if oracleDiags.HasError() {
-				resp.Diagnostics.Append(oracleDiags...)
-				return
-			}
-			if aEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.LookupPartnerPortsRequest{
-					Key:       oracleConfig.VirtualCircuitId.ValueString(),
-					PortSpeed: int(plan.RateLimit.ValueInt64()),
-					Partner:   "ORACLE",
-				}
-				partnerPortReq.ProductID = a.RequestedProductUID.ValueString()
-
-				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				aEndConfig.ProductUID = partnerPortRes.ProductUID
-			}
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = oraclePartnerConfig
-		case "ibm":
-			if aPartnerConfig.IBMPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": IBM Partner configuration is required",
-				)
-				return
-			}
-			var ibmConfig vxcPartnerConfigIbmModel
-			ibmDiags := aPartnerConfig.IBMPartnerConfig.As(ctx, &ibmConfig, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(ibmDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			ibmDiags, ibmPartnerConfig, partnerConfigObj := createIBMPartnerConfig(ctx, ibmConfig)
-			if ibmDiags.HasError() {
-				resp.Diagnostics.Append(ibmDiags...)
-				return
-			}
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = ibmPartnerConfig
-		case "vrouter":
-			if aPartnerConfig.VrouterPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
-				)
-				return
-			}
-			var partnerConfigAEnd vxcPartnerConfigVrouterModel
-			aEndDiags := aPartnerConfig.VrouterPartnerConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
-			if aEndDiags.HasError() {
-				resp.Diagnostics.Append(aEndDiags...)
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
-
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
-			if vrouterDiags.HasError() {
-				resp.Diagnostics.Append(vrouterDiags...)
-				return
-			}
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = vrouterMegaportConfig
-		case "a-end":
-			if aPartnerConfig.PartnerAEndConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": A-End Partner configuration is required",
-				)
-				return
-			}
-			var partnerConfigAEnd vxcPartnerConfigAEndModel
-			aEndDiags := aPartnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
-			if aEndDiags.HasError() {
-				resp.Diagnostics.Append(aEndDiags...)
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
-			aEndDiags, aEndMegaportConfig, partnerConfigObj := createAEndPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
-			if aEndDiags.HasError() {
-				resp.Diagnostics.Append(aEndDiags...)
-				return
-			}
-
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = aEndMegaportConfig
-		case "transit":
-			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
-			if transitDiags.HasError() {
-				resp.Diagnostics.Append(transitDiags...)
-				return
-			}
-			plan.AEndPartnerConfig = partnerConfigObj
-			aEndConfig.PartnerConfig = transitPartnerConfig
-		default:
+	// A-End vrouter partner config
+	if !a.VrouterPartnerConfig.IsNull() && !a.VrouterPartnerConfig.IsUnknown() {
+		var partnerConfigAEnd vxcPartnerConfigVrouterModel
+		vrouterDiags := a.VrouterPartnerConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+		if vrouterDiags.HasError() {
+			resp.Diagnostics.Append(vrouterDiags...)
+			return
+		}
+		prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.ProductUID.ValueString())
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
-				"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
+				"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
 			)
 			return
 		}
+		vrouterDiags2, vrouterMegaportConfig := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+		if vrouterDiags2.HasError() {
+			resp.Diagnostics.Append(vrouterDiags2...)
+			return
+		}
+		aEndConfig.PartnerConfig = vrouterMegaportConfig
 	}
 
 	buyReq.AEndConfiguration = *aEndConfig
 
-	var b vxcEndConfigurationModel
-	bEndDiags := bEndObj.As(ctx, &b, basetypes.ObjectAsOptions{})
+	// B-End config
+	var b vxcBEndConfigModel
+	bEndDiags := plan.BEndConfiguration.As(ctx, &b, basetypes.ObjectAsOptions{})
 	if bEndDiags.HasError() {
 		resp.Diagnostics.Append(bEndDiags...)
 		return
 	}
 	bEndConfig := &megaport.VXCOrderEndpointConfiguration{
-		ProductUID: b.RequestedProductUID.ValueString(),
-		VLAN:       int(b.VLAN.ValueInt64()),
+		ProductUID: b.ProductUID.ValueString(),
 	}
 	if serviceKeyBEndUID != "" {
-		// If B End Requested Product UID was provided and it differs from the Service Key Product UID, warn that it is being overridden
-		if b.RequestedProductUID.ValueString() != "" && b.RequestedProductUID.ValueString() != serviceKeyBEndUID {
+		// If B End Product UID was provided and it differs from the Service Key Product UID, warn
+		if b.ProductUID.ValueString() != "" && b.ProductUID.ValueString() != serviceKeyBEndUID {
 			resp.Diagnostics.AddWarning(
 				"Overriding B-End Product UID",
-				"Overriding the requested B-End Product UID of "+b.RequestedProductUID.ValueString()+" with "+serviceKeyBEndUID+" based on the provided Service Key.",
+				"Overriding the requested B-End Product UID of "+b.ProductUID.ValueString()+" with "+serviceKeyBEndUID+" based on the provided Service Key.",
 			)
 		}
 		bEndConfig.ProductUID = serviceKeyBEndUID
 	}
-	if !b.OrderedVLAN.IsNull() {
-		bEndConfig.VLAN = int(b.OrderedVLAN.ValueInt64())
+	if !b.VLAN.IsNull() && !b.VLAN.IsUnknown() {
+		bEndConfig.VLAN = int(b.VLAN.ValueInt64())
 	} else {
 		bEndConfig.VLAN = 0
 	}
 
 	// Check product type - if MVE, require VNIC Index
-	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
+	productType, _ = r.client.ProductService.GetProductType(ctx, b.ProductUID.ValueString())
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
 		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
 			resp.Diagnostics.AddError(
@@ -1545,244 +728,146 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 		bEndConfig.VXCOrderMVEConfig = vxcOrderMVEConfig
 	}
-	if !plan.BEndPartnerConfig.IsNull() {
-		var bPartnerConfig vxcPartnerConfigurationModel
-		bPartnerDiags := plan.BEndPartnerConfig.As(ctx, &bPartnerConfig, basetypes.ObjectAsOptions{})
-		resp.Diagnostics.Append(bPartnerDiags...)
-		switch bPartnerConfig.Partner.ValueString() {
-		case "aws":
-			if bPartnerConfig.AWSPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": AWS Partner configuration is required",
-				)
-				return
-			}
-			var awsConfig vxcPartnerConfigAWSModel
-			awsDiags := bPartnerConfig.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
-			if awsDiags.HasError() {
-				resp.Diagnostics.Append(awsDiags...)
-				return
-			}
-			if awsConfig.ConnectType.ValueString() == "AWS" {
-				// Only allow type of "public", "private", or "transit" for AWS VIFs
-				if awsConfig.Type.ValueString() != "public" && awsConfig.Type.ValueString() != "private" && awsConfig.Type.ValueString() != "transit" {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						"Could not create VXC with name "+plan.Name.ValueString()+": AWS Connect Type must be public, private, or transit",
-					)
-					return
-				}
-			}
-			awsDiags, partnerConfig, partnerConfigObj := createAWSPartnerConfig(ctx, awsConfig)
-			if awsDiags.HasError() {
-				resp.Diagnostics.Append(awsDiags...)
-				return
-			}
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = partnerConfig
-		case "azure":
-			if bPartnerConfig.AzurePartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Azure Partner configuration is required",
-				)
-				return
-			}
-			var azureConfig vxcPartnerConfigAzureModel
-			azureDiags := bPartnerConfig.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
-			if azureDiags.HasError() {
-				resp.Diagnostics.Append(azureDiags...)
-				return
-			}
 
-			azureDiags, azurePartnerConfig, partnerConfigObj := createAzurePartnerConfig(ctx, azureConfig)
-			if azureDiags.HasError() {
-				resp.Diagnostics.Append(azureDiags...)
-				return
-			}
-			if bEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.ListPartnerPortsRequest{
-					Key:     azureConfig.ServiceKey.ValueString(),
-					Partner: "AZURE",
-				}
-				partnerPortRes, err := r.client.VXCService.ListPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				// find primary or secondary port
-				for _, port := range partnerPortRes.Data.Megaports {
-					p := &port
-					if p.Type == azureConfig.PortChoice.ValueString() {
-						bEndConfig.ProductUID = p.ProductUID
-					}
-				}
-				if bEndConfig.ProductUID == "" {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not find azure port with type: %s", azureConfig.PortChoice.ValueString()),
-					)
-					return
-				}
-			}
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = azurePartnerConfig
-		case "google":
-			if bPartnerConfig.GooglePartnerConfig.IsNull() {
+	// B-End partner configs
+	bEndPartnerType := inferBEndPartnerType(&b)
+	switch bEndPartnerType {
+	case "aws":
+		var awsConfig vxcPartnerConfigAWSModel
+		awsDiags := b.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{})
+		if awsDiags.HasError() {
+			resp.Diagnostics.Append(awsDiags...)
+			return
+		}
+		if awsConfig.ConnectType.ValueString() == "AWS" {
+			if awsConfig.Type.ValueString() != "public" && awsConfig.Type.ValueString() != "private" && awsConfig.Type.ValueString() != "transit" {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Google Partner configuration is required",
+					"Could not create VXC with name "+plan.Name.ValueString()+": AWS Connect Type must be public, private, or transit",
 				)
 				return
 			}
-			var googleConfig vxcPartnerConfigGoogleModel
-			googleDiags := bPartnerConfig.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
-			if googleDiags.HasError() {
-				resp.Diagnostics.Append(googleDiags...)
-				return
+		}
+		awsDiags2, partnerConfig, _ := createAWSPartnerConfig(ctx, awsConfig)
+		if awsDiags2.HasError() {
+			resp.Diagnostics.Append(awsDiags2...)
+			return
+		}
+		bEndConfig.PartnerConfig = partnerConfig
+	case "azure":
+		var azureConfig vxcPartnerConfigAzureModel
+		azureDiags := b.AzurePartnerConfig.As(ctx, &azureConfig, basetypes.ObjectAsOptions{})
+		if azureDiags.HasError() {
+			resp.Diagnostics.Append(azureDiags...)
+			return
+		}
+		azureDiags2, azurePartnerConfig, _ := createAzurePartnerConfig(ctx, azureConfig)
+		if azureDiags2.HasError() {
+			resp.Diagnostics.Append(azureDiags2...)
+			return
+		}
+		bEndConfig.PartnerConfig = azurePartnerConfig
+	case "google":
+		var googleConfig vxcPartnerConfigGoogleModel
+		googleDiags := b.GooglePartnerConfig.As(ctx, &googleConfig, basetypes.ObjectAsOptions{})
+		if googleDiags.HasError() {
+			resp.Diagnostics.Append(googleDiags...)
+			return
+		}
+		googleDiags2, googlePartnerConfig, _ := createGooglePartnerConfig(ctx, googleConfig)
+		if googleDiags2.HasError() {
+			resp.Diagnostics.Append(googleDiags2...)
+			return
+		}
+		if bEndConfig.ProductUID == "" {
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       googleConfig.PairingKey.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "GOOGLE",
 			}
-
-			googleDiags, googlePartnerConfig, partnerConfigObj := createGooglePartnerConfig(ctx, googleConfig)
-			if googleDiags.HasError() {
-				resp.Diagnostics.Append(googleDiags...)
-				return
+			if !b.ProductUID.IsNull() {
+				partnerPortReq.ProductID = b.ProductUID.ValueString()
 			}
-			if bEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.LookupPartnerPortsRequest{
-					Key:       googleConfig.PairingKey.ValueString(),
-					PortSpeed: int(plan.RateLimit.ValueInt64()),
-					Partner:   "GOOGLE",
-				}
-				if !b.RequestedProductUID.IsNull() {
-					partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
-				}
-				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				bEndConfig.ProductUID = partnerPortRes.ProductUID
-			}
-
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = googlePartnerConfig
-		case "oracle":
-			if bPartnerConfig.OraclePartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Oracle Partner configuration is required",
-				)
-				return
-			}
-			var oracleConfig vxcPartnerConfigOracleModel
-			oracleDiags := bPartnerConfig.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
-			if oracleDiags.HasError() {
-				resp.Diagnostics.Append(oracleDiags...)
-				return
-			}
-			oracleDiags, oraclePartnerConfig, partnerConfigObj := createOraclePartnerConfig(ctx, oracleConfig)
-			if oracleDiags.HasError() {
-				resp.Diagnostics.Append(oracleDiags...)
-				return
-			}
-			if bEndConfig.ProductUID == "" {
-				partnerPortReq := &megaport.LookupPartnerPortsRequest{
-					Key:       oracleConfig.VirtualCircuitId.ValueString(),
-					PortSpeed: int(plan.RateLimit.ValueInt64()),
-					Partner:   "ORACLE",
-				}
-				if !b.RequestedProductUID.IsNull() {
-					partnerPortReq.ProductID = b.RequestedProductUID.ValueString()
-				}
-				partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error creating VXC",
-						fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
-					)
-					return
-				}
-				bEndConfig.ProductUID = partnerPortRes.ProductUID
-			}
-
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = oraclePartnerConfig
-		case "ibm":
-			if bPartnerConfig.IBMPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": IBM Partner configuration is required",
-				)
-				return
-			}
-			var ibmConfig vxcPartnerConfigIbmModel
-			ibmDiags := bPartnerConfig.IBMPartnerConfig.As(ctx, &ibmConfig, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(ibmDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			ibmDiags, ibmPartnerConfig, partnerConfigObj := createIBMPartnerConfig(ctx, ibmConfig)
-			if ibmDiags.HasError() {
-				resp.Diagnostics.Append(ibmDiags...)
-				return
-			}
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = ibmPartnerConfig
-		case "transit":
-			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
-			if transitDiags.HasError() {
-				resp.Diagnostics.Append(transitDiags...)
-				return
-			}
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = transitPartnerConfig
-		case "vrouter":
-			if bPartnerConfig.VrouterPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
-				)
-				return
-			}
-			var partnerConfigBEnd vxcPartnerConfigVrouterModel
-			bEndDiags := bPartnerConfig.VrouterPartnerConfig.As(ctx, &partnerConfigBEnd, basetypes.ObjectAsOptions{})
-			if aEndDiags.HasError() {
-				resp.Diagnostics.Append(bEndDiags...)
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, b.RequestedProductUID.ValueString())
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
-					"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
 				)
 				return
 			}
-
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList)
-			if vrouterDiags.HasError() {
-				resp.Diagnostics.Append(vrouterDiags...)
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
+		}
+		bEndConfig.PartnerConfig = googlePartnerConfig
+	case "oracle":
+		var oracleConfig vxcPartnerConfigOracleModel
+		oracleDiags := b.OraclePartnerConfig.As(ctx, &oracleConfig, basetypes.ObjectAsOptions{})
+		if oracleDiags.HasError() {
+			resp.Diagnostics.Append(oracleDiags...)
+			return
+		}
+		oracleDiags2, oraclePartnerConfig, _ := createOraclePartnerConfig(ctx, oracleConfig)
+		if oracleDiags2.HasError() {
+			resp.Diagnostics.Append(oracleDiags2...)
+			return
+		}
+		if bEndConfig.ProductUID == "" {
+			partnerPortReq := &megaport.LookupPartnerPortsRequest{
+				Key:       oracleConfig.VirtualCircuitId.ValueString(),
+				PortSpeed: int(plan.RateLimit.ValueInt64()),
+				Partner:   "ORACLE",
+			}
+			if !b.ProductUID.IsNull() {
+				partnerPortReq.ProductID = b.ProductUID.ValueString()
+			}
+			partnerPortRes, err := r.client.VXCService.LookupPartnerPorts(ctx, partnerPortReq)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating VXC",
+					fmt.Sprintf("Could not create %s, there was an error looking up partner ports: %s", plan.Name.ValueString(), err.Error()),
+				)
 				return
 			}
-			plan.BEndPartnerConfig = partnerConfigObj
-			bEndConfig.PartnerConfig = vrouterMegaportConfig
-		default:
+			bEndConfig.ProductUID = partnerPortRes.ProductUID
+		}
+		bEndConfig.PartnerConfig = oraclePartnerConfig
+	case "ibm":
+		var ibmConfig vxcPartnerConfigIbmModel
+		ibmDiags := b.IBMPartnerConfig.As(ctx, &ibmConfig, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(ibmDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		ibmDiags2, ibmPartnerConfig, _ := createIBMPartnerConfig(ctx, ibmConfig)
+		if ibmDiags2.HasError() {
+			resp.Diagnostics.Append(ibmDiags2...)
+			return
+		}
+		bEndConfig.PartnerConfig = ibmPartnerConfig
+	case "transit":
+		bEndConfig.PartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
+	case "vrouter":
+		var partnerConfigBEnd vxcPartnerConfigVrouterModel
+		vrouterDiags := b.VrouterPartnerConfig.As(ctx, &partnerConfigBEnd, basetypes.ObjectAsOptions{})
+		if vrouterDiags.HasError() {
+			resp.Diagnostics.Append(vrouterDiags...)
+			return
+		}
+		prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, b.ProductUID.ValueString())
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating VXC",
-				"Could not create VXC with name "+plan.Name.ValueString()+": Partner configuration not supported",
+				"Could not create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
 			)
 			return
 		}
+		vrouterDiags2, vrouterMegaportConfig := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList)
+		if vrouterDiags2.HasError() {
+			resp.Diagnostics.Append(vrouterDiags2...)
+			return
+		}
+		bEndConfig.PartnerConfig = vrouterMegaportConfig
 	}
-
-	buyReq.BEndConfiguration = *bEndConfig
 
 	buyReq.BEndConfiguration = *bEndConfig
 
@@ -1826,9 +911,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// update the plan with the VXC info
-	// Pass &plan so that user-only fields (ordered_vlan, requested_product_uid,
-	// vnic_index, partner configs) are preserved from the plan — the API may
-	// not return them reliably immediately after create.
 	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, &plan)
 	resp.Diagnostics.Append(apiDiags...)
 
@@ -1894,13 +976,6 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-
-	aEndConfig := &vxcEndConfigurationModel{}
-	bEndConfig := &vxcEndConfigurationModel{}
-	aEndConfigDiags := state.AEndConfiguration.As(ctx, aEndConfig, basetypes.ObjectAsOptions{})
-	bEndConfigDiags := state.BEndConfiguration.As(ctx, bEndConfig, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(aEndConfigDiags...)
-	resp.Diagnostics.Append(bEndConfigDiags...)
 }
 
 func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -1913,45 +988,35 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	var aEndPartnerChange, bEndPartnerChange bool
-
-	// Detect changes BEFORE normalizing null state values, otherwise adding
-	// partner config to a VXC that didn't have one is silently ignored.
-	if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) {
-		aEndPartnerChange = true
-	}
-	if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-		bEndPartnerChange = true
-	}
-
-	// If imported, partner config will be null in state. Copy plan values
-	// so downstream deserialization (.As()) does not fail on null objects.
-	if state.AEndPartnerConfig.IsNull() {
-		state.AEndPartnerConfig = plan.AEndPartnerConfig
-	}
-	if state.BEndPartnerConfig.IsNull() {
-		state.BEndPartnerConfig = plan.BEndPartnerConfig
-	}
-
-	var aEndPlan, bEndPlan, aEndState, bEndState *vxcEndConfigurationModel
-	var aEndPartnerPlan, bEndPartnerPlan, aEndPartnerState, bEndPartnerState *vxcPartnerConfigurationModel
-
-	// Check if AEnd or BEnd is a CSP Partner Configuration
-	var aEndCSP, bEndCSP bool
+	var aEndPlan, bEndPlan, aEndState, bEndState vxcAEndConfigModel
+	var bEndPlanConfig, bEndStateConfig vxcBEndConfigModel
 
 	aEndPlanDiags := plan.AEndConfiguration.As(ctx, &aEndPlan, basetypes.ObjectAsOptions{})
 	resp.Diagnostics.Append(aEndPlanDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	bEndPlanDiags := plan.BEndConfiguration.As(ctx, &bEndPlan, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(bEndPlanDiags...)
+	aEndStateDiags := state.AEndConfiguration.As(ctx, &aEndState, basetypes.ObjectAsOptions{})
+	resp.Diagnostics.Append(aEndStateDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	aEndStateDiags := state.AEndConfiguration.As(ctx, &aEndState, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(aEndStateDiags...)
+	// For B-end, we need full config model (with partner configs)
+	bEndPlanFullDiags := plan.BEndConfiguration.As(ctx, &bEndPlanConfig, basetypes.ObjectAsOptions{})
+	resp.Diagnostics.Append(bEndPlanFullDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	bEndStateFullDiags := state.BEndConfiguration.As(ctx, &bEndStateConfig, basetypes.ObjectAsOptions{})
+	resp.Diagnostics.Append(bEndStateFullDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Also extract simple b-end for VLAN/VNIC updates
+	bEndPlanDiags := plan.BEndConfiguration.As(ctx, &bEndPlan, basetypes.ObjectAsOptions{})
+	resp.Diagnostics.Append(bEndPlanDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -1961,46 +1026,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	aEndPartnerPlanDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerPlan, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(aEndPartnerPlanDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if !plan.AEndPartnerConfig.IsNull() {
-		if !aEndPartnerPlan.Partner.IsNull() {
-			// Check if the partner is a CSP Partner
-			if aEndPartnerPlan.Partner.ValueString() != "a-end" && aEndPartnerPlan.Partner.ValueString() != "vrouter" && aEndPartnerPlan.Partner.ValueString() != "transit" {
-				aEndCSP = true
-			}
-		}
-	}
-	bEndPartnerPlanDiags := plan.BEndPartnerConfig.As(ctx, &bEndPartnerPlan, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(bEndPartnerPlanDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if !plan.BEndPartnerConfig.IsNull() {
-		if !bEndPartnerPlan.Partner.IsNull() {
-			// Check if the partner is a CSP Partner
-			if bEndPartnerPlan.Partner.ValueString() != "a-end" && bEndPartnerPlan.Partner.ValueString() != "vrouter" && bEndPartnerPlan.Partner.ValueString() != "transit" {
-				bEndCSP = true
-			}
-		}
-	}
-
-	aEndPartnerStateDiags := state.AEndPartnerConfig.As(ctx, &aEndPartnerState, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(aEndPartnerStateDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	bEndPartnerStateDiags := state.BEndPartnerConfig.As(ctx, &bEndPartnerState, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(bEndPartnerStateDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, aEndPlan.RequestedProductUID.ValueString())
-	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, bEndPlan.RequestedProductUID.ValueString())
+	aEndProductType, _ := r.client.ProductService.GetProductType(ctx, aEndPlan.ProductUID.ValueString())
+	bEndProductType, _ := r.client.ProductService.GetProductType(ctx, bEndPlan.ProductUID.ValueString())
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
@@ -2011,58 +1038,48 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	var aEndPartnerType, bEndPartnerType string
-	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerPlan != nil {
-		aEndPartnerType = aEndPartnerPlan.Partner.ValueString()
-	}
-	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerPlan != nil {
-		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
-	}
+	aEndPartnerType := inferBEndPartnerType(&vxcBEndConfigModel{
+		VrouterPartnerConfig: aEndPlan.VrouterPartnerConfig,
+	})
+	bEndPartnerType := inferBEndPartnerType(&bEndPlanConfig)
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) &&
+	// If VLAN is different from state VLAN, attempt to change it.
+	if !aEndPlan.VLAN.IsUnknown() && !aEndPlan.VLAN.IsNull() &&
+		!aEndPlan.VLAN.Equal(aEndState.VLAN) &&
 		supportVLANUpdates(aEndPartnerType) {
-		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
 	}
-	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
 	// Check VNIC index for A End
 	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
 		if supportVLANUpdates(aEndPartnerType) &&
 			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
-			// Only include VLAN if we need it for validation but don't already have it set correctly
-			if !aEndPlan.OrderedVLAN.IsNull() &&
-				!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
-				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+			if !aEndPlan.VLAN.IsNull() &&
+				!aEndPlan.VLAN.Equal(aEndState.VLAN) {
+				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.VLAN.ValueInt64()))
 			} else if !aEndState.VLAN.IsNull() &&
 				updateReq.AEndVLAN == nil {
-				// Only include the current VLAN if we haven't already added a VLAN update
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 			}
 		}
 	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
 			"Error updating VXC",
 			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
 		)
 		return
 	} else {
-		// For non-MVE products, explicitly set to null in state
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
-	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) &&
+	// If VLAN is different from state VLAN, attempt to change it.
+	if !bEndPlan.VLAN.IsUnknown() && !bEndPlan.VLAN.IsNull() &&
+		!bEndPlan.VLAN.Equal(bEndState.VLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
-		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
 	}
-	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
 	// Prevent setting inner_vlan during updates for partners that don't support VLAN changes
 	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() &&
@@ -2070,18 +1087,15 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
-	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
 	if !aEndPlan.InnerVLAN.IsNull() && !aEndPlan.InnerVLAN.IsUnknown() && aEndPlan.InnerVLAN.ValueInt64() == -1 {
 		aEndState.InnerVLAN = types.Int64Value(-1)
 	}
 
-	// Similarly add for B-End
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
 		!bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
-	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
 	if !bEndPlan.InnerVLAN.IsNull() && !bEndPlan.InnerVLAN.IsUnknown() && bEndPlan.InnerVLAN.ValueInt64() == -1 {
 		bEndState.InnerVLAN = types.Int64Value(-1)
 	}
@@ -2090,28 +1104,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
 		if supportVLANUpdates(bEndPartnerType) &&
 			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
-			// Only include VLAN if we need it for validation but don't already have it set correctly
-			if !bEndPlan.OrderedVLAN.IsNull() &&
-				!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
-				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+			if !bEndPlan.VLAN.IsNull() &&
+				!bEndPlan.VLAN.Equal(bEndState.VLAN) {
+				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.VLAN.ValueInt64()))
 			} else if !bEndState.VLAN.IsNull() &&
 				updateReq.BEndVLAN == nil {
-				// Only include the current VLAN if we haven't already added a VLAN update
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 			}
 		}
 	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
 		resp.Diagnostics.AddError(
 			"Error updating VXC",
 			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
 		)
 		return
 	} else {
-		// For non-MVE products, explicitly set to null in state
 		bEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
@@ -2127,79 +1136,45 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Term = megaport.PtrTo(int(plan.ContractTermMonths.ValueInt64()))
 	}
 
-	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
-			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
-			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+	// Determine if B-End is a CSP partner (not updatable)
+	bEndCSP := false
+	switch bEndPartnerType {
+	case "aws", "azure", "google", "oracle", "ibm":
+		bEndCSP = true
+	}
+
+	aEndCSP := false
+	// A-End only uses vrouter, which is not a CSP
+
+	if !aEndPlan.ProductUID.IsNull() && !aEndPlan.ProductUID.Equal(aEndState.ProductUID) {
+		if !aEndCSP && !aEndPlan.ProductUID.Equal(aEndState.AssignedProductUID) {
+			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.ProductUID.ValueString())
+			aEndState.ProductUID = aEndPlan.ProductUID
 		} else {
-			aEndState.RequestedProductUID = aEndState.CurrentProductUID
+			aEndState.ProductUID = aEndState.AssignedProductUID
 		}
 	}
-	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
-			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
-			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
+	if !bEndPlan.ProductUID.IsNull() && !bEndPlan.ProductUID.Equal(bEndState.ProductUID) {
+		if !bEndCSP && !bEndPlan.ProductUID.Equal(bEndState.AssignedProductUID) {
+			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.ProductUID.ValueString())
+			bEndState.ProductUID = bEndPlan.ProductUID
 		} else {
-			bEndState.RequestedProductUID = bEndState.CurrentProductUID
+			bEndState.ProductUID = bEndState.AssignedProductUID
 		}
 	}
-	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerChange && !aEndCSP {
-		aPartnerConfig := aEndPartnerPlan
-		switch aEndPartnerPlan.Partner.ValueString() {
-		case "transit":
-			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
-			if transitDiags.HasError() {
-				resp.Diagnostics.Append(transitDiags...)
-				return
-			}
-			state.AEndPartnerConfig = partnerConfigObj
-			updateReq.AEndPartnerConfig = transitPartnerConfig
-		case "a-end":
-			if aPartnerConfig.PartnerAEndConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": A-End Partner configuration is required",
-				)
-				return
-			}
-			var partnerConfigAEnd vxcPartnerConfigAEndModel
-			aEndDiags := aPartnerConfig.PartnerAEndConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(aEndDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndPlan.RequestedProductUID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": "+err.Error(),
-				)
-				return
-			}
-			aEndDiags, aEndMegaportConfig, partnerConfigObj := createAEndPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
-			if aEndDiags.HasError() {
-				resp.Diagnostics.Append(aEndDiags...)
-				return
-			}
-			state.AEndPartnerConfig = partnerConfigObj
-			updateReq.AEndPartnerConfig = aEndMegaportConfig
-		case "vrouter":
-			if aEndPartnerPlan.VrouterPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
-				)
-				return
-			}
+
+	// Detect A-End vrouter partner change
+	if !plan.AEndConfiguration.Equal(state.AEndConfiguration) {
+		aEndPlanVrouter := aEndPlan.VrouterPartnerConfig
+		aEndStateVrouter := aEndState.VrouterPartnerConfig
+		if !aEndPlanVrouter.Equal(aEndStateVrouter) && !aEndPlanVrouter.IsNull() {
 			var partnerConfigAEnd vxcPartnerConfigVrouterModel
-			aEndDiags := aEndPartnerPlan.VrouterPartnerConfig.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(aEndDiags...)
+			vrouterDiags := aEndPlanVrouter.As(ctx, &partnerConfigAEnd, basetypes.ObjectAsOptions{})
+			resp.Diagnostics.Append(vrouterDiags...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.ProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2207,47 +1182,25 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				)
 				return
 			}
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
-			if vrouterDiags.HasError() {
-				resp.Diagnostics.Append(vrouterDiags...)
+			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			if vrouterDiags2.HasError() {
+				resp.Diagnostics.Append(vrouterDiags2...)
 				return
 			}
-			state.AEndPartnerConfig = partnerConfigObj
 			updateReq.AEndPartnerConfig = vrouterPartnerConfig
-		default:
-			resp.Diagnostics.AddError(
-				"Error Updating VXC",
-				"Could not update VXC with ID "+state.UID.ValueString()+": Partner configuration not supported",
-			)
-			return
 		}
 	}
 
-	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerChange && !bEndCSP {
-		switch bEndPartnerPlan.Partner.ValueString() {
-		case "transit":
-			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
-			if transitDiags.HasError() {
-				resp.Diagnostics.Append(transitDiags...)
-				return
-			}
-			state.BEndPartnerConfig = partnerConfigObj
-			updateReq.BEndPartnerConfig = transitPartnerConfig
-		case "vrouter":
-			if bEndPartnerPlan.VrouterPartnerConfig.IsNull() {
-				resp.Diagnostics.AddError(
-					"Error updating VXC",
-					"Could not update VXC with name "+plan.Name.ValueString()+": Virtual router configuration is required",
-				)
-				return
-			}
+	// Detect B-End vrouter partner change (only vrouter is updatable)
+	if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "vrouter" && !bEndCSP {
+		if !bEndPlanConfig.VrouterPartnerConfig.IsNull() {
 			var vrouterModel vxcPartnerConfigVrouterModel
-			bEndDiags := bEndPartnerPlan.VrouterPartnerConfig.As(ctx, &vrouterModel, basetypes.ObjectAsOptions{})
-			resp.Diagnostics.Append(bEndDiags...)
+			vrouterDiags := bEndPlanConfig.VrouterPartnerConfig.As(ctx, &vrouterModel, basetypes.ObjectAsOptions{})
+			resp.Diagnostics.Append(vrouterDiags...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.ProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2255,26 +1208,20 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				)
 				return
 			}
-
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
-			if vrouterDiags.HasError() {
-				resp.Diagnostics.Append(vrouterDiags...)
+			vrouterDiags2, vrouterPartnerConfig := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
+			if vrouterDiags2.HasError() {
+				resp.Diagnostics.Append(vrouterDiags2...)
 				return
 			}
-
-			state.BEndPartnerConfig = partnerConfigObj
 			updateReq.BEndPartnerConfig = vrouterPartnerConfig
-		default:
-			resp.Diagnostics.AddError(
-				"Error Updating VXC",
-				"Could not update VXC with ID "+state.UID.ValueString()+": Partner configuration not supported",
-			)
-			return
+		}
+	} else if !plan.BEndConfiguration.Equal(state.BEndConfiguration) && bEndPartnerType == "transit" && !bEndCSP {
+		if !bEndStateConfig.Transit.IsNull() && !bEndPlanConfig.Transit.Equal(bEndStateConfig.Transit) {
+			updateReq.BEndPartnerConfig = megaport.VXCPartnerConfigTransit{ConnectType: "TRANSIT"}
 		}
 	}
 
 	// Only send API call if there are changes to the VXC in the Update Request
-
 	var isChanged bool
 	var waitErr error
 	if updateReq.Name != nil || updateReq.AEndInnerVLAN != nil || updateReq.BEndInnerVLAN != nil ||
@@ -2307,10 +1254,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Update state with any changes from plan configuration following successful update
-	aEndStateObj, aEndStateDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndState)
+	aEndStateObj, aEndStateDiags := types.ObjectValueFrom(ctx, vxcAEndConfigAttrs, aEndState)
 	resp.Diagnostics.Append(aEndStateDiags...)
 	state.AEndConfiguration = aEndStateObj
-	bEndStateObj, bEndStateDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndState)
+	bEndStateObj, bEndStateDiags := types.ObjectValueFrom(ctx, vxcBEndConfigAttrs, bEndState)
 	resp.Diagnostics.Append(bEndStateDiags...)
 	state.BEndConfiguration = bEndStateObj
 
@@ -2446,179 +1393,9 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
-
-}
-
-func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (types.Object, diag.Diagnostics) {
-	apiDiags := diag.Diagnostics{}
-	switch provider := c.(type) {
-	case megaport.CSPConnectionAWS:
-		awsModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			VLAN:              types.Int64Value(int64(provider.VLAN)),
-			Account:           types.StringValue(provider.Account),
-			AmazonAddress:     types.StringValue(provider.AmazonAddress),
-			ASN:               types.Int64Value(int64(provider.ASN)),
-			AuthKey:           types.StringValue(provider.AuthKey),
-			CustomerAddress:   types.StringValue(provider.CustomerAddress),
-			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
-			ID:                types.Int64Value(int64(provider.ID)),
-			Name:              types.StringValue(provider.Name),
-			OwnerAccount:      types.StringValue(provider.OwnerAccount),
-			PeerASN:           types.Int64Value(int64(provider.PeerASN)),
-			Type:              types.StringValue(provider.Type),
-			VIFID:             types.StringValue(provider.VIFID),
-		}
-		awsModel.Bandwidths = types.ListNull(types.Int64Type)
-		awsModel.IPAddresses = types.ListNull(types.StringType)
-		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
-		apiDiags = append(apiDiags, awsDiags...)
-		return awsObject, apiDiags
-	case megaport.CSPConnectionAWSHC:
-		awsHCModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			Name:         types.StringValue(provider.Name),
-			OwnerAccount: types.StringValue(provider.OwnerAccount),
-			ConnectionID: types.StringValue(provider.ConnectionID),
-		}
-		bandwidths := []int64{}
-		for _, b := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(b))
-		}
-		bandwidthList, bandwidthDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
-		apiDiags = append(apiDiags, bandwidthDiags...)
-		awsHCModel.Bandwidths = bandwidthList
-		awsHCModel.IPAddresses = types.ListNull(types.StringType)
-		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
-		apiDiags = append(apiDiags, awsHCDiags...)
-		return awsHCObject, apiDiags
-	case megaport.CSPConnectionAzure:
-		azureModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			Managed:      types.BoolValue(provider.Managed),
-			ServiceKey:   types.StringValue(provider.ServiceKey),
-			VLAN:         types.Int64Value(int64(provider.VLAN)),
-		}
-		azureModel.Bandwidths = types.ListNull(types.Int64Type)
-		azureModel.IPAddresses = types.ListNull(types.StringType)
-		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
-		apiDiags = append(apiDiags, azureObjDiags...)
-		return azureObject, apiDiags
-	case megaport.CSPConnectionGoogle:
-		googleModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-			CSPName:      types.StringValue(provider.CSPName),
-			PairingKey:   types.StringValue(provider.PairingKey),
-		}
-		bandwidths := []int64{}
-
-		for _, b := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(b))
-		}
-		googleModel.IPAddresses = types.ListNull(types.StringType)
-		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
-		apiDiags = append(apiDiags, bwListDiags...)
-		googleModel.Bandwidths = bandwidthList
-		googleObject, googleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, googleModel)
-		apiDiags = append(apiDiags, googleObjDiags...)
-		return googleObject, apiDiags
-	case megaport.CSPConnectionVirtualRouter:
-		virtualRouterModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			VLAN:              types.Int64Value(int64(provider.VLAN)),
-			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
-		}
-		virtualRouterModel.Bandwidths = types.ListNull(types.Int64Type)
-		ipAddresses := []string{}
-		ipAddresses = append(ipAddresses, ipAddresses...)
-		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
-		apiDiags = append(apiDiags, ipListDiags...)
-		virtualRouterModel.IPAddresses = ipList
-		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
-		apiDiags = append(apiDiags, vrObjDiags...)
-		return virtualRouterObject, apiDiags
-	case megaport.CSPConnectionTransit:
-		transitModel := &cspConnectionModel{
-			ConnectType:        types.StringValue(provider.ConnectType),
-			ResourceName:       types.StringValue(provider.ResourceName),
-			ResourceType:       types.StringValue(provider.ResourceType),
-			CustomerIP4Address: types.StringValue(provider.CustomerIP4Address),
-			CustomerIP6Network: types.StringValue(provider.CustomerIP6Network),
-			IPv4GatewayAddress: types.StringValue(provider.IPv4GatewayAddress),
-			IPv6GatewayAddress: types.StringValue(provider.IPv6GatewayAddress),
-		}
-		transitModel.Bandwidths = types.ListNull(types.Int64Type)
-		transitModel.IPAddresses = types.ListNull(types.StringType)
-		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
-		apiDiags = append(apiDiags, transitObjectDiags...)
-		return transitObject, apiDiags
-	case megaport.CSPConnectionOracle:
-		oracleModel := &cspConnectionModel{
-			ConnectType:  types.StringValue(provider.ConnectType),
-			ResourceName: types.StringValue(provider.ResourceName),
-			ResourceType: types.StringValue(provider.ResourceType),
-			CSPName:      types.StringValue(provider.CSPName),
-			Bandwidth:    types.Int64Value(int64(provider.Bandwidth)),
-		}
-
-		// Set VirtualCircuitId if available
-		if provider.VirtualCircuitId != "" {
-			oracleModel.ConnectionID = types.StringValue(provider.VirtualCircuitId)
-		} else {
-			oracleModel.ConnectionID = types.StringNull()
-		}
-
-		// Set null values for fields that don't apply to Oracle connections
-		oracleModel.Bandwidths = types.ListNull(types.Int64Type)
-		oracleModel.IPAddresses = types.ListNull(types.StringType)
-
-		// Convert the model to a Terraform Object
-		oracleObj, oracleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, oracleModel)
-		apiDiags = append(apiDiags, oracleObjDiags...)
-		return oracleObj, apiDiags
-	case megaport.CSPConnectionIBM:
-		ibmModel := &cspConnectionModel{
-			ConnectType:       types.StringValue(provider.ConnectType),
-			ResourceName:      types.StringValue(provider.ResourceName),
-			ResourceType:      types.StringValue(provider.ResourceType),
-			AccountID:         types.StringValue(provider.AccountID),
-			CustomerASN:       types.Int64Value(int64(provider.CustomerASN)),
-			CustomerIPAddress: types.StringValue(provider.CustomerIPAddress),
-			ProviderIPAddress: types.StringValue(provider.ProviderIPAddress),
-			Bandwidth:         types.Int64Value(int64(provider.Bandwidth)),
-			CSPName:           types.StringValue(provider.CSPName),
-		}
-		bandwidths := []int64{}
-		for _, bandwidth := range provider.Bandwidths {
-			bandwidths = append(bandwidths, int64(bandwidth))
-		}
-		bandwidthList, bandwidthListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
-		apiDiags = append(apiDiags, bandwidthListDiags...)
-		ibmModel.Bandwidths = bandwidthList
-		ibmModel.IPAddresses = types.ListNull(types.StringType)
-		ibmObject, ibmObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
-		apiDiags = append(apiDiags, ibmObjectDiags...)
-		return ibmObject, apiDiags
-	}
-	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 }
 
 func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// Get current state
 	var plan, state vxcResourceModel
 	diags := diag.Diagnostics{}
 
@@ -2640,130 +1417,85 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
 		if !req.Plan.Raw.IsNull() {
-			var aEndCSP, bEndCSP bool
-			aEndStateObj := state.AEndConfiguration
-			bEndStateObj := state.BEndConfiguration
-			aEndStateConfig := &vxcEndConfigurationModel{}
-			bEndStateConfig := &vxcEndConfigurationModel{}
-			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
-			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
+			aEndStateConfig := &vxcAEndConfigModel{}
+			bEndStateConfig := &vxcBEndConfigModel{}
+			aEndDiags := state.AEndConfiguration.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
+			bEndDiags := state.BEndConfiguration.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
 			diags = append(diags, aEndDiags...)
 			diags = append(diags, bEndDiags...)
-			aEndPlanObj := plan.AEndConfiguration
-			bEndPlanObj := plan.BEndConfiguration
-			aEndPlanConfig := &vxcEndConfigurationModel{}
-			bEndPlanConfig := &vxcEndConfigurationModel{}
-			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
-			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			if aEndStateConfig.OrderedVLAN.IsUnknown() {
-				aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
+
+			aEndPlanConfig := &vxcAEndConfigModel{}
+			bEndPlanConfig := &vxcBEndConfigModel{}
+			aEndPlanDiags := plan.AEndConfiguration.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
+			bEndPlanDiags := plan.BEndConfiguration.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
+			diags = append(diags, aEndPlanDiags...)
+			diags = append(diags, bEndPlanDiags...)
+
+			// Infer partner types
+			bEndCSP := false
+			bEndPartnerType := inferBEndPartnerType(bEndPlanConfig)
+			switch bEndPartnerType {
+			case "aws", "azure", "google", "oracle", "ibm":
+				bEndCSP = true
 			}
-			if bEndStateConfig.OrderedVLAN.IsUnknown() {
-				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
-			}
-			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.AEndPartnerConfig.IsNull() {
-				if !aEndPartnerConfigModel.Partner.IsNull() {
-					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-						aEndCSP = true
-					}
-				}
-			}
-			if state.AEndPartnerConfig.IsNull() {
-				if !plan.AEndPartnerConfig.IsNull() {
-					state.AEndPartnerConfig = plan.AEndPartnerConfig
-				} else {
-					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) && aEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
+
+			// Handle CSP partner config replace detection for B-End
+			if bEndCSP {
+				// Check if the b_end_config partner config changed
+				planBEndCSPObj := extractBEndCSPObj(bEndPlanConfig)
+				stateBEndCSPObj := extractBEndCSPObj(bEndStateConfig)
+				if !planBEndCSPObj.Equal(stateBEndCSPObj) {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_config"))
 				}
 			}
 
-			if aEndStateConfig.RequestedProductUID.IsNull() {
-				if aEndPlanConfig.RequestedProductUID.IsNull() {
-					aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-					aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
+			// Handle product UID reconciliation for CSP connections
+			if aEndStateConfig.ProductUID.IsNull() {
+				if aEndPlanConfig.ProductUID.IsNull() {
+					aEndStateConfig.ProductUID = aEndStateConfig.AssignedProductUID
+					aEndPlanConfig.ProductUID = aEndStateConfig.AssignedProductUID
 				} else {
-					aEndStateConfig.RequestedProductUID = aEndPlanConfig.RequestedProductUID
-				}
-			} else if aEndCSP {
-				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-					tflog.Info(ctx, "Cloud provider port mapping detected for A-End",
-						map[string]any{
-							"requested_product_uid": aEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   aEndStateConfig.CurrentProductUID.ValueString(),
-						},
-					)
-				}
-				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
-			}
-
-			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.BEndPartnerConfig.IsNull() {
-				if !bEndPartnerConfigModel.Partner.IsNull() {
-					if !bEndPartnerConfigModel.Partner.IsNull() {
-						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-							bEndCSP = true
-						}
-					}
+					aEndStateConfig.ProductUID = aEndPlanConfig.ProductUID
 				}
 			}
 
-			if state.BEndPartnerConfig.IsNull() {
-				if !plan.BEndPartnerConfig.IsNull() {
-					state.BEndPartnerConfig = plan.BEndPartnerConfig
+			if bEndStateConfig.ProductUID.IsNull() {
+				if bEndPlanConfig.ProductUID.IsNull() {
+					bEndStateConfig.ProductUID = bEndStateConfig.AssignedProductUID
+					bEndPlanConfig.ProductUID = bEndStateConfig.AssignedProductUID
 				} else {
-					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) && bEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
-				}
-			}
-
-			if bEndStateConfig.RequestedProductUID.IsNull() {
-				if bEndPlanConfig.RequestedProductUID.IsNull() {
-					bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-					bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-				} else {
-					bEndStateConfig.RequestedProductUID = bEndPlanConfig.RequestedProductUID
+					bEndStateConfig.ProductUID = bEndPlanConfig.ProductUID
 				}
 			} else if bEndCSP {
-				if !bEndPlanConfig.RequestedProductUID.IsNull() && bEndPlanConfig.RequestedProductUID.ValueString() != "" && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.RequestedProductUID) {
+				if !bEndPlanConfig.ProductUID.IsNull() && bEndPlanConfig.ProductUID.ValueString() != "" && !bEndPlanConfig.ProductUID.Equal(bEndStateConfig.ProductUID) {
 					tflog.Info(ctx, "Cloud provider port mapping detected for B-End",
 						map[string]any{
-							"requested_product_uid": bEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   bEndStateConfig.CurrentProductUID.ValueString(),
+							"product_uid":          bEndPlanConfig.ProductUID.ValueString(),
+							"assigned_product_uid": bEndStateConfig.AssignedProductUID.ValueString(),
 						},
 					)
 				}
-				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
+				bEndPlanConfig.ProductUID = bEndStateConfig.ProductUID
 			}
 
-			newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
-			newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
+			newPlanAEndObj, aEndDiags2 := types.ObjectValueFrom(ctx, vxcAEndConfigAttrs, aEndPlanConfig)
+			newPlanBEndObj, bEndDiags2 := types.ObjectValueFrom(ctx, vxcBEndConfigAttrs, bEndPlanConfig)
+			diags = append(diags, aEndDiags2...)
+			diags = append(diags, bEndDiags2...)
 			plan.AEndConfiguration = newPlanAEndObj
 			plan.BEndConfiguration = newPlanBEndObj
-			newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
-			newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
+
+			newStateAEndObj, aEndDiags3 := types.ObjectValueFrom(ctx, vxcAEndConfigAttrs, aEndStateConfig)
+			newStateBEndObj, bEndDiags3 := types.ObjectValueFrom(ctx, vxcBEndConfigAttrs, bEndStateConfig)
+			diags = append(diags, aEndDiags3...)
+			diags = append(diags, bEndDiags3...)
 			state.AEndConfiguration = newStateAEndObj
 			state.BEndConfiguration = newStateBEndObj
+
 			req.Plan.Set(ctx, &plan)
 			resp.Plan.Set(ctx, &plan)
-			stateDiags := req.State.Set(ctx, &state)
-			diags = append(diags, stateDiags...)
+			stateDiags2 := req.State.Set(ctx, &state)
+			diags = append(diags, stateDiags2...)
 		}
 	}
 
@@ -2771,4 +1503,25 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// extractBEndCSPObj extracts the non-null CSP partner config object from a b-end config model
+// for comparison purposes (to detect if the CSP config changed).
+func extractBEndCSPObj(cfg *vxcBEndConfigModel) types.Object {
+	if !cfg.AWSPartnerConfig.IsNull() {
+		return cfg.AWSPartnerConfig
+	}
+	if !cfg.AzurePartnerConfig.IsNull() {
+		return cfg.AzurePartnerConfig
+	}
+	if !cfg.GooglePartnerConfig.IsNull() {
+		return cfg.GooglePartnerConfig
+	}
+	if !cfg.OraclePartnerConfig.IsNull() {
+		return cfg.OraclePartnerConfig
+	}
+	if !cfg.IBMPartnerConfig.IsNull() {
+		return cfg.IBMPartnerConfig
+	}
+	return types.ObjectNull(nil)
 }
