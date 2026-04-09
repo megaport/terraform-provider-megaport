@@ -16,6 +16,7 @@ func TestMCRPrefixFilterListDataSourceProviderTestSuite(t *testing.T) {
 }
 
 func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRPrefixFilterListDataSource_Basic() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -86,7 +87,7 @@ func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRP
 						megaport_mcr_prefix_filter_list.prefix_list_2
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				`, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Data source checks
 					resource.TestCheckResourceAttr("data.megaport_mcr_prefix_filter_lists.all_lists", "prefix_filter_lists.#", "2"),

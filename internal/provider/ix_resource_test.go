@@ -19,6 +19,7 @@ func TestIXProviderTestSuite(t *testing.T) {
 
 // TestAccMegaportIX_Basic tests the basic lifecycle of an IX resource
 func (suite *IXProviderTestSuite) TestAccMegaportIX_Basic() {
+	locationID, _ := findPortTestLocation(suite.T(), 1000)
 	ixName := RandomTestName()
 	portName := RandomTestName()
 	ixNameUpdated := ixName + "-updated"
@@ -46,7 +47,7 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixName, ixRateLimit, ixVLAN)
+`, portName, locationID, ixName, ixRateLimit, ixVLAN)
 
 	// Updated Terraform config
 	configUpdated := fmt.Sprintf(`
@@ -68,7 +69,7 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
+`, portName, locationID, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
 
 	resourceName := "megaport_ix.test_ix"
 

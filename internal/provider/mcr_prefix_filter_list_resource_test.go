@@ -18,6 +18,7 @@ func TestMCRPrefixFilterListProviderTestSuite(t *testing.T) {
 }
 
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_Basic() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -98,7 +99,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				`, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// MCR checks
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -251,7 +252,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+				`, locationID, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// MCR checks
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -320,7 +321,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
+				`, locationID, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew),
@@ -337,6 +338,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 }
 
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_IPv6() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -384,7 +386,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_list", "description", prefixFilterName),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_list", "address_family", "IPv6"),
@@ -409,6 +411,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // or le=128 (IPv6) instead of the exact match value configured by the user.
 // See PR #308 for details on the bug fix.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ExactMatch() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterNameIPv4 := RandomTestName()
 	prefixFilterNameIPv6 := RandomTestName()
@@ -486,7 +489,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				`, locationID, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// IPv4 Exact Match Checks - verify ge=le is preserved
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "description", prefixFilterNameIPv4),
@@ -599,7 +602,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				`, locationID, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
 				// PlanOnly checks that no changes are needed - validates idempotency
 				PlanOnly: true,
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -651,6 +654,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // are rejected with a descriptive error, and that canonical prefixes work correctly.
 // This is the end-to-end test for the fix in issue #317.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_CIDRValidation() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -692,7 +696,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				ExpectError: regexp.MustCompile(`(?s)host bits set.*Use the network address.*192\.168\.1\.0/24`),
 			},
 		},
@@ -702,6 +706,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // TestAccMegaportMCRPrefixFilterList_MixedExactAndRange tests a combination of exact match
 // and range-based prefix filter entries to ensure both are handled correctly.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_MixedExactAndRange() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -765,7 +770,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "description", prefixFilterName),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.#", "4"),
@@ -802,6 +807,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // 3. After importing the prefix filter list, the VXC should NOT detect changes
 // 4. The MCR should NOT attempt to delete the standalone-managed prefix filter lists
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -896,7 +902,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 
 				depends_on = [megaport_mcr_prefix_filter_list.pfl]
 			}
-		`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
+		`, locationID, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
 	}
 
 	resource.Test(suite.T(), resource.TestCase{
@@ -959,6 +965,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // standalone prefix filter lists does not trigger updates on VXCs that reference them.
 // This mirrors the GoTo customer pattern of importing multiple prefix filter lists at once.
 func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift() {
+	locationID, _ := findMCRTestLocation(suite.T(), 2500)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -1082,7 +1089,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					megaport_mcr_prefix_filter_list.pfl_export,
 				]
 			}
-		`, MCRTestLocationIDNum, mcrName, costCentreName,
+		`, locationID, mcrName, costCentreName,
 			pflName1, pflName2, pflName3,
 			portName, vxcName,
 			pflName1, pflName3)

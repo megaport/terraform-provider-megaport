@@ -9,11 +9,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const (
-	SinglePortTestLocation      = "NextDC B1"
-	SinglePortTestLocationIDNum = 5 // "NextDC B1"
-)
-
 type SinglePortProviderTestSuite ProviderTestSuite
 
 func TestSinglePortProviderTestSuite(t *testing.T) {
@@ -22,6 +17,7 @@ func TestSinglePortProviderTestSuite(t *testing.T) {
 }
 
 func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
+	locationID, _ := findPortTestLocation(suite.T(), 1000)
 	portName := RandomTestName()
 	portNameNew := RandomTestName()
 	costCentreName := RandomTestName()
@@ -47,7 +43,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 						"key1" = "value1"
 						"key2" = "value2"
   					}
-			      }`, SinglePortTestLocationIDNum, portName, costCentreName),
+			      }`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -103,7 +99,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 						"key1-updated" = "value1-updated"
 						"key2-updated" = "value2-updated"
 					}
-			      }`, SinglePortTestLocationIDNum, portNameNew, costCentreNameNew),
+			      }`, locationID, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -127,6 +123,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 }
 
 func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRemoval() {
+	locationID, _ := findPortTestLocation(suite.T(), 1000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	resource.Test(suite.T(), resource.TestCase{
@@ -144,7 +141,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName, costCentreName),
+				}`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", costCentreName),
 				),
@@ -161,7 +158,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", ""),
 				),
@@ -171,6 +168,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 }
 
 func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTermUpdate() {
+	locationID, _ := findPortTestLocation(suite.T(), 1000)
 	portName := RandomTestName()
 	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -186,7 +184,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
 					waitForProvisioningStatus("megaport_port.port"),
@@ -203,7 +201,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 12
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
 				),

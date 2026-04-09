@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	MVEArubaTestLocationIDNum = 59  // Los Angeles "Equinix LA1" (lax-eq1)
-	MVEVersaTestLocationIDNum = 70  // Chicago "CyrusOne Aurora (CHI2)" (chi-tx2)
-	MVEArubaImageIDMVE        = 152 // Aruba MVE image ID
+	MVEArubaImageIDMVE = 152 // Aruba MVE image ID
 )
 
 type MVEArubaProviderTestSuite ProviderTestSuite
@@ -29,6 +27,7 @@ func TestMVEVersaProviderTestSuite(t *testing.T) {
 }
 
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
+	locationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	mveNameNew := RandomTestName()
@@ -83,7 +82,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                  }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -170,7 +169,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
+                  }`, locationID, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -217,6 +216,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 }
 
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemoval() {
+	locationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	costCentreName := RandomTestName()
@@ -262,7 +262,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreName),
 				),
@@ -306,7 +306,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", ""),
 				),
@@ -316,6 +316,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 }
 
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpdate() {
+	locationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	resource.Test(suite.T(), resource.TestCase{
@@ -356,7 +357,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					waitForProvisioningStatus("megaport_mve.mve"),
@@ -397,7 +398,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "12"),
 				),
@@ -407,6 +408,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 }
 
 func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
+	locationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
@@ -462,7 +464,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEVersaTestLocationIDNum, mveName, costCentre),
+                  }`, locationID, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -553,7 +555,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEVersaTestLocationIDNum, mveNameNew, costCentreNew),
+                  }`, locationID, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -600,6 +602,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 }
 
 func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIgnoreChanges() {
+	locationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	costCentre := RandomTestName()
@@ -642,7 +645,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     {
                         description = "Control Plane"
                     }]
-                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName),
 				),
@@ -706,7 +709,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     lifecycle {
                         ignore_changes = [vendor_config]
                     }
-                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName+"-updated"),
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "cost_centre", costCentre+"-updated"),

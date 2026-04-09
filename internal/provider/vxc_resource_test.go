@@ -26,16 +26,10 @@ const (
 	VXCLocationID2 = 3  // "Global Switch Sydney West"
 	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
 
-	AzureServiceKey           = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
-	GooglePairingKeyCSPs      = "36ac9f72-c8e5-473f-a4b7-537a2502e446/australia-southeast1/1"
-	GooglePairingKeyGCPTest   = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
-	GooglePairingKeyEcosystem = "c0c9b06c-b4e2-4c71-a3ad-86e1cd671928/asia-northeast1/1"
-	OracleVirtualCircuitID    = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
-	AzurePartnerPortUID       = "13f28165-de96-484e-8f99-babb24650e6a"                                                      // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
+	OracleVirtualCircuitID = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
+	AzurePartnerPortUID    = "13f28165-de96-484e-8f99-babb24650e6a"                                                      // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
 
-	MVEArubaImageID              = 152
-	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
-	VXCMixedMVETestLocationIDNum = 321 // Denver "Iron Mountain DEN-1" (den-irm) - 8 test_demo_cores
+	MVEArubaImageID = 152
 )
 
 func TestVXCBasicProviderTestSuite(t *testing.T) {
@@ -991,6 +985,8 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 // }
 
 func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
+	azureServiceKey := pickAzureServiceKey(suite.T())
+	gcpPairingKey := pickGCPPairingKey(suite.T())
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
@@ -1098,7 +1094,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         }
                     }
                   }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKeyCSPs, vxcName3, AzureServiceKey),
+                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, gcpPairingKey, vxcName3, azureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1416,6 +1412,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 }
 
 func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
+	gcpPairingKey := pickGCPPairingKey(suite.T())
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	gcpCostCentreName := RandomTestName()
@@ -1468,7 +1465,7 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, GooglePairingKeyGCPTest),
+                  `, VXCLocationID1, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, gcpPairingKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "product_uid"),
@@ -1544,6 +1541,7 @@ func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
 }
 
 func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
+	azureServiceKey := pickAzureServiceKey(suite.T())
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	azureCostCentreName := RandomTestName()
@@ -1590,7 +1588,7 @@ func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, mcrName, mcrCostCentreName, azureVXCName, azureCostCentreName, AzurePartnerPortUID, AzureServiceKey),
+                  `, VXCLocationID1, mcrName, mcrCostCentreName, azureVXCName, azureCostCentreName, AzurePartnerPortUID, azureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
@@ -1719,6 +1717,8 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXC_BEndIpMtu() {
 }
 
 func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
+	azureServiceKey := pickAzureServiceKey(suite.T())
+	gcpPairingKey := pickGCPPairingKey(suite.T())
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
@@ -1885,7 +1885,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKeyEcosystem, azureVXCName, AzureServiceKey),
+                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, gcpPairingKey, azureVXCName, azureServiceKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2940,6 +2940,8 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
 }
 
 func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
+	mveLocationID, _ := findMVETestLocation(suite.T(), 2)
+	mcrLocationID, _ := findMCRTestLocation(suite.T(), 2500)
 	portName := RandomTestName()
 	mcrName := RandomTestName()
 	mveName := RandomTestName()
@@ -3035,8 +3037,8 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mcrName, MCRTestLocationIDNum,
-					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+					mcrName, mcrLocationID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcPortToMCRName, vxcMCRToMVEName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3144,8 +3146,8 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mcrName, MCRTestLocationIDNum,
-					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+					mcrName, mcrLocationID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
@@ -3162,6 +3164,7 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 }
 
 func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
+	mveLocationID, _ := findMVETestLocation(suite.T(), 2)
 	mveName1 := RandomTestName()
 	mveName2 := RandomTestName()
 	mveName3 := RandomTestName()
@@ -3292,10 +3295,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
-					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
-					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
-					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
+					mveName1, mveLocationID, mveName1, mveName1,
+					mveName2, mveLocationID, mveName2, mveName2,
+					mveName3, mveLocationID, mveName3, mveName3,
+					mveName4, mveLocationID, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs
@@ -3437,10 +3440,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
-					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
-					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
-					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
+					mveName1, mveLocationID, mveName1, mveName1,
+					mveName2, mveLocationID, mveName2, mveName2,
+					mveName3, mveLocationID, mveName3, mveName3,
+					mveName4, mveLocationID, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs still exist
@@ -3470,6 +3473,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
 }
 
 func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
+	mveLocationID, _ := findMVETestLocation(suite.T(), 2)
 	// Test names
 	portName := RandomTestName()
 	mveName := RandomTestName()
@@ -3538,7 +3542,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3612,7 +3616,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3668,7 +3672,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                 }
                 `,
 					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				PlanOnly: true,
@@ -4106,6 +4110,7 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWS
 // return the user-configured vnic_index on read, so the provider must preserve
 // it from state/plan to avoid an infinite update loop.
 func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithVnicIndex() {
+	mveLocationID, _ := findMVETestLocation(suite.T(), 2)
 	portName := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -4159,7 +4164,7 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 				}
 			}
 		`, portName, VXCLocationID1,
-			mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+			mveName, mveLocationID, MVEArubaImageID,
 			mveName, mveName,
 			vxcName)
 	}
