@@ -185,11 +185,9 @@ func (r *mcrIpsecAddonResource) Read(ctx context.Context, req resource.ReadReque
 
 	mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		if isMCRNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error reading MCR",
@@ -294,11 +292,9 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 	// Setting tunnel count to 0 disables/removes the add-on
 	err := r.client.MCRService.UpdateMCRIPsecAddOn(ctx, mcrID, addOnUID, 0)
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				// Already deleted
-				return
-			}
+		if isMCRNotFoundError(err) {
+			// MCR or add-on already deleted
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error deleting MCR IPSec add-on",
@@ -329,14 +325,12 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 	// Verify the resource exists
 	mcr, err := r.client.MCRService.GetMCR(ctx, mcrUID)
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("MCR %s does not exist", mcrUID),
-				)
-				return
-			}
+		if isMCRNotFoundError(err) {
+			resp.Diagnostics.AddError(
+				"Resource not found",
+				fmt.Sprintf("MCR %s does not exist", mcrUID),
+			)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error verifying resource during import",
@@ -407,19 +401,31 @@ func (r *mcrIpsecAddonResource) findIPsecAddOn(mcr *megaport.MCR, addOnUID strin
 	return nil
 }
 
+// isMCRNotFoundError checks if an error indicates the MCR was not found.
+// The API can return either HTTP 404 or HTTP 400 with "Could not find a service with UID".
+func isMCRNotFoundError(err error) bool {
+	apiErr, ok := err.(*megaport.ErrorResponse)
+	if !ok || apiErr.Response == nil {
+		return false
+	}
+	if apiErr.Response.StatusCode == http.StatusNotFound {
+		return true
+	}
+	if apiErr.Response.StatusCode == http.StatusBadRequest &&
+		strings.Contains(apiErr.Message, "Could not find a service with UID") {
+		return true
+	}
+	return false
+}
+
 // parseImportIDStrings parses an import ID in the format "part1:part2" and returns both parts as strings.
 func parseImportIDStrings(importID string) (string, string, error) {
-	idx := strings.Index(importID, ":")
-	if idx == -1 {
+	left, right, found := strings.Cut(importID, ":")
+	if !found {
 		return "", "", fmt.Errorf("invalid import ID format, expected 'mcr_uid:add_on_uid', got '%s'", importID)
 	}
-
-	part1 := importID[:idx]
-	part2 := importID[idx+1:]
-
-	if part1 == "" || part2 == "" {
+	if left == "" || right == "" {
 		return "", "", fmt.Errorf("invalid import ID format, both mcr_uid and add_on_uid must be non-empty, got '%s'", importID)
 	}
-
-	return part1, part2, nil
+	return left, right, nil
 }
