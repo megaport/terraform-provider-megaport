@@ -200,7 +200,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			"owner": "team-a",
 		}
 
-		detail := fromAPIMCRDetail(mcr, tags)
+		detail, _ := fromAPIMCRDetail(mcr, tags)
 
 		assert.Equal(t, "mcr-abc-123", detail.UID.ValueString())
 		assert.Equal(t, "My Test MCR", detail.Name.ValueString())
@@ -236,7 +236,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			ContractEndDate:   nil,
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, _ := fromAPIMCRDetail(mcr, nil)
 
 		assert.Equal(t, "", detail.CreateDate.ValueString())
 		assert.Equal(t, "", detail.LiveDate.ValueString())
@@ -251,7 +251,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			AttributeTags: nil,
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, _ := fromAPIMCRDetail(mcr, nil)
 
 		assert.True(t, detail.AttributeTags.IsNull())
 		assert.True(t, detail.ResourceTags.IsNull())
@@ -262,7 +262,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			UID: "mcr-empty-tags",
 		}
 
-		detail := fromAPIMCRDetail(mcr, map[string]string{})
+		detail, _ := fromAPIMCRDetail(mcr, map[string]string{})
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
