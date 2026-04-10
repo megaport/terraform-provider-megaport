@@ -93,6 +93,12 @@ func getProductStatus(ctx context.Context, client *megaport.Client, productUID s
 			return "", err
 		}
 		return vxc.ProvisioningStatus, nil
+	case "megaport_nat_gateway":
+		gw, err := client.NATGatewayService.GetNATGateway(ctx, productUID)
+		if err != nil {
+			return "", err
+		}
+		return gw.ProvisioningStatus, nil
 	default:
 		return "", fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
