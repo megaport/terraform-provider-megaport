@@ -295,7 +295,8 @@ func NewIXResource() resource.Resource {
 
 // ixResource is the resource implementation.
 type ixResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -741,4 +742,5 @@ func (r *ixResource) Configure(_ context.Context, req resource.ConfigureRequest,
 		return
 	}
 	r.client = providerData.client
+	r.waitForTime = providerData.waitForTime
 }

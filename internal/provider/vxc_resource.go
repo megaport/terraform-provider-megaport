@@ -323,7 +323,8 @@ func NewVXCResource() resource.Resource {
 
 // vxcResource is the resource implementation.
 type vxcResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -576,7 +577,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ServiceKey: plan.ServiceKey.ValueString(),
 
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	var serviceKeyBEndUID string
@@ -1081,7 +1082,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
-		WaitForTime:   waitForTime,
+		WaitForTime:   r.waitForTime,
 	}
 
 	if !plan.Name.Equal(state.Name) {
@@ -1326,9 +1327,8 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	client := data.client
-
-	r.client = client
+	r.client = data.client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
