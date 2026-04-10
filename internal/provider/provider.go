@@ -325,7 +325,6 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewMCRResource,
 		NewMCRPrefixFilterListResource,
-		NewMCRIpsecAddonResource,
 		NewPortResource,
 		NewLagPortResource,
 		NewMVEResource,
