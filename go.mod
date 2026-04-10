@@ -1,6 +1,6 @@
 module github.com/megaport/terraform-provider-megaport/v2
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.24.0
@@ -34,6 +34,7 @@ require (
 	github.com/yuin/goldmark-meta v1.1.0 // indirect
 	go.abhg.dev/goldmark/frontmatter v0.2.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect

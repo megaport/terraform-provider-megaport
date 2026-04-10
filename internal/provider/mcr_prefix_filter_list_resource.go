@@ -2,11 +2,13 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -43,11 +45,20 @@ func (r *mcrPrefixFilterListResource) Schema(_ context.Context, _ resource.Schem
 
 // Configure adds the provider configured client to the resource.
 func (r *mcrPrefixFilterListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	providerData, ok := configureMegaportResource(req, resp)
-	if !ok {
+	if req.ProviderData == nil {
 		return
 	}
-	r.client = providerData.client
+
+	client, ok := req.ProviderData.(*megaportProviderData)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.client = client.client
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -143,9 +154,9 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx,
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
-			if apiErr.Response.StatusCode == http.StatusNotFound ||
-				(apiErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(apiErr.Message, "Could not find")) {
+		// Check if the resource was deleted
+		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
+			if apiErr.Response.StatusCode == http.StatusNotFound {
 				resp.State.RemoveResource(ctx)
 				return
 			}
@@ -245,36 +256,43 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 
 	// Delete the prefix filter list via API, retrying on 409 Conflict (e.g. when a
 	// VXC with a BGP connection referencing this list is still being deprovisioned).
-	maxRetries := 12
-	retryInterval := 10 * time.Second
-	for attempt := range maxRetries {
-		_, err := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
+	cfg := RetryConfig{
+		InitialBackoff: 10 * time.Second,
+		MaxBackoff:     30 * time.Second,
+		Multiplier:     1.5,
+		MaxRetries:     12,
+		RetryableFunc: func(err error) bool {
+			var apiErr *megaport.ErrorResponse
+			if errors.As(err, &apiErr) {
+				return apiErr.Response.StatusCode == http.StatusConflict
+			}
+			return false
+		},
+	}
+
+	err := RetryWithBackoff(ctx, cfg, func(ctx context.Context) error {
+		_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
 			state.MCRID.ValueString(), int(state.ID.ValueInt64()))
-		if err == nil {
-			return
-		}
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				// Resource was already deleted, which is fine
-				return
+		if deleteErr != nil {
+			if IsNotFoundError(deleteErr) {
+				return nil // already deleted
 			}
-			if apiErr.Response.StatusCode == http.StatusConflict && attempt < maxRetries-1 {
-				tflog.Debug(ctx, "Prefix filter list still associated with a BGP connection, retrying delete",
-					map[string]interface{}{
-						"prefix_list_id": state.ID.ValueInt64(),
-						"mcr_id":         state.MCRID.ValueString(),
-						"attempt":        attempt + 1,
-					})
-				time.Sleep(retryInterval)
-				continue
-			}
+			tflog.Debug(ctx, "Prefix filter list delete attempt failed, may retry",
+				map[string]interface{}{
+					"prefix_list_id": state.ID.ValueInt64(),
+					"mcr_id":         state.MCRID.ValueString(),
+					"error":          deleteErr.Error(),
+				})
+			return deleteErr
 		}
+		return nil
+	})
+	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting MCR prefix filter list",
 			fmt.Sprintf("Could not delete prefix filter list %d for MCR %s: %s",
 				state.ID.ValueInt64(), state.MCRID.ValueString(), err.Error()),
 		)
-		return
 	}
 }
 
@@ -328,4 +346,61 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 
 	// Save the imported state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// validatePrefixListEntry validates a single prefix list entry
+func (r *mcrPrefixFilterListResource) validatePrefixListEntry(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string, index int) diag.Diagnostics {
+	diags := diag.Diagnostics{}
+
+	// Validate prefix format
+	_, network, err := net.ParseCIDR(entry.Prefix.ValueString())
+	if err != nil {
+		diags.AddError(
+			fmt.Sprintf("Invalid prefix in entry %d", index),
+			fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix.ValueString(), err.Error()),
+		)
+		return diags
+	}
+
+	// Validate address family matches prefix type
+	isIPv4 := network.IP.To4() != nil
+	expectedIPv4 := addressFamily == "IPv4"
+
+	if isIPv4 != expectedIPv4 {
+		diags.AddError(
+			fmt.Sprintf("Address family mismatch in entry %d", index),
+			fmt.Sprintf("Prefix %s is %s but address family is set to %s",
+				entry.Prefix.ValueString(),
+				map[bool]string{true: "IPv4", false: "IPv6"}[isIPv4],
+				addressFamily),
+		)
+	}
+
+	// Validate ge/le ranges based on address family
+	maxLength := 32
+	if addressFamily == "IPv6" {
+		maxLength = 128
+	}
+
+	if !entry.Ge.IsNull() {
+		ge := entry.Ge.ValueInt64()
+		if ge < 0 || ge > int64(maxLength) {
+			diags.AddError(
+				fmt.Sprintf("Invalid ge value in entry %d", index),
+				fmt.Sprintf("ge must be between 0 and %d for %s", maxLength, addressFamily),
+			)
+		}
+	}
+
+	if !entry.Le.IsNull() {
+		le := entry.Le.ValueInt64()
+		if le < 0 || le > int64(maxLength) {
+			diags.AddError(
+				fmt.Sprintf("Invalid le value in entry %d", index),
+				fmt.Sprintf("le must be between 0 and %d for %s", maxLength, addressFamily),
+			)
+		}
+	}
+
+	return diags
 }

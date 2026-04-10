@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -580,40 +581,29 @@ func supportVLANUpdates(partnerType string) bool {
 //   - The context is cancelled
 //   - The timeout is reached before the update is verified
 func (r *vxcResource) waitForVXCUpdate(ctx context.Context, uid string, updateReq *megaport.UpdateVXCRequest, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	backoff := 2 * time.Second
-	maxBackoff := 10 * time.Second
-
-	// Add initial delay before first check to allow for quick propagation
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(1 * time.Second):
+	cfg := RetryConfig{
+		InitialBackoff: 2 * time.Second,
+		MaxBackoff:     10 * time.Second,
+		Multiplier:     1.5,
+		Timeout:        timeout,
+		InitialDelay:   1 * time.Second,
 	}
 
-	for time.Now().Before(deadline) {
+	_, err := PollWithBackoff(ctx, cfg, func(ctx context.Context) (struct{}, bool, error) {
 		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve VXC status during update verification for VXC UID %s: %w", uid, err)
+			return struct{}{}, false, fmt.Errorf("failed to retrieve VXC status during update verification for VXC UID %s: %w", uid, err)
 		}
-
-		// Verify the expected changes are reflected
 		if r.verifyUpdateApplied(vxc, updateReq) {
-			return nil
+			return struct{}{}, true, nil
 		}
+		return struct{}{}, false, nil
+	})
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-			backoff = time.Duration(float64(backoff) * 1.5)
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
+	if errors.Is(err, ErrPollTimeout) {
+		return fmt.Errorf("update verification timed out after %v", timeout)
 	}
-
-	return fmt.Errorf("update verification timed out after %v", timeout)
+	return err
 }
 
 // verifyUpdateApplied checks if the VXC returned from the API matches the expected values
@@ -690,56 +680,41 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 		return r.client.VXCService.GetVXC(ctx, uid)
 	}
 
-	deadline := time.Now().Add(timeout)
-	backoff := 2 * time.Second
-	maxBackoff := 10 * time.Second
-
-	// Small initial delay to let the API propagate.
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-time.After(1 * time.Second):
+	cfg := RetryConfig{
+		InitialBackoff: 2 * time.Second,
+		MaxBackoff:     10 * time.Second,
+		Multiplier:     1.5,
+		Timeout:        timeout,
+		InitialDelay:   1 * time.Second,
 	}
 
-	for time.Now().Before(deadline) {
-		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read VXC %s while waiting for vnic_index propagation: %w", uid, err)
+	vxc, err := PollWithBackoff(ctx, cfg, func(ctx context.Context) (*megaport.VXC, bool, error) {
+		v, getErr := r.client.VXCService.GetVXC(ctx, uid)
+		if getErr != nil {
+			return nil, false, fmt.Errorf("failed to read VXC %s while waiting for vnic_index propagation: %w", uid, getErr)
 		}
-
-		match := true
-		if expectedAEnd != nil && vxc.AEndConfiguration.NetworkInterfaceIndex != *expectedAEnd {
-			match = false
-		}
-		if expectedBEnd != nil && vxc.BEndConfiguration.NetworkInterfaceIndex != *expectedBEnd {
-			match = false
-		}
+		match := (expectedAEnd == nil || v.AEndConfiguration.NetworkInterfaceIndex == *expectedAEnd) &&
+			(expectedBEnd == nil || v.BEndConfiguration.NetworkInterfaceIndex == *expectedBEnd)
 		if match {
-			return vxc, nil
+			return v, true, nil
 		}
+		return nil, false, nil
+	})
 
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-			backoff = time.Duration(float64(backoff) * 1.5)
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
+	if errors.Is(err, ErrPollTimeout) {
+		// Timed out — do a final read, patch in the expected values so state
+		// stays consistent with the plan, and warn the caller.
+		vxc, readErr := r.client.VXCService.GetVXC(ctx, uid)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read VXC %s after vnic_index wait timeout: %w", uid, readErr)
 		}
+		if expectedAEnd != nil {
+			vxc.AEndConfiguration.NetworkInterfaceIndex = *expectedAEnd
+		}
+		if expectedBEnd != nil {
+			vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
+		}
+		return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
 	}
-
-	// Timed out — do a final read, patch in the expected values so state
-	// stays consistent with the plan, and warn the caller.
-	vxc, err := r.client.VXCService.GetVXC(ctx, uid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read VXC %s after vnic_index wait timeout: %w", uid, err)
-	}
-	if expectedAEnd != nil {
-		vxc.AEndConfiguration.NetworkInterfaceIndex = *expectedAEnd
-	}
-	if expectedBEnd != nil {
-		vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
-	}
-	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
+	return vxc, err
 }
