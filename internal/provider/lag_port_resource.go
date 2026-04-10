@@ -648,10 +648,13 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	// Delete existing order
-	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:     state.UID.ValueString(),
-		DeleteNow:  !r.cancelAtEndOfTerm,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
+			PortID:     state.UID.ValueString(),
+			DeleteNow:  !r.cancelAtEndOfTerm,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(

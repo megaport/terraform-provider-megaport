@@ -6,22 +6,17 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-type ServiceKeyProviderTestSuite ProviderTestSuite
-
-func TestServiceKeyProviderTestSuite(t *testing.T) {
+func TestAccMegaportServiceKey_MultiUse(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(ServiceKeyProviderTestSuite))
-}
-
-func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	keyDescription := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create port + multi-use service key
@@ -47,7 +42,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 					single_use  = false
 					active      = true
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test", "description", keyDescription),
 					resource.TestCheckResourceAttr("megaport_service_key.test", "max_speed", "500"),
@@ -97,7 +92,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 					single_use  = false
 					active      = false
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test", "active", "false"),
 					resource.TestCheckResourceAttr("megaport_service_key.test", "description", keyDescription),
@@ -126,7 +121,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 					single_use  = false
 					active      = true
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test", "active", "true"),
 				),
@@ -135,12 +130,15 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_MultiUse() {
 	})
 }
 
-func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_SingleUseWithVLAN() {
+func TestAccMegaportServiceKey_SingleUseWithVLAN(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	keyDescription := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -166,7 +164,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_SingleUseWit
 					active      = true
 					vlan        = 100
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test_single", "single_use", "true"),
 					resource.TestCheckResourceAttr("megaport_service_key.test_single", "vlan", "100"),
@@ -179,12 +177,15 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_SingleUseWit
 	})
 }
 
-func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_ValidFor() {
+func TestAccMegaportServiceKey_ValidFor(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	keyDescription := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create with valid_for
@@ -215,7 +216,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_ValidFor() {
 						end_time   = "2026-12-31T23:59:59Z"
 					}
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test_valid_for", "active", "true"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test_valid_for", "valid_for.start_time"),
@@ -250,7 +251,7 @@ func (suite *ServiceKeyProviderTestSuite) TestAccMegaportServiceKey_ValidFor() {
 						end_time   = "2027-06-30T23:59:59Z"
 					}
 				}
-				`, SinglePortTestLocationIDNum, portName, costCentreName, keyDescription),
+				`, locationID, portName, costCentreName, keyDescription),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_service_key.test_valid_for", "active", "true"),
 					resource.TestCheckResourceAttrSet("megaport_service_key.test_valid_for", "valid_for.start_time"),

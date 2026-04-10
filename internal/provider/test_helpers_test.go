@@ -1,0 +1,871 @@
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"math/rand"
+	"os"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	megaport "github.com/megaport/megaportgo"
+)
+
+// ── Acceptance Test Rate Limiter ──────────────────────────────────────────────
+
+// accTestSemaphore limits the number of concurrent acceptance tests that
+// provision real infrastructure, preventing staging API overload.
+const maxConcurrentAccTests = 21
+
+var accTestSemaphore = make(chan struct{}, maxConcurrentAccTests)
+
+// acquireAccTestSlot blocks until a slot is available in the concurrency pool.
+// Returns a release function that must be deferred.
+func acquireAccTestSlot(t *testing.T) func() {
+	t.Helper()
+	accTestSemaphore <- struct{}{}
+	return func() { <-accTestSemaphore }
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type cspCredentials struct {
+	AzureServiceKeys          []string `json:"azure_service_keys"`
+	AzureServiceKeysWithPeers []string `json:"azure_service_keys_with_peers"`
+	OracleVirtualCircuitIDs   []string `json:"oracle_virtual_circuit_ids"`
+	GooglePairingKeys         []string `json:"google_pairing_keys"`
+}
+
+// ── MVE Location Picker ───────────────────────────────────────────────────────
+
+// mveTestLocationCandidates is a curated list of staging location IDs ordered by
+// available CPU capacity (highest first). This ensures parallel MVE tests claim
+// the locations most likely to have slots. Refresh from Metabase capacity data.
+// Last updated: 2026-04-10.
+var mveTestLocationCandidates = []int{
+	// Tier 1: 30+ available cores (best bets)
+	4,   // Melbourne mel-nxt1 — red: 16+98 cores
+	527, // Paris par-ix5 — red: 60 cores
+	65,  // Bay Area sjc-tx2 — red: 46 cores
+	36,  // Singapore sin-sg1 — red: 30+47 cores
+	130, // Frankfurt fra-ix6 — red: 20+64, blue: 6+6 cores
+	558, // Tokyo tky-aty — red: 32 cores
+	572, // Osaka osk-eq1 — red: 30+27 cores
+	47,  // Hong Kong hkg-mgi — red: 30 cores
+	256, // London Telehouse North — blue: 30 cores
+	5,   // Brisbane bne-nxt1 — blue: 8+36 cores
+	131, // Frankfurt fra-eq5 — blue: 18+25 cores
+	515, // Paris par-eq2 — blue: 26 cores
+
+	// Tier 2: 15-29 available cores
+	23,  // Melbourne mel-mdc — blue: 22+18 cores
+	354, // Bay Area sjc-vxc — blue: 22 cores
+	89,  // London lon-tc1 — red: 26 cores
+	346, // Ashburn ash-rw3 — blue: 20 cores
+	68,  // Ashburn ash-cs2 — red: 20 cores
+	573, // Calgary cgy-ro1 — blue: 24 cores
+	574, // Calgary cgy-es1 — red: 24 cores
+	122, // Berlin ber-ipb2 — blue: 24 cores
+	98,  // Stockholm sto-ix5 — red: 24 cores
+	413, // London lon-vl1 — red: 24 cores
+	552, // Miami mia-qt1 — red: 24 cores
+	62,  // New York nyc-tx1 — blue: 20 cores
+	321, // Denver den-irm — blue: 14+30 cores
+	330, // Phoenix phx-io1 — blue: 18+4 cores
+	234, // Miami mia-vzn — blue: 18 cores
+	85,  // Amsterdam ams-eq1 — blue: 18+13 cores
+	50,  // Perth per-nxt1 — blue: 12, red: 14 cores
+
+	// Tier 3: 8-14 available cores (fallback)
+	59,  // Los Angeles lax-eq1 — blue: 10, red: 6+22 cores
+	90,  // London lon-eq5 — blue: 12+7 cores
+	94,  // Dublin dub-tc1 — blue: 14+14 cores
+	116, // Atlanta atl-tx1 — blue: 12+19 cores
+	93,  // Toronto tor-co2 — red: 10+26 cores
+	320, // Denver den-cs1 — blue: 10, red: 10+32 cores
+	100, // Las Vegas las-sw7 — blue: 12 cores
+	57,  // Seattle sea-eq2 — blue Supermicro: 29 cores
+	2,   // Sydney syd-sy1 — blue: 4+12 cores
+	37,  // Singapore sin-sg2 — blue: 8 cores
+	383, // Brisbane bne-nxt2 — red Supermicro: 30 cores
+}
+
+// mveClaimedLocations tracks locations already handed out by findMVETestLocation
+// so that parallel tests each get a unique location and don't compete for capacity.
+var (
+	mveClaimedMu        sync.Mutex
+	mveClaimedLocations = map[int]bool{}
+)
+
+// mveProbeOpts configures how the MVE location probe validates capacity.
+type mveProbeOpts struct {
+	vendorConfig  megaport.VendorConfig
+	diversityZone string
+	vnicCount     int
+}
+
+// findMVETestLocation returns a staging location with confirmed Aruba SMALL MVE
+// capacity in the "red" diversity zone. Each call returns a different location.
+//
+//nolint:unparam // minCPUCores kept for future use when API populates the field
+func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
+	return findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.ArubaConfig{
+			Vendor:      "aruba",
+			ImageID:     MVEArubaImageIDMVE,
+			ProductSize: "SMALL",
+			MVELabel:    "MVE 2/8",
+			AccountName: "probe",
+			AccountKey:  "probe",
+			SystemTag:   "Preconfiguration-aruba-test-1",
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+	})
+}
+
+// findMVETestLocationHighCapacity returns a staging location with enough capacity
+// for multiple simultaneous Aruba SMALL MVEs (e.g., the MVE-to-MVE VXC test that
+// creates 4 MVEs at the same site). It validates by probing N times.
+func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+
+	byID := make(map[int]*megaport.LocationV3, len(locations))
+	for _, loc := range locations {
+		byID[loc.ID] = loc
+	}
+
+	probe := func(loc *megaport.LocationV3) bool {
+		if !strings.EqualFold(loc.Status, "active") || !loc.HasMVESupport() {
+			return false
+		}
+		// Validate N MVEs at once to confirm bulk capacity.
+		for i := range count {
+			err := client.MVEService.ValidateMVEOrder(ctx, &megaport.BuyMVERequest{
+				LocationID: loc.ID,
+				Name:       fmt.Sprintf("probe-%d", i),
+				Term:       1,
+				VendorConfig: &megaport.ArubaConfig{
+					Vendor:      "aruba",
+					ImageID:     MVEArubaImageIDMVE,
+					ProductSize: "SMALL",
+					MVELabel:    "MVE 2/8",
+					AccountName: fmt.Sprintf("probe-%d", i),
+					AccountKey:  fmt.Sprintf("probe-%d", i),
+					SystemTag:   "Preconfiguration-aruba-test-1",
+				},
+				Vnics: []megaport.MVENetworkInterface{
+					{Description: "Data Plane"},
+					{Description: "Management Plane"},
+					{Description: "Control Plane"},
+				},
+			})
+			if err != nil {
+				return false
+			}
+		}
+		return true
+	}
+
+	for _, candidateID := range mveTestLocationCandidates {
+		if loc, ok := byID[candidateID]; ok && probe(loc) {
+			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs", loc.ID, loc.Name, count)
+			return loc.ID, loc.Name
+		}
+	}
+	for _, loc := range locations {
+		if probe(loc) {
+			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", loc.ID, loc.Name, count)
+			return loc.ID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no location with capacity for %d MVEs found", count)
+	return 0, ""
+}
+
+// findMVETestLocationBlueZone returns a staging location with Aruba SMALL MVE
+// capacity in the "blue" diversity zone with 3 vNICs.
+func findMVETestLocationBlueZone(t *testing.T) (id int, name string) {
+	return findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.ArubaConfig{
+			Vendor:      "aruba",
+			ImageID:     MVEArubaImageIDMVE,
+			ProductSize: "SMALL",
+			MVELabel:    "MVE 2/8",
+			AccountName: "probe",
+			AccountKey:  "probe",
+			SystemTag:   "Preconfiguration-aruba-test-1",
+		},
+		diversityZone: "blue",
+		vnicCount:     3,
+	})
+}
+
+// findMVEVersaTestLocation returns a staging location with Versa MVE capacity.
+func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
+	return findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.VersaConfig{
+			Vendor:            "versa",
+			ImageID:           20,
+			ProductSize:       "SMALL",
+			MVELabel:          "MVE 2/8",
+			DirectorAddress:   "director1.versa.com",
+			ControllerAddress: "controller1.versa.com",
+			LocalAuth:         "SDWAN-Branch@Versa.com",
+			RemoteAuth:        "Controller-1-staging@Versa.com",
+			SerialNumber:      "Megaport-Hub1",
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+	})
+}
+
+// findMVETestLocationWithOpts returns a staging location ID with confirmed MVE
+// capacity for the given probe options. Each call returns a unique location.
+func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+
+	byID := make(map[int]*megaport.LocationV3, len(locations))
+	for _, loc := range locations {
+		byID[loc.ID] = loc
+	}
+
+	probe := func(loc *megaport.LocationV3) bool {
+		if !strings.EqualFold(loc.Status, "active") || !loc.HasMVESupport() {
+			return false
+		}
+		vnics := make([]megaport.MVENetworkInterface, opts.vnicCount)
+		for i := range vnics {
+			vnics[i] = megaport.MVENetworkInterface{Description: fmt.Sprintf("vNIC %d", i)}
+		}
+		err := client.MVEService.ValidateMVEOrder(ctx, &megaport.BuyMVERequest{
+			LocationID:    loc.ID,
+			Name:          "probe",
+			Term:          1,
+			DiversityZone: opts.diversityZone,
+			VendorConfig:  opts.vendorConfig,
+			Vnics:         vnics,
+		})
+		return err == nil
+	}
+
+	claim := func(locID int, locName, source string) (int, string) {
+		mveClaimedMu.Lock()
+		defer mveClaimedMu.Unlock()
+		if mveClaimedLocations[locID] {
+			return 0, "" // already taken
+		}
+		mveClaimedLocations[locID] = true
+		t.Logf("findMVETestLocation: using location %d (%s) [%s]", locID, locName, source)
+		return locID, locName
+	}
+
+	// Fast path: curated candidates
+	for _, candidateID := range mveTestLocationCandidates {
+		if loc, ok := byID[candidateID]; ok && probe(loc) {
+			if id, name := claim(loc.ID, loc.Name, "curated"); id != 0 {
+				return id, name
+			}
+		}
+	}
+
+	// Slow path: full sweep
+	for _, loc := range locations {
+		if probe(loc) {
+			if id, name := claim(loc.ID, loc.Name, "sweep"); id != 0 {
+				return id, name
+			}
+		}
+	}
+
+	t.Skip("skipping: no location with available MVE capacity found in staging")
+	return 0, ""
+}
+
+// ── Port/MCR Location Pickers ─────────────────────────────────────────────────
+
+// findPortTestLocation returns a staging location ID that supports Megaport
+// ports at the given speed (Mbps). Calls t.Skip if none found.
+//
+//nolint:unparam // name return is available for callers that want it
+var (
+	portClaimedMu        sync.Mutex
+	portClaimedLocations = map[int]bool{}
+)
+
+//nolint:unparam // name is used in log messages and may be used by future callers
+func findPortTestLocation(t *testing.T, speedMbps int) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	portClaimedMu.Lock()
+	defer portClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, speedMbps) && !portClaimedLocations[loc.ID] {
+			portClaimedLocations[loc.ID] = true
+			t.Logf("findPortTestLocation: using location %d (%s)", loc.ID, loc.Name)
+			return loc.ID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps Megaport port capacity", speedMbps)
+	return 0, ""
+}
+
+// findMCRTestLocation returns a staging location ID that supports MCR at the
+// given speed (Mbps). Calls t.Skip if none found.
+//
+//nolint:unparam // speedMbps is always 2500 today; kept for future test flexibility
+var (
+	mcrClaimedMu        sync.Mutex
+	mcrClaimedLocations = map[int]bool{}
+)
+
+//nolint:unparam // name is used in log messages and may be used by future callers
+func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	mcrClaimedMu.Lock()
+	defer mcrClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, speedMbps) && !mcrClaimedLocations[loc.ID] {
+			mcrClaimedLocations[loc.ID] = true
+			t.Logf("findMCRTestLocation: using location %d (%s)", loc.ID, loc.Name)
+			return loc.ID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity", speedMbps)
+	return 0, ""
+}
+
+// portLocationHasCapacity returns true when at least one diversity zone at loc
+// lists speedMbps (or higher) in MegaportSpeedMbps.
+func portLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
+	if loc.DiversityZones == nil {
+		return false
+	}
+	check := func(zone *megaport.LocationV3DiversityZone) bool {
+		if zone == nil {
+			return false
+		}
+		for _, s := range zone.MegaportSpeedMbps {
+			if s == speedMbps {
+				return true
+			}
+		}
+		return false
+	}
+	return check(loc.DiversityZones.Red) || check(loc.DiversityZones.Blue)
+}
+
+// mcrLocationHasCapacity returns true when at least one diversity zone at loc
+// lists speedMbps (or higher) in McrSpeedMbps.
+func mcrLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
+	if loc.DiversityZones == nil {
+		return false
+	}
+	check := func(zone *megaport.LocationV3DiversityZone) bool {
+		if zone == nil {
+			return false
+		}
+		for _, s := range zone.McrSpeedMbps {
+			if s == speedMbps {
+				return true
+			}
+		}
+		return false
+	}
+	return check(loc.DiversityZones.Red) || check(loc.DiversityZones.Blue)
+}
+
+// ── CSP Credential Pickers ────────────────────────────────────────────────────
+
+// cspPickResult holds a validated CSP key along with the partner port UID and
+// location that the key resolves to. Tests should use LocationID for their MCR
+// to ensure the CSP interconnect is reachable.
+type cspPickResult struct {
+	Key            string
+	PartnerPortUID string
+	LocationID     int
+}
+
+// pickAzureServiceKey returns the first Azure service key from the pool that
+// has available VXC capacity. It resolves the partner port and its location so
+// the caller can place an MCR at a compatible site. Calls t.Skip if none found.
+func pickAzureServiceKey(t *testing.T) cspPickResult {
+	t.Helper()
+	return pickCSPKey(t, "AZURE", "azure")
+}
+
+// pickGCPPairingKey returns the first GCP pairing key from the pool that has
+// available VXC capacity. Calls t.Skip if none found.
+func pickGCPPairingKey(t *testing.T) cspPickResult {
+	t.Helper()
+	return pickCSPKey(t, "GOOGLE", "google")
+}
+
+// cspClaimedKeys tracks CSP keys and partner port UIDs already handed out so
+// parallel tests don't reuse the same key or hit the same Azure port (different
+// keys can map to the same ExpressRoute circuit, causing VLAN conflicts).
+var (
+	cspClaimedMu    sync.Mutex
+	cspClaimedKeys  = map[string]bool{}
+	cspClaimedPorts = map[string]bool{}
+)
+
+// pickCSPKey is the shared implementation for CSP key pickers. It validates
+// each key via LookupPartnerPorts, then resolves the partner port's location
+// via ListPartnerMegaports so the test can place its MCR at a compatible site.
+// Each key is claimed exclusively so parallel tests get unique keys.
+func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
+	t.Helper()
+	creds := loadCSPCredentials()
+
+	var keys []string
+	switch partner {
+	case "AZURE":
+		keys = creds.AzureServiceKeys
+	case "GOOGLE":
+		keys = creds.GooglePairingKeys
+	}
+	if len(keys) == 0 {
+		t.Skipf("skipping: no %s keys in testdata/csp_credentials.json", partner)
+		return cspPickResult{}
+	}
+
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return cspPickResult{}
+	}
+
+	// Build a location lookup from partner ports so we can resolve port UID → location.
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return cspPickResult{}
+	}
+	portLocation := make(map[string]int, len(partnerPorts))
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) {
+			portLocation[pp.ProductUID] = pp.LocationId
+		}
+	}
+
+	//nolint:gosec // weak random is fine for test key shuffling
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	shuffled := make([]string, len(keys))
+	copy(shuffled, keys)
+	r.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
+	for _, key := range shuffled {
+		cspClaimedMu.Lock()
+		if cspClaimedKeys[key] {
+			cspClaimedMu.Unlock()
+			t.Logf("pick%sKey: key %s already claimed by another test, skipping", partner, key)
+			continue
+		}
+		cspClaimedMu.Unlock()
+
+		resp, lookupErr := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
+			Partner:   partner,
+			Key:       key,
+			PortSpeed: 1000,
+		})
+		if lookupErr != nil {
+			t.Logf("pick%sKey: key %s unavailable: %v", partner, key, lookupErr)
+			continue
+		}
+		locID := portLocation[resp.ProductUID]
+		if locID == 0 {
+			t.Logf("pick%sKey: key %s resolved to port %s but location unknown, skipping", partner, key, resp.ProductUID)
+			continue
+		}
+
+		cspClaimedMu.Lock()
+		if cspClaimedKeys[key] || cspClaimedPorts[resp.ProductUID] {
+			cspClaimedMu.Unlock()
+			t.Logf("pick%sKey: key %s or port %s already claimed, skipping", partner, key, resp.ProductUID)
+			continue
+		}
+		cspClaimedKeys[key] = true
+		cspClaimedPorts[resp.ProductUID] = true
+		cspClaimedMu.Unlock()
+
+		t.Logf("pick%sKey: using key %s (port %s, location %d)", partner, key, resp.ProductUID, locID)
+		return cspPickResult{Key: key, PartnerPortUID: resp.ProductUID, LocationID: locID}
+	}
+
+	t.Skipf("skipping: no %s key with available capacity found", partner)
+	return cspPickResult{}
+}
+
+// oracleClaimedMu and oracleClaimedIDs ensure each parallel test gets a unique
+// Oracle virtual circuit ID from the pool (they're fake keys matching a regex,
+// but reusing the same one in concurrent tests causes "already in use" errors).
+var (
+	oracleClaimedMu  sync.Mutex
+	oracleClaimedIDs = map[string]bool{}
+)
+
+// pickOracleVirtualCircuitID returns a unique Oracle virtual circuit ID from the
+// pool. These are synthetic IDs matching /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
+// — no API validation needed. Calls t.Skip if the pool is exhausted.
+func pickOracleVirtualCircuitID(t *testing.T) string {
+	t.Helper()
+	creds := loadCSPCredentials()
+	if len(creds.OracleVirtualCircuitIDs) == 0 {
+		t.Skip("skipping: no Oracle virtual circuit IDs in testdata/csp_credentials.json")
+		return ""
+	}
+
+	oracleClaimedMu.Lock()
+	defer oracleClaimedMu.Unlock()
+	for _, id := range creds.OracleVirtualCircuitIDs {
+		if !oracleClaimedIDs[id] {
+			oracleClaimedIDs[id] = true
+			t.Logf("pickOracleVirtualCircuitID: using %s", id)
+			return id
+		}
+	}
+	t.Skip("skipping: all Oracle virtual circuit IDs already claimed by concurrent tests")
+	return ""
+}
+
+func loadCSPCredentials() cspCredentials {
+	data, err := os.ReadFile("testdata/csp_credentials.json")
+	if err != nil {
+		return cspCredentials{}
+	}
+	var creds cspCredentials
+	_ = json.Unmarshal(data, &creds)
+	return creds
+}
+
+// ── Staging Health Check ──────────────────────────────────────────────────────
+
+// TestStagingHealthCheck verifies staging environment preconditions.
+// Run before a full acceptance suite to catch problems early:
+//
+//	go test -v -run TestStagingHealthCheck ./internal/provider/
+func TestStagingHealthCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("health check requires API access")
+	}
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("staging API unreachable: %v", err)
+	}
+
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("could not list locations (company may be deactivated): %v", err)
+	}
+
+	// MVE capacity — count locations that declare MVE support. Note: staging does not
+	// populate mveMaxCpuCoreCount, so this is an approximation based on the MveAvailable
+	// flag. Actual capacity is only confirmed by findMVETestLocation via ValidateMVEOrder.
+	mveCount := 0
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && loc.HasMVESupport() {
+			mveCount++
+		}
+	}
+	t.Logf("Locations reporting MVE support (approximate — staging does not populate mveMaxCpuCoreCount): %d", mveCount)
+	if mveCount == 0 {
+		t.Error("WARN: no MVE capacity available — MVE tests will be skipped")
+	}
+
+	// Port capacity (1G)
+	portCount := 0
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) {
+			portCount++
+		}
+	}
+	t.Logf("Locations with 1000 Mbps port capacity: %d", portCount)
+	if portCount == 0 {
+		t.Error("WARN: no 1G port capacity available — port tests will be skipped")
+	}
+
+	// MCR capacity (2500 Mbps)
+	mcrCount := 0
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, 2500) {
+			mcrCount++
+		}
+	}
+	t.Logf("Locations with 2500 Mbps MCR capacity: %d", mcrCount)
+	if mcrCount == 0 {
+		t.Error("WARN: no 2.5G MCR capacity available — MCR tests will be skipped")
+	}
+
+	// Partner ports
+	ports, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Errorf("could not list partner ports: %v", err)
+	} else {
+		for _, partner := range []string{"AWS", "AZURE", "GOOGLE"} {
+			found := false
+			for _, p := range ports {
+				if p.ConnectType == partner && p.VXCPermitted {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("WARN: no %s partner port found — %s VXC tests will be skipped", partner, partner)
+			}
+		}
+	}
+
+	// CSP credentials pool — probe each key for live capacity
+	creds := loadCSPCredentials()
+	t.Logf("Azure service keys in pool: %d", len(creds.AzureServiceKeys))
+	t.Logf("GCP pairing keys in pool: %d", len(creds.GooglePairingKeys))
+
+	azureAvailable := 0
+	for _, key := range creds.AzureServiceKeys {
+		_, err := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
+			Partner:   "AZURE",
+			Key:       key,
+			PortSpeed: 1000,
+		})
+		if err == nil {
+			azureAvailable++
+		}
+	}
+	t.Logf("Azure service keys with available capacity: %d/%d", azureAvailable, len(creds.AzureServiceKeys))
+	if azureAvailable == 0 {
+		t.Error("WARN: no Azure service key has available capacity — Azure VXC tests will be skipped")
+	}
+
+	gcpAvailable := 0
+	for _, key := range creds.GooglePairingKeys {
+		_, err := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
+			Partner:   "GOOGLE",
+			Key:       key,
+			PortSpeed: 1000,
+		})
+		if err == nil {
+			gcpAvailable++
+		}
+	}
+	t.Logf("GCP pairing keys with available capacity: %d/%d", gcpAvailable, len(creds.GooglePairingKeys))
+	if gcpAvailable == 0 {
+		t.Error("WARN: no GCP pairing key has available capacity — GCP VXC tests will be skipped")
+	}
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+
+// TestListMVECapacity prints all staging locations with available MVE capacity.
+// Never fails. Run manually to discover locations or to refresh the pool file:
+//
+//	go test -v -run TestListMVECapacity ./internal/provider/
+func TestListMVECapacity(t *testing.T) {
+	if testing.Short() {
+		t.Skip("diagnostic only")
+	}
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("no client: %v", err)
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("list failed: %v", err)
+	}
+	t.Logf("%-6s %-10s %-8s %s", "ID", "MaxCores", "Status", "Name")
+	for _, loc := range locations {
+		if !loc.HasMVESupport() {
+			continue
+		}
+		cores := loc.GetMVEMaxCpuCores()
+		coresStr := "nil"
+		if cores != nil {
+			coresStr = fmt.Sprintf("%d", *cores)
+		}
+		t.Logf("%-6d %-10s %-8s %s", loc.ID, coresStr, loc.Status, loc.Name)
+	}
+	t.Skip("diagnostic complete")
+}
+
+// TestListPortCapacity prints all staging locations with port/MCR capacity.
+// Never fails. Run manually to refresh testdata/port_test_locations.json:
+//
+//	go test -v -run TestListPortCapacity ./internal/provider/
+func TestListPortCapacity(t *testing.T) {
+	if testing.Short() {
+		t.Skip("diagnostic only")
+	}
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("no client: %v", err)
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("list failed: %v", err)
+	}
+	t.Logf("%-6s %-8s %s", "ID", "Status", "Name")
+	for _, loc := range locations {
+		if loc.DiversityZones == nil {
+			continue
+		}
+		if !portLocationHasCapacity(loc, 1) && !mcrLocationHasCapacity(loc, 1) {
+			continue
+		}
+		t.Logf("%-6d %-8s %s", loc.ID, loc.Status, loc.Name)
+	}
+	t.Skip("diagnostic complete")
+}
+
+// cleanupDelete controls whether TestCleanupOrphanedResources deletes resources.
+// Pass -cleanup-delete on the go test command line to enable deletion.
+var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test resources in TestCleanupOrphanedResources")
+
+// TestCleanupOrphanedResources lists (and optionally deletes) staging resources
+// whose name starts with "tf-acc-test-". VXCs are deleted first (before their
+// endpoints). Never fails — always skips at the end.
+//
+//	# List only:
+//	go test -v -run TestCleanupOrphanedResources ./internal/provider/
+//
+//	# Delete:
+//	go test -v -run TestCleanupOrphanedResources -cleanup-delete ./internal/provider/
+func TestCleanupOrphanedResources(t *testing.T) {
+	if testing.Short() {
+		t.Skip("cleanup requires API access")
+	}
+	const prefix = "tf-acc-test-"
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("no client: %v", err)
+	}
+
+	// VXCs first — must be deleted before their A/B-end resources
+	vxcs, err := client.VXCService.ListVXCs(ctx, &megaport.ListVXCsRequest{})
+	if err != nil {
+		t.Logf("WARN: could not list VXCs: %v", err)
+	}
+	for _, vxc := range vxcs {
+		if !strings.HasPrefix(vxc.Name, prefix) {
+			continue
+		}
+		t.Logf("VXC  %s (%s) status=%s", vxc.Name, vxc.UID, vxc.ProvisioningStatus)
+		if *cleanupDelete {
+			if delErr := client.VXCService.DeleteVXC(ctx, vxc.UID, &megaport.DeleteVXCRequest{DeleteNow: true}); delErr != nil {
+				t.Logf("  delete failed: %v", delErr)
+			} else {
+				t.Logf("  deleted")
+			}
+		}
+	}
+
+	// MVEs
+	mves, err := client.MVEService.ListMVEs(ctx, &megaport.ListMVEsRequest{})
+	if err != nil {
+		t.Logf("WARN: could not list MVEs: %v", err)
+	}
+	for _, mve := range mves {
+		if !strings.HasPrefix(mve.Name, prefix) {
+			continue
+		}
+		t.Logf("MVE  %s (%s) status=%s", mve.Name, mve.UID, mve.ProvisioningStatus)
+		if *cleanupDelete {
+			if _, delErr := client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{MVEID: mve.UID}); delErr != nil {
+				t.Logf("  delete failed: %v", delErr)
+			} else {
+				t.Logf("  deleted")
+			}
+		}
+	}
+
+	// MCRs
+	mcrs, err := client.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{})
+	if err != nil {
+		t.Logf("WARN: could not list MCRs: %v", err)
+	}
+	for _, mcr := range mcrs {
+		if !strings.HasPrefix(mcr.Name, prefix) {
+			continue
+		}
+		t.Logf("MCR  %s (%s) status=%s", mcr.Name, mcr.UID, mcr.ProvisioningStatus)
+		if *cleanupDelete {
+			if _, delErr := client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{MCRID: mcr.UID, DeleteNow: true}); delErr != nil {
+				t.Logf("  delete failed: %v", delErr)
+			} else {
+				t.Logf("  deleted")
+			}
+		}
+	}
+
+	// Ports (last — must come after VXCs that connect to them)
+	ports, err := client.PortService.ListPorts(ctx)
+	if err != nil {
+		t.Logf("WARN: could not list ports: %v", err)
+	}
+	for _, port := range ports {
+		if !strings.HasPrefix(port.Name, prefix) {
+			continue
+		}
+		t.Logf("Port %s (%s) status=%s", port.Name, port.UID, port.ProvisioningStatus)
+		if *cleanupDelete {
+			if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true}); delErr != nil {
+				t.Logf("  delete failed: %v", delErr)
+			} else {
+				t.Logf("  deleted")
+			}
+		}
+	}
+
+	t.Skip("cleanup scan complete")
+}

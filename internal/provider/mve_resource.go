@@ -980,9 +980,12 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Call the API to delete the resource
 	productUID := state.UID.ValueString()
-	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID:      productUID,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
+			MVEID:      productUID,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1065,7 +1068,29 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			}
 			state.VendorConfig = plan.VendorConfig
 		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
-			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			// During destroy, the plan's VendorConfig is null — nothing to compare.
+			if plan.VendorConfig.IsNull() || plan.VendorConfig.IsUnknown() {
+				// No replacement decision needed during destroy.
+			} else {
+				// BUG FIX: plan.VendorConfig.Equal() does a case-sensitive string comparison.
+				// The API normalizes vendor to uppercase (e.g., "aruba" → "ARUBA") and size
+				// similarly, so a user writing vendor="ArUbA" would cause Equal() to return
+				// false against the state's "ARUBA", triggering an unnecessary destroy+recreate.
+				//
+				// Only force replacement when the vendor or size actually changes (case-insensitive).
+				// Other vendor_config field changes (account_name, image_id, etc.) are handled
+				// by the API as in-place updates and don't require replacement.
+				var planVC vendorConfigModel
+				planVCDiags := plan.VendorConfig.As(ctx, &planVC, basetypes.ObjectAsOptions{})
+				resp.Diagnostics.Append(planVCDiags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !strings.EqualFold(state.Vendor.ValueString(), planVC.Vendor.ValueString()) ||
+					!strings.EqualFold(state.Size.ValueString(), planVC.ProductSize.ValueString()) {
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+				}
+			}
 		}
 		diags := req.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
