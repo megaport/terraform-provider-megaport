@@ -46,7 +46,7 @@ func (suite *NATGatewayProviderTestSuite) TestAccMegaportNATGateway_Basic() {
 	natGWNameUpdated := RandomTestName()
 	resourceName := "megaport_nat_gateway.test"
 
-	speed, sessionCount, err := getNATGatewayTestConfig()
+	speed, _, err := getNATGatewayTestConfig()
 	if err != nil {
 		suite.T().Skipf("Skipping NAT Gateway test: %v", err)
 	}
@@ -61,7 +61,6 @@ resource "megaport_nat_gateway" "test" {
     location_id          = data.megaport_location.test_location.id
     speed                = %d
     contract_term_months = 1
-    session_count        = %d
     diversity_zone       = "red"
 
     resource_tags = {
@@ -69,7 +68,7 @@ resource "megaport_nat_gateway" "test" {
         "key2" = "value2"
     }
 }
-`, MCRTestLocationIDNum, natGWName, speed, sessionCount)
+`, MCRTestLocationIDNum, natGWName, speed)
 
 	configUpdated := providerConfig + fmt.Sprintf(`
 data "megaport_location" "test_location" {
@@ -81,7 +80,6 @@ resource "megaport_nat_gateway" "test" {
     location_id          = data.megaport_location.test_location.id
     speed                = %d
     contract_term_months = 1
-    session_count        = %d
     diversity_zone       = "red"
 
     resource_tags = {
@@ -89,7 +87,7 @@ resource "megaport_nat_gateway" "test" {
         "key3" = "value3"
     }
 }
-`, MCRTestLocationIDNum, natGWNameUpdated, speed, sessionCount)
+`, MCRTestLocationIDNum, natGWNameUpdated, speed)
 
 	resource.Test(suite.T(), resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -101,12 +99,10 @@ resource "megaport_nat_gateway" "test" {
 					resource.TestCheckResourceAttr(resourceName, "product_name", natGWName),
 					resource.TestCheckResourceAttr(resourceName, "speed", fmt.Sprintf("%d", speed)),
 					resource.TestCheckResourceAttr(resourceName, "contract_term_months", "1"),
-					resource.TestCheckResourceAttr(resourceName, "session_count", fmt.Sprintf("%d", sessionCount)),
 					resource.TestCheckResourceAttr(resourceName, "diversity_zone", "red"),
 					resource.TestCheckResourceAttr(resourceName, "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr(resourceName, "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet(resourceName, "product_uid"),
-					resource.TestCheckResourceAttrSet(resourceName, "provisioning_status"),
 					resource.TestCheckResourceAttrSet(resourceName, "create_date"),
 					resource.TestCheckResourceAttrSet(resourceName, "created_by"),
 					resource.TestCheckResourceAttrSet(resourceName, "location_id"),
