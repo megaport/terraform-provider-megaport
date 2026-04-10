@@ -18,6 +18,7 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 ### Required
 
 - `contract_term_months` (Number) The contract term for the NAT Gateway in months. Valid values are 1, 12, 24, 36, 48, or 60.
+- `diversity_zone` (String) The diversity zone of the NAT Gateway.
 - `location_id` (Number) The numeric location ID of the NAT Gateway. This value can be retrieved from the data source megaport_location.
 - `product_name` (String) The name of the NAT Gateway.
 - `speed` (Number) The speed of the NAT Gateway in Mbps.
@@ -27,20 +28,13 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `asn` (Number) The Autonomous System Number (ASN) for the NAT Gateway.
 - `auto_renew_term` (Boolean) Whether the NAT Gateway contract will auto-renew.
 - `bgp_shutdown_default` (Boolean) Whether BGP sessions are shut down by default on the NAT Gateway.
-- `diversity_zone` (String) The diversity zone of the NAT Gateway. If not provided, a diversity zone will be automatically allocated.
 - `promo_code` (String) A promotional code for the NAT Gateway order.
 - `resource_tags` (Map of String) Resource tags for the NAT Gateway.
-- `service_level_reference` (String) The service level reference for the NAT Gateway.
-- `session_count` (Number) The session count of the NAT Gateway. Valid session counts depend on the selected speed and can be retrieved from the NAT Gateway sessions API.
 
 ### Read-Only
 
-- `admin_locked` (Boolean) Whether the NAT Gateway is admin locked.
 - `contract_end_date` (String) The end date of the contract for the NAT Gateway.
 - `create_date` (String) The date the NAT Gateway was created.
 - `created_by` (String) The user who created the NAT Gateway.
 - `last_updated` (String) Last updated by the Terraform provider.
-- `locked` (Boolean) Whether the NAT Gateway is locked.
-- `order_approval_status` (String) The order approval status of the NAT Gateway.
 - `product_uid` (String) The unique identifier of the NAT Gateway.
-- `provisioning_status` (String) The provisioning status of the NAT Gateway.

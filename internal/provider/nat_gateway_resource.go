@@ -31,36 +31,29 @@ var (
 
 // natGatewayResourceModel maps the resource schema data.
 type natGatewayResourceModel struct {
-	LastUpdated           types.String `tfsdk:"last_updated"`
-	ProductUID            types.String `tfsdk:"product_uid"`
-	ProductName           types.String `tfsdk:"product_name"`
-	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
-	CreateDate            types.String `tfsdk:"create_date"`
-	CreatedBy             types.String `tfsdk:"created_by"`
-	ContractEndDate       types.String `tfsdk:"contract_end_date"`
-	LocationID            types.Int64  `tfsdk:"location_id"`
-	Speed                 types.Int64  `tfsdk:"speed"`
-	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
-	AutoRenewTerm         types.Bool   `tfsdk:"auto_renew_term"`
-	PromoCode             types.String `tfsdk:"promo_code"`
-	ServiceLevelReference types.String `tfsdk:"service_level_reference"`
-	Locked                types.Bool   `tfsdk:"locked"`
-	AdminLocked           types.Bool   `tfsdk:"admin_locked"`
-	OrderApprovalStatus   types.String `tfsdk:"order_approval_status"`
-	ResourceTags          types.Map    `tfsdk:"resource_tags"`
+	LastUpdated        types.String `tfsdk:"last_updated"`
+	ProductUID         types.String `tfsdk:"product_uid"`
+	ProductName        types.String `tfsdk:"product_name"`
+	CreateDate         types.String `tfsdk:"create_date"`
+	CreatedBy          types.String `tfsdk:"created_by"`
+	ContractEndDate    types.String `tfsdk:"contract_end_date"`
+	LocationID         types.Int64  `tfsdk:"location_id"`
+	Speed              types.Int64  `tfsdk:"speed"`
+	ContractTermMonths types.Int64  `tfsdk:"contract_term_months"`
+	AutoRenewTerm      types.Bool   `tfsdk:"auto_renew_term"`
+	PromoCode          types.String `tfsdk:"promo_code"`
+	ResourceTags       types.Map    `tfsdk:"resource_tags"`
 
 	// Config fields (flattened from NATGatewayNetworkConfig)
 	DiversityZone      types.String `tfsdk:"diversity_zone"`
 	ASN                types.Int64  `tfsdk:"asn"`
 	BGPShutdownDefault types.Bool   `tfsdk:"bgp_shutdown_default"`
-	SessionCount       types.Int64  `tfsdk:"session_count"`
 }
 
 // fromAPINATGateway maps the API NAT Gateway response to the resource schema.
 func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 	m.ProductUID = types.StringValue(gw.ProductUID)
 	m.ProductName = types.StringValue(gw.ProductName)
-	m.ProvisioningStatus = types.StringValue(gw.ProvisioningStatus)
 	m.CreateDate = types.StringValue(gw.CreateDate)
 	m.CreatedBy = types.StringValue(gw.CreatedBy)
 	m.ContractEndDate = types.StringValue(gw.ContractEndDate)
@@ -68,10 +61,6 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 	m.Speed = types.Int64Value(int64(gw.Speed))
 	m.ContractTermMonths = types.Int64Value(int64(gw.Term))
 	m.AutoRenewTerm = types.BoolValue(gw.AutoRenewTerm)
-	m.Locked = types.BoolValue(gw.Locked)
-	m.AdminLocked = types.BoolValue(gw.AdminLocked)
-	m.OrderApprovalStatus = types.StringValue(gw.OrderApprovalStatus)
-	m.ServiceLevelReference = types.StringValue(gw.ServiceLevelReference)
 
 	if gw.PromoCode != "" {
 		m.PromoCode = types.StringValue(gw.PromoCode)
@@ -81,7 +70,6 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 	m.DiversityZone = types.StringValue(gw.Config.DiversityZone)
 	m.ASN = types.Int64Value(int64(gw.Config.ASN))
 	m.BGPShutdownDefault = types.BoolValue(gw.Config.BGPShutdownDefault)
-	m.SessionCount = types.Int64Value(int64(gw.Config.SessionCount))
 
 	// Resource tags
 	if len(gw.ResourceTags) > 0 {
@@ -147,10 +135,6 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "The name of the NAT Gateway.",
 				Required:    true,
 			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the NAT Gateway.",
-				Computed:    true,
-			},
 			"create_date": schema.StringAttribute{
 				Description: "The date the NAT Gateway was created.",
 				Computed:    true,
@@ -202,44 +186,14 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"service_level_reference": schema.StringAttribute{
-				Description: "The service level reference for the NAT Gateway.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the NAT Gateway is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the NAT Gateway is admin locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"order_approval_status": schema.StringAttribute{
-				Description: "The order approval status of the NAT Gateway.",
-				Computed:    true,
-			},
 			"resource_tags": schema.MapAttribute{
 				Description: "Resource tags for the NAT Gateway.",
 				Optional:    true,
 				ElementType: types.StringType,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the NAT Gateway. If not provided, a diversity zone will be automatically allocated.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description: "The diversity zone of the NAT Gateway.",
+				Required:    true,
 			},
 			"asn": schema.Int64Attribute{
 				Description: "The Autonomous System Number (ASN) for the NAT Gateway.",
@@ -255,14 +209,6 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"session_count": schema.Int64Attribute{
-				Description: "The session count of the NAT Gateway. Valid session counts depend on the selected speed and can be retrieved from the NAT Gateway sessions API.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -293,23 +239,15 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 		createReq.PromoCode = plan.PromoCode.ValueString()
 	}
 
-	if !plan.ServiceLevelReference.IsNull() && !plan.ServiceLevelReference.IsUnknown() {
-		createReq.ServiceLevelReference = plan.ServiceLevelReference.ValueString()
-	}
-
 	// Config fields
-	config := megaport.NATGatewayNetworkConfig{}
-	if !plan.DiversityZone.IsNull() && !plan.DiversityZone.IsUnknown() {
-		config.DiversityZone = plan.DiversityZone.ValueString()
+	config := megaport.NATGatewayNetworkConfig{
+		DiversityZone: plan.DiversityZone.ValueString(),
 	}
 	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() {
 		config.ASN = int(plan.ASN.ValueInt64())
 	}
 	if !plan.BGPShutdownDefault.IsNull() && !plan.BGPShutdownDefault.IsUnknown() {
 		config.BGPShutdownDefault = plan.BGPShutdownDefault.ValueBool()
-	}
-	if !plan.SessionCount.IsNull() && !plan.SessionCount.IsUnknown() {
-		config.SessionCount = int(plan.SessionCount.ValueInt64())
 	}
 	createReq.Config = config
 
@@ -452,23 +390,15 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 		updateReq.PromoCode = plan.PromoCode.ValueString()
 	}
 
-	if !plan.ServiceLevelReference.IsNull() && !plan.ServiceLevelReference.IsUnknown() {
-		updateReq.ServiceLevelReference = plan.ServiceLevelReference.ValueString()
-	}
-
 	// Config fields
-	config := megaport.NATGatewayNetworkConfig{}
-	if !plan.DiversityZone.IsNull() && !plan.DiversityZone.IsUnknown() {
-		config.DiversityZone = plan.DiversityZone.ValueString()
+	config := megaport.NATGatewayNetworkConfig{
+		DiversityZone: plan.DiversityZone.ValueString(),
 	}
 	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() {
 		config.ASN = int(plan.ASN.ValueInt64())
 	}
 	if !plan.BGPShutdownDefault.IsNull() && !plan.BGPShutdownDefault.IsUnknown() {
 		config.BGPShutdownDefault = plan.BGPShutdownDefault.ValueBool()
-	}
-	if !plan.SessionCount.IsNull() && !plan.SessionCount.IsUnknown() {
-		config.SessionCount = int(plan.SessionCount.ValueInt64())
 	}
 	updateReq.Config = config
 
