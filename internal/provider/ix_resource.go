@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -150,7 +151,8 @@ type ixVPLSInterfaceModel struct {
 }
 
 // fromAPI maps the API IX response to the resource schema.
-func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
+func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) diag.Diagnostics {
+	apiDiags := diag.Diagnostics{}
 	// Map basic fields
 	orm.ProductUID = types.StringValue(ix.ProductUID)
 	orm.ProductID = types.Int64Value(int64(ix.ProductID))
@@ -196,11 +198,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			Shutdown:     types.BoolValue(ix.Resources.Interface.Shutdown),
 		}
 		ifObj, diags := types.ObjectValueFrom(ctx, interfaceAttrTypes, iface)
-		if diags.HasError() {
-			res.Interface = types.ObjectNull(interfaceAttrTypes)
-		} else {
-			res.Interface = ifObj
-		}
+		apiDiags.Append(diags...)
+		res.Interface = ifObj
 	} else {
 		res.Interface = types.ObjectNull(interfaceAttrTypes)
 	}
@@ -222,11 +221,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			})
 		}
 		bgpList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: bgpConnectionAttrTypes}, bgpModels)
-		if diags.HasError() {
-			res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
-		} else {
-			res.BGPConnections = bgpList
-		}
+		apiDiags.Append(diags...)
+		res.BGPConnections = bgpList
 	} else {
 		res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
 	}
@@ -244,11 +240,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			})
 		}
 		ipList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ipAddressAttrTypes}, ipModels)
-		if diags.HasError() {
-			res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
-		} else {
-			res.IPAddresses = ipList
-		}
+		apiDiags.Append(diags...)
+		res.IPAddresses = ipList
 	} else {
 		res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
 	}
@@ -264,22 +257,18 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			Shutdown:      types.BoolValue(ix.Resources.VPLSInterface.Shutdown),
 		}
 		vplsObj, diags := types.ObjectValueFrom(ctx, vplsInterfaceAttrTypes, vpls)
-		if diags.HasError() {
-			res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
-		} else {
-			res.VPLSInterface = vplsObj
-		}
+		apiDiags.Append(diags...)
+		res.VPLSInterface = vplsObj
 	} else {
 		res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
 	}
 
 	// Convert ixResourcesModel to a Terraform object
 	resObj, diags := types.ObjectValueFrom(ctx, resourcesAttrTypes, res)
-	if diags.HasError() {
-		orm.Resources = types.ObjectNull(resourcesAttrTypes)
-	} else {
-		orm.Resources = resObj
-	}
+	apiDiags.Append(diags...)
+	orm.Resources = resObj
+
+	return apiDiags
 }
 
 // NewIXResource is a helper function to simplify the provider implementation.
@@ -596,7 +585,10 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Update the plan with the IX info
-	plan.fromAPI(ctx, ix)
+	resp.Diagnostics.Append(plan.fromAPI(ctx, ix)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -625,7 +617,10 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	// Update the state with the IX info
-	state.fromAPI(ctx, ix)
+	resp.Diagnostics.Append(state.fromAPI(ctx, ix)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -705,7 +700,10 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// Update the state with the IX info
-	state.fromAPI(ctx, updatedIX)
+	resp.Diagnostics.Append(state.fromAPI(ctx, updatedIX)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.PromoCode = plan.PromoCode
 
 	// Persist the new state
