@@ -31,15 +31,15 @@ var (
 
 // natGatewayResourceModel maps the resource schema data.
 type natGatewayResourceModel struct {
-	LastUpdated        types.String `tfsdk:"last_updated"`
-	ProductUID         types.String `tfsdk:"product_uid"`
-	ProductName        types.String `tfsdk:"product_name"`
-	CreateDate         types.String `tfsdk:"create_date"`
-	CreatedBy          types.String `tfsdk:"created_by"`
-	ContractEndDate    types.String `tfsdk:"contract_end_date"`
-	LocationID         types.Int64  `tfsdk:"location_id"`
-	Speed              types.Int64  `tfsdk:"speed"`
-	ContractTermMonths types.Int64  `tfsdk:"contract_term_months"`
+	LastUpdated           types.String `tfsdk:"last_updated"`
+	ProductUID            types.String `tfsdk:"product_uid"`
+	ProductName           types.String `tfsdk:"product_name"`
+	CreateDate            types.String `tfsdk:"create_date"`
+	CreatedBy             types.String `tfsdk:"created_by"`
+	ContractEndDate       types.String `tfsdk:"contract_end_date"`
+	LocationID            types.Int64  `tfsdk:"location_id"`
+	Speed                 types.Int64  `tfsdk:"speed"`
+	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	AutoRenewTerm         types.Bool   `tfsdk:"auto_renew_term"`
 	Locked                types.Bool   `tfsdk:"locked"`
 	AdminLocked           types.Bool   `tfsdk:"admin_locked"`
