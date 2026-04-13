@@ -40,9 +40,12 @@ type natGatewayResourceModel struct {
 	LocationID         types.Int64  `tfsdk:"location_id"`
 	Speed              types.Int64  `tfsdk:"speed"`
 	ContractTermMonths types.Int64  `tfsdk:"contract_term_months"`
-	AutoRenewTerm      types.Bool   `tfsdk:"auto_renew_term"`
-	PromoCode          types.String `tfsdk:"promo_code"`
-	ResourceTags       types.Map    `tfsdk:"resource_tags"`
+	AutoRenewTerm         types.Bool   `tfsdk:"auto_renew_term"`
+	Locked                types.Bool   `tfsdk:"locked"`
+	AdminLocked           types.Bool   `tfsdk:"admin_locked"`
+	ServiceLevelReference types.String `tfsdk:"service_level_reference"`
+	PromoCode             types.String `tfsdk:"promo_code"`
+	ResourceTags          types.Map    `tfsdk:"resource_tags"`
 
 	// Config fields (flattened from NATGatewayNetworkConfig)
 	DiversityZone      types.String `tfsdk:"diversity_zone"`
@@ -61,6 +64,9 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 	m.Speed = types.Int64Value(int64(gw.Speed))
 	m.ContractTermMonths = types.Int64Value(int64(gw.Term))
 	m.AutoRenewTerm = types.BoolValue(gw.AutoRenewTerm)
+	m.Locked = types.BoolValue(gw.Locked)
+	m.AdminLocked = types.BoolValue(gw.AdminLocked)
+	m.ServiceLevelReference = types.StringValue(gw.ServiceLevelReference)
 
 	if gw.PromoCode != "" {
 		m.PromoCode = types.StringValue(gw.PromoCode)
@@ -177,6 +183,28 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"locked": schema.BoolAttribute{
+				Description: "Whether the NAT Gateway is locked.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"admin_locked": schema.BoolAttribute{
+				Description: "Whether the NAT Gateway is admin locked.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"service_level_reference": schema.StringAttribute{
+				Description: "A service level reference for the NAT Gateway.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"promo_code": schema.StringAttribute{
