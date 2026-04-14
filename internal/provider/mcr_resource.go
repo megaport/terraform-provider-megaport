@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,6 +27,7 @@ var (
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+	_ resource.ResourceWithMoveState   = &mcrResource{}
 )
 
 // mcrResourceModel maps the resource schema data.
@@ -477,4 +479,182 @@ func (r *mcrResource) fetchResourceTags(ctx context.Context, id string) (map[str
 func (r *mcrResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// MoveState returns state movers that handle migration from V1 to V2 of the MCR resource.
+func (r *mcrResource) MoveState(ctx context.Context) []resource.StateMover {
+	return []resource.StateMover{
+		{
+			StateMover: func(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
+				if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_mcr" {
+					return
+				}
+
+				var rawState map[string]json.RawMessage
+				if err := json.Unmarshal(req.SourceRawState.JSON, &rawState); err != nil {
+					resp.Diagnostics.AddError(
+						"Error unmarshalling V1 MCR state",
+						fmt.Sprintf("Could not unmarshal V1 MCR raw state: %s", err.Error()),
+					)
+					return
+				}
+
+				var model mcrResourceModel
+
+				// UID (product_uid)
+				if v, ok := rawState["product_uid"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.UID = types.StringValue(*s)
+					} else {
+						model.UID = types.StringNull()
+					}
+				}
+
+				// Name (product_name)
+				if v, ok := rawState["product_name"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.Name = types.StringValue(*s)
+					} else {
+						model.Name = types.StringNull()
+					}
+				}
+
+				// CostCentre
+				if v, ok := rawState["cost_centre"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.CostCentre = types.StringValue(*s)
+					} else {
+						model.CostCentre = types.StringNull()
+					}
+				}
+
+				// PortSpeed
+				if v, ok := rawState["port_speed"]; ok {
+					var n *float64
+					if err := json.Unmarshal(v, &n); err == nil && n != nil {
+						model.PortSpeed = types.Int64Value(int64(*n))
+					} else {
+						model.PortSpeed = types.Int64Null()
+					}
+				}
+
+				// LocationID
+				if v, ok := rawState["location_id"]; ok {
+					var n *float64
+					if err := json.Unmarshal(v, &n); err == nil && n != nil {
+						model.LocationID = types.Int64Value(int64(*n))
+					} else {
+						model.LocationID = types.Int64Null()
+					}
+				}
+
+				// MarketplaceVisibility
+				if v, ok := rawState["marketplace_visibility"]; ok {
+					var b *bool
+					if err := json.Unmarshal(v, &b); err == nil && b != nil {
+						model.MarketplaceVisibility = types.BoolValue(*b)
+					} else {
+						model.MarketplaceVisibility = types.BoolNull()
+					}
+				}
+
+				// CompanyUID
+				if v, ok := rawState["company_uid"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.CompanyUID = types.StringValue(*s)
+					} else {
+						model.CompanyUID = types.StringNull()
+					}
+				}
+
+				// ContractTermMonths
+				if v, ok := rawState["contract_term_months"]; ok {
+					var n *float64
+					if err := json.Unmarshal(v, &n); err == nil && n != nil {
+						model.ContractTermMonths = types.Int64Value(int64(*n))
+					} else {
+						model.ContractTermMonths = types.Int64Null()
+					}
+				}
+
+				// ASN
+				if v, ok := rawState["asn"]; ok {
+					var n *float64
+					if err := json.Unmarshal(v, &n); err == nil && n != nil {
+						model.ASN = types.Int64Value(int64(*n))
+					} else {
+						model.ASN = types.Int64Null()
+					}
+				} else {
+					model.ASN = types.Int64Null()
+				}
+
+				// DiversityZone
+				if v, ok := rawState["diversity_zone"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.DiversityZone = types.StringValue(*s)
+					} else {
+						model.DiversityZone = types.StringNull()
+					}
+				}
+
+				// PromoCode
+				if v, ok := rawState["promo_code"]; ok {
+					var s *string
+					if err := json.Unmarshal(v, &s); err == nil && s != nil {
+						model.PromoCode = types.StringValue(*s)
+					} else {
+						model.PromoCode = types.StringNull()
+					}
+				}
+
+				// AttributeTags
+				if v, ok := rawState["attribute_tags"]; ok {
+					var tags *map[string]string
+					if err := json.Unmarshal(v, &tags); err == nil && tags != nil {
+						tagValues := make(map[string]attr.Value, len(*tags))
+						for k, val := range *tags {
+							tagValues[k] = types.StringValue(val)
+						}
+						mapVal, mapDiags := types.MapValue(types.StringType, tagValues)
+						resp.Diagnostics.Append(mapDiags...)
+						model.AttributeTags = mapVal
+					} else {
+						model.AttributeTags = types.MapNull(types.StringType)
+					}
+				} else {
+					model.AttributeTags = types.MapNull(types.StringType)
+				}
+
+				// ResourceTags
+				if v, ok := rawState["resource_tags"]; ok {
+					var tags *map[string]string
+					if err := json.Unmarshal(v, &tags); err == nil && tags != nil {
+						tagValues := make(map[string]attr.Value, len(*tags))
+						for k, val := range *tags {
+							tagValues[k] = types.StringValue(val)
+						}
+						mapVal, mapDiags := types.MapValue(types.StringType, tagValues)
+						resp.Diagnostics.Append(mapDiags...)
+						model.ResourceTags = mapVal
+					} else {
+						model.ResourceTags = types.MapNull(types.StringType)
+					}
+				} else {
+					model.ResourceTags = types.MapNull(types.StringType)
+				}
+
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(resp.TargetState.Set(ctx, &model)...)
+			},
+		},
+	}
 }

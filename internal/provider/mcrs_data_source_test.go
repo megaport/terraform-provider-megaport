@@ -106,7 +106,7 @@ func (m *MockMCRService) GetMCRPrefixFilterLists(ctx context.Context, mcrId stri
 	return nil, nil
 }
 
-func (m *MockMCRService) UpdateMCRWithAddOn(ctx context.Context, mcrID string, req any) error {
+func (m *MockMCRService) UpdateMCRWithAddOn(ctx context.Context, mcrID string, req megaport.MCRAddOnRequest) error {
 	return nil
 }
 
