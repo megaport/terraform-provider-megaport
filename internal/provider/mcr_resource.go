@@ -76,6 +76,8 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 		attributeTagsValue, tagDiags := types.MapValue(types.StringType, attributeTags)
 		apiDiags = append(apiDiags, tagDiags...)
 		orm.AttributeTags = attributeTagsValue
+	} else {
+		orm.AttributeTags = types.MapNull(types.StringType)
 	}
 
 	if len(tags) > 0 {
@@ -156,6 +158,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},

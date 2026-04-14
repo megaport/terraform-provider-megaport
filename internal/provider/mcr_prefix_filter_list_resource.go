@@ -301,7 +301,7 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Verify the resource exists by attempting to read it
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
+		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
 			if apiErr.Response.StatusCode == http.StatusNotFound {
 				resp.Diagnostics.AddError(
 					"Resource not found",
