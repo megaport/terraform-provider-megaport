@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -33,6 +34,7 @@ var (
 	_ resource.Resource                = &vxcResource{}
 	_ resource.ResourceWithConfigure   = &vxcResource{}
 	_ resource.ResourceWithImportState = &vxcResource{}
+	_ resource.ResourceWithMoveState   = &vxcResource{}
 
 	// Leaf attr maps (no references to other maps) must be declared first.
 
@@ -1332,6 +1334,218 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// MoveState implements resource.ResourceWithMoveState to support automatic
+// state migration from the V1 provider (megaport/megaport) to the V2 provider.
+func (r *vxcResource) MoveState(ctx context.Context) []resource.StateMover {
+	return []resource.StateMover{
+		{
+			SourceSchema: nil, // Use raw JSON approach
+			StateMover:   r.moveStateV1ToV2,
+		},
+	}
+}
+
+// moveStateV1ToV2 migrates VXC state from the V1 provider schema to V2.
+func (r *vxcResource) moveStateV1ToV2(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
+	// Only handle moves from the megaport/megaport provider.
+	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" {
+		return
+	}
+	// Only handle the megaport_vxc resource type.
+	if req.SourceTypeName != "megaport_vxc" {
+		return
+	}
+
+	tflog.Info(ctx, "Migrating VXC state from V1 to V2")
+
+	if req.SourceRawState == nil {
+		resp.Diagnostics.AddError("Missing source state", "No raw state available for V1 to V2 migration")
+		return
+	}
+
+	// Parse the raw V1 state JSON.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(req.SourceRawState.JSON, &raw); err != nil {
+		resp.Diagnostics.AddError("Failed to parse V1 state", err.Error())
+		return
+	}
+
+	var state vxcResourceModel
+
+	// Helper to unmarshal a scalar field from the raw map.
+	unmarshalString := func(key string) types.String {
+		v, ok := raw[key]
+		if !ok {
+			return types.StringNull()
+		}
+		var s *string
+		if err := json.Unmarshal(v, &s); err != nil || s == nil {
+			return types.StringNull()
+		}
+		return types.StringValue(*s)
+	}
+	unmarshalInt64 := func(key string) types.Int64 {
+		v, ok := raw[key]
+		if !ok {
+			return types.Int64Null()
+		}
+		var n *int64
+		if err := json.Unmarshal(v, &n); err != nil || n == nil {
+			return types.Int64Null()
+		}
+		return types.Int64Value(*n)
+	}
+	unmarshalBool := func(key string) types.Bool {
+		v, ok := raw[key]
+		if !ok {
+			return types.BoolNull()
+		}
+		var b *bool
+		if err := json.Unmarshal(v, &b); err != nil || b == nil {
+			return types.BoolNull()
+		}
+		return types.BoolValue(*b)
+	}
+	unmarshalMap := func(key string) types.Map {
+		v, ok := raw[key]
+		if !ok {
+			return types.MapNull(types.StringType)
+		}
+		var m *map[string]string
+		if err := json.Unmarshal(v, &m); err != nil || m == nil {
+			return types.MapNull(types.StringType)
+		}
+		result, diags := types.MapValueFrom(ctx, types.StringType, *m)
+		if diags.HasError() {
+			return types.MapNull(types.StringType)
+		}
+		return result
+	}
+
+	// Map scalar fields.
+	state.UID = unmarshalString("product_uid")
+	state.ServiceID = unmarshalInt64("service_id")
+	state.Name = unmarshalString("product_name")
+	state.RateLimit = unmarshalInt64("rate_limit")
+	state.DistanceBand = unmarshalString("distance_band")
+	state.PromoCode = unmarshalString("promo_code")
+	state.ServiceKey = unmarshalString("service_key")
+	state.CreatedBy = unmarshalString("created_by")
+	state.ContractTermMonths = unmarshalInt64("contract_term_months")
+	state.CompanyUID = unmarshalString("company_uid")
+	state.AttributeTags = unmarshalMap("attribute_tags")
+	state.CostCentre = unmarshalString("cost_centre")
+	state.Shutdown = unmarshalBool("shutdown")
+	state.ResourceTags = unmarshalMap("resource_tags")
+
+	// Convert V1 end configs to V2 end configs.
+	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(ctx, raw["a_end"])
+	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(ctx, raw["b_end"])
+
+	resp.Diagnostics.Append(resp.TargetState.Set(ctx, &state)...)
+}
+
+// migrateV1EndConfigToV2AEnd converts a V1 a_end JSON object to the V2 a_end_config object type.
+func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+	if rawEnd == nil {
+		return types.ObjectNull(vxcAEndConfigAttrs)
+	}
+
+	var v1 map[string]json.RawMessage
+	if err := json.Unmarshal(rawEnd, &v1); err != nil {
+		return types.ObjectNull(vxcAEndConfigAttrs)
+	}
+
+	// Handle the case where a_end is JSON null.
+	if v1 == nil {
+		return types.ObjectNull(vxcAEndConfigAttrs)
+	}
+
+	productUID := extractStringField(v1, "requested_product_uid")
+	assignedProductUID := extractStringField(v1, "current_product_uid")
+	vlan := extractInt64Field(v1, "vlan")
+	innerVLAN := extractInt64Field(v1, "inner_vlan")
+	vnicIndex := extractInt64Field(v1, "vnic_index")
+
+	attrValues := map[string]attr.Value{
+		"product_uid":          productUID,
+		"assigned_product_uid": assignedProductUID,
+		"vlan":                 vlan,
+		"inner_vlan":           innerVLAN,
+		"vnic_index":           vnicIndex,
+		"vrouter_config":       types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+	}
+
+	obj, _ := types.ObjectValue(vxcAEndConfigAttrs, attrValues)
+	return obj
+}
+
+// migrateV1EndConfigToV2BEnd converts a V1 b_end JSON object to the V2 b_end_config object type.
+func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+	if rawEnd == nil {
+		return types.ObjectNull(vxcBEndConfigAttrs)
+	}
+
+	var v1 map[string]json.RawMessage
+	if err := json.Unmarshal(rawEnd, &v1); err != nil {
+		return types.ObjectNull(vxcBEndConfigAttrs)
+	}
+
+	if v1 == nil {
+		return types.ObjectNull(vxcBEndConfigAttrs)
+	}
+
+	productUID := extractStringField(v1, "requested_product_uid")
+	assignedProductUID := extractStringField(v1, "current_product_uid")
+	vlan := extractInt64Field(v1, "vlan")
+	innerVLAN := extractInt64Field(v1, "inner_vlan")
+	vnicIndex := extractInt64Field(v1, "vnic_index")
+
+	attrValues := map[string]attr.Value{
+		"product_uid":          productUID,
+		"assigned_product_uid": assignedProductUID,
+		"vlan":                 vlan,
+		"inner_vlan":           innerVLAN,
+		"vnic_index":           vnicIndex,
+		"aws_config":           types.ObjectNull(vxcPartnerConfigAWSAttrs),
+		"azure_config":         types.ObjectNull(vxcPartnerConfigAzureAttrs),
+		"google_config":        types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+		"oracle_config":        types.ObjectNull(vxcPartnerConfigOracleAttrs),
+		"ibm_config":           types.ObjectNull(vxcPartnerConfigIbmAttrs),
+		"vrouter_config":       types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+		"transit":              types.BoolNull(),
+	}
+
+	obj, _ := types.ObjectValue(vxcBEndConfigAttrs, attrValues)
+	return obj
+}
+
+// extractStringField extracts a nullable string field from a raw JSON map.
+func extractStringField(raw map[string]json.RawMessage, key string) types.String {
+	v, ok := raw[key]
+	if !ok {
+		return types.StringNull()
+	}
+	var s *string
+	if err := json.Unmarshal(v, &s); err != nil || s == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(*s)
+}
+
+// extractInt64Field extracts a nullable int64 field from a raw JSON map.
+func extractInt64Field(raw map[string]json.RawMessage, key string) types.Int64 {
+	v, ok := raw[key]
+	if !ok {
+		return types.Int64Null()
+	}
+	var n *int64
+	if err := json.Unmarshal(v, &n); err != nil || n == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(*n)
 }
 
 // buildEndVLANVnicUpdates populates VLAN and VNIC-related fields in the update request
