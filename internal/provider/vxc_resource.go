@@ -1176,7 +1176,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		isChanged = true
 	}
 	if isChanged {
-		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
+		_, err := r.client.VXCService.UpdateVXC(ctx, state.UID.ValueString(), updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Updating VXC",
@@ -1186,7 +1186,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 
 		// Add retry logic to wait for API propagation
-		waitErr = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
+		waitErr = r.waitForVXCUpdate(ctx, state.UID.ValueString(), updateReq, updateTimeout)
 		if waitErr != nil {
 			resp.Diagnostics.AddWarning(
 				"VXC Update Propagation Delay",
@@ -1441,14 +1441,17 @@ func (r *vxcResource) moveStateV1ToV2(ctx context.Context, req resource.MoveStat
 	state.ResourceTags = unmarshalMap("resource_tags")
 
 	// Convert V1 end configs to V2 end configs.
-	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(ctx, raw["a_end"])
-	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(ctx, raw["b_end"])
+	// V1 stored partner configurations as separate top-level fields
+	// (a_end_partner_config, b_end_partner_config); V2 inlines them into the end config object.
+	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(ctx, raw["a_end"], raw["a_end_partner_config"])
+	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(ctx, raw["b_end"], raw["b_end_partner_config"])
 
 	resp.Diagnostics.Append(resp.TargetState.Set(ctx, &state)...)
 }
 
 // migrateV1EndConfigToV2AEnd converts a V1 a_end JSON object to the V2 a_end_config object type.
-func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+// rawPartnerConfig is the V1 a_end_partner_config top-level field (may be nil/null).
+func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcAEndConfigAttrs)
 	}
@@ -1469,21 +1472,36 @@ func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage) typ
 	innerVLAN := extractInt64Field(v1, "inner_vlan")
 	vnicIndex := extractInt64Field(v1, "vnic_index")
 
+	vrouterConfig := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+	if len(rawPartnerConfig) > 0 && !isJSONNull(rawPartnerConfig) {
+		var pc map[string]json.RawMessage
+		if err := json.Unmarshal(rawPartnerConfig, &pc); err == nil {
+			partner := ""
+			if pRaw, ok := pc["partner"]; ok {
+				_ = json.Unmarshal(pRaw, &partner)
+			}
+			if partner == "vrouter" || partner == "a-end" {
+				vrouterConfig = migrateV1VrouterConfig(ctx, pc["vrouter_config"])
+			}
+		}
+	}
+
 	attrValues := map[string]attr.Value{
 		"product_uid":          productUID,
 		"assigned_product_uid": assignedProductUID,
 		"vlan":                 vlan,
 		"inner_vlan":           innerVLAN,
 		"vnic_index":           vnicIndex,
-		"vrouter_config":       types.ObjectNull(vxcPartnerConfigVrouterAttrs),
+		"vrouter_config":       vrouterConfig,
 	}
 
 	obj, _ := types.ObjectValue(vxcAEndConfigAttrs, attrValues)
 	return obj
 }
 
-// migrateV1EndConfigToV2BEnd converts a V1 b_end JSON object to the V2 b_end_config object type.
-func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+// migrateV1EndConfigToV2BEnd converts a V1 b_end JSON object and V1 b_end_partner_config to the V2 b_end_config object type.
+// rawPartnerConfig is the V1 b_end_partner_config top-level field (may be nil/null).
+func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcBEndConfigAttrs)
 	}
@@ -1503,23 +1521,320 @@ func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage) typ
 	innerVLAN := extractInt64Field(v1, "inner_vlan")
 	vnicIndex := extractInt64Field(v1, "vnic_index")
 
+	// Migrate partner config from V1's top-level b_end_partner_config.
+	awsConfig := types.ObjectNull(vxcPartnerConfigAWSAttrs)
+	azureConfig := types.ObjectNull(vxcPartnerConfigAzureAttrs)
+	googleConfig := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+	oracleConfig := types.ObjectNull(vxcPartnerConfigOracleAttrs)
+	ibmConfig := types.ObjectNull(vxcPartnerConfigIbmAttrs)
+	vrouterConfig := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+	transit := types.BoolNull()
+
+	if len(rawPartnerConfig) > 0 && !isJSONNull(rawPartnerConfig) {
+		var pc map[string]json.RawMessage
+		if err := json.Unmarshal(rawPartnerConfig, &pc); err == nil {
+			partner := ""
+			if pRaw, ok := pc["partner"]; ok {
+				_ = json.Unmarshal(pRaw, &partner)
+			}
+			switch partner {
+			case "aws":
+				if subRaw, ok := pc["aws_config"]; ok && !isJSONNull(subRaw) {
+					awsConfig = migrateV1AWSConfig(subRaw)
+				}
+			case "azure":
+				if subRaw, ok := pc["azure_config"]; ok && !isJSONNull(subRaw) {
+					azureConfig = migrateV1AzureConfig(ctx, subRaw)
+				}
+			case "google":
+				if subRaw, ok := pc["google_config"]; ok && !isJSONNull(subRaw) {
+					googleConfig = migrateV1GoogleConfig(subRaw)
+				}
+			case "oracle":
+				if subRaw, ok := pc["oracle_config"]; ok && !isJSONNull(subRaw) {
+					oracleConfig = migrateV1OracleConfig(subRaw)
+				}
+			case "ibm":
+				if subRaw, ok := pc["ibm_config"]; ok && !isJSONNull(subRaw) {
+					ibmConfig = migrateV1IBMConfig(subRaw)
+				}
+			case "transit":
+				transit = types.BoolValue(true)
+			case "vrouter":
+				if subRaw, ok := pc["vrouter_config"]; ok && !isJSONNull(subRaw) {
+					vrouterConfig = migrateV1VrouterConfig(ctx, subRaw)
+				}
+			}
+		}
+	}
+
 	attrValues := map[string]attr.Value{
 		"product_uid":          productUID,
 		"assigned_product_uid": assignedProductUID,
 		"vlan":                 vlan,
 		"inner_vlan":           innerVLAN,
 		"vnic_index":           vnicIndex,
-		"aws_config":           types.ObjectNull(vxcPartnerConfigAWSAttrs),
-		"azure_config":         types.ObjectNull(vxcPartnerConfigAzureAttrs),
-		"google_config":        types.ObjectNull(vxcPartnerConfigGoogleAttrs),
-		"oracle_config":        types.ObjectNull(vxcPartnerConfigOracleAttrs),
-		"ibm_config":           types.ObjectNull(vxcPartnerConfigIbmAttrs),
-		"vrouter_config":       types.ObjectNull(vxcPartnerConfigVrouterAttrs),
-		"transit":              types.BoolNull(),
+		"aws_config":           awsConfig,
+		"azure_config":         azureConfig,
+		"google_config":        googleConfig,
+		"oracle_config":        oracleConfig,
+		"ibm_config":           ibmConfig,
+		"vrouter_config":       vrouterConfig,
+		"transit":              transit,
 	}
 
 	obj, _ := types.ObjectValue(vxcBEndConfigAttrs, attrValues)
 	return obj
+}
+
+// migrateV1AWSConfig migrates V1 aws_config JSON to a types.Object.
+func migrateV1AWSConfig(raw json.RawMessage) types.Object {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigAWSAttrs)
+	}
+	vals := map[string]attr.Value{
+		"connect_type":        extractStringField(fields, "connect_type"),
+		"type":                extractStringField(fields, "type"),
+		"owner_account":       extractStringField(fields, "owner_account"),
+		"asn":                 extractInt64Field(fields, "asn"),
+		"amazon_asn":          extractInt64Field(fields, "amazon_asn"),
+		"auth_key":            extractStringField(fields, "auth_key"),
+		"prefixes":            extractStringField(fields, "prefixes"),
+		"customer_ip_address": extractStringField(fields, "customer_ip_address"),
+		"amazon_ip_address":   extractStringField(fields, "amazon_ip_address"),
+		"name":                extractStringField(fields, "name"),
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigAWSAttrs, vals)
+	return obj
+}
+
+// migrateV1AzureConfig migrates V1 azure_config JSON to a types.Object.
+func migrateV1AzureConfig(ctx context.Context, raw json.RawMessage) types.Object {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigAzureAttrs)
+	}
+
+	serviceKey := extractStringField(fields, "service_key")
+	peersList := types.ListNull(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs))
+
+	if peersRaw, ok := fields["peers"]; ok && !isJSONNull(peersRaw) {
+		var rawPeers []json.RawMessage
+		if err := json.Unmarshal(peersRaw, &rawPeers); err == nil {
+			peerObjs := make([]attr.Value, 0, len(rawPeers))
+			for _, peerRaw := range rawPeers {
+				var peerFields map[string]json.RawMessage
+				if err2 := json.Unmarshal(peerRaw, &peerFields); err2 != nil {
+					continue
+				}
+				peerVals := map[string]attr.Value{
+					"type":             extractStringField(peerFields, "type"),
+					"peer_asn":         extractStringField(peerFields, "peer_asn"),
+					"primary_subnet":   extractStringField(peerFields, "primary_subnet"),
+					"secondary_subnet": extractStringField(peerFields, "secondary_subnet"),
+					"prefixes":         extractStringField(peerFields, "prefixes"),
+					"shared_key":       extractStringField(peerFields, "shared_key"),
+					"vlan":             extractInt64Field(peerFields, "vlan"),
+				}
+				peerObj, _ := types.ObjectValue(partnerOrderAzurePeeringConfigAttrs, peerVals)
+				peerObjs = append(peerObjs, peerObj)
+			}
+			peersList, _ = types.ListValue(types.ObjectType{}.WithAttributeTypes(partnerOrderAzurePeeringConfigAttrs), peerObjs)
+		}
+	}
+
+	vals := map[string]attr.Value{
+		"service_key": serviceKey,
+		"peers":       peersList,
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigAzureAttrs, vals)
+	return obj
+}
+
+// migrateV1GoogleConfig migrates V1 google_config JSON to a types.Object.
+func migrateV1GoogleConfig(raw json.RawMessage) types.Object {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigGoogleAttrs)
+	}
+	vals := map[string]attr.Value{
+		"pairing_key": extractStringField(fields, "pairing_key"),
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigGoogleAttrs, vals)
+	return obj
+}
+
+// migrateV1OracleConfig migrates V1 oracle_config JSON to a types.Object.
+func migrateV1OracleConfig(raw json.RawMessage) types.Object {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigOracleAttrs)
+	}
+	vals := map[string]attr.Value{
+		"virtual_circuit_id": extractStringField(fields, "virtual_circuit_id"),
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigOracleAttrs, vals)
+	return obj
+}
+
+// migrateV1IBMConfig migrates V1 ibm_config JSON to a types.Object.
+func migrateV1IBMConfig(raw json.RawMessage) types.Object {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigIbmAttrs)
+	}
+	vals := map[string]attr.Value{
+		"account_id":          extractStringField(fields, "account_id"),
+		"customer_asn":        extractInt64Field(fields, "customer_asn"),
+		"name":                extractStringField(fields, "name"),
+		"customer_ip_address": extractStringField(fields, "customer_ip_address"),
+		"provider_ip_address": extractStringField(fields, "provider_ip_address"),
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigIbmAttrs, vals)
+	return obj
+}
+
+// migrateV1VrouterConfig migrates V1 vrouter_config JSON to a types.Object.
+func migrateV1VrouterConfig(ctx context.Context, raw json.RawMessage) types.Object {
+	if len(raw) == 0 || isJSONNull(raw) {
+		return types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return types.ObjectNull(vxcPartnerConfigVrouterAttrs)
+	}
+
+	ifacesList := types.ListNull(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs))
+	if ifacesRaw, ok := fields["interfaces"]; ok && !isJSONNull(ifacesRaw) {
+		ifacesList = migrateV1VrouterInterfaces(ctx, ifacesRaw)
+	}
+
+	vals := map[string]attr.Value{
+		"interfaces": ifacesList,
+	}
+	obj, _ := types.ObjectValue(vxcPartnerConfigVrouterAttrs, vals)
+	return obj
+}
+
+// migrateV1VrouterInterfaces migrates a V1 vrouter interfaces JSON array to a types.List.
+func migrateV1VrouterInterfaces(ctx context.Context, raw json.RawMessage) types.List {
+	nullList := types.ListNull(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs))
+
+	var rawIfaces []json.RawMessage
+	if err := json.Unmarshal(raw, &rawIfaces); err != nil {
+		return nullList
+	}
+
+	ifaceObjs := make([]attr.Value, 0, len(rawIfaces))
+	for _, ifaceRaw := range rawIfaces {
+		var f map[string]json.RawMessage
+		if err := json.Unmarshal(ifaceRaw, &f); err != nil {
+			continue
+		}
+
+		ipAddrsList := extractStringListField(f, "ip_addresses")
+		natAddrsList := extractStringListField(f, "nat_ip_addresses")
+
+		ipRoutesList := types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs))
+		if v, ok := f["ip_routes"]; ok && !isJSONNull(v) {
+			var rawRoutes []json.RawMessage
+			if err := json.Unmarshal(v, &rawRoutes); err == nil {
+				routeObjs := make([]attr.Value, 0, len(rawRoutes))
+				for _, routeRaw := range rawRoutes {
+					var rf map[string]json.RawMessage
+					if err2 := json.Unmarshal(routeRaw, &rf); err2 != nil {
+						continue
+					}
+					routeVals := map[string]attr.Value{
+						"prefix":      extractStringField(rf, "prefix"),
+						"description": extractStringField(rf, "description"),
+						"next_hop":    extractStringField(rf, "next_hop"),
+					}
+					routeObj, _ := types.ObjectValue(ipRouteAttrs, routeVals)
+					routeObjs = append(routeObjs, routeObj)
+				}
+				ipRoutesList, _ = types.ListValue(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), routeObjs)
+			}
+		}
+
+		bfdObj := types.ObjectNull(bfdConfigAttrs)
+		if v, ok := f["bfd"]; ok && !isJSONNull(v) {
+			var bf map[string]json.RawMessage
+			if err := json.Unmarshal(v, &bf); err == nil {
+				bfdVals := map[string]attr.Value{
+					"tx_interval": extractInt64Field(bf, "tx_interval"),
+					"rx_interval": extractInt64Field(bf, "rx_interval"),
+					"multiplier":  extractInt64Field(bf, "multiplier"),
+				}
+				bfdObj, _ = types.ObjectValue(bfdConfigAttrs, bfdVals)
+			}
+		}
+
+		bgpList := types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig))
+		if v, ok := f["bgp_connections"]; ok && !isJSONNull(v) {
+			bgpList = migrateV1BgpConnections(v)
+		}
+
+		ifaceVals := map[string]attr.Value{
+			"ip_mtu":           extractInt64Field(f, "ip_mtu"),
+			"ip_addresses":     ipAddrsList,
+			"ip_routes":        ipRoutesList,
+			"nat_ip_addresses": natAddrsList,
+			"bfd":              bfdObj,
+			"vlan":             extractInt64Field(f, "vlan"),
+			"bgp_connections":  bgpList,
+		}
+		ifaceObj, _ := types.ObjectValue(vxcVrouterInterfaceAttrs, ifaceVals)
+		ifaceObjs = append(ifaceObjs, ifaceObj)
+	}
+
+	list, _ := types.ListValue(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), ifaceObjs)
+	return list
+}
+
+// migrateV1BgpConnections migrates a V1 BGP connections JSON array to a types.List.
+func migrateV1BgpConnections(raw json.RawMessage) types.List {
+	nullList := types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig))
+
+	var rawConns []json.RawMessage
+	if err := json.Unmarshal(raw, &rawConns); err != nil {
+		return nullList
+	}
+
+	connObjs := make([]attr.Value, 0, len(rawConns))
+	for _, connRaw := range rawConns {
+		var f map[string]json.RawMessage
+		if err := json.Unmarshal(connRaw, &f); err != nil {
+			continue
+		}
+		connVals := map[string]attr.Value{
+			"peer_type":             extractStringField(f, "peer_type"),
+			"peer_asn":              extractInt64Field(f, "peer_asn"),
+			"local_asn":             extractInt64Field(f, "local_asn"),
+			"local_ip_address":      extractStringField(f, "local_ip_address"),
+			"peer_ip_address":       extractStringField(f, "peer_ip_address"),
+			"password":              extractStringField(f, "password"),
+			"shutdown":              extractBoolField(f, "shutdown"),
+			"description":           extractStringField(f, "description"),
+			"med_in":                extractInt64Field(f, "med_in"),
+			"med_out":               extractInt64Field(f, "med_out"),
+			"bfd_enabled":           extractBoolField(f, "bfd_enabled"),
+			"export_policy":         extractStringField(f, "export_policy"),
+			"permit_export_to":      extractStringListField(f, "permit_export_to"),
+			"deny_export_to":        extractStringListField(f, "deny_export_to"),
+			"import_whitelist":      extractStringField(f, "import_whitelist"),
+			"import_blacklist":      extractStringField(f, "import_blacklist"),
+			"export_whitelist":      extractStringField(f, "export_whitelist"),
+			"export_blacklist":      extractStringField(f, "export_blacklist"),
+			"as_path_prepend_count": extractInt64Field(f, "as_path_prepend_count"),
+		}
+		connObj, _ := types.ObjectValue(bgpVrouterConnectionConfig, connVals)
+		connObjs = append(connObjs, connObj)
+	}
+
+	list, _ := types.ListValue(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), connObjs)
+	return list
 }
 
 // extractStringField extracts a nullable string field from a raw JSON map.
@@ -1546,6 +1861,37 @@ func extractInt64Field(raw map[string]json.RawMessage, key string) types.Int64 {
 		return types.Int64Null()
 	}
 	return types.Int64Value(*n)
+}
+
+// extractBoolField extracts a nullable bool field from a raw JSON map.
+func extractBoolField(raw map[string]json.RawMessage, key string) types.Bool {
+	v, ok := raw[key]
+	if !ok {
+		return types.BoolNull()
+	}
+	var b *bool
+	if err := json.Unmarshal(v, &b); err != nil || b == nil {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*b)
+}
+
+// extractStringListField extracts a nullable list-of-strings field from a raw JSON map.
+func extractStringListField(raw map[string]json.RawMessage, key string) types.List {
+	v, ok := raw[key]
+	if !ok || isJSONNull(v) {
+		return types.ListNull(types.StringType)
+	}
+	var strs []string
+	if err := json.Unmarshal(v, &strs); err != nil {
+		return types.ListNull(types.StringType)
+	}
+	strVals := make([]attr.Value, len(strs))
+	for i, s := range strs {
+		strVals[i] = types.StringValue(s)
+	}
+	list, _ := types.ListValue(types.StringType, strVals)
+	return list
 }
 
 // buildEndVLANVnicUpdates populates VLAN and VNIC-related fields in the update request
@@ -1597,7 +1943,9 @@ func (r *vxcResource) buildEndVLANVnicUpdates(
 
 	// VNIC index: required when endpoint is MVE.
 	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		setVnicIndex(int(endPlan.NetworkInterfaceIndex.ValueInt64()))
+		if isPresent(endPlan.NetworkInterfaceIndex) {
+			setVnicIndex(int(endPlan.NetworkInterfaceIndex.ValueInt64()))
+		}
 
 		if supportVLANUpdates(partnerType) && !endPlan.NetworkInterfaceIndex.Equal(endState.NetworkInterfaceIndex) {
 			if !endPlan.VLAN.IsNull() && !endPlan.VLAN.Equal(endState.VLAN) {
@@ -1666,13 +2014,17 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				bEndCSP = true
 			}
 
-			// Handle CSP partner config replace detection for B-End
+			// Handle CSP partner config replace detection for B-End.
+			// Only trigger replace when state already had a non-null CSP config.
+			// A null state config means the VXC was just imported or migrated from V1 —
+			// in that case we don't know what the previous config was, so we don't force replace.
 			if bEndCSP {
-				// Check if the b_end_config partner config changed
-				planBEndCSPObj := extractBEndCSPObjForCompare(ctx, bEndPlanConfig)
 				stateBEndCSPObj := extractBEndCSPObjForCompare(ctx, bEndStateConfig)
-				if !planBEndCSPObj.Equal(stateBEndCSPObj) {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_config"))
+				if !stateBEndCSPObj.IsNull() {
+					planBEndCSPObj := extractBEndCSPObjForCompare(ctx, bEndPlanConfig)
+					if !planBEndCSPObj.Equal(stateBEndCSPObj) {
+						resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_config"))
+					}
 				}
 			}
 
@@ -1729,9 +2081,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			state.AEndConfiguration = newStateAEndObj
 			state.BEndConfiguration = newStateBEndObj
 
-			planDiags := req.Plan.Set(ctx, &plan)
-			diags = append(diags, planDiags...)
-			resp.Plan.Set(ctx, &plan)
+			resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 			stateDiags2 := req.State.Set(ctx, &state)
 			diags = append(diags, stateDiags2...)
 		}
