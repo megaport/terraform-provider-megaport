@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -440,6 +441,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"product_uid": schema.StringAttribute{
 						Description: "The Product UID for the A-End configuration.",
 						Required:    true,
+						Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 					},
 					"assigned_product_uid": schema.StringAttribute{
 						Description: "The assigned product UID of the A-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.",
@@ -483,6 +485,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Description: "The Product UID for the B-End configuration.",
 						Optional:    true,
 						Computed:    true,
+						Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 					},
 					"assigned_product_uid": schema.StringAttribute{
 						Description: "The assigned product UID of the B-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.",
@@ -1022,6 +1025,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	// Read config to access WriteOnly fields (BGP passwords) that are stripped from the plan.
+	var aFromConfig vxcAEndConfigModel
+	var bFromConfig vxcBEndConfigModel
+	{
+		var cfgModel vxcResourceModel
+		if cfgDiags := req.Config.Get(ctx, &cfgModel); !cfgDiags.HasError() {
+			// Best-effort: if unmarshalling fails, aFromConfig/bFromConfig remain zero-valued and
+			// password injection is skipped (passwords will be omitted from the update request).
+			cfgModel.AEndConfiguration.As(ctx, &aFromConfig, basetypes.ObjectAsOptions{}) //nolint:errcheck
+			cfgModel.BEndConfiguration.As(ctx, &bFromConfig, basetypes.ObjectAsOptions{}) //nolint:errcheck
+		}
+	}
+
 	var aEndPlan, aEndState vxcAEndConfigModel
 	var bEndPlan, bEndPlanConfig, bEndStateConfig vxcBEndConfigModel
 	var bEndState vxcBEndConfigModel
@@ -1152,13 +1168,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Detect A-End vrouter partner change
-	r.applyAEndPartnerUpdate(ctx, plan, state, aEndPlan, aEndState, updateReq, &resp.Diagnostics)
+	r.applyAEndPartnerUpdate(ctx, plan, state, aEndPlan, aEndState, aFromConfig, updateReq, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Detect B-End vrouter/transit partner change
-	r.applyBEndPartnerUpdate(ctx, plan, state, bEndPlanConfig, bEndState, bEndPartnerType, bEndCSP, updateReq, &resp.Diagnostics)
+	r.applyBEndPartnerUpdate(ctx, plan, state, bEndPlanConfig, bEndState, bEndPartnerType, bEndCSP, bFromConfig, updateReq, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -1480,8 +1496,12 @@ func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage, raw
 			if pRaw, ok := pc["partner"]; ok {
 				_ = json.Unmarshal(pRaw, &partner)
 			}
-			if partner == "vrouter" || partner == "a-end" {
+			switch partner {
+			case "vrouter":
 				vrouterConfig = migrateV1VrouterConfig(ctx, pc["vrouter_config"])
+			case "a-end":
+				// V1 used "partner_a_end_config" key for the a-end deprecated partner type.
+				vrouterConfig = migrateV1VrouterConfig(ctx, pc["partner_a_end_config"])
 			}
 		}
 	}
@@ -2183,11 +2203,79 @@ func nullifyVrouterPasswords(ctx context.Context, vrouterObj types.Object) types
 	return normalized
 }
 
+// injectVrouterPasswordsFromConfig copies BGP connection passwords from a config-side vrouter
+// object into the plan-side model. WriteOnly password fields are null in req.Plan after the
+// first apply; they must be read from req.Config instead so they are not silently omitted on
+// subsequent updates.
+func injectVrouterPasswordsFromConfig(ctx context.Context, target *vxcPartnerConfigVrouterModel, cfgVrouter types.Object) {
+	if !isPresent(cfgVrouter) || !isPresent(target.Interfaces) {
+		return
+	}
+	var cfgModel vxcPartnerConfigVrouterModel
+	if diags := cfgVrouter.As(ctx, &cfgModel, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return
+	}
+	if !isPresent(cfgModel.Interfaces) {
+		return
+	}
+	var cfgIfaces []*vxcPartnerConfigInterfaceModel
+	if diags := cfgModel.Interfaces.ElementsAs(ctx, &cfgIfaces, false); diags.HasError() {
+		return
+	}
+	var tgtIfaces []*vxcPartnerConfigInterfaceModel
+	if diags := target.Interfaces.ElementsAs(ctx, &tgtIfaces, false); diags.HasError() {
+		return
+	}
+	changed := false
+	for i := range tgtIfaces {
+		if i >= len(cfgIfaces) {
+			break
+		}
+		if !isPresent(cfgIfaces[i].BgpConnections) || !isPresent(tgtIfaces[i].BgpConnections) {
+			continue
+		}
+		var cfgConns []*bgpConnectionConfigModel
+		if diags := cfgIfaces[i].BgpConnections.ElementsAs(ctx, &cfgConns, false); diags.HasError() {
+			continue
+		}
+		var tgtConns []*bgpConnectionConfigModel
+		if diags := tgtIfaces[i].BgpConnections.ElementsAs(ctx, &tgtConns, false); diags.HasError() {
+			continue
+		}
+		bgpChanged := false
+		for j := range tgtConns {
+			if j >= len(cfgConns) {
+				break
+			}
+			if isPresent(cfgConns[j].Password) {
+				tgtConns[j].Password = cfgConns[j].Password
+				bgpChanged = true
+			}
+		}
+		if bgpChanged {
+			newBgpList, d := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), tgtConns)
+			if !d.HasError() {
+				tgtIfaces[i].BgpConnections = newBgpList
+				changed = true
+			}
+		}
+	}
+	if changed {
+		newIfaceList, d := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), tgtIfaces)
+		if !d.HasError() {
+			target.Interfaces = newIfaceList
+		}
+	}
+}
+
 // applyAEndPartnerUpdate detects A-end partner config changes and populates updateReq.AEndPartnerConfig.
+// aFromConfig is the A-end config read from req.Config, used to inject WriteOnly BGP passwords that
+// are null in req.Plan after the first apply.
 func (r *vxcResource) applyAEndPartnerUpdate(
 	ctx context.Context,
 	plan, state vxcResourceModel,
 	aEndPlan, aEndState vxcAEndConfigModel,
+	aFromConfig vxcAEndConfigModel,
 	updateReq *megaport.UpdateVXCRequest,
 	diags *diag.Diagnostics,
 ) {
@@ -2203,6 +2291,8 @@ func (r *vxcResource) applyAEndPartnerUpdate(
 			if diags.HasError() {
 				return
 			}
+			// Inject BGP passwords from req.Config (stripped from req.Plan by the framework).
+			injectVrouterPasswordsFromConfig(ctx, &partnerConfigAEnd, aFromConfig.VrouterPartnerConfig)
 			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.ProductUID.ValueString())
 			if err != nil {
 				diags.AddError(
@@ -2222,6 +2312,8 @@ func (r *vxcResource) applyAEndPartnerUpdate(
 }
 
 // applyBEndPartnerUpdate detects B-end partner config changes and populates updateReq.BEndPartnerConfig.
+// bFromConfig is the B-end config read from req.Config, used to inject WriteOnly BGP passwords that
+// are null in req.Plan after the first apply.
 func (r *vxcResource) applyBEndPartnerUpdate(
 	ctx context.Context,
 	plan, state vxcResourceModel,
@@ -2229,6 +2321,7 @@ func (r *vxcResource) applyBEndPartnerUpdate(
 	bEndState vxcBEndConfigModel,
 	bEndPartnerType string,
 	bEndCSP bool,
+	bFromConfig vxcBEndConfigModel,
 	updateReq *megaport.UpdateVXCRequest,
 	diags *diag.Diagnostics,
 ) {
@@ -2241,6 +2334,8 @@ func (r *vxcResource) applyBEndPartnerUpdate(
 			if diags.HasError() {
 				return
 			}
+			// Inject BGP passwords from req.Config (stripped from req.Plan by the framework).
+			injectVrouterPasswordsFromConfig(ctx, &vrouterModel, bFromConfig.VrouterPartnerConfig)
 			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.ProductUID.ValueString())
 			if err != nil {
 				diags.AddError(
