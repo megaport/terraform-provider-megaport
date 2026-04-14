@@ -389,6 +389,9 @@ func (suite *MCRContractTermProviderTestSuite) TestAccMegaportMCR_ContractTermUp
 				),
 			},
 			{
+				// contract_term_months has RequiresReplace — changing it
+				// destroys and recreates the MCR. Verify the new resource
+				// has the updated value.
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
 					id = %d
@@ -401,6 +404,7 @@ func (suite *MCRContractTermProviderTestSuite) TestAccMegaportMCR_ContractTermUp
 				}`, MCRTestLocationIDNum, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+					waitForProvisioningStatus("megaport_mcr.mcr"),
 				),
 			},
 		},

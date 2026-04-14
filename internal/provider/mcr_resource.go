@@ -66,7 +66,11 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 	orm.MarketplaceVisibility = types.BoolValue(m.MarketplaceVisibility)
 	orm.CompanyUID = types.StringValue(m.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
-	orm.DiversityZone = types.StringValue(m.DiversityZone)
+	if m.DiversityZone != "" {
+		orm.DiversityZone = types.StringValue(m.DiversityZone)
+	} else {
+		orm.DiversityZone = types.StringNull()
+	}
 
 	if m.AttributeTags != nil {
 		attributeTags := make(map[string]attr.Value)
@@ -199,6 +203,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				ElementType: types.StringType,
 				Description: "Attribute tags of the product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"resource_tags": schema.MapAttribute{
 				Description: "The resource tags associated with the product.",
@@ -433,6 +440,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	// Copy plan-only fields not returned by the API before overwriting with API response.
+	state.PromoCode = plan.PromoCode
 	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
@@ -495,6 +504,13 @@ func (r *mcrResource) MoveState(ctx context.Context) []resource.StateMover {
 					return
 				}
 
+				if req.SourceRawState == nil {
+					resp.Diagnostics.AddError(
+						"Missing source state",
+						"Cannot migrate MCR state: source raw state is nil.",
+					)
+					return
+				}
 				var rawState map[string]json.RawMessage
 				if err := json.Unmarshal(req.SourceRawState.JSON, &rawState); err != nil {
 					resp.Diagnostics.AddError(
