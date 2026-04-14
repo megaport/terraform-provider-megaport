@@ -114,9 +114,6 @@ func (r *mcrPrefixFilterListResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	// Set last updated timestamp
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -232,9 +229,6 @@ func (r *mcrPrefixFilterListResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	// Set last updated timestamp
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -331,9 +325,6 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// Set last updated timestamp for imported resource
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Save the imported state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

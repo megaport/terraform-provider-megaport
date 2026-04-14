@@ -116,7 +116,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.ge", "25"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.le", "27"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "last_updated"),
 
 					// Prefix filter list 2 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "description", prefixFilterName2),
@@ -131,7 +130,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.le", "25"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "last_updated"),
 				),
 			},
 			// Test ImportState for prefix filter list 1
@@ -156,7 +154,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Update Test 1: Modify existing prefix filter lists and add a new one
 			{
@@ -604,7 +602,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				// for exact match entries. During normal operation, we normalize this back to
 				// the user's configured value (ge=le). But during import, we can't know the
 				// user's intention, so we return raw API values.
-				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+				ImportStateVerifyIgnore: []string{"entries.0.le", "entries.1.le", "entries.2.le"},
 			},
 		},
 	})
@@ -879,7 +877,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Apply the same config after import - reconcile any import differences
 			{
@@ -1062,7 +1060,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Import prefix filter list 2 (blacklist)
 			{
@@ -1083,7 +1081,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 4: Import prefix filter list 3 (export)
 			{
@@ -1104,7 +1102,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 5: Apply same config to reconcile any import state differences
 			{

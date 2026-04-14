@@ -145,7 +145,6 @@ output "prefix_filter_list_id" {
 ### Read-Only
 
 - `id` (Number) Numeric ID of the prefix filter list.
-- `last_updated` (String) Timestamp of when the resource was last updated.
 
 <a id="nestedatt--entries"></a>
 ### Nested Schema for `entries`

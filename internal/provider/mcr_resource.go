@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
-
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -32,8 +30,6 @@ var (
 
 // mcrResourceModel maps the resource schema data.
 type mcrResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                   types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
@@ -111,10 +107,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	resp.Schema = schema.Schema{
 		Description: "Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs. The MCR is a managed virtual router service that establishes Layer 3 connectivity on the worldwide Megaport software-defined network (SDN). MCR instances are preconfigured in data centers in key global routing zones. An MCR enables data transfer between multi-cloud or hybrid cloud networks, network service providers, and cloud service providers.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "Last updated by the Terraform provider.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "UID identifier of the product.",
 				Computed:    true,
@@ -297,8 +289,6 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -438,9 +428,6 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
-
-	// Update the state with the new values
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

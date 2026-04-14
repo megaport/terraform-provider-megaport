@@ -43,7 +43,6 @@ resource "megaport_mcr" "mcr" {
 
 - `attribute_tags` (Map of String) Attribute tags of the product.
 - `company_uid` (String) Megaport Company UID of the product.
-- `last_updated` (String) Last updated by the Terraform provider.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
 - `product_uid` (String) UID identifier of the product.
 

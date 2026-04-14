@@ -78,7 +78,7 @@ func (suite *MCRBasicProviderTestSuite) TestAccMegaportMCR_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Update Test
 			{
@@ -276,7 +276,7 @@ func (suite *MCRCustomASNProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() 
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Update Test 1
 			{

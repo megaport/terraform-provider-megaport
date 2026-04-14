@@ -20,7 +20,6 @@ type mcrPrefixFilterListResourceModel struct {
 	Description   types.String `tfsdk:"description"`
 	AddressFamily types.String `tfsdk:"address_family"`
 	Entries       types.List   `tfsdk:"entries"`
-	LastUpdated   types.String `tfsdk:"last_updated"`
 }
 
 // mcrPrefixFilterListEntryResourceModel represents a single entry in a prefix filter list

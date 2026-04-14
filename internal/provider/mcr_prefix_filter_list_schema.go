@@ -106,10 +106,6 @@ func mcrPrefixFilterListResourceSchema() schema.Schema {
 					},
 				},
 			},
-			"last_updated": schema.StringAttribute{
-				Description: "Timestamp of when the resource was last updated.",
-				Computed:    true,
-			},
 		},
 	}
 }
