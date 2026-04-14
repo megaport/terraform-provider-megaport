@@ -5,252 +5,328 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
 
+// isPresent reports whether a Terraform attribute value has been set (i.e., it is
+// neither null nor unknown). Use this instead of the verbose !v.IsNull() && !v.IsUnknown()
+// pattern which is scattered throughout the codebase.
+func isPresent(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
+}
+
 // fromAPIVXC updates the resource model from API response data.
-// The optional plan parameter allows preserving user-only fields (like requested_product_uid,
-// ordered_vlan, and partner configs) that are not returned by the API. This is particularly
+// The optional plan parameter allows preserving user-only fields (like product_uid,
+// vlan, and partner configs) that are not returned by the API. This is particularly
 // important after import or during updates where the plan contains user configuration that
 // would otherwise be lost.
 func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, tags map[string]string, plan *vxcResourceModel) diag.Diagnostics {
-	apiDiags := diag.Diagnostics{}
+	var diags diag.Diagnostics
 
 	orm.UID = types.StringValue(v.UID)
-	orm.ID = types.Int64Value(int64(v.ID))
 	orm.Name = types.StringValue(v.Name)
 	orm.ServiceID = types.Int64Value(int64(v.ServiceID))
-	orm.Type = types.StringValue(v.Type)
 	orm.RateLimit = types.Int64Value(int64(v.RateLimit))
 	orm.DistanceBand = types.StringValue(v.DistanceBand)
-	orm.ProvisioningStatus = types.StringValue(v.ProvisioningStatus)
-	orm.SecondaryName = types.StringValue(v.SecondaryName)
-	orm.UsageAlgorithm = types.StringValue(v.UsageAlgorithm)
 	orm.CreatedBy = types.StringValue(v.CreatedBy)
 	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
-	orm.CompanyName = types.StringValue(v.CompanyName)
 	orm.Shutdown = types.BoolValue(v.Shutdown)
 	orm.CostCentre = types.StringValue(v.CostCentre)
-	orm.Locked = types.BoolValue(v.Locked)
-	orm.AdminLocked = types.BoolValue(v.AdminLocked)
-	orm.Cancelable = types.BoolValue(v.Cancelable)
 
-	if v.CreateDate != nil {
-		orm.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-	if v.LiveDate != nil {
-		orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
-	if v.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
-	if v.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
-	var aEndOrderedVLAN, bEndOrderedVLAN *int64
-	var aEndInnerVLAN, bEndInnerVLAN *int64
-	var aEndVnicIndex, bEndVnicIndex *int64
-	var aEndRequestedProductUID, bEndRequestedProductUID string
+	diags.Append(orm.buildAEndConfig(ctx, v, plan)...)
+	diags.Append(orm.buildBEndConfig(ctx, v, plan)...)
+	diags.Append(orm.mapVXCTags(ctx, v, tags)...)
 
-	// First, try to get values from existing state
+	return diags
+}
+
+// buildAEndConfig constructs the A-End configuration model from API data, supplementing
+// with plan/state values that the API does not return.
+func (orm *vxcResourceModel) buildAEndConfig(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	aEndModel := &vxcAEndConfigModel{
+		AssignedProductUID: types.StringValue(v.AEndConfiguration.UID),
+	}
+
+	// Default: preserve product_uid from existing state, then override from plan.
+	aEndProductUID := ""
+	var aEndVnicIndex *int64
+	var aEndVLAN *int64
+	var aEndPlanVLAN *int64
+	var aEndInnerVLAN *int64
+
 	if !orm.AEndConfiguration.IsNull() {
-		existingAEnd := &vxcEndConfigurationModel{}
-		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, aEndDiags...)
-		aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
-		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
-			vlan := existingAEnd.OrderedVLAN.ValueInt64()
-			aEndOrderedVLAN = &vlan
-		}
-		if !existingAEnd.InnerVLAN.IsNull() && !existingAEnd.InnerVLAN.IsUnknown() {
-			vlan := existingAEnd.InnerVLAN.ValueInt64()
-			aEndInnerVLAN = &vlan
-		}
-		// During Read (plan == nil), preserve vnic_index from state because the
-		// API does not reliably return it immediately after changes.
-		if plan == nil && !existingAEnd.NetworkInterfaceIndex.IsNull() && !existingAEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
-			aEndVnicIndex = &idx
+		existingAEnd := &vxcAEndConfigModel{}
+		if ds := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
+			aEndProductUID = existingAEnd.ProductUID.ValueString()
+			// Preserve vnic_index from state during Read (plan == nil).
+			if plan == nil && isPresent(existingAEnd.NetworkInterfaceIndex) {
+				idx := existingAEnd.NetworkInterfaceIndex.ValueInt64()
+				aEndVnicIndex = &idx
+			}
+			if isPresent(existingAEnd.VLAN) {
+				vlan := existingAEnd.VLAN.ValueInt64()
+				aEndVLAN = &vlan
+			}
+			if isPresent(existingAEnd.InnerVLAN) {
+				vlan := existingAEnd.InnerVLAN.ValueInt64()
+				aEndInnerVLAN = &vlan
+			}
+			// Preserve vrouter_config from state during Read (plan == nil).
+			if plan == nil && isPresent(existingAEnd.VrouterPartnerConfig) {
+				aEndModel.VrouterPartnerConfig = existingAEnd.VrouterPartnerConfig
+			}
+		} else {
+			diags.Append(ds...)
 		}
 	}
 
-	// If plan is provided and state values are empty, use plan values.
-	// This handles the import case where state is initially null, and
-	// the Create case where the API may not yet reflect the vnic_index.
 	if plan != nil && !plan.AEndConfiguration.IsNull() {
-		planAEnd := &vxcEndConfigurationModel{}
-		planDiags := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, planDiags...)
-
-		if aEndRequestedProductUID == "" && !planAEnd.RequestedProductUID.IsNull() {
-			aEndRequestedProductUID = planAEnd.RequestedProductUID.ValueString()
-		}
-		if aEndOrderedVLAN == nil && !planAEnd.OrderedVLAN.IsNull() && !planAEnd.OrderedVLAN.IsUnknown() {
-			vlan := planAEnd.OrderedVLAN.ValueInt64()
-			aEndOrderedVLAN = &vlan
-		}
-		if aEndInnerVLAN == nil && !planAEnd.InnerVLAN.IsNull() && !planAEnd.InnerVLAN.IsUnknown() {
-			vlan := planAEnd.InnerVLAN.ValueInt64()
-			aEndInnerVLAN = &vlan
-		}
-		if aEndVnicIndex == nil && !planAEnd.NetworkInterfaceIndex.IsNull() && !planAEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
-			aEndVnicIndex = &idx
+		planAEnd := &vxcAEndConfigModel{}
+		if ds := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
+			if isPresent(planAEnd.ProductUID) {
+				aEndProductUID = planAEnd.ProductUID.ValueString()
+			}
+			if aEndVnicIndex == nil && isPresent(planAEnd.NetworkInterfaceIndex) {
+				idx := planAEnd.NetworkInterfaceIndex.ValueInt64()
+				aEndVnicIndex = &idx
+			}
+			if isPresent(planAEnd.VLAN) {
+				vlan := planAEnd.VLAN.ValueInt64()
+				aEndVLAN = &vlan
+				aEndPlanVLAN = &vlan
+			}
+			if isPresent(planAEnd.InnerVLAN) {
+				vlan := planAEnd.InnerVLAN.ValueInt64()
+				aEndInnerVLAN = &vlan
+			}
+			// Preserve vrouter_config from plan (not returned by API).
+			if isPresent(planAEnd.VrouterPartnerConfig) {
+				aEndModel.VrouterPartnerConfig = planAEnd.VrouterPartnerConfig
+			}
+		} else {
+			diags.Append(ds...)
 		}
 	}
 
-	aEndModel := &vxcEndConfigurationModel{
-		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(aEndRequestedProductUID),
-		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
-		Name:                  types.StringValue(v.AEndConfiguration.Name),
-		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
-		Location:              types.StringValue(v.AEndConfiguration.Location),
-		NetworkInterfaceIndex: types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex)),
-		SecondaryName:         types.StringValue(v.AEndConfiguration.SecondaryName),
+	aEndModel.ProductUID = types.StringValue(aEndProductUID)
+
+	// VLAN priority:
+	//   1. Plan value (Create/Update): always authoritative, including vlan=0 (auto-assign).
+	//      vlan=0 is stored as 0 in state — not replaced with the API-assigned value.
+	//      This avoids "planned value does not match config value" framework errors that
+	//      arise when plan modifiers try to convert a known config value to Unknown.
+	//   2. State value (Read, plan==nil): preserve whatever the user configured in state.
+	//      The API can assign a different VLAN than requested (e.g. assigns 1691 for vlan=200),
+	//      so the configured value is authoritative — we never overwrite state from the API.
+	//   3. API value (non-zero): only used when state has no VLAN (import or first-time read).
+	//   4. Null: no VLAN configured and API returned 0.
+	if aEndPlanVLAN != nil {
+		aEndModel.VLAN = types.Int64Value(*aEndPlanVLAN)
+	} else if aEndVLAN != nil {
+		// Preserve configured VLAN from state (including 0 for auto-assign).
+		aEndModel.VLAN = types.Int64Value(*aEndVLAN)
+	} else if v.AEndConfiguration.VLAN != 0 {
+		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
+	} else {
+		aEndModel.VLAN = types.Int64Null()
 	}
+
+	// InnerVLAN: preserve -1 (untagged) from state.
+	if v.AEndConfiguration.InnerVLAN != 0 {
+		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
+	} else if aEndInnerVLAN != nil && *aEndInnerVLAN == -1 {
+		aEndModel.InnerVLAN = types.Int64Value(-1)
+	} else {
+		aEndModel.InnerVLAN = types.Int64Null()
+	}
+
+	// VnicIndex: use API, fall back to plan/state.
 	if aEndVnicIndex != nil {
 		aEndModel.NetworkInterfaceIndex = types.Int64Value(*aEndVnicIndex)
-	}
-	if aEndOrderedVLAN != nil {
-		aEndModel.OrderedVLAN = types.Int64Value(*aEndOrderedVLAN)
-	}
-	if v.AEndConfiguration.InnerVLAN == 0 {
-		// Check if existing inner VLAN is null or -1
-		if aEndInnerVLAN != nil && *aEndInnerVLAN == -1 {
-			// Keep it as -1 (untagged)
-			aEndModel.InnerVLAN = types.Int64Value(*aEndInnerVLAN)
-		} else {
-			// API didn't return a value, keep as null
-			aEndModel.InnerVLAN = types.Int64PointerValue(nil)
-		}
 	} else {
-		// API returned a non-zero value - use it
-		aEndModel.InnerVLAN = types.Int64Value(int64(v.AEndConfiguration.InnerVLAN))
+		aEndModel.NetworkInterfaceIndex = types.Int64Value(int64(v.AEndConfiguration.NetworkInterfaceIndex))
 	}
 
-	if v.AEndConfiguration.VLAN == 0 {
-		aEndModel.VLAN = types.Int64PointerValue(nil)
-	} else {
-		aEndModel.VLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
+	// Initialise vrouter_config to null if not already set from plan.
+	if aEndModel.VrouterPartnerConfig.IsUnknown() || aEndModel.VrouterPartnerConfig.IsNull() || aEndModel.VrouterPartnerConfig.AttributeTypes(ctx) == nil {
+		aEndModel.VrouterPartnerConfig = types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 	}
-	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndModel)
-	apiDiags = append(apiDiags, aEndDiags...)
+
+	aEnd, aEndDiags := types.ObjectValueFrom(ctx, vxcAEndConfigAttrs, aEndModel)
+	diags.Append(aEndDiags...)
 	orm.AEndConfiguration = aEnd
 
-	// First, try to get B-End values from existing state
+	return diags
+}
+
+// buildBEndConfig constructs the B-End configuration model from API data, supplementing
+// with plan/state values that the API does not return.
+func (orm *vxcResourceModel) buildBEndConfig(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	bEndModel := &vxcBEndConfigModel{
+		AssignedProductUID: types.StringValue(v.BEndConfiguration.UID),
+	}
+
+	bEndProductUID := ""
+	var bEndVnicIndex *int64
+	var bEndVLAN *int64
+	var bEndPlanVLAN *int64
+	var bEndInnerVLAN *int64
+
 	if !orm.BEndConfiguration.IsNull() {
-		existingBEnd := &vxcEndConfigurationModel{}
-		bEndDiags := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, bEndDiags...)
-		if !existingBEnd.OrderedVLAN.IsNull() && !existingBEnd.OrderedVLAN.IsUnknown() {
-			vlan := existingBEnd.OrderedVLAN.ValueInt64()
-			bEndOrderedVLAN = &vlan
+		existingBEnd := &vxcBEndConfigModel{}
+		if ds := orm.BEndConfiguration.As(ctx, existingBEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
+			bEndProductUID = existingBEnd.ProductUID.ValueString()
+			if plan == nil && isPresent(existingBEnd.NetworkInterfaceIndex) {
+				idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
+				bEndVnicIndex = &idx
+			}
+			if isPresent(existingBEnd.VLAN) {
+				vlan := existingBEnd.VLAN.ValueInt64()
+				bEndVLAN = &vlan
+			}
+			if isPresent(existingBEnd.InnerVLAN) {
+				vlan := existingBEnd.InnerVLAN.ValueInt64()
+				bEndInnerVLAN = &vlan
+			}
+			// Preserve partner configs from state during Read (plan == nil).
+			if plan == nil {
+				for _, pair := range []struct {
+					src *types.Object
+					dst *types.Object
+				}{
+					{&existingBEnd.AWSPartnerConfig, &bEndModel.AWSPartnerConfig},
+					{&existingBEnd.AzurePartnerConfig, &bEndModel.AzurePartnerConfig},
+					{&existingBEnd.GooglePartnerConfig, &bEndModel.GooglePartnerConfig},
+					{&existingBEnd.OraclePartnerConfig, &bEndModel.OraclePartnerConfig},
+					{&existingBEnd.IBMPartnerConfig, &bEndModel.IBMPartnerConfig},
+					{&existingBEnd.VrouterPartnerConfig, &bEndModel.VrouterPartnerConfig},
+				} {
+					if isPresent(*pair.src) {
+						*pair.dst = *pair.src
+					}
+				}
+				if isPresent(existingBEnd.Transit) {
+					bEndModel.Transit = existingBEnd.Transit
+				}
+			}
+		} else {
+			diags.Append(ds...)
 		}
-		if !existingBEnd.InnerVLAN.IsNull() && !existingBEnd.InnerVLAN.IsUnknown() {
-			vlan := existingBEnd.InnerVLAN.ValueInt64()
-			bEndInnerVLAN = &vlan
-		}
-		// During Read (plan == nil), preserve vnic_index from state because the
-		// API does not reliably return it immediately after changes.
-		if plan == nil && !existingBEnd.NetworkInterfaceIndex.IsNull() && !existingBEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
-			bEndVnicIndex = &idx
-		}
-		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
 	}
 
-	// If plan is provided and state values are empty, use plan values for B-End.
 	if plan != nil && !plan.BEndConfiguration.IsNull() {
-		planBEnd := &vxcEndConfigurationModel{}
-		planDiags := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{})
-		apiDiags = append(apiDiags, planDiags...)
-
-		if bEndRequestedProductUID == "" && !planBEnd.RequestedProductUID.IsNull() {
-			bEndRequestedProductUID = planBEnd.RequestedProductUID.ValueString()
-		}
-		if bEndOrderedVLAN == nil && !planBEnd.OrderedVLAN.IsNull() && !planBEnd.OrderedVLAN.IsUnknown() {
-			vlan := planBEnd.OrderedVLAN.ValueInt64()
-			bEndOrderedVLAN = &vlan
-		}
-		if bEndInnerVLAN == nil && !planBEnd.InnerVLAN.IsNull() && !planBEnd.InnerVLAN.IsUnknown() {
-			vlan := planBEnd.InnerVLAN.ValueInt64()
-			bEndInnerVLAN = &vlan
-		}
-		if bEndVnicIndex == nil && !planBEnd.NetworkInterfaceIndex.IsNull() && !planBEnd.NetworkInterfaceIndex.IsUnknown() {
-			idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
-			bEndVnicIndex = &idx
+		planBEnd := &vxcBEndConfigModel{}
+		if ds := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{}); !ds.HasError() {
+			if isPresent(planBEnd.ProductUID) {
+				bEndProductUID = planBEnd.ProductUID.ValueString()
+			}
+			if bEndVnicIndex == nil && isPresent(planBEnd.NetworkInterfaceIndex) {
+				idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
+				bEndVnicIndex = &idx
+			}
+			if isPresent(planBEnd.VLAN) {
+				vlan := planBEnd.VLAN.ValueInt64()
+				bEndVLAN = &vlan
+				bEndPlanVLAN = &vlan
+			}
+			if isPresent(planBEnd.InnerVLAN) {
+				vlan := planBEnd.InnerVLAN.ValueInt64()
+				bEndInnerVLAN = &vlan
+			}
+			// Preserve partner configs from plan — the API does not return them on read.
+			for _, pair := range []struct {
+				src *types.Object
+				dst *types.Object
+			}{
+				{&planBEnd.AWSPartnerConfig, &bEndModel.AWSPartnerConfig},
+				{&planBEnd.AzurePartnerConfig, &bEndModel.AzurePartnerConfig},
+				{&planBEnd.GooglePartnerConfig, &bEndModel.GooglePartnerConfig},
+				{&planBEnd.OraclePartnerConfig, &bEndModel.OraclePartnerConfig},
+				{&planBEnd.IBMPartnerConfig, &bEndModel.IBMPartnerConfig},
+				{&planBEnd.VrouterPartnerConfig, &bEndModel.VrouterPartnerConfig},
+			} {
+				if isPresent(*pair.src) {
+					*pair.dst = *pair.src
+				}
+			}
+			if isPresent(planBEnd.Transit) {
+				bEndModel.Transit = planBEnd.Transit
+			}
+		} else {
+			diags.Append(ds...)
 		}
 	}
 
-	bEndModel := &vxcEndConfigurationModel{
-		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(bEndRequestedProductUID),
-		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
-		Name:                  types.StringValue(v.BEndConfiguration.Name),
-		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
-		Location:              types.StringValue(v.BEndConfiguration.Location),
-		NetworkInterfaceIndex: types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex)),
-		SecondaryName:         types.StringValue(v.BEndConfiguration.SecondaryName),
+	bEndModel.ProductUID = types.StringValue(bEndProductUID)
+
+	// VLAN priority: same logic as A-End above.
+	if bEndPlanVLAN != nil {
+		bEndModel.VLAN = types.Int64Value(*bEndPlanVLAN)
+	} else if bEndVLAN != nil {
+		bEndModel.VLAN = types.Int64Value(*bEndVLAN)
+	} else if v.BEndConfiguration.VLAN != 0 {
+		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
+	} else {
+		bEndModel.VLAN = types.Int64Null()
 	}
+
+	if v.BEndConfiguration.InnerVLAN != 0 {
+		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
+	} else if bEndInnerVLAN != nil && *bEndInnerVLAN == -1 {
+		bEndModel.InnerVLAN = types.Int64Value(-1)
+	} else {
+		bEndModel.InnerVLAN = types.Int64Null()
+	}
+
 	if bEndVnicIndex != nil {
 		bEndModel.NetworkInterfaceIndex = types.Int64Value(*bEndVnicIndex)
-	}
-	if bEndOrderedVLAN != nil {
-		bEndModel.OrderedVLAN = types.Int64Value(*bEndOrderedVLAN)
-	}
-	if v.BEndConfiguration.InnerVLAN == 0 {
-		// Check if existing inner VLAN is null or -1
-		if bEndInnerVLAN != nil && *bEndInnerVLAN == -1 {
-			// Keep it as -1 (untagged)
-			bEndModel.InnerVLAN = types.Int64Value(*bEndInnerVLAN)
-		} else {
-			// Keep it as null, which means un-assigned.
-			bEndModel.InnerVLAN = types.Int64PointerValue(nil)
-		}
 	} else {
-		bEndModel.InnerVLAN = types.Int64Value(int64(v.BEndConfiguration.InnerVLAN))
-	}
-	if v.BEndConfiguration.VLAN == 0 {
-		bEndModel.VLAN = types.Int64PointerValue(nil)
-	} else {
-		bEndModel.VLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
+		bEndModel.NetworkInterfaceIndex = types.Int64Value(int64(v.BEndConfiguration.NetworkInterfaceIndex))
 	}
 
-	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndModel)
-	apiDiags = append(apiDiags, bEndDiags...)
+	// Initialise any partner config fields to null if not set from plan.
+	for _, pair := range []struct {
+		field *types.Object
+		attrs map[string]attr.Type
+	}{
+		{&bEndModel.AWSPartnerConfig, vxcPartnerConfigAWSAttrs},
+		{&bEndModel.AzurePartnerConfig, vxcPartnerConfigAzureAttrs},
+		{&bEndModel.GooglePartnerConfig, vxcPartnerConfigGoogleAttrs},
+		{&bEndModel.OraclePartnerConfig, vxcPartnerConfigOracleAttrs},
+		{&bEndModel.IBMPartnerConfig, vxcPartnerConfigIbmAttrs},
+		{&bEndModel.VrouterPartnerConfig, vxcPartnerConfigVrouterAttrs},
+	} {
+		if !isPresent(*pair.field) {
+			*pair.field = types.ObjectNull(pair.attrs)
+		}
+	}
+	if bEndModel.Transit.IsUnknown() {
+		bEndModel.Transit = types.BoolNull()
+	}
+
+	bEnd, bEndDiags := types.ObjectValueFrom(ctx, vxcBEndConfigAttrs, bEndModel)
+	diags.Append(bEndDiags...)
 	orm.BEndConfiguration = bEnd
 
-	if v.Resources != nil && v.Resources.CSPConnection != nil {
-		cspConnections := []types.Object{}
-		for _, c := range v.Resources.CSPConnection.CSPConnection {
-			cspConnection, cspDiags := fromAPICSPConnection(ctx, c)
-			apiDiags = append(apiDiags, cspDiags...)
-			cspConnections = append(cspConnections, cspConnection)
-		}
-		cspConnectionsList, cspConnectionDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), cspConnections)
-		apiDiags = append(apiDiags, cspConnectionDiags...)
-		orm.CSPConnections = cspConnectionsList
-	} else {
-		cspConnectionsList := types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs))
-		orm.CSPConnections = cspConnectionsList
-	}
+	return diags
+}
+
+// mapVXCTags maps attribute tags and resource tags from API response data into the model.
+func (orm *vxcResourceModel) mapVXCTags(ctx context.Context, v *megaport.VXC, tags map[string]string) diag.Diagnostics {
+	var diags diag.Diagnostics
 
 	if v.AttributeTags != nil {
 		attributeTags, attributeDiags := types.MapValueFrom(ctx, types.StringType, v.AttributeTags)
-		apiDiags = append(apiDiags, attributeDiags...)
+		diags.Append(attributeDiags...)
 		orm.AttributeTags = attributeTags
 	} else {
 		orm.AttributeTags = types.MapNull(types.StringType)
@@ -258,24 +334,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 
 	if len(tags) > 0 {
 		resourceTags, tagDiags := types.MapValueFrom(ctx, types.StringType, tags)
-		apiDiags = append(apiDiags, tagDiags...)
+		diags.Append(tagDiags...)
 		orm.ResourceTags = resourceTags
 	} else {
 		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	// Preserve partner configs from plan if provided.
-	// Partner configs are user-only values not returned by the API.
-	if plan != nil {
-		if !plan.AEndPartnerConfig.IsNull() {
-			orm.AEndPartnerConfig = plan.AEndPartnerConfig
-		}
-		if !plan.BEndPartnerConfig.IsNull() {
-			orm.BEndPartnerConfig = plan.BEndPartnerConfig
-		}
-	}
-
-	return apiDiags
+	return diags
 }
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.
@@ -296,28 +361,7 @@ func createAWSPartnerConfig(ctx context.Context, awsConfig vxcPartnerConfigAWSMo
 	}
 	awsConfigObj, awsDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAWSAttrs, awsConfig)
 	diags.Append(awsDiags...)
-
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	partnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("aws"),
-		AWSPartnerConfig:     awsConfigObj,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		VrouterPartnerConfig: vrouter,
-		PartnerAEndConfig:    aEndPartner,
-		IBMPartnerConfig:     ibmPartner,
-	}
-
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-	diags.Append(partnerDiags...)
-
-	return diags, partnerConfig, partnerConfigObj
+	return diags, partnerConfig, awsConfigObj
 }
 
 func createAzurePartnerConfig(ctx context.Context, azureConfig vxcPartnerConfigAzureModel) (diag.Diagnostics, megaport.VXCPartnerConfigAzure, basetypes.ObjectValue) {
@@ -352,27 +396,7 @@ func createAzurePartnerConfig(ctx context.Context, azureConfig vxcPartnerConfigA
 
 	azureConfigObj, azureDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAzureAttrs, azureConfig)
 	diags.Append(azureDiags...)
-
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	partnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("azure"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azureConfigObj,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		VrouterPartnerConfig: vrouter,
-		PartnerAEndConfig:    aEndPartner,
-		IBMPartnerConfig:     ibmPartner,
-	}
-
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, partnerConfig, partnerConfigObj
+	return diags, partnerConfig, azureConfigObj
 }
 
 func createGooglePartnerConfig(ctx context.Context, googleConfig vxcPartnerConfigGoogleModel) (diag.Diagnostics, megaport.VXCPartnerConfigGoogle, basetypes.ObjectValue) {
@@ -383,26 +407,7 @@ func createGooglePartnerConfig(ctx context.Context, googleConfig vxcPartnerConfi
 	}
 	googleConfigObj, googleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigGoogleAttrs, googleConfig)
 	diags.Append(googleDiags...)
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("google"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  googleConfigObj,
-		OraclePartnerConfig:  oracle,
-		VrouterPartnerConfig: vrouter,
-		IBMPartnerConfig:     ibmPartner,
-		PartnerAEndConfig:    aEndPartner,
-	}
-
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, googlePartnerConfig, partnerConfigObj
+	return diags, googlePartnerConfig, googleConfigObj
 }
 
 func createOraclePartnerConfig(ctx context.Context, oracleConfig vxcPartnerConfigOracleModel) (diag.Diagnostics, megaport.VXCPartnerConfigOracle, basetypes.ObjectValue) {
@@ -413,27 +418,7 @@ func createOraclePartnerConfig(ctx context.Context, oracleConfig vxcPartnerConfi
 	}
 	oracleConfigObj, oracleDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigOracleAttrs, oracleConfig)
 	diags.Append(oracleDiags...)
-
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	bEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("oracle"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracleConfigObj,
-		IBMPartnerConfig:     ibmPartner,
-		VrouterPartnerConfig: vrouter,
-		PartnerAEndConfig:    aEndPartner,
-	}
-
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, bEndPartnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, oraclePartnerConfig, partnerConfigObj
+	return diags, oraclePartnerConfig, oracleConfigObj
 }
 
 func createIBMPartnerConfig(ctx context.Context, ibmConfig vxcPartnerConfigIbmModel) (diag.Diagnostics, megaport.VXCPartnerConfigIBM, basetypes.ObjectValue) {
@@ -446,30 +431,12 @@ func createIBMPartnerConfig(ctx context.Context, ibmConfig vxcPartnerConfigIbmMo
 		CustomerIPAddress: ibmConfig.CustomerIPAddress.ValueString(),
 		ProviderIPAddress: ibmConfig.ProviderIPAddress.ValueString(),
 	}
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmParnterConfigObj, ibmDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigIbmAttrs, ibmConfig)
+	ibmConfigObj, ibmDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigIbmAttrs, ibmConfig)
 	diags.Append(ibmDiags...)
-	aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("ibm"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		VrouterPartnerConfig: vrouter,
-		PartnerAEndConfig:    aEndPartner,
-		IBMPartnerConfig:     ibmParnterConfigObj,
-	}
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, ibmPartnerConfig, partnerConfigObj
+	return diags, ibmPartnerConfig, ibmConfigObj
 }
 
-func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
+func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig) {
 	diags := diag.Diagnostics{}
 	vrouterPartnerConfig := &megaport.VXCOrderVrouterPartnerConfig{}
 	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
@@ -526,7 +493,6 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
 					LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
 					PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
-					Password:           bgpConnection.Password.ValueString(),
 					Shutdown:           bgpConnection.Shutdown.ValueBool(),
 					Description:        bgpConnection.Description.ValueString(),
 					MedIn:              int(bgpConnection.MedIn.ValueInt64()),
@@ -535,6 +501,11 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
 					AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
 					PeerType:           bgpConnection.PeerType.ValueString(),
+				}
+				// Only send password if provided — avoids clearing BGP auth post-import
+				// when the user has not supplied the WriteOnly field in their config.
+				if !bgpConnection.Password.IsNull() {
+					bgpToAppend.Password = bgpConnection.Password.ValueString()
 				}
 				if !bgpConnection.LocalAsn.IsNull() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
@@ -571,7 +542,6 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() {
@@ -585,193 +555,7 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}
-	vrouterConfigObj, bEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterConfig)
-	diags.Append(bEndDiags...)
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	partnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("vrouter"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		IBMPartnerConfig:     ibmPartner,
-		VrouterPartnerConfig: vrouterConfigObj,
-		PartnerAEndConfig:    aEndPartner,
-	}
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, vrouterPartnerConfig, partnerConfigObj
-}
-
-func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPartnerConfigAEndModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
-	diags := diag.Diagnostics{}
-	aEndMegaportConfig := &megaport.VXCOrderVrouterPartnerConfig{}
-	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
-	ifaceDiags := partnerConfigAEndModel.Interfaces.ElementsAs(ctx, &ifaceModels, true)
-	diags.Append(ifaceDiags...)
-	for _, iface := range ifaceModels {
-		toAppend := megaport.PartnerConfigInterface{}
-		if !iface.IpMtu.IsNull() {
-			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
-		}
-		if !iface.IPAddresses.IsNull() {
-			ipAddresses := []string{}
-			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
-			diags.Append(ipDiags...)
-			toAppend.IpAddresses = ipAddresses
-		}
-		if !iface.IPRoutes.IsNull() {
-			ipRoutes := []*ipRouteModel{}
-			ipRouteDiags := iface.IPRoutes.ElementsAs(ctx, &ipRoutes, true)
-			diags.Append(ipRouteDiags...)
-			for _, ipRoute := range ipRoutes {
-				toAppend.IpRoutes = append(toAppend.IpRoutes, megaport.IpRoute{
-					Prefix:      ipRoute.Prefix.ValueString(),
-					Description: ipRoute.Description.ValueString(),
-					NextHop:     ipRoute.NextHop.ValueString(),
-				})
-			}
-		}
-		if !iface.NatIPAddresses.IsNull() {
-			natIPAddresses := []string{}
-			natDiags := iface.NatIPAddresses.ElementsAs(ctx, &natIPAddresses, true)
-			diags.Append(natDiags...)
-			toAppend.NatIpAddresses = natIPAddresses
-		}
-		if !iface.Bfd.IsNull() {
-			bfd := &bfdConfigModel{}
-			bfdDiags := iface.Bfd.As(ctx, bfd, basetypes.ObjectAsOptions{})
-			diags.Append(bfdDiags...)
-			toAppend.Bfd = megaport.BfdConfig{
-				TxInterval: int(bfd.TxInterval.ValueInt64()),
-				RxInterval: int(bfd.RxInterval.ValueInt64()),
-				Multiplier: int(bfd.Multiplier.ValueInt64()),
-			}
-		}
-		if !iface.BgpConnections.IsNull() {
-			bgpConnections := []*bgpConnectionConfigModel{}
-			bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
-			diags.Append(bgpDiags...)
-			for _, bgpConnection := range bgpConnections {
-				bgpToAppend := megaport.BgpConnectionConfig{
-					PeerAsn:            int(bgpConnection.PeerAsn.ValueInt64()),
-					LocalIpAddress:     bgpConnection.LocalIPAddress.ValueString(),
-					PeerIpAddress:      bgpConnection.PeerIPAddress.ValueString(),
-					Password:           bgpConnection.Password.ValueString(),
-					Shutdown:           bgpConnection.Shutdown.ValueBool(),
-					Description:        bgpConnection.Description.ValueString(),
-					MedIn:              int(bgpConnection.MedIn.ValueInt64()),
-					MedOut:             int(bgpConnection.MedOut.ValueInt64()),
-					BfdEnabled:         bgpConnection.BfdEnabled.ValueBool(),
-					ExportPolicy:       bgpConnection.ExportPolicy.ValueString(),
-					AsPathPrependCount: int(bgpConnection.AsPathPrependCount.ValueInt64()),
-				}
-				if !bgpConnection.LocalAsn.IsNull() {
-					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
-				}
-				if !bgpConnection.ImportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportWhitelist.ValueString() {
-							bgpToAppend.ImportWhitelist = pfl.Id
-						}
-					}
-				}
-				if !bgpConnection.ImportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportBlacklist.ValueString() {
-							bgpToAppend.ImportBlacklist = pfl.Id
-						}
-					}
-				}
-				if !bgpConnection.ExportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportWhitelist.ValueString() {
-							bgpToAppend.ExportWhitelist = pfl.Id
-						}
-					}
-				}
-				if !bgpConnection.ExportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportBlacklist.ValueString() {
-							bgpToAppend.ExportBlacklist = pfl.Id
-						}
-					}
-				}
-				if !bgpConnection.PermitExportTo.IsNull() {
-					permitExportTo := []string{}
-					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
-					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
-					bgpToAppend.PermitExportTo = permitExportTo
-				}
-				if !bgpConnection.DenyExportTo.IsNull() {
-					denyExportTo := []string{}
-					denyDiags := bgpConnection.DenyExportTo.ElementsAs(ctx, &denyExportTo, true)
-					diags.Append(denyDiags...)
-					bgpToAppend.DenyExportTo = denyExportTo
-				}
-				toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
-			}
-		}
-		aEndMegaportConfig.Interfaces = append(aEndMegaportConfig.Interfaces, toAppend)
-	}
-	aEndConfigObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, partnerConfigAEndModel)
-	diags.Append(aEndDiags...)
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-	aEndPartnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("a-end"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		PartnerAEndConfig:    aEndConfigObj,
-		VrouterPartnerConfig: vrouter,
-		IBMPartnerConfig:     ibmPartner,
-	}
-	partnerConfigObj, partnerDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, aEndPartnerConfigModel)
-	diags.Append(partnerDiags...)
-	return diags, aEndMegaportConfig, partnerConfigObj
-}
-
-func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport.VXCPartnerConfigTransit, basetypes.ObjectValue) {
-	diags := diag.Diagnostics{}
-	transitPartnerConfig := megaport.VXCPartnerConfigTransit{
-		ConnectType: "TRANSIT",
-	}
-
-	aws := types.ObjectNull(vxcPartnerConfigAWSAttrs)
-	azure := types.ObjectNull(vxcPartnerConfigAzureAttrs)
-	google := types.ObjectNull(vxcPartnerConfigGoogleAttrs)
-	oracle := types.ObjectNull(vxcPartnerConfigOracleAttrs)
-	vrouter := types.ObjectNull(vxcPartnerConfigVrouterAttrs)
-	aEndPartner := types.ObjectNull(vxcPartnerConfigAEndAttrs)
-	ibmPartner := types.ObjectNull(vxcPartnerConfigIbmAttrs)
-
-	transitPartnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("transit"),
-		AWSPartnerConfig:     aws,
-		AzurePartnerConfig:   azure,
-		GooglePartnerConfig:  google,
-		OraclePartnerConfig:  oracle,
-		VrouterPartnerConfig: vrouter,
-		PartnerAEndConfig:    aEndPartner,
-		IBMPartnerConfig:     ibmPartner,
-	}
-
-	transitConfigObj, transitDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, transitPartnerConfigModel)
-	diags.Append(transitDiags...)
-
-	return diags, transitPartnerConfig, transitConfigObj
+	return diags, vrouterPartnerConfig
 }
 
 func supportVLANUpdates(partnerType string) bool {

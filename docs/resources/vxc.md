@@ -275,16 +275,14 @@ resource "megaport_vxc" "service_key_vxc" {
 
 ### Required
 
-- `a_end` (Attributes) The current A-End configuration of the VXC. (see [below for nested schema](#nestedatt--a_end))
-- `b_end` (Attributes) The current B-End configuration of the VXC. (see [below for nested schema](#nestedatt--b_end))
+- `a_end_config` (Attributes) The A-End configuration of the VXC. (see [below for nested schema](#nestedatt--a_end_config))
+- `b_end_config` (Attributes) The B-End configuration of the VXC. (see [below for nested schema](#nestedatt--b_end_config))
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `product_name` (String) The name of the product.
 - `rate_limit` (Number) The rate limit of the product.
 
 ### Optional
 
-- `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply. (see [below for nested schema](#nestedatt--a_end_partner_config))
-- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
@@ -293,92 +291,117 @@ resource "megaport_vxc" "service_key_vxc" {
 
 ### Read-Only
 
-- `admin_locked` (Boolean) Whether the product is admin locked.
 - `attribute_tags` (Map of String) The attribute tags associated with the product.
-- `cancelable` (Boolean) Whether the product is cancelable.
-- `company_name` (String) The name of the company the product is associated with.
 - `company_uid` (String) The UID of the company the product is associated with.
-- `contract_end_date` (String) The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `contract_start_date` (String) The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `create_date` (String) The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `created_by` (String) The user who created the product.
-- `csp_connections` (Attributes List) The Cloud Service Provider (CSP) connections associated with the VXC. (see [below for nested schema](#nestedatt--csp_connections))
 - `distance_band` (String) The distance band of the product.
-- `last_updated` (String) The last time the resource was updated.
-- `live_date` (String) The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.
-- `locked` (Boolean) Whether the product is locked.
-- `product_id` (Number) The numeric ID of the product.
-- `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
-- `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
-- `usage_algorithm` (String) The usage algorithm of the product.
 
-<a id="nestedatt--a_end"></a>
-### Nested Schema for `a_end`
+<a id="nestedatt--a_end_config"></a>
+### Nested Schema for `a_end_config`
 
 Required:
 
-- `requested_product_uid` (String) The Product UID requested by the user for the A-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
+- `product_uid` (String) The Product UID for the A-End configuration.
 
 Optional:
 
-- `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
-- `inner_vlan` (Number) The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
+- `assigned_product_uid` (String) The assigned product UID of the A-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.
+- `inner_vlan` (Number) The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider.
+- `vlan` (Number) The VLAN of the A-End configuration. Values can range from 2 to 4093. Set to 0 for auto-assignment. Set to -1 for untagged. If not set, the Megaport system allocates a valid VLAN.
 - `vnic_index` (Number) The network interface index of the A-End configuration. Required for MVE connections.
+- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--a_end_config--vrouter_config))
 
-Read-Only:
+<a id="nestedatt--a_end_config--vrouter_config"></a>
+### Nested Schema for `a_end_config.vrouter_config`
 
-- `location` (String) The location of the A-End configuration.
-- `location_id` (Number) The location ID of the A-End configuration.
-- `owner_uid` (String) The owner UID of the A-End configuration.
-- `product_name` (String) The product name of the A-End configuration.
-- `secondary_name` (String) The secondary name of the A-End configuration.
-- `vlan` (Number) The current VLAN of the A-End configuration. May be different from the A-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the A-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the A-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.
+Required:
 
+- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_config--vrouter_config--interfaces))
 
-<a id="nestedatt--b_end"></a>
-### Nested Schema for `b_end`
+<a id="nestedatt--a_end_config--vrouter_config--interfaces"></a>
+### Nested Schema for `a_end_config.vrouter_config.interfaces`
 
 Optional:
 
-- `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
-- `inner_vlan` (Number) The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
-- `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
+- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_config--vrouter_config--interfaces--bfd))
+- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_config--vrouter_config--interfaces--bgp_connections))
+- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
+- `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
+- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_config--vrouter_config--interfaces--ip_routes))
+- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
+
+<a id="nestedatt--a_end_config--vrouter_config--interfaces--bfd"></a>
+### Nested Schema for `a_end_config.vrouter_config.interfaces.bfd`
+
+Optional:
+
+- `multiplier` (Number) The multiplier of the BFD.
+- `rx_interval` (Number) The receive interval of the BFD.
+- `tx_interval` (Number) The transmit interval of the BFD.
+
+
+<a id="nestedatt--a_end_config--vrouter_config--interfaces--bgp_connections"></a>
+### Nested Schema for `a_end_config.vrouter_config.interfaces.bgp_connections`
+
+Optional:
+
+- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
+- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
+- `deny_export_to` (List of String) The denied export to of the BGP connection.
+- `description` (String) The description of the BGP connection.
+- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_policy` (String) The export policy of the BGP connection.
+- `export_whitelist` (String) The export whitelist of the BGP connection.
+- `import_blacklist` (String) The import blacklist of the BGP connection.
+- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
+- `med_in` (Number) The MED in of the BGP connection.
+- `med_out` (Number) The MED out of the BGP connection.
+- `password` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The password of the BGP connection.
+- `peer_asn` (Number) The peer ASN of the BGP connection.
+- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
+- `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
+- `permit_export_to` (List of String) The permitted export to of the BGP connection.
+- `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--a_end_config--vrouter_config--interfaces--ip_routes"></a>
+### Nested Schema for `a_end_config.vrouter_config.interfaces.ip_routes`
+
+Optional:
+
+- `description` (String) The description of the IP route.
+- `next_hop` (String) The next hop of the IP route.
+- `prefix` (String) The prefix of the IP route.
+
+
+
+
+
+<a id="nestedatt--b_end_config"></a>
+### Nested Schema for `b_end_config`
+
+Optional:
+
+- `assigned_product_uid` (String) The assigned product UID of the B-End configuration. The Megaport API may change a Partner Port from the requested UID to a different Port in the same location and diversity zone.
+- `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end_config--aws_config))
+- `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_config--azure_config))
+- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_config--google_config))
+- `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_config--ibm_config))
+- `inner_vlan` (Number) The inner VLAN of the B-End configuration. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider.
+- `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_config--oracle_config))
+- `product_uid` (String) The Product UID for the B-End configuration.
+- `transit` (Boolean) Whether this is a transit VXC connection.
+- `vlan` (Number) The VLAN of the B-End configuration. Values can range from 2 to 4093. Set to 0 for auto-assignment. Set to -1 for untagged. If not set, the Megaport system allocates a valid VLAN.
 - `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.
+- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--b_end_config--vrouter_config))
 
-Read-Only:
-
-- `location` (String) The location of the B-End configuration.
-- `location_id` (Number) The location ID of the B-End configuration.
-- `owner_uid` (String) The owner UID of the B-End configuration.
-- `product_name` (String) The product name of the B-End configuration.
-- `secondary_name` (String) The secondary name of the B-End configuration.
-- `vlan` (Number) The current VLAN of the B-End configuration. May be different from the B-End ordered VLAN if the system allocated a different VLAN. Values can range from 2 to 4093. If the B-End ordered_vlan was set to 0, the Megaport system allocated a valid VLAN. If the B-End ordered_vlan was set to -1, the Megaport system will automatically set this value to null.
-
-
-<a id="nestedatt--a_end_partner_config"></a>
-### Nested Schema for `a_end_partner_config`
-
-Required:
-
-- `partner` (String) The partner of the partner configuration.
-
-Optional:
-
-- `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--aws_config))
-- `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
-- `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--ibm_config))
-- `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
-- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config))
-
-<a id="nestedatt--a_end_partner_config--aws_config"></a>
-### Nested Schema for `a_end_partner_config.aws_config`
+<a id="nestedatt--b_end_config--aws_config"></a>
+### Nested Schema for `b_end_config.aws_config`
 
 Required:
 
@@ -391,26 +414,25 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
+- `auth_key` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
 
 
-<a id="nestedatt--a_end_partner_config--azure_config"></a>
-### Nested Schema for `a_end_partner_config.azure_config`
+<a id="nestedatt--b_end_config--azure_config"></a>
+### Nested Schema for `b_end_config.azure_config`
 
 Required:
 
-- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
-- `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
+- `service_key` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:
 
-- `peers` (Attributes List) The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config--peers))
+- `peers` (Attributes List) The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC. (see [below for nested schema](#nestedatt--b_end_config--azure_config--peers))
 
-<a id="nestedatt--a_end_partner_config--azure_config--peers"></a>
-### Nested Schema for `a_end_partner_config.azure_config.peers`
+<a id="nestedatt--b_end_config--azure_config--peers"></a>
+### Nested Schema for `b_end_config.azure_config.peers`
 
 Required:
 
@@ -422,21 +444,21 @@ Optional:
 - `prefixes` (String) The prefixes of the peer.
 - `primary_subnet` (String) The primary subnet of the peer.
 - `secondary_subnet` (String) The secondary subnet of the peer.
-- `shared_key` (String) The shared key of the peer.
+- `shared_key` (String, Sensitive) The shared key of the peer.
 - `vlan` (Number) The VLAN of the peer.
 
 
 
-<a id="nestedatt--a_end_partner_config--google_config"></a>
-### Nested Schema for `a_end_partner_config.google_config`
+<a id="nestedatt--b_end_config--google_config"></a>
+### Nested Schema for `b_end_config.google_config`
 
 Required:
 
 - `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
 
 
-<a id="nestedatt--a_end_partner_config--ibm_config"></a>
-### Nested Schema for `a_end_partner_config.ibm_config`
+<a id="nestedatt--b_end_config--ibm_config"></a>
+### Nested Schema for `b_end_config.ibm_config`
 
 Required:
 
@@ -450,101 +472,36 @@ Optional:
 - `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
 
 
-<a id="nestedatt--a_end_partner_config--oracle_config"></a>
-### Nested Schema for `a_end_partner_config.oracle_config`
+<a id="nestedatt--b_end_config--oracle_config"></a>
+### Nested Schema for `b_end_config.oracle_config`
 
 Required:
 
 - `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
 
 
-<a id="nestedatt--a_end_partner_config--partner_a_end_config"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config`
+<a id="nestedatt--b_end_config--vrouter_config"></a>
+### Nested Schema for `b_end_config.vrouter_config`
 
 Required:
 
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces))
+- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_config--vrouter_config--interfaces))
 
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bfd`
+<a id="nestedatt--b_end_config--vrouter_config--interfaces"></a>
+### Nested Schema for `b_end_config.vrouter_config.interfaces`
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
-
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
-
-Optional:
-
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
-- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
-- `deny_export_to` (List of String) The denied export to of the BGP connection.
-- `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
-- `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
-- `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
-- `med_in` (Number) The MED in of the BGP connection.
-- `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
-- `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
-- `permit_export_to` (List of String) The permitted export to of the BGP connection.
-- `shutdown` (Boolean) Whether the BGP connection is shut down.
-
-
-<a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.partner_a_end_config.interfaces.ip_routes`
-
-Optional:
-
-- `description` (String) The description of the IP route.
-- `next_hop` (String) The next hop of the IP route.
-- `prefix` (String) The prefix of the IP route.
-
-
-
-
-<a id="nestedatt--a_end_partner_config--vrouter_config"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces))
-
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
+- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_config--vrouter_config--interfaces--bfd))
+- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_config--vrouter_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bfd`
+<a id="nestedatt--b_end_config--vrouter_config--interfaces--bfd"></a>
+### Nested Schema for `b_end_config.vrouter_config.interfaces.bfd`
 
 Optional:
 
@@ -553,8 +510,8 @@ Optional:
 - `tx_interval` (Number) The transmit interval of the BFD.
 
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.bgp_connections`
+<a id="nestedatt--b_end_config--vrouter_config--interfaces--bgp_connections"></a>
+### Nested Schema for `b_end_config.vrouter_config.interfaces.bgp_connections`
 
 Optional:
 
@@ -571,7 +528,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -579,291 +536,14 @@ Optional:
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 
-<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.ip_routes`
+<a id="nestedatt--b_end_config--vrouter_config--interfaces--ip_routes"></a>
+### Nested Schema for `b_end_config.vrouter_config.interfaces.ip_routes`
 
 Optional:
 
 - `description` (String) The description of the IP route.
 - `next_hop` (String) The next hop of the IP route.
 - `prefix` (String) The prefix of the IP route.
-
-
-
-
-
-<a id="nestedatt--b_end_partner_config"></a>
-### Nested Schema for `b_end_partner_config`
-
-Required:
-
-- `partner` (String) The partner of the partner configuration.
-
-Optional:
-
-- `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--aws_config))
-- `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
-- `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
-- `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
-- `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
-- `vrouter_config` (Attributes) The partner configuration of the virtual router configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config))
-
-<a id="nestedatt--b_end_partner_config--aws_config"></a>
-### Nested Schema for `b_end_partner_config.aws_config`
-
-Required:
-
-- `connect_type` (String) The connection type of the partner configuration. Required for AWS partner configurations - valid values are "AWS" for Virtual Interface or AWSHC for AWS Hosted Connections.
-- `name` (String) The name of the partner configuration.
-- `owner_account` (String) The owner AWS account of the partner configuration. Required for AWS partner configurations.
-
-Optional:
-
-- `amazon_asn` (Number) The Amazon ASN of the partner configuration.
-- `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
-- `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
-- `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `prefixes` (String) The prefixes of the partner configuration.
-- `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
-
-
-<a id="nestedatt--b_end_partner_config--azure_config"></a>
-### Nested Schema for `b_end_partner_config.azure_config`
-
-Required:
-
-- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
-- `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
-
-Optional:
-
-- `peers` (Attributes List) The peers of the partner configuration. If this is set, the user must delete any Azure resources associated with the VXC on Azure before deleting the VXC. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config--peers))
-
-<a id="nestedatt--b_end_partner_config--azure_config--peers"></a>
-### Nested Schema for `b_end_partner_config.azure_config.peers`
-
-Required:
-
-- `type` (String) The type of the peer.
-
-Optional:
-
-- `peer_asn` (String) The peer ASN of the peer.
-- `prefixes` (String) The prefixes of the peer.
-- `primary_subnet` (String) The primary subnet of the peer.
-- `secondary_subnet` (String) The secondary subnet of the peer.
-- `shared_key` (String) The shared key of the peer.
-- `vlan` (Number) The VLAN of the peer.
-
-
-
-<a id="nestedatt--b_end_partner_config--google_config"></a>
-### Nested Schema for `b_end_partner_config.google_config`
-
-Required:
-
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
-
-
-<a id="nestedatt--b_end_partner_config--ibm_config"></a>
-### Nested Schema for `b_end_partner_config.ibm_config`
-
-Required:
-
-- `account_id` (String) Customer's IBM Acount ID. Required for all IBM partner configurations.
-
-Optional:
-
-- `customer_asn` (Number) Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
-- `customer_ip_address` (String) Customer IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
-- `name` (String) Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT"
-- `provider_ip_address` (String) Provider IPv4 network address including subnet mask.
-
-
-<a id="nestedatt--b_end_partner_config--oracle_config"></a>
-### Nested Schema for `b_end_partner_config.oracle_config`
-
-Required:
-
-- `virtual_circuit_id` (String) The virtual circuit ID of the partner configuration. Required for Oracle partner configurations.
-
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces))
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bfd`
-
-Optional:
-
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
-
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.bgp_connections`
-
-Optional:
-
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
-- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
-- `deny_export_to` (List of String) The denied export to of the BGP connection.
-- `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
-- `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
-- `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
-- `med_in` (Number) The MED in of the BGP connection.
-- `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
-- `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
-- `permit_export_to` (List of String) The permitted export to of the BGP connection.
-- `shutdown` (Boolean) Whether the BGP connection is shut down.
-
-
-<a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.partner_a_end_config.interfaces.ip_routes`
-
-Optional:
-
-- `description` (String) The description of the IP route.
-- `next_hop` (String) The next hop of the IP route.
-- `prefix` (String) The prefix of the IP route.
-
-
-
-
-<a id="nestedatt--b_end_partner_config--vrouter_config"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config`
-
-Required:
-
-- `interfaces` (Attributes List) The interfaces of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces))
-
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces`
-
-Optional:
-
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
-- `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
-- `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
-- `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
-- `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-- `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
-
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bfd`
-
-Optional:
-
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
-
-
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.bgp_connections`
-
-Optional:
-
-- `as_path_prepend_count` (Number) The AS path prepend count of the BGP connection. Minimum value of 0 and maximum value of 10.
-- `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
-- `deny_export_to` (List of String) The denied export to of the BGP connection.
-- `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
-- `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
-- `local_asn` (Number) The local ASN of the BGP connection.
-- `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
-- `med_in` (Number) The MED in of the BGP connection.
-- `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
-- `peer_asn` (Number) The peer ASN of the BGP connection.
-- `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
-- `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
-- `permit_export_to` (List of String) The permitted export to of the BGP connection.
-- `shutdown` (Boolean) Whether the BGP connection is shut down.
-
-
-<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
-### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.ip_routes`
-
-Optional:
-
-- `description` (String) The description of the IP route.
-- `next_hop` (String) The next hop of the IP route.
-- `prefix` (String) The prefix of the IP route.
-
-
-
-
-
-<a id="nestedatt--csp_connections"></a>
-### Nested Schema for `csp_connections`
-
-Optional:
-
-- `account` (String) The account of the CSP connection.
-- `account_id` (String) The account ID of the CSP connection.
-- `amazon_address` (String) The Amazon address of the CSP connection.
-- `asn` (Number) The ASN of the CSP connection.
-- `auth_key` (String) The authentication key of the CSP connection.
-- `bandwidth` (Number) The bandwidth of the CSP connection.
-- `bandwidths` (List of Number) The bandwidths of the CSP connection.
-- `connect_type` (String) The connection type of the CSP connection.
-- `connection_id` (String) The hosted connection ID of the CSP connection.
-- `csp_name` (String) The name of the CSP connection.
-- `customer_address` (String) The customer address of the CSP connection.
-- `customer_asn` (Number) The customer ASN of the CSP connection.
-- `customer_ip4_address` (String) The customer IPv4 address of the CSP connection.
-- `customer_ip6_network` (String) The customer IPv6 network of the Transit VXC connection.
-- `customer_ip_address` (String) The customer IP address of the CSP connection.
-- `id` (Number) The ID of the CSP connection.
-- `ip_addresses` (List of String) The IP addresses of the Virtual Router.
-- `ipv4_gateway_address` (String) The IPv4 gateway address of the Transit VXC connection.
-- `ipv6_gateway_address` (String) The IPv6 gateway address of the Transit VXC connection.
-- `managed` (Boolean) Whether the CSP connection is managed.
-- `name` (String) The name of the CSP connection.
-- `owner_account` (String) The owner's AWS account of the CSP connection.
-- `pairing_key` (String) The pairing key of the Google Cloud connection.
-- `peer_asn` (Number) The peer ASN of the CSP connection.
-- `provider_ip_address` (String) The provider IP address of the CSP connection.
-- `resource_name` (String) The resource name of the CSP connection.
-- `resource_type` (String) The resource type of the CSP connection.
-- `service_key` (String, Sensitive) The Azure service key of the CSP connection.
-- `type` (String) The type of the AWS Virtual Interface.
-- `vif_id` (String) The ID of the AWS Virtual Interface.
-- `virtual_router_name` (String) The name of the Virtual Router.
-
-Read-Only:
-
-- `vlan` (Number) The VLAN of the CSP connection.
 
 ## Import
 

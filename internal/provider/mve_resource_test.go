@@ -11,7 +11,7 @@ import (
 
 const (
 	MVEArubaTestLocationIDNum = 59  // Los Angeles "Equinix LA1" (lax-eq1)
-	MVEVersaTestLocationIDNum = 70  // Chicago "CyrusOne Aurora (CHI2)" (chi-tx2)
+	MVEVersaTestLocationIDNum = 527 // Paris "Interxion Paris (PAR-IX5)" (par-ix5)
 	MVEArubaImageIDMVE        = 152 // Aruba MVE image ID
 )
 
