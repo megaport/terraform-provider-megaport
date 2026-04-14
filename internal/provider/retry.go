@@ -144,7 +144,7 @@ func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx co
 // 409 Conflict, 429 Too Many Requests, and 500+.
 func IsRetryableHTTPError(err error) bool {
 	var apiErr *megaport.ErrorResponse
-	if !errors.As(err, &apiErr) {
+	if !errors.As(err, &apiErr) || apiErr.Response == nil {
 		return false
 	}
 	code := apiErr.Response.StatusCode
@@ -156,7 +156,7 @@ func IsRetryableHTTPError(err error) bool {
 // IsNotFoundError returns true if the error represents an HTTP 404 Not Found.
 func IsNotFoundError(err error) bool {
 	var apiErr *megaport.ErrorResponse
-	if !errors.As(err, &apiErr) {
+	if !errors.As(err, &apiErr) || apiErr.Response == nil {
 		return false
 	}
 	return apiErr.Response.StatusCode == http.StatusNotFound

@@ -155,11 +155,9 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
 	if err != nil {
 		// Check if the resource was deleted
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		if IsNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error reading MCR prefix filter list",
@@ -263,7 +261,7 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 		MaxRetries:     12,
 		RetryableFunc: func(err error) bool {
 			var apiErr *megaport.ErrorResponse
-			if errors.As(err, &apiErr) {
+			if errors.As(err, &apiErr) && apiErr.Response != nil {
 				return apiErr.Response.StatusCode == http.StatusConflict
 			}
 			return false
@@ -319,14 +317,12 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Verify the resource exists by attempting to read it
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
-				)
-				return
-			}
+		if IsNotFoundError(err) {
+			resp.Diagnostics.AddError(
+				"Resource not found",
+				fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
+			)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error verifying resource during import",
