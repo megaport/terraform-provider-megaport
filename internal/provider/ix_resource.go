@@ -686,7 +686,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		updateReq.Shutdown != nil {
 		_, err := r.client.IXService.UpdateIX(ctx, state.ProductUID.ValueString(), updateReq)
 		if err != nil {
-			addAPIError(&resp.Diagnostics, updateErrorSummary("IX", plan.ProductUID.ValueString()), err)
+			addAPIError(&resp.Diagnostics, updateErrorSummary("IX", state.ProductUID.ValueString()), err)
 			return
 		}
 	}
@@ -694,7 +694,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// Refetch the updated IX
 	updatedIX, err := r.client.IXService.GetIX(ctx, state.ProductUID.ValueString())
 	if err != nil {
-		addAPIError(&resp.Diagnostics, readErrorSummary("IX", plan.ProductUID.ValueString()), err)
+		addAPIError(&resp.Diagnostics, readErrorSummary("IX", state.ProductUID.ValueString()), err)
 		return
 	}
 
