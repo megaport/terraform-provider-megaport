@@ -1067,6 +1067,9 @@ func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return // Destroy operation — no plan modifications needed.
+	}
 	var plan, state mveResourceModel
 	if !req.Plan.Raw.IsNull() {
 		planDiags := req.Plan.Get(ctx, &plan)
@@ -1127,47 +1130,47 @@ func planProductSizeFromModel(ctx context.Context, m mveResourceModel) string {
 		if m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.AviatrixConfig.IsNull():
+	case !m.AviatrixConfig.IsNull() && !m.AviatrixConfig.IsUnknown():
 		var cfg aviatrixConfigModel
 		if m.AviatrixConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.CiscoConfig.IsNull():
+	case !m.CiscoConfig.IsNull() && !m.CiscoConfig.IsUnknown():
 		var cfg ciscoConfigModel
 		if m.CiscoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.FortinetConfig.IsNull():
+	case !m.FortinetConfig.IsNull() && !m.FortinetConfig.IsUnknown():
 		var cfg fortinetConfigModel
 		if m.FortinetConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.MerakiConfig.IsNull():
+	case !m.MerakiConfig.IsNull() && !m.MerakiConfig.IsUnknown():
 		var cfg merakiConfigModel
 		if m.MerakiConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.PaloAltoConfig.IsNull():
+	case !m.PaloAltoConfig.IsNull() && !m.PaloAltoConfig.IsUnknown():
 		var cfg paloAltoConfigModel
 		if m.PaloAltoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.PrismaConfig.IsNull():
+	case !m.PrismaConfig.IsNull() && !m.PrismaConfig.IsUnknown():
 		var cfg prismaConfigModel
 		if m.PrismaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.SixwindConfig.IsNull():
+	case !m.SixwindConfig.IsNull() && !m.SixwindConfig.IsUnknown():
 		var cfg sixwindConfigModel
 		if m.SixwindConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.VersaConfig.IsNull():
+	case !m.VersaConfig.IsNull() && !m.VersaConfig.IsUnknown():
 		var cfg versaConfigModel
 		if m.VersaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
 		}
-	case !m.VmwareConfig.IsNull():
+	case !m.VmwareConfig.IsNull() && !m.VmwareConfig.IsUnknown():
 		var cfg vmwareConfigModel
 		if m.VmwareConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
@@ -1221,9 +1224,9 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 	model := &mveResourceModel{
 		UID:                   types.StringValue(getString("product_uid")),
 		Name:                  types.StringValue(getString("product_name")),
-		CreatedBy:             types.StringValue(getString("created_by")),
-		TerminateDate:         types.StringValue(getString("terminate_date")),
-		Market:                types.StringValue(getString("market")),
+		CreatedBy:             unmarshalStringAttr(raw, "created_by"),
+		TerminateDate:         unmarshalStringAttr(raw, "terminate_date"),
+		Market:                unmarshalStringAttr(raw, "market"),
 		LocationID:            types.Int64Value(getInt64("location_id")),
 		MarketplaceVisibility: types.BoolValue(getBool("marketplace_visibility")),
 		VXCAutoApproval:       types.BoolValue(getBool("vxc_auto_approval")),
@@ -1336,18 +1339,6 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		return v
 	}
 
-	vcGetBool := func(key string) bool {
-		b, ok := vcMap[key]
-		if !ok {
-			return false
-		}
-		var v bool
-		if err := json.Unmarshal(b, &v); err != nil {
-			return false
-		}
-		return v
-	}
-
 	vendor := strings.ToLower(vcGetString("vendor"))
 
 	switch vendor {
@@ -1357,8 +1348,8 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 			ProductSize: types.StringValue(vcGetString("product_size")),
 			MVELabel:    unmarshalStringAttr(vcMap, "mve_label"),
 			AccountName: types.StringValue(vcGetString("account_name")),
-			AccountKey:  types.StringValue(vcGetString("account_key")),
-			SystemTag:   types.StringValue(vcGetString("system_tag")),
+			AccountKey:  unmarshalStringAttr(vcMap, "account_key"),
+			SystemTag:   unmarshalStringAttr(vcMap, "system_tag"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, arubaConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1369,7 +1360,7 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 			ImageID:     types.Int64Value(vcGetImageID()),
 			ProductSize: types.StringValue(vcGetString("product_size")),
 			MVELabel:    unmarshalStringAttr(vcMap, "mve_label"),
-			CloudInit:   types.StringValue(vcGetString("cloud_init")),
+			CloudInit:   unmarshalStringAttr(vcMap, "cloud_init"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, aviatrixConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1379,14 +1370,14 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := ciscoConfigModel{
 			ImageID:            types.Int64Value(vcGetImageID()),
 			ProductSize:        types.StringValue(vcGetString("product_size")),
-			MVELabel:           types.StringValue(vcGetString("mve_label")),
-			AdminSSHPublicKey:  types.StringValue(vcGetString("admin_ssh_public_key")),
-			SSHPublicKey:       types.StringValue(vcGetString("ssh_public_key")),
-			ManageLocally:      types.BoolValue(vcGetBool("manage_locally")),
-			CloudInit:          types.StringValue(vcGetString("cloud_init")),
-			FMCIPAddress:       types.StringValue(vcGetString("fmc_ip_address")),
-			FMCRegistrationKey: types.StringValue(vcGetString("fmc_registration_key")),
-			FMCNatID:           types.StringValue(vcGetString("fmc_nat_id")),
+			MVELabel:           unmarshalStringAttr(vcMap, "mve_label"),
+			AdminSSHPublicKey:  unmarshalStringAttr(vcMap, "admin_ssh_public_key"),
+			SSHPublicKey:       unmarshalStringAttr(vcMap, "ssh_public_key"),
+			ManageLocally:      unmarshalBoolAttr(vcMap, "manage_locally"),
+			CloudInit:          unmarshalStringAttr(vcMap, "cloud_init"),
+			FMCIPAddress:       unmarshalStringAttr(vcMap, "fmc_ip_address"),
+			FMCRegistrationKey: unmarshalStringAttr(vcMap, "fmc_registration_key"),
+			FMCNatID:           unmarshalStringAttr(vcMap, "fmc_nat_id"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, ciscoConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1396,10 +1387,10 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := fortinetConfigModel{
 			ImageID:           types.Int64Value(vcGetImageID()),
 			ProductSize:       types.StringValue(vcGetString("product_size")),
-			MVELabel:          types.StringValue(vcGetString("mve_label")),
-			AdminSSHPublicKey: types.StringValue(vcGetString("admin_ssh_public_key")),
-			SSHPublicKey:      types.StringValue(vcGetString("ssh_public_key")),
-			LicenseData:       types.StringValue(vcGetString("license_data")),
+			MVELabel:          unmarshalStringAttr(vcMap, "mve_label"),
+			AdminSSHPublicKey: unmarshalStringAttr(vcMap, "admin_ssh_public_key"),
+			SSHPublicKey:      unmarshalStringAttr(vcMap, "ssh_public_key"),
+			LicenseData:       unmarshalStringAttr(vcMap, "license_data"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, fortinetConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1410,7 +1401,7 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 			ImageID:     types.Int64Value(vcGetImageID()),
 			ProductSize: types.StringValue(vcGetString("product_size")),
 			MVELabel:    unmarshalStringAttr(vcMap, "mve_label"),
-			Token:       types.StringValue(vcGetString("token")),
+			Token:       unmarshalStringAttr(vcMap, "token"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, merakiConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1420,11 +1411,11 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := paloAltoConfigModel{
 			ImageID:           types.Int64Value(vcGetImageID()),
 			ProductSize:       types.StringValue(vcGetString("product_size")),
-			MVELabel:          types.StringValue(vcGetString("mve_label")),
-			AdminSSHPublicKey: types.StringValue(vcGetString("admin_ssh_public_key")),
-			SSHPublicKey:      types.StringValue(vcGetString("ssh_public_key")),
-			AdminPasswordHash: types.StringValue(vcGetString("admin_password_hash")),
-			LicenseData:       types.StringValue(vcGetString("license_data")),
+			MVELabel:          unmarshalStringAttr(vcMap, "mve_label"),
+			AdminSSHPublicKey: unmarshalStringAttr(vcMap, "admin_ssh_public_key"),
+			SSHPublicKey:      unmarshalStringAttr(vcMap, "ssh_public_key"),
+			AdminPasswordHash: unmarshalStringAttr(vcMap, "admin_password_hash"),
+			LicenseData:       unmarshalStringAttr(vcMap, "license_data"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, paloAltoConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1435,8 +1426,8 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 			ImageID:     types.Int64Value(vcGetImageID()),
 			ProductSize: types.StringValue(vcGetString("product_size")),
 			MVELabel:    unmarshalStringAttr(vcMap, "mve_label"),
-			IONKey:      types.StringValue(vcGetString("ion_key")),
-			SecretKey:   types.StringValue(vcGetString("secret_key")),
+			IONKey:      unmarshalStringAttr(vcMap, "ion_key"),
+			SecretKey:   unmarshalStringAttr(vcMap, "secret_key"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, prismaConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1446,8 +1437,8 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := sixwindConfigModel{
 			ImageID:      types.Int64Value(vcGetImageID()),
 			ProductSize:  types.StringValue(vcGetString("product_size")),
-			MVELabel:     types.StringValue(vcGetString("mve_label")),
-			SSHPublicKey: types.StringValue(vcGetString("ssh_public_key")),
+			MVELabel:     unmarshalStringAttr(vcMap, "mve_label"),
+			SSHPublicKey: unmarshalStringAttr(vcMap, "ssh_public_key"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, sixwindConfigAttrs, cfg)
 		diags.Append(objDiags...)
@@ -1457,11 +1448,11 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := versaConfigModel{
 			ImageID:           types.Int64Value(vcGetImageID()),
 			ProductSize:       types.StringValue(vcGetString("product_size")),
-			MVELabel:          types.StringValue(vcGetString("mve_label")),
+			MVELabel:          unmarshalStringAttr(vcMap, "mve_label"),
 			DirectorAddress:   types.StringValue(vcGetString("director_address")),
 			ControllerAddress: types.StringValue(vcGetString("controller_address")),
-			LocalAuth:         types.StringValue(vcGetString("local_auth")),
-			RemoteAuth:        types.StringValue(vcGetString("remote_auth")),
+			LocalAuth:         unmarshalStringAttr(vcMap, "local_auth"),
+			RemoteAuth:        unmarshalStringAttr(vcMap, "remote_auth"),
 			SerialNumber:      types.StringValue(vcGetString("serial_number")),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, versaConfigAttrs, cfg)
@@ -1472,11 +1463,11 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 		cfg := vmwareConfigModel{
 			ImageID:           types.Int64Value(vcGetImageID()),
 			ProductSize:       types.StringValue(vcGetString("product_size")),
-			MVELabel:          types.StringValue(vcGetString("mve_label")),
-			AdminSSHPublicKey: types.StringValue(vcGetString("admin_ssh_public_key")),
-			SSHPublicKey:      types.StringValue(vcGetString("ssh_public_key")),
+			MVELabel:          unmarshalStringAttr(vcMap, "mve_label"),
+			AdminSSHPublicKey: unmarshalStringAttr(vcMap, "admin_ssh_public_key"),
+			SSHPublicKey:      unmarshalStringAttr(vcMap, "ssh_public_key"),
 			VcoAddress:        types.StringValue(vcGetString("vco_address")),
-			VcoActivationCode: types.StringValue(vcGetString("vco_activation_code")),
+			VcoActivationCode: unmarshalStringAttr(vcMap, "vco_activation_code"),
 		}
 		obj, objDiags := types.ObjectValueFrom(ctx, vmwareConfigAttrs, cfg)
 		diags.Append(objDiags...)
