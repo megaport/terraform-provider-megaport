@@ -441,26 +441,54 @@ func vendorNameFromModel(m mveResourceModel) string {
 	switch {
 	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		return "aruba"
-	case !m.AviatrixConfig.IsNull():
+	case !m.AviatrixConfig.IsNull() && !m.AviatrixConfig.IsUnknown():
 		return "aviatrix"
-	case !m.CiscoConfig.IsNull():
+	case !m.CiscoConfig.IsNull() && !m.CiscoConfig.IsUnknown():
 		return "cisco"
-	case !m.FortinetConfig.IsNull():
+	case !m.FortinetConfig.IsNull() && !m.FortinetConfig.IsUnknown():
 		return "fortinet"
-	case !m.MerakiConfig.IsNull():
+	case !m.MerakiConfig.IsNull() && !m.MerakiConfig.IsUnknown():
 		return "meraki"
-	case !m.PaloAltoConfig.IsNull():
+	case !m.PaloAltoConfig.IsNull() && !m.PaloAltoConfig.IsUnknown():
 		return "palo_alto"
-	case !m.PrismaConfig.IsNull():
+	case !m.PrismaConfig.IsNull() && !m.PrismaConfig.IsUnknown():
 		return "prisma"
-	case !m.SixwindConfig.IsNull():
+	case !m.SixwindConfig.IsNull() && !m.SixwindConfig.IsUnknown():
 		return "6wind"
-	case !m.VersaConfig.IsNull():
+	case !m.VersaConfig.IsNull() && !m.VersaConfig.IsUnknown():
 		return "versa"
-	case !m.VmwareConfig.IsNull():
+	case !m.VmwareConfig.IsNull() && !m.VmwareConfig.IsUnknown():
 		return "vmware"
 	}
 	return ""
+}
+
+// vendorConfigPath returns the root path for the vendor config block that corresponds to
+// the given vendor name string. Used for RequiresReplace in ModifyPlan.
+func vendorConfigPath(vendorName string) path.Path {
+	switch strings.ToLower(vendorName) {
+	case "aruba":
+		return path.Root("aruba_config")
+	case "aviatrix":
+		return path.Root("aviatrix_config")
+	case "cisco":
+		return path.Root("cisco_config")
+	case "fortinet":
+		return path.Root("fortinet_config")
+	case "meraki":
+		return path.Root("meraki_config")
+	case "palo_alto":
+		return path.Root("palo_alto_config")
+	case "prisma":
+		return path.Root("prisma_config")
+	case "6wind":
+		return path.Root("sixwind_config")
+	case "versa":
+		return path.Root("versa_config")
+	case "vmware":
+		return path.Root("vmware_config")
+	}
+	return path.Empty()
 }
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags map[string]string) diag.Diagnostics {
@@ -1096,87 +1124,104 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				return
 			}
 			planVendor := vendorNameFromModel(plan)
+			cfgPath := vendorConfigPath(planVendor)
 
 			if !state.Vendor.IsNull() && !state.Vendor.IsUnknown() &&
 				!strings.EqualFold(state.Vendor.ValueString(), planVendor) {
-				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor"))
+				// Require replacement of the vendor config block — computed "vendor" field is not
+				// user-controlled so RequiresReplace must target the user config block.
+				resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
 			}
 
 			if !state.Size.IsNull() && !state.Size.IsUnknown() {
 				// Extract product_size from the non-null plan config block.
-				planSize := planProductSizeFromModel(ctx, plan)
+				planSize, sizeDiags := planProductSizeFromModel(ctx, plan)
+				resp.Diagnostics.Append(sizeDiags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
 				if planSize != "" && !strings.EqualFold(state.Size.ValueString(), planSize) {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("mve_size"))
+					resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
 				}
 			}
 
-			copyVendorConfigs(&state, &plan)
-		}
-
-		diags := req.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
+			// Propagate vendor configs from plan into the plan response so that
+			// null-in-state vendor configs don't trigger spurious RequiresReplace
+			// from the schema plan modifiers on subsequent applies.
+			copyVendorConfigs(&plan, &plan)
+			diags := resp.Plan.Set(ctx, &plan)
+			resp.Diagnostics.Append(diags...)
 		}
 	}
 }
 
 // planProductSizeFromModel extracts the product_size string from whichever
 // vendor config block is non-null in the plan model.
-func planProductSizeFromModel(ctx context.Context, m mveResourceModel) string {
+func planProductSizeFromModel(ctx context.Context, m mveResourceModel) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
 	switch {
 	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		var cfg arubaConfigModel
-		if m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.AviatrixConfig.IsNull() && !m.AviatrixConfig.IsUnknown():
 		var cfg aviatrixConfigModel
-		if m.AviatrixConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.AviatrixConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.CiscoConfig.IsNull() && !m.CiscoConfig.IsUnknown():
 		var cfg ciscoConfigModel
-		if m.CiscoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.CiscoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.FortinetConfig.IsNull() && !m.FortinetConfig.IsUnknown():
 		var cfg fortinetConfigModel
-		if m.FortinetConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.FortinetConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.MerakiConfig.IsNull() && !m.MerakiConfig.IsUnknown():
 		var cfg merakiConfigModel
-		if m.MerakiConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.MerakiConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.PaloAltoConfig.IsNull() && !m.PaloAltoConfig.IsUnknown():
 		var cfg paloAltoConfigModel
-		if m.PaloAltoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.PaloAltoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.PrismaConfig.IsNull() && !m.PrismaConfig.IsUnknown():
 		var cfg prismaConfigModel
-		if m.PrismaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.PrismaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.SixwindConfig.IsNull() && !m.SixwindConfig.IsUnknown():
 		var cfg sixwindConfigModel
-		if m.SixwindConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.SixwindConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.VersaConfig.IsNull() && !m.VersaConfig.IsUnknown():
 		var cfg versaConfigModel
-		if m.VersaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.VersaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	case !m.VmwareConfig.IsNull() && !m.VmwareConfig.IsUnknown():
 		var cfg vmwareConfigModel
-		if m.VmwareConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
-			return cfg.ProductSize.ValueString()
+		diags.Append(m.VmwareConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() {
+			return cfg.ProductSize.ValueString(), diags
 		}
 	}
-	return ""
+	return "", diags
 }
 
 // mveModelFromV1RawState converts a V1 raw JSON state map into a V2 mveResourceModel.

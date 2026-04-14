@@ -230,9 +230,11 @@ func TestMoveState_MVE_V1ToV2_Cisco(t *testing.T) {
 	assert.Equal(t, "LARGE", cisco.ProductSize.ValueString())
 	assert.Equal(t, "cisco-mve", cisco.MVELabel.ValueString())
 	assert.Equal(t, "ssh-rsa AAAA...", cisco.AdminSSHPublicKey.ValueString())
+	assert.Equal(t, "ssh-rsa BBBB...", cisco.SSHPublicKey.ValueString())
 	assert.True(t, cisco.ManageLocally.ValueBool())
 	assert.Equal(t, "10.0.0.1", cisco.FMCIPAddress.ValueString())
 	assert.Equal(t, "regkey123", cisco.FMCRegistrationKey.ValueString())
+	assert.Equal(t, "natid456", cisco.FMCNatID.ValueString())
 }
 
 func TestMoveState_MVE_V1ToV2_Versa(t *testing.T) {
@@ -306,6 +308,8 @@ func TestMoveState_MVE_V1ToV2_VMware(t *testing.T) {
 	diags := model.VmwareConfig.As(context.Background(), &vmw, basetypes.ObjectAsOptions{})
 	require.False(t, diags.HasError())
 	assert.Equal(t, int64(321), vmw.ImageID.ValueInt64())
+	assert.Equal(t, "ssh-rsa CCCC...", vmw.AdminSSHPublicKey.ValueString())
+	assert.Equal(t, "ssh-rsa DDDD...", vmw.SSHPublicKey.ValueString())
 	assert.Equal(t, "vco.example.com", vmw.VcoAddress.ValueString())
 	assert.Equal(t, "ACT-KEY-XYZ", vmw.VcoActivationCode.ValueString())
 }
