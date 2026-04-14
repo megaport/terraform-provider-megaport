@@ -355,6 +355,10 @@ func moveStatePort(ctx context.Context, req resource.MoveStateRequest, resp *res
 		return
 	}
 
+	if req.SourceRawState == nil {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state is nil")
+		return
+	}
 	rawJSON := req.SourceRawState.JSON
 	if len(rawJSON) == 0 {
 		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state JSON is empty")
