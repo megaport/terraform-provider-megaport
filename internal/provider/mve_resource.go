@@ -1165,10 +1165,9 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				}
 			}
 
-			// Propagate vendor configs from plan into the plan response so that
-			// null-in-state vendor configs don't trigger spurious RequiresReplace
-			// from the schema plan modifiers on subsequent applies.
-			copyVendorConfigs(&plan, &plan)
+			// Propagate plan (which already has vendor configs from user HCL) into
+			// the plan response so the framework doesn't see null-in-state vendor
+			// configs as requiring replacement on the first apply after import.
 			diags := resp.Plan.Set(ctx, &plan)
 			resp.Diagnostics.Append(diags...)
 		}
@@ -1555,6 +1554,10 @@ func (r *mveResource) MoveState(ctx context.Context) []resource.StateMover {
 		{
 			StateMover: func(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
 				if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_mve" {
+					return
+				}
+				if req.SourceRawState == nil {
+					resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state is missing")
 					return
 				}
 				rawJSON := req.SourceRawState.JSON
