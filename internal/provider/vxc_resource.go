@@ -157,8 +157,6 @@ var (
 
 // vxcResourceModel maps the resource schema data.
 type vxcResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                types.String `tfsdk:"product_uid"`
 	ServiceID          types.Int64  `tfsdk:"service_id"`
 	Name               types.String `tfsdk:"product_name"`
@@ -336,10 +334,6 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	resp.Schema = schema.Schema{
 		Description: "Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
@@ -954,8 +948,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	apiDiags := plan.fromAPIVXC(ctx, vxc, tags, &plan)
 	resp.Diagnostics.Append(apiDiags...)
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -1283,7 +1275,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// In Update, pass plan to preserve user-only configuration values
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state

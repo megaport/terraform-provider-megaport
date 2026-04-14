@@ -295,7 +295,6 @@ resource "megaport_vxc" "service_key_vxc" {
 - `company_uid` (String) The UID of the company the product is associated with.
 - `created_by` (String) The user who created the product.
 - `distance_band` (String) The distance band of the product.
-- `last_updated` (String) The last time the resource was updated.
 - `product_uid` (String) The unique identifier for the resource.
 - `service_id` (Number) The service ID of the VXC.
 

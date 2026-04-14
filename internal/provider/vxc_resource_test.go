@@ -193,7 +193,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// Update Test - Move VXC
 			{
@@ -657,7 +657,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -849,7 +849,7 @@ func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// Update: change A-end VLAN from 191 to 195
 			{
@@ -1013,7 +1013,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// ImportState testing
 			{
@@ -1033,7 +1033,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 		},
 	})
@@ -1157,7 +1157,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// UPDATE Test - Change BGP Connection in Partner Config
 			{
@@ -1741,7 +1741,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// ImportState testing
 			{
@@ -1761,7 +1761,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// ImportState testing
 			{
@@ -1781,7 +1781,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 		},
 	})
@@ -1859,7 +1859,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 		},
 	})
@@ -1967,7 +1967,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 		},
 	})
@@ -2151,7 +2151,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// ImportState testing
 			{
@@ -2171,7 +2171,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// ImportState testing
 			{
@@ -2191,7 +2191,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// UPDATE
 			{
@@ -2452,7 +2452,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
+				ImportStateVerifyIgnore: []string{"a_end_config.product_uid", "b_end_config.product_uid", "a_end_config.vlan", "a_end_config.vrouter_config", "b_end_config.aws_config", "b_end_config.azure_config", "b_end_config.google_config", "b_end_config.oracle_config", "b_end_config.ibm_config", "b_end_config.vrouter_config", "b_end_config.transit"},
 			},
 			// Update
 			{
