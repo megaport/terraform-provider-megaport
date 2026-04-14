@@ -54,22 +54,23 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 		deadline = time.Now().Add(cfg.Timeout)
 	}
 
+	var lastErr error
 	for attempt := 0; ; attempt++ {
 		if cfg.MaxRetries > 0 && attempt >= cfg.MaxRetries {
-			return fmt.Errorf("max retries (%d) exceeded", cfg.MaxRetries)
+			return fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxRetries, lastErr)
 		}
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			return fmt.Errorf("timeout (%v) exceeded", cfg.Timeout)
 		}
 
-		err := fn(ctx)
-		if err == nil {
+		lastErr = fn(ctx)
+		if lastErr == nil {
 			return nil
 		}
 
 		// Check if the error is retryable.
-		if cfg.RetryableFunc != nil && !cfg.RetryableFunc(err) {
-			return err
+		if cfg.RetryableFunc != nil && !cfg.RetryableFunc(lastErr) {
+			return lastErr
 		}
 
 		// Full jitter: sleep = rand(0, min(maxBackoff, initial * multiplier^attempt))
@@ -80,10 +81,12 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 		}
 		jittered := time.Duration(rand.Int63n(int64(capped) + 1)) //nolint:gosec
 
+		timer := time.NewTimer(jittered)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return ctx.Err()
-		case <-time.After(jittered):
+		case <-timer.C:
 		}
 	}
 }
@@ -107,10 +110,12 @@ func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx co
 
 	// Optional initial delay before the first poll.
 	if cfg.InitialDelay > 0 {
+		timer := time.NewTimer(cfg.InitialDelay)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return zero, ctx.Err()
-		case <-time.After(cfg.InitialDelay):
+		case <-timer.C:
 		}
 	}
 
@@ -128,10 +133,12 @@ func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx co
 			return val, nil
 		}
 
+		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return zero, ctx.Err()
-		case <-time.After(backoff):
+		case <-timer.C:
 			backoff = time.Duration(float64(backoff) * cfg.Multiplier)
 			if backoff > cfg.MaxBackoff {
 				backoff = cfg.MaxBackoff

@@ -378,12 +378,19 @@ func (r *mcrPrefixFilterListResource) validatePrefixListEntry(entry *mcrPrefixFi
 		maxLength = 128
 	}
 
+	prefixLen, _ := network.Mask.Size()
+
 	if !entry.Ge.IsNull() {
 		ge := entry.Ge.ValueInt64()
 		if ge < 0 || ge > int64(maxLength) {
 			diags.AddError(
 				fmt.Sprintf("Invalid ge value in entry %d", index),
 				fmt.Sprintf("ge must be between 0 and %d for %s", maxLength, addressFamily),
+			)
+		} else if ge < int64(prefixLen) {
+			diags.AddError(
+				fmt.Sprintf("Invalid ge value in entry %d", index),
+				fmt.Sprintf("ge (%d) must be >= the prefix length (%d)", ge, prefixLen),
 			)
 		}
 	}
@@ -394,6 +401,22 @@ func (r *mcrPrefixFilterListResource) validatePrefixListEntry(entry *mcrPrefixFi
 			diags.AddError(
 				fmt.Sprintf("Invalid le value in entry %d", index),
 				fmt.Sprintf("le must be between 0 and %d for %s", maxLength, addressFamily),
+			)
+		} else if le < int64(prefixLen) {
+			diags.AddError(
+				fmt.Sprintf("Invalid le value in entry %d", index),
+				fmt.Sprintf("le (%d) must be >= the prefix length (%d)", le, prefixLen),
+			)
+		}
+	}
+
+	if !entry.Ge.IsNull() && !entry.Le.IsNull() {
+		ge := entry.Ge.ValueInt64()
+		le := entry.Le.ValueInt64()
+		if ge > le {
+			diags.AddError(
+				fmt.Sprintf("Invalid ge/le values in entry %d", index),
+				fmt.Sprintf("ge (%d) must be <= le (%d)", ge, le),
 			)
 		}
 	}
