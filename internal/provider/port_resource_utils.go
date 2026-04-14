@@ -139,10 +139,6 @@ func syncPortResourceTags(ctx context.Context, plan, state types.Map, uid string
 // Callers add their own product_name, port_speed, and marketplace_visibility.
 func commonPortSchemaAttrs() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"last_updated": schema.StringAttribute{
-			Description: "The last time the resource was updated.",
-			Computed:    true,
-		},
 		"product_uid": schema.StringAttribute{
 			Description: "The unique identifier for the resource.",
 			Computed:    true,

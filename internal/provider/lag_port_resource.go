@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -27,8 +26,6 @@ var (
 
 // lagPortResourceModel maps the resource schema data.
 type lagPortResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                   types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
 	PortSpeed             types.Int64  `tfsdk:"port_speed"`
@@ -222,8 +219,6 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(lagDiags...)
 	plan.LagPortUIDs = lagPortUIDs
 	plan.UID = types.StringValue(createdID)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -334,8 +329,6 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	lagPortUIDs, lagDiags := lagPortUIDsList(port.LagPortUIDs)
 	resp.Diagnostics.Append(lagDiags...)
 	state.LagPortUIDs = lagPortUIDs
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

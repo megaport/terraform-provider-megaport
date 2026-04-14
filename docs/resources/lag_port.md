@@ -47,7 +47,6 @@ resource "megaport_lag_port" "lag_port" {
 
 - `company_uid` (String) The unique identifier of the company.
 - `lag_port_uids` (List of String) The unique identifiers of the individual LAG member ports.
-- `last_updated` (String) The last time the resource was updated.
 - `product_uid` (String) The unique identifier for the resource.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 

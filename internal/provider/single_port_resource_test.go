@@ -80,7 +80,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "resources"},
+				ImportStateVerifyIgnore: []string{"resources"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`

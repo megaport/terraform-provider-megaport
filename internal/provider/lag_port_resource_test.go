@@ -79,7 +79,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "resources"},
+				ImportStateVerifyIgnore: []string{"lag_count", "lag_port_uids", "resources"},
 			},
 			// Update Testing
 			{

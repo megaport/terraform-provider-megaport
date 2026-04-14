@@ -44,7 +44,6 @@ resource "megaport_port" "port" {
 ### Read-Only
 
 - `company_uid` (String) The unique identifier of the company.
-- `last_updated` (String) The last time the resource was updated.
 - `product_uid` (String) The unique identifier for the resource.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
 
