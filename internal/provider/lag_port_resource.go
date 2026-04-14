@@ -260,6 +260,9 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	lagPortUIDs, lagDiags := lagPortUIDsList(port.LagPortUIDs)
 	resp.Diagnostics.Append(lagDiags...)
@@ -433,8 +436,13 @@ func (r *lagPortResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	}
 
 	// If lag_count changes and we have confirmed state, require replacement.
-	if !state.UID.IsNull() && !plan.LagCount.IsNull() && !state.LagPortUIDs.IsNull() {
-		if len(state.LagPortUIDs.Elements()) != int(plan.LagCount.ValueInt64()) {
+	if !state.UID.IsNull() && !plan.LagCount.IsNull() {
+		if !state.LagPortUIDs.IsNull() {
+			if len(state.LagPortUIDs.Elements()) != int(plan.LagCount.ValueInt64()) {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("lag_count"))
+			}
+		} else if !plan.LagCount.Equal(state.LagCount) {
+			// LagPortUIDs not yet populated but lag_count changed — require replacement
 			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("lag_count"))
 		}
 	}

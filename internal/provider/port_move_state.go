@@ -168,10 +168,6 @@ func unmarshalResourceTags(_ context.Context, raw map[string]json.RawMessage) (t
 		return types.MapNull(types.StringType), nil
 	}
 
-	if len(tags) == 0 {
-		return types.MapNull(types.StringType), nil
-	}
-
 	elements := make(map[string]attr.Value, len(tags))
 	for k, val := range tags {
 		elements[k] = types.StringValue(val)

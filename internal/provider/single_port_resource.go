@@ -234,6 +234,9 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
