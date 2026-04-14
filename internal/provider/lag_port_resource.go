@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -22,6 +23,7 @@ var (
 	_ resource.Resource                = &lagPortResource{}
 	_ resource.ResourceWithConfigure   = &lagPortResource{}
 	_ resource.ResourceWithImportState = &lagPortResource{}
+	_ resource.ResourceWithMoveState   = &lagPortResource{}
 )
 
 // lagPortResourceModel maps the resource schema data.
@@ -369,6 +371,44 @@ func (r *lagPortResource) fetchResourceTags(ctx context.Context, uid string) (ma
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// MoveState implements resource.ResourceWithMoveState to support automatic
+// V1-to-V2 state migration when users move from megaport/megaport (v1) to v2.
+func (r *lagPortResource) MoveState(ctx context.Context) []resource.StateMover {
+	return []resource.StateMover{
+		{
+			StateMover: moveStateLagPort,
+		},
+	}
+}
+
+// moveStateLagPort migrates a V1 megaport_lag_port state to V2 by extracting
+// only the fields that exist in the V2 schema and dropping all removed fields.
+func moveStateLagPort(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
+	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_lag_port" {
+		return
+	}
+
+	rawJSON := req.SourceRawState.JSON
+	if len(rawJSON) == 0 {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state JSON is empty")
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rawJSON, &raw); err != nil {
+		resp.Diagnostics.AddError("Unable to unmarshal V1 state", err.Error())
+		return
+	}
+
+	model, diags := lagPortModelFromV1RawState(ctx, raw)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.TargetState.Set(ctx, model)...)
 }
 
 func (r *lagPortResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
