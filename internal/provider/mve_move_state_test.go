@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -435,11 +436,209 @@ func TestMoveState_MVE_WrongType(t *testing.T) {
 	assert.Nil(t, model, "model should be nil when type doesn't match (skipped)")
 }
 
+func TestMoveState_MVE_V1ToV2_Aviatrix(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "aviatrix"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":       "aviatrix",
+		"image_id":     float64(200),
+		"product_size": "MEDIUM",
+		"mve_label":    "avx-label",
+		"cloud_init":   "#!/bin/bash\necho hello",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "eth0", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.AviatrixConfig.IsNull(), "aviatrix_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var avx aviatrixConfigModel
+	diags := model.AviatrixConfig.As(context.Background(), &avx, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(200), avx.ImageID.ValueInt64())
+	assert.Equal(t, "avx-label", avx.MVELabel.ValueString())
+	assert.Equal(t, "#!/bin/bash\necho hello", avx.CloudInit.ValueString())
+}
+
+func TestMoveState_MVE_V1ToV2_Fortinet(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "fortinet"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":               "fortinet",
+		"image_id":             float64(300),
+		"product_size":         "LARGE",
+		"mve_label":            "fort-label",
+		"admin_ssh_public_key": "ssh-rsa AAAA...",
+		"ssh_public_key":       "ssh-rsa BBBB...",
+		"license_data":         "FGTVM010000000000",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "port1", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.FortinetConfig.IsNull(), "fortinet_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var fort fortinetConfigModel
+	diags := model.FortinetConfig.As(context.Background(), &fort, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(300), fort.ImageID.ValueInt64())
+	assert.Equal(t, "ssh-rsa AAAA...", fort.AdminSSHPublicKey.ValueString())
+	assert.Equal(t, "FGTVM010000000000", fort.LicenseData.ValueString())
+}
+
+func TestMoveState_MVE_V1ToV2_Meraki(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "meraki"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":       "meraki",
+		"image_id":     float64(400),
+		"product_size": "MEDIUM",
+		"mve_label":    "meraki-label",
+		"token":        "tok-abc123",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "WAN", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.MerakiConfig.IsNull(), "meraki_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var mer merakiConfigModel
+	diags := model.MerakiConfig.As(context.Background(), &mer, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(400), mer.ImageID.ValueInt64())
+	assert.Equal(t, "tok-abc123", mer.Token.ValueString())
+}
+
+func TestMoveState_MVE_V1ToV2_PaloAlto(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "palo_alto"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":               "palo_alto",
+		"image_id":             float64(500),
+		"product_size":         "LARGE",
+		"mve_label":            "pa-label",
+		"admin_ssh_public_key": "ssh-rsa CCCC...",
+		"ssh_public_key":       "ssh-rsa DDDD...",
+		"admin_password_hash":  "$6$hash...",
+		"license_data":         "PA-VM-LICENSE",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "eth0", "vlan": float64(0)},
+		map[string]interface{}{"description": "eth1", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.PaloAltoConfig.IsNull(), "palo_alto_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var pa paloAltoConfigModel
+	diags := model.PaloAltoConfig.As(context.Background(), &pa, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(500), pa.ImageID.ValueInt64())
+	assert.Equal(t, "$6$hash...", pa.AdminPasswordHash.ValueString())
+	assert.Equal(t, "PA-VM-LICENSE", pa.LicenseData.ValueString())
+}
+
+func TestMoveState_MVE_V1ToV2_Prisma(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "prisma"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":       "prisma",
+		"image_id":     float64(600),
+		"product_size": "MEDIUM",
+		"mve_label":    "prisma-label",
+		"ion_key":      "ion-key-xyz",
+		"secret_key":   "secret-key-abc",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "eth0", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.PrismaConfig.IsNull(), "prisma_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var pr prismaConfigModel
+	diags := model.PrismaConfig.As(context.Background(), &pr, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(600), pr.ImageID.ValueInt64())
+	assert.Equal(t, "ion-key-xyz", pr.IONKey.ValueString())
+	assert.Equal(t, "secret-key-abc", pr.SecretKey.ValueString())
+}
+
+func TestMoveState_MVE_V1ToV2_Sixwind(t *testing.T) {
+	v1 := baseV1MVEState()
+	v1["vendor"] = "6wind"
+	v1["vendor_config"] = map[string]interface{}{
+		"vendor":         "6wind",
+		"image_id":       float64(700),
+		"product_size":   "MEDIUM",
+		"mve_label":      "6wind-label",
+		"ssh_public_key": "ssh-rsa EEEE...",
+	}
+	v1["vnics"] = []interface{}{
+		map[string]interface{}{"description": "eth0", "vlan": float64(0)},
+	}
+
+	rawJSON, err := json.Marshal(v1)
+	require.NoError(t, err)
+
+	resp, model := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	require.NotNil(t, model)
+
+	assert.False(t, model.SixwindConfig.IsNull(), "sixwind_config should be populated")
+	assert.True(t, model.ArubaConfig.IsNull())
+
+	var sw sixwindConfigModel
+	diags := model.SixwindConfig.As(context.Background(), &sw, basetypes.ObjectAsOptions{})
+	require.False(t, diags.HasError())
+	assert.Equal(t, int64(700), sw.ImageID.ValueInt64())
+	assert.Equal(t, "ssh-rsa EEEE...", sw.SSHPublicKey.ValueString())
+}
+
 // sortedKeys returns sorted keys of a map for deterministic comparison.
 func sortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return keys
 }

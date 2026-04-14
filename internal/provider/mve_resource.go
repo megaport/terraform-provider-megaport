@@ -254,7 +254,7 @@ func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkIn
 func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megaport.VendorConfig, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	switch {
-	case !m.ArubaConfig.IsNull():
+	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		var cfg arubaConfigModel
 		diags.Append(m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -269,7 +269,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			AccountKey:  cfg.AccountKey.ValueString(),
 			SystemTag:   cfg.SystemTag.ValueString(),
 		}, diags
-	case !m.AviatrixConfig.IsNull():
+	case !m.AviatrixConfig.IsNull() && !m.AviatrixConfig.IsUnknown():
 		var cfg aviatrixConfigModel
 		diags.Append(m.AviatrixConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -282,7 +282,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			MVELabel:    cfg.MVELabel.ValueString(),
 			CloudInit:   cfg.CloudInit.ValueString(),
 		}, diags
-	case !m.CiscoConfig.IsNull():
+	case !m.CiscoConfig.IsNull() && !m.CiscoConfig.IsUnknown():
 		var cfg ciscoConfigModel
 		diags.Append(m.CiscoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -301,7 +301,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			FMCRegistrationKey: cfg.FMCRegistrationKey.ValueString(),
 			FMCNatID:           cfg.FMCNatID.ValueString(),
 		}, diags
-	case !m.FortinetConfig.IsNull():
+	case !m.FortinetConfig.IsNull() && !m.FortinetConfig.IsUnknown():
 		var cfg fortinetConfigModel
 		diags.Append(m.FortinetConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -316,7 +316,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
 			LicenseData:       cfg.LicenseData.ValueString(),
 		}, diags
-	case !m.MerakiConfig.IsNull():
+	case !m.MerakiConfig.IsNull() && !m.MerakiConfig.IsUnknown():
 		var cfg merakiConfigModel
 		diags.Append(m.MerakiConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -329,7 +329,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			MVELabel:    cfg.MVELabel.ValueString(),
 			Token:       cfg.Token.ValueString(),
 		}, diags
-	case !m.PaloAltoConfig.IsNull():
+	case !m.PaloAltoConfig.IsNull() && !m.PaloAltoConfig.IsUnknown():
 		var cfg paloAltoConfigModel
 		diags.Append(m.PaloAltoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -345,7 +345,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
 			LicenseData:       cfg.LicenseData.ValueString(),
 		}, diags
-	case !m.PrismaConfig.IsNull():
+	case !m.PrismaConfig.IsNull() && !m.PrismaConfig.IsUnknown():
 		var cfg prismaConfigModel
 		diags.Append(m.PrismaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -359,7 +359,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			IONKey:      cfg.IONKey.ValueString(),
 			SecretKey:   cfg.SecretKey.ValueString(),
 		}, diags
-	case !m.SixwindConfig.IsNull():
+	case !m.SixwindConfig.IsNull() && !m.SixwindConfig.IsUnknown():
 		var cfg sixwindConfigModel
 		diags.Append(m.SixwindConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -372,7 +372,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			MVELabel:     cfg.MVELabel.ValueString(),
 			SSHPublicKey: cfg.SSHPublicKey.ValueString(),
 		}, diags
-	case !m.VersaConfig.IsNull():
+	case !m.VersaConfig.IsNull() && !m.VersaConfig.IsUnknown():
 		var cfg versaConfigModel
 		diags.Append(m.VersaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -389,7 +389,7 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 			RemoteAuth:        cfg.RemoteAuth.ValueString(),
 			SerialNumber:      cfg.SerialNumber.ValueString(),
 		}, diags
-	case !m.VmwareConfig.IsNull():
+	case !m.VmwareConfig.IsNull() && !m.VmwareConfig.IsUnknown():
 		var cfg vmwareConfigModel
 		diags.Append(m.VmwareConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
 		if diags.HasError() {
@@ -411,12 +411,14 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megap
 	}
 }
 
-// allVendorConfigsNull returns true when all 10 vendor config blocks are null.
+// allVendorConfigsNull returns true when all 10 vendor config blocks are null or unknown.
 func allVendorConfigsNull(m mveResourceModel) bool {
-	return m.ArubaConfig.IsNull() && m.AviatrixConfig.IsNull() && m.CiscoConfig.IsNull() &&
-		m.FortinetConfig.IsNull() && m.MerakiConfig.IsNull() && m.PaloAltoConfig.IsNull() &&
-		m.PrismaConfig.IsNull() && m.SixwindConfig.IsNull() && m.VersaConfig.IsNull() &&
-		m.VmwareConfig.IsNull()
+	nullOrUnknown := func(o types.Object) bool { return o.IsNull() || o.IsUnknown() }
+	return nullOrUnknown(m.ArubaConfig) && nullOrUnknown(m.AviatrixConfig) &&
+		nullOrUnknown(m.CiscoConfig) && nullOrUnknown(m.FortinetConfig) &&
+		nullOrUnknown(m.MerakiConfig) && nullOrUnknown(m.PaloAltoConfig) &&
+		nullOrUnknown(m.PrismaConfig) && nullOrUnknown(m.SixwindConfig) &&
+		nullOrUnknown(m.VersaConfig) && nullOrUnknown(m.VmwareConfig)
 }
 
 // copyVendorConfigs copies all 10 vendor config blocks from src to dst.
@@ -437,7 +439,7 @@ func copyVendorConfigs(dst, src *mveResourceModel) {
 // config block is non-null in the model.
 func vendorNameFromModel(m mveResourceModel) string {
 	switch {
-	case !m.ArubaConfig.IsNull():
+	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		return "aruba"
 	case !m.AviatrixConfig.IsNull():
 		return "aviatrix"
@@ -1092,7 +1094,8 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			}
 			planVendor := vendorNameFromModel(plan)
 
-			if !strings.EqualFold(state.Vendor.ValueString(), planVendor) {
+			if !state.Vendor.IsNull() && !state.Vendor.IsUnknown() &&
+				!strings.EqualFold(state.Vendor.ValueString(), planVendor) {
 				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor"))
 			}
 
@@ -1119,7 +1122,7 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 // vendor config block is non-null in the plan model.
 func planProductSizeFromModel(ctx context.Context, m mveResourceModel) string {
 	switch {
-	case !m.ArubaConfig.IsNull():
+	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		var cfg arubaConfigModel
 		if m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{}) == nil {
 			return cfg.ProductSize.ValueString()
@@ -1299,7 +1302,7 @@ func mveModelFromV1RawState(ctx context.Context, raw map[string]json.RawMessage)
 	}
 
 	// A JSON null vendor_config means the resource was imported — leave all vendor blocks null.
-	if string(vcRaw) == "null" {
+	if isJSONNull(vcRaw) {
 		return model, diags
 	}
 
