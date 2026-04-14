@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -253,6 +254,25 @@ func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkIn
 // toAPIVendorConfigFromModel converts the per-vendor config block to a megaport.VendorConfig.
 func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel) (megaport.VendorConfig, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
+	// Count non-null/non-unknown vendor config blocks to catch schema validator bypass.
+	vendorConfigCount := 0
+	for _, obj := range []types.Object{
+		m.ArubaConfig, m.AviatrixConfig, m.CiscoConfig, m.FortinetConfig, m.MerakiConfig,
+		m.PaloAltoConfig, m.PrismaConfig, m.SixwindConfig, m.VersaConfig, m.VmwareConfig,
+	} {
+		if !obj.IsNull() && !obj.IsUnknown() {
+			vendorConfigCount++
+		}
+	}
+	if vendorConfigCount != 1 {
+		diags.AddError(
+			"Invalid vendor configuration",
+			fmt.Sprintf("Exactly one vendor configuration block must be set, got %d.", vendorConfigCount),
+		)
+		return nil, diags
+	}
+
 	switch {
 	case !m.ArubaConfig.IsNull() && !m.ArubaConfig.IsUnknown():
 		var cfg arubaConfigModel
@@ -678,7 +698,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vnics": schema.ListNestedAttribute{
-				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others.",
+				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each vNIC requires a description. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{

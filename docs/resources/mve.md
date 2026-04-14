@@ -189,7 +189,7 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
 - `sixwind_config` (Attributes) 6WIND MVE vendor configuration. Exactly one vendor config block must be set. (see [below for nested schema](#nestedatt--sixwind_config))
 - `versa_config` (Attributes) Versa MVE vendor configuration. Exactly one vendor config block must be set. (see [below for nested schema](#nestedatt--versa_config))
 - `vmware_config` (Attributes) VMware MVE vendor configuration. Exactly one vendor config block must be set. (see [below for nested schema](#nestedatt--vmware_config))
-- `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
+- `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each vNIC requires a description. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
 
