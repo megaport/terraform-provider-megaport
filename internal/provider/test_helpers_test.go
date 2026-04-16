@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -911,8 +912,11 @@ func loadCSPCredentials() (cspCredentials, error) {
 	}
 	// Fall back to local file for developer convenience.
 	data, err := os.ReadFile("testdata/csp_credentials.json")
+	if errors.Is(err, os.ErrNotExist) {
+		return cspCredentials{}, nil // file missing is not an error — tests will skip on empty pools
+	}
 	if err != nil {
-		return cspCredentials{}, nil //nolint:nilerr // file missing is not an error — tests will skip on empty pools
+		return cspCredentials{}, fmt.Errorf("testdata/csp_credentials.json: %w", err)
 	}
 	var creds cspCredentials
 	if err := json.Unmarshal(data, &creds); err != nil {
