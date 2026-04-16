@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -115,7 +116,7 @@ func (d *vxcsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			},
 			"include_resource_tags": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to fetch resource tags for each VXC. Defaults to false. Enabling this causes an additional API call per VXC, which may be slow for accounts with many VXCs.",
+				Description: "Whether to fetch resource tags for each VXC. Enabling this causes an additional API call per VXC, which may be slow for accounts with many VXCs.",
 			},
 			"vxcs": schema.ListNestedAttribute{
 				Description: "List of VXCs with detailed information.",
@@ -380,26 +381,26 @@ func fromAPIVXCDetail(v *megaport.VXC, tags map[string]string) vxcDetailModel {
 		detail.BEndVLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
 	}
 
-	// Time fields
+	// Time fields — use RFC850 and null for nil, consistent with the VXC resource
 	if v.CreateDate != nil {
-		detail.CreateDate = types.StringValue(v.CreateDate.String())
+		detail.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if v.LiveDate != nil {
-		detail.LiveDate = types.StringValue(v.LiveDate.String())
+		detail.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
 	} else {
-		detail.LiveDate = types.StringValue("")
+		detail.LiveDate = types.StringNull()
 	}
 	if v.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(v.ContractStartDate.String())
+		detail.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
 	} else {
-		detail.ContractStartDate = types.StringValue("")
+		detail.ContractStartDate = types.StringNull()
 	}
 	if v.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(v.ContractEndDate.String())
+		detail.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
 	} else {
-		detail.ContractEndDate = types.StringValue("")
+		detail.ContractEndDate = types.StringNull()
 	}
 
 	// Attribute tags

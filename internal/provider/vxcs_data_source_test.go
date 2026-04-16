@@ -229,7 +229,7 @@ func TestFromAPIVXCDetail(t *testing.T) {
 		assert.True(t, detail.BEndVLAN.IsNull(), "B-End VLAN 0 should map to null")
 	})
 
-	t.Run("Nil time fields produce empty strings", func(t *testing.T) {
+	t.Run("Nil time fields produce null strings", func(t *testing.T) {
 		vxc := &megaport.VXC{
 			UID:               "vxc-nil-times",
 			CreateDate:        nil,
@@ -240,10 +240,10 @@ func TestFromAPIVXCDetail(t *testing.T) {
 
 		detail := fromAPIVXCDetail(vxc, nil)
 
-		assert.Equal(t, "", detail.CreateDate.ValueString())
-		assert.Equal(t, "", detail.LiveDate.ValueString())
-		assert.Equal(t, "", detail.ContractStartDate.ValueString())
-		assert.Equal(t, "", detail.ContractEndDate.ValueString())
+		assert.True(t, detail.CreateDate.IsNull(), "nil CreateDate should map to null")
+		assert.True(t, detail.LiveDate.IsNull(), "nil LiveDate should map to null")
+		assert.True(t, detail.ContractStartDate.IsNull(), "nil ContractStartDate should map to null")
+		assert.True(t, detail.ContractEndDate.IsNull(), "nil ContractEndDate should map to null")
 	})
 
 	t.Run("Nil tags produce null maps", func(t *testing.T) {
