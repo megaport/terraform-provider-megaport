@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -260,16 +261,16 @@ func fromAPIIXDetail(ix *megaport.IX) (ixDetailModel, diag.Diagnostics) {
 		NetworkServiceType: types.StringValue(ix.NetworkServiceType),
 	}
 
-	// Time fields
+	// Time fields — use RFC3339 to match the IX resource, null when unset
 	if ix.CreateDate != nil {
-		detail.CreateDate = types.StringValue(ix.CreateDate.String())
+		detail.CreateDate = types.StringValue(ix.CreateDate.Format(time.RFC3339))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if ix.DeployDate != nil {
-		detail.DeployDate = types.StringValue(ix.DeployDate.String())
+		detail.DeployDate = types.StringValue(ix.DeployDate.Format(time.RFC3339))
 	} else {
-		detail.DeployDate = types.StringValue("")
+		detail.DeployDate = types.StringNull()
 	}
 
 	// Attribute tags
