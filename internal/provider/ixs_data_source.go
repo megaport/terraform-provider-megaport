@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -191,11 +192,20 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 			)
 			return
 		}
+		if ix == nil {
+			resp.Diagnostics.AddError(
+				"Error reading IX",
+				"IX not found: "+data.ProductUID.ValueString(),
+			)
+			return
+		}
 		ixs = []*megaport.IX{ix}
 	} else {
 		// List all IXs
 		var err error
-		ixs, err = d.client.IXService.ListIXs(ctx, &megaport.ListIXsRequest{})
+		ixs, err = d.client.IXService.ListIXs(ctx, &megaport.ListIXsRequest{
+			IncludeInactive: false,
+		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error listing IXs",
@@ -209,7 +219,11 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	ixObjects := make([]types.Object, 0, len(ixs))
 
 	for _, ix := range ixs {
-		detail := fromAPIIXDetail(ix)
+		detail, detailDiags := fromAPIIXDetail(ix)
+		resp.Diagnostics.Append(detailDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		obj, objDiags := types.ObjectValueFrom(ctx, ixDetailAttrs, &detail)
 		resp.Diagnostics.Append(objDiags...)
 		if resp.Diagnostics.HasError() {
@@ -229,7 +243,9 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 }
 
 // fromAPIIXDetail maps an API IX to an ixDetailModel.
-func fromAPIIXDetail(ix *megaport.IX) ixDetailModel {
+func fromAPIIXDetail(ix *megaport.IX) (ixDetailModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
 	detail := ixDetailModel{
 		UID:                types.StringValue(ix.ProductUID),
 		Name:               types.StringValue(ix.ProductName),
@@ -262,10 +278,12 @@ func fromAPIIXDetail(ix *megaport.IX) ixDetailModel {
 		for k, v := range ix.AttributeTags {
 			attrTagValues[k] = types.StringValue(v)
 		}
-		detail.AttributeTags, _ = types.MapValue(types.StringType, attrTagValues)
+		var tagDiags diag.Diagnostics
+		detail.AttributeTags, tagDiags = types.MapValue(types.StringType, attrTagValues)
+		diags.Append(tagDiags...)
 	} else {
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
 
-	return detail
+	return detail, diags
 }
