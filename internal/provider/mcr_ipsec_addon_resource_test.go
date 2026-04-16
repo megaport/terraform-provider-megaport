@@ -102,10 +102,9 @@ func TestParseImportIDStrings(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "multiple colons",
-			input:     "a:b:c",
-			wantLeft:  "a",
-			wantRight: "b:c",
+			name:    "multiple colons",
+			input:   "a:b:c",
+			wantErr: true,
 		},
 	}
 

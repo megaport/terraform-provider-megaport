@@ -460,12 +460,12 @@ func isMCRNotFoundError(err error) bool {
 
 // parseImportIDStrings parses an import ID in the format "part1:part2" and returns both parts as strings.
 func parseImportIDStrings(importID string) (string, string, error) {
-	left, right, found := strings.Cut(importID, ":")
-	if !found {
-		return "", "", fmt.Errorf("invalid import ID format, expected 'mcr_uid:add_on_uid', got '%s'", importID)
+	parts := strings.Split(importID, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid import ID format, expected 'mcr_uid:add_on_uid' (exactly one colon), got '%s'", importID)
 	}
-	if left == "" || right == "" {
+	if parts[0] == "" || parts[1] == "" {
 		return "", "", fmt.Errorf("invalid import ID format, both mcr_uid and add_on_uid must be non-empty, got '%s'", importID)
 	}
-	return left, right, nil
+	return parts[0], parts[1], nil
 }
