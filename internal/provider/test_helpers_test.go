@@ -444,6 +444,31 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 // mechanism as findPortTestLocation so parallel tests don't collide.
 // Calls t.Skip if not enough locations are found.
 //
+// findAnyActiveLocationID returns the ID of any active staging location.
+// It does NOT claim the location, so use this only for data-source-only tests
+// that don't provision real resources.
+func findAnyActiveLocationID(t *testing.T) int {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0
+	}
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") {
+			return loc.ID
+		}
+	}
+	t.Skip("skipping: no active locations found")
+	return 0
+}
+
 //nolint:unparam // count is 1 today but callers may vary it
 func findVXCPortTestLocations(t *testing.T, count int) []int {
 	t.Helper()
@@ -575,6 +600,73 @@ func findVXCPortTestLocationsWithPartner(t *testing.T, count int, connectType st
 	}
 	if len(ids) < count {
 		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port capacity and %s partner ports", len(ids), count, connectType)
+		return nil
+	}
+	return ids
+}
+
+// findVXCPortTestLocationsWithPartners is like findVXCPortTestLocationsWithPartner
+// but requires ALL of the given connect types at each location (e.g., "AWS" AND
+// "TRANSIT"). Use this for tests that need multiple partner types at the same site.
+func findVXCPortTestLocationsWithPartners(t *testing.T, count int, connectTypes ...string) []int {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return nil
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return nil
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return nil
+	}
+	// Build a set of connect types present at each location.
+	locTypes := map[int]map[string]bool{}
+	for _, pp := range partnerPorts {
+		if !pp.VXCPermitted {
+			continue
+		}
+		if locTypes[pp.LocationId] == nil {
+			locTypes[pp.LocationId] = map[string]bool{}
+		}
+		locTypes[pp.LocationId][strings.ToUpper(pp.ConnectType)] = true
+	}
+	hasAll := func(locID int) bool {
+		m := locTypes[locID]
+		for _, ct := range connectTypes {
+			if !m[strings.ToUpper(ct)] {
+				return false
+			}
+		}
+		return true
+	}
+	portClaimedMu.Lock()
+	defer portClaimedMu.Unlock()
+	var ids []int
+	for _, loc := range locations {
+		if len(ids) >= count {
+			break
+		}
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && hasAll(loc.ID) && !portClaimedLocations[loc.ID] {
+			portClaimedLocations[loc.ID] = true
+			locID := loc.ID
+			t.Cleanup(func() {
+				portClaimedMu.Lock()
+				defer portClaimedMu.Unlock()
+				delete(portClaimedLocations, locID)
+			})
+			t.Logf("findVXCPortTestLocationsWithPartners(%v): claimed location %d (%s)", connectTypes, loc.ID, loc.Name)
+			ids = append(ids, loc.ID)
+		}
+	}
+	if len(ids) < count {
+		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port capacity and %v partner ports", len(ids), count, connectTypes)
 		return nil
 	}
 	return ids
@@ -745,7 +837,16 @@ func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
 		}
 		cspClaimedKeys[key] = true
 		cspClaimedPorts[resp.ProductUID] = true
+		claimedKey := key
+		claimedPort := resp.ProductUID
 		cspClaimedMu.Unlock()
+
+		t.Cleanup(func() {
+			cspClaimedMu.Lock()
+			delete(cspClaimedKeys, claimedKey)
+			delete(cspClaimedPorts, claimedPort)
+			cspClaimedMu.Unlock()
+		})
 
 		t.Logf("pick%sKey: using key %s (location %d)", partner, masked, locID)
 		return cspPickResult{Key: key, PartnerPortUID: resp.ProductUID, LocationID: locID}
@@ -783,6 +884,12 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 	for _, id := range creds.OracleVirtualCircuitIDs {
 		if !oracleClaimedIDs[id] {
 			oracleClaimedIDs[id] = true
+			claimedID := id
+			t.Cleanup(func() {
+				oracleClaimedMu.Lock()
+				delete(oracleClaimedIDs, claimedID)
+				oracleClaimedMu.Unlock()
+			})
 			t.Logf("pickOracleVirtualCircuitID: using ...%s", id[max(0, len(id)-8):])
 			return id
 		}

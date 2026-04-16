@@ -879,10 +879,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	// If Imported, VendorConfig will be Null. Set VendorConfig in state to existing one in plan.
-	if state.VendorConfig.IsNull() {
-		state.VendorConfig = plan.VendorConfig
-	}
+	// Preserve the plan's VendorConfig in state. This handles two cases:
+	// 1. After Import, VendorConfig in state is null — adopt the plan value.
+	// 2. Case-only changes (e.g., "aruba" → "aRuBa") — adopt the plan's casing
+	//    so Terraform doesn't see an inconsistent result after apply.
+	state.VendorConfig = plan.VendorConfig
 
 	if resp.Diagnostics.HasError() {
 		return

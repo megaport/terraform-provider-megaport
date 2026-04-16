@@ -88,16 +88,16 @@ func TestSinglePortLocation(t *testing.T) {
 
 func TestDynamicLocation(t *testing.T) {
 	t.Parallel()
-	locs := findVXCPortTestLocations(t, 1)
+	locID := findAnyActiveLocationID(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
 					id = "%d"
-				}`, locs[0]),
+				}`, locID),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", locs[0])),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", locID)),
 				),
 			},
 		},

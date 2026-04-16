@@ -23,4 +23,4 @@ if [[ "${1:-}" == "--delete" ]]; then
   sleep 5
 fi
 
-go test -v -count=1 -run TestCleanupOrphanedResources ./internal/provider/ ${DELETE_FLAG}
+go test -v -count=1 -run TestCleanupOrphanedResources ${DELETE_FLAG} ./internal/provider/
