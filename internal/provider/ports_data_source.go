@@ -103,11 +103,11 @@ func (d *portsDataSource) Metadata(_ context.Context, req datasource.MetadataReq
 // Schema defines the schema for the data source.
 func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Looks up ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.",
+		Description: "Looks up active ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.",
 		Attributes: map[string]schema.Attribute{
 			"product_uid": schema.StringAttribute{
 				Optional:    true,
-				Description: "The unique identifier of a specific port to look up. If not provided, all ports are returned.",
+				Description: "The unique identifier of a specific port to look up. If not provided, all active ports are returned.",
 			},
 			"include_resource_tags": schema.BoolAttribute{
 				Optional:    true,
