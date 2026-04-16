@@ -150,6 +150,19 @@ func TestReadPorts_GetByUIDError(t *testing.T) {
 	assert.Contains(t, err.Error(), "port not found")
 }
 
+func TestReadPorts_GetByUIDReturnsNil(t *testing.T) {
+	mockPortService := &MockPortService{
+		GetPortResult: nil,
+		GetPortErr:    nil,
+	}
+	mockClient := &megaport.Client{PortService: mockPortService}
+	ds := &portsDataSource{client: mockClient}
+
+	port, err := ds.client.PortService.GetPort(context.Background(), "port-nonexistent")
+	assert.NoError(t, err)
+	assert.Nil(t, port)
+}
+
 func TestFromAPIPortDetail(t *testing.T) {
 	t.Run("Maps all fields correctly", func(t *testing.T) {
 		port := &megaport.Port{
@@ -180,7 +193,8 @@ func TestFromAPIPortDetail(t *testing.T) {
 			"owner": "team-a",
 		}
 
-		detail := fromAPIPortDetail(port, tags)
+		detail, diags := fromAPIPortDetail(port, tags)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "port-abc-123", detail.UID.ValueString())
 		assert.Equal(t, "My Test Port", detail.Name.ValueString())
@@ -215,7 +229,8 @@ func TestFromAPIPortDetail(t *testing.T) {
 			ContractEndDate:   nil,
 		}
 
-		detail := fromAPIPortDetail(port, nil)
+		detail, diags := fromAPIPortDetail(port, nil)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "", detail.CreateDate.ValueString())
 		assert.Equal(t, "", detail.LiveDate.ValueString())
@@ -229,7 +244,8 @@ func TestFromAPIPortDetail(t *testing.T) {
 			UID: "port-nil-tags",
 		}
 
-		detail := fromAPIPortDetail(port, nil)
+		detail, diags := fromAPIPortDetail(port, nil)
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
@@ -239,7 +255,8 @@ func TestFromAPIPortDetail(t *testing.T) {
 			UID: "port-empty-tags",
 		}
 
-		detail := fromAPIPortDetail(port, map[string]string{})
+		detail, diags := fromAPIPortDetail(port, map[string]string{})
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
@@ -248,14 +265,16 @@ func TestFromAPIPortDetail(t *testing.T) {
 func TestFromAPIPortDetail_ResourceTagsOptIn(t *testing.T) {
 	t.Run("Tags nil when not fetched", func(t *testing.T) {
 		port := &megaport.Port{UID: "port-1"}
-		detail := fromAPIPortDetail(port, nil)
+		detail, diags := fromAPIPortDetail(port, nil)
+		assert.False(t, diags.HasError())
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
 
 	t.Run("Tags populated when fetched", func(t *testing.T) {
 		port := &megaport.Port{UID: "port-1"}
 		tags := map[string]string{"env": "prod"}
-		detail := fromAPIPortDetail(port, tags)
+		detail, diags := fromAPIPortDetail(port, tags)
+		assert.False(t, diags.HasError())
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
 }
@@ -285,7 +304,8 @@ func TestReadPorts_TagsNotFetchedByDefault(t *testing.T) {
 		if fetchTags {
 			tags, _ = mockClient.PortService.ListPortResourceTags(context.Background(), port.UID)
 		}
-		detail := fromAPIPortDetail(port, tags)
+		detail, diags := fromAPIPortDetail(port, tags)
+		assert.False(t, diags.HasError())
 		assert.True(t, detail.ResourceTags.IsNull())
 	}
 	assert.False(t, tagsCalled, "ListPortResourceTags should not be called when include_resource_tags is false")
@@ -297,7 +317,8 @@ func TestReadPorts_TagsNotFetchedByDefault(t *testing.T) {
 		if fetchTags {
 			tags, _ = mockClient.PortService.ListPortResourceTags(context.Background(), port.UID)
 		}
-		detail := fromAPIPortDetail(port, tags)
+		detail, diags := fromAPIPortDetail(port, tags)
+		assert.False(t, diags.HasError())
 		assert.False(t, detail.ResourceTags.IsNull())
 	}
 	assert.True(t, tagsCalled, "ListPortResourceTags should be called when include_resource_tags is true")
