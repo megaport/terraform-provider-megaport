@@ -53,7 +53,7 @@ func (m *MockIXService) DeleteIX(ctx context.Context, id string, req *megaport.D
 	return nil
 }
 
-func TestReadIXs_ListAll(t *testing.T) {
+func TestIXService_ListAll(t *testing.T) {
 	mockIXService := &MockIXService{
 		ListIXsResult: []*megaport.IX{
 			{ProductUID: "ix-1", ProductName: "IX One"},
@@ -70,7 +70,7 @@ func TestReadIXs_ListAll(t *testing.T) {
 	assert.Equal(t, "ix-2", ixs[1].ProductUID)
 }
 
-func TestReadIXs_GetByUID(t *testing.T) {
+func TestIXService_GetByUID(t *testing.T) {
 	mockIXService := &MockIXService{
 		GetIXResult: &megaport.IX{ProductUID: "ix-1", ProductName: "IX One"},
 	}
@@ -83,7 +83,7 @@ func TestReadIXs_GetByUID(t *testing.T) {
 	assert.Equal(t, "IX One", ix.ProductName)
 }
 
-func TestReadIXs_ListError(t *testing.T) {
+func TestIXService_ListError(t *testing.T) {
 	mockIXService := &MockIXService{
 		ListIXsErr: errors.New("API error"),
 	}
@@ -96,7 +96,7 @@ func TestReadIXs_ListError(t *testing.T) {
 	assert.Contains(t, err.Error(), "API error")
 }
 
-func TestReadIXs_GetByUIDError(t *testing.T) {
+func TestIXService_GetByUIDError(t *testing.T) {
 	mockIXService := &MockIXService{
 		GetIXErr: errors.New("IX not found"),
 	}
