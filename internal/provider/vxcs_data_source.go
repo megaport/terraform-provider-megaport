@@ -237,7 +237,7 @@ func (d *vxcsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 						},
 						"resource_tags": schema.MapAttribute{
 							ElementType: types.StringType,
-							Description: "The resource tags associated with the VXC.",
+							Description: "The resource tags associated with the VXC. Only populated when include_resource_tags is enabled; otherwise null.",
 							Computed:    true,
 						},
 					},
@@ -360,14 +360,24 @@ func fromAPIVXCDetail(v *megaport.VXC, tags map[string]string) vxcDetailModel {
 		Locked:             types.BoolValue(v.Locked),
 		AdminLocked:        types.BoolValue(v.AdminLocked),
 		Cancelable:         types.BoolValue(v.Cancelable),
-		AEndUID:            types.StringValue(v.AEndConfiguration.UID),
-		AEndName:           types.StringValue(v.AEndConfiguration.Name),
-		AEndLocationID:     types.Int64Value(int64(v.AEndConfiguration.LocationID)),
-		AEndVLAN:           types.Int64Value(int64(v.AEndConfiguration.VLAN)),
-		BEndUID:            types.StringValue(v.BEndConfiguration.UID),
-		BEndName:           types.StringValue(v.BEndConfiguration.Name),
-		BEndLocationID:     types.Int64Value(int64(v.BEndConfiguration.LocationID)),
-		BEndVLAN:           types.Int64Value(int64(v.BEndConfiguration.VLAN)),
+		AEndUID:        types.StringValue(v.AEndConfiguration.UID),
+		AEndName:       types.StringValue(v.AEndConfiguration.Name),
+		AEndLocationID: types.Int64Value(int64(v.AEndConfiguration.LocationID)),
+		BEndUID:        types.StringValue(v.BEndConfiguration.UID),
+		BEndName:       types.StringValue(v.BEndConfiguration.Name),
+		BEndLocationID: types.Int64Value(int64(v.BEndConfiguration.LocationID)),
+	}
+
+	// VLAN 0 means unset — map to null to stay consistent with the VXC resource
+	if v.AEndConfiguration.VLAN == 0 {
+		detail.AEndVLAN = types.Int64Null()
+	} else {
+		detail.AEndVLAN = types.Int64Value(int64(v.AEndConfiguration.VLAN))
+	}
+	if v.BEndConfiguration.VLAN == 0 {
+		detail.BEndVLAN = types.Int64Null()
+	} else {
+		detail.BEndVLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
 	}
 
 	// Time fields

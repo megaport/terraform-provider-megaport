@@ -203,13 +203,30 @@ func TestFromAPIVXCDetail(t *testing.T) {
 		assert.Equal(t, "port-aaa", detail.AEndUID.ValueString())
 		assert.Equal(t, "Port A", detail.AEndName.ValueString())
 		assert.Equal(t, int64(123), detail.AEndLocationID.ValueInt64())
+		assert.False(t, detail.AEndVLAN.IsNull())
 		assert.Equal(t, int64(100), detail.AEndVLAN.ValueInt64())
 		assert.Equal(t, "port-bbb", detail.BEndUID.ValueString())
 		assert.Equal(t, "Port B", detail.BEndName.ValueString())
 		assert.Equal(t, int64(456), detail.BEndLocationID.ValueInt64())
+		assert.False(t, detail.BEndVLAN.IsNull())
 		assert.Equal(t, int64(200), detail.BEndVLAN.ValueInt64())
 		assert.False(t, detail.AttributeTags.IsNull())
 		assert.False(t, detail.ResourceTags.IsNull())
+	})
+
+	t.Run("VLAN 0 maps to null", func(t *testing.T) {
+		vxc := &megaport.VXC{
+			UID: "vxc-zero-vlan",
+			AEndConfiguration: megaport.VXCEndConfiguration{
+				VLAN: 0,
+			},
+			BEndConfiguration: megaport.VXCEndConfiguration{
+				VLAN: 0,
+			},
+		}
+		detail := fromAPIVXCDetail(vxc, nil)
+		assert.True(t, detail.AEndVLAN.IsNull(), "A-End VLAN 0 should map to null")
+		assert.True(t, detail.BEndVLAN.IsNull(), "B-End VLAN 0 should map to null")
 	})
 
 	t.Run("Nil time fields produce empty strings", func(t *testing.T) {

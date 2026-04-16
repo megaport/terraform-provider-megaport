@@ -55,6 +55,6 @@ Read-Only:
 - `product_uid` (String) The unique identifier of the VXC.
 - `provisioning_status` (String) The provisioning status of the VXC.
 - `rate_limit` (Number) The rate limit of the VXC in Mbps.
-- `resource_tags` (Map of String) The resource tags associated with the VXC.
+- `resource_tags` (Map of String) The resource tags associated with the VXC. Only populated when include_resource_tags is enabled; otherwise null.
 - `secondary_name` (String) The secondary name of the VXC.
 - `shutdown` (Boolean) Whether the VXC is shut down.
