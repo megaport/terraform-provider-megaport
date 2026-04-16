@@ -5,8 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -53,60 +57,130 @@ func (m *MockIXService) DeleteIX(ctx context.Context, id string, req *megaport.D
 	return nil
 }
 
-func TestIXService_ListAll(t *testing.T) {
+// ixsReadRequest builds a datasource.ReadRequest and ReadResponse for the ixs
+// data source schema. When productUID is non-nil the config sets product_uid to
+// that value; otherwise the attribute is null (triggering a list-all call).
+func ixsReadRequest(t *testing.T, ds *ixsDataSource, productUID *string) (datasource.ReadRequest, *datasource.ReadResponse) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Obtain the schema so tfsdk objects match.
+	schemaResp := datasource.SchemaResponse{}
+	ds.Schema(ctx, datasource.SchemaRequest{}, &schemaResp)
+
+	tfType := schemaResp.Schema.Type().TerraformType(ctx)
+
+	// Build the product_uid tftypes value.
+	var uidVal tftypes.Value
+	if productUID != nil {
+		uidVal = tftypes.NewValue(tftypes.String, *productUID)
+	} else {
+		uidVal = tftypes.NewValue(tftypes.String, nil) // null
+	}
+
+	// The ixs attribute is computed, so it is always null in config.
+	ixsAttrType := schemaResp.Schema.Attributes["ixs"].GetType().TerraformType(ctx)
+	configRaw := tftypes.NewValue(tfType, map[string]tftypes.Value{
+		"product_uid": uidVal,
+		"ixs":         tftypes.NewValue(ixsAttrType, nil),
+	})
+
+	req := datasource.ReadRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: configRaw},
+	}
+	resp := &datasource.ReadResponse{
+		State: tfsdk.State{Schema: schemaResp.Schema},
+	}
+	return req, resp
+}
+
+func TestReadIXs_ListAll(t *testing.T) {
+	ctx := context.Background()
 	mockIXService := &MockIXService{
 		ListIXsResult: []*megaport.IX{
 			{ProductUID: "ix-1", ProductName: "IX One"},
 			{ProductUID: "ix-2", ProductName: "IX Two"},
 		},
 	}
-	mockClient := &megaport.Client{IXService: mockIXService}
-	ds := &ixsDataSource{client: mockClient}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
 
-	ixs, err := ds.client.IXService.ListIXs(context.Background(), &megaport.ListIXsRequest{})
-	assert.NoError(t, err)
-	assert.Len(t, ixs, 2)
-	assert.Equal(t, "ix-1", ixs[0].ProductUID)
-	assert.Equal(t, "ix-2", ixs[1].ProductUID)
+	req, resp := ixsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state ixsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+
+	var details []ixDetailModel
+	diags = state.IXs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 2)
+	assert.Equal(t, "ix-1", details[0].UID.ValueString())
+	assert.Equal(t, "IX One", details[0].Name.ValueString())
+	assert.Equal(t, "ix-2", details[1].UID.ValueString())
+	assert.Equal(t, "IX Two", details[1].Name.ValueString())
 }
 
-func TestIXService_GetByUID(t *testing.T) {
+func TestReadIXs_GetByUID(t *testing.T) {
+	ctx := context.Background()
 	mockIXService := &MockIXService{
 		GetIXResult: &megaport.IX{ProductUID: "ix-1", ProductName: "IX One"},
 	}
-	mockClient := &megaport.Client{IXService: mockIXService}
-	ds := &ixsDataSource{client: mockClient}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
 
-	ix, err := ds.client.IXService.GetIX(context.Background(), "ix-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "ix-1", ix.ProductUID)
-	assert.Equal(t, "IX One", ix.ProductName)
+	uid := "ix-1"
+	req, resp := ixsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state ixsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.Equal(t, "ix-1", state.ProductUID.ValueString())
+
+	var details []ixDetailModel
+	diags = state.IXs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 1)
+	assert.Equal(t, "ix-1", details[0].UID.ValueString())
+	assert.Equal(t, "IX One", details[0].Name.ValueString())
 }
 
-func TestIXService_ListError(t *testing.T) {
+func TestReadIXs_ListError(t *testing.T) {
+	ctx := context.Background()
 	mockIXService := &MockIXService{
 		ListIXsErr: errors.New("API error"),
 	}
-	mockClient := &megaport.Client{IXService: mockIXService}
-	ds := &ixsDataSource{client: mockClient}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
 
-	ixs, err := ds.client.IXService.ListIXs(context.Background(), &megaport.ListIXsRequest{})
-	assert.Error(t, err)
-	assert.Nil(t, ixs)
-	assert.Contains(t, err.Error(), "API error")
+	req, resp := ixsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "API error")
 }
 
-func TestIXService_GetByUIDError(t *testing.T) {
+func TestReadIXs_GetByUIDError(t *testing.T) {
+	ctx := context.Background()
 	mockIXService := &MockIXService{
 		GetIXErr: errors.New("IX not found"),
 	}
-	mockClient := &megaport.Client{IXService: mockIXService}
-	ds := &ixsDataSource{client: mockClient}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
 
-	ix, err := ds.client.IXService.GetIX(context.Background(), "ix-nonexistent")
-	assert.Error(t, err)
-	assert.Nil(t, ix)
-	assert.Contains(t, err.Error(), "IX not found")
+	uid := "ix-nonexistent"
+	req, resp := ixsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "IX not found")
 }
 
 func TestFromAPIIXDetail(t *testing.T) {
