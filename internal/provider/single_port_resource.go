@@ -307,10 +307,14 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:     state.UID.ValueString(),
-		DeleteNow:  !r.cancelAtEndOfTerm,
-		SafeDelete: true,
+	// Delete existing order
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
+			PortID:     state.UID.ValueString(),
+			DeleteNow:  !r.cancelAtEndOfTerm,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
