@@ -61,11 +61,12 @@ echo "" >> "$OUT"
 echo "## Release History" >> "$OUT"
 echo "" >> "$OUT"
 
-# Collect tags newest-first into an array
+# Collect tags newest-first into an array, sorted by version so release ranges
+# follow semantic version progression instead of tag creation time.
 tags=()
 while IFS= read -r t; do
     tags+=("$t")
-done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-creatordate)
+done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname)
 
 for i in "${!tags[@]}"; do
     tag="${tags[$i]}"
@@ -84,7 +85,7 @@ for i in "${!tags[@]}"; do
     fi
 
     git -C "$REPO_ROOT" log --no-merges --format="- %s" "$range" 2>/dev/null \
-        | grep -v "^- chore:" \
+        | grep -Ev '^- chore(\([^)]*\))?:' \
         | grep -v "^- Merge " \
         >> "$OUT" || true
 
