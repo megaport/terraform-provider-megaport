@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -87,6 +88,7 @@ func NewLagPortResource() resource.Resource {
 type lagPortResource struct {
 	client            *megaport.Client
 	cancelAtEndOfTerm bool
+	waitForTime       time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -155,7 +157,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		CostCentre:            plan.CostCentre.ValueString(),
 		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	}
 
 	if !plan.ResourceTags.IsNull() {
@@ -290,7 +292,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		CostCentre:            params.costCentre,
 		ContractTermMonths:    params.contractTermMonths,
 		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -367,6 +369,7 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 	}
 	r.client = data.client
 	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
+	r.waitForTime = data.waitForTime
 }
 
 func (r *lagPortResource) fetchResourceTags(ctx context.Context, uid string) (map[string]string, error) {

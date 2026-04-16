@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -96,7 +97,8 @@ func NewMCRResource() resource.Resource {
 
 // mcrResource is the resource implementation.
 type mcrResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -225,7 +227,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		CostCentre:       plan.CostCentre.ValueString(),
 		PromoCode:        plan.PromoCode.ValueString(),
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	if !plan.ASN.IsNull() {
@@ -374,7 +376,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		MarketplaceVisibility: &marketplaceVisibility,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	})
 
 	if err != nil {
@@ -473,6 +475,7 @@ func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 	r.client = providerData.client
+	r.waitForTime = providerData.waitForTime
 }
 
 func (r *mcrResource) fetchResourceTags(ctx context.Context, id string) (map[string]string, error) {
