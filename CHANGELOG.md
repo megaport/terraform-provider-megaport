@@ -460,7 +460,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v1.1.6] — 2024-09-04
 
-
+- _No user-facing changes._
 
 ### [v1.1.5] — 2024-09-04
 
@@ -807,6 +807,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v0.2.8] — 2023-02-20
 
+- _No user-facing changes._
 
 ### [v0.2.7] — 2022-12-08
 
