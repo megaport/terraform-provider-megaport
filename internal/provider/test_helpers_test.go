@@ -868,8 +868,9 @@ var (
 )
 
 // pickOracleVirtualCircuitID returns a unique Oracle virtual circuit ID from the
-// pool. These are synthetic IDs matching /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
-// — no API validation needed. Calls t.Skip if the pool is exhausted.
+// pool that is not already attached to an existing VXC. Each candidate is probed
+// via LookupPartnerPorts — if the VCID is already in use (orphaned from a prior
+// test run), it is skipped. Calls t.Skip if no usable VCID is found.
 func pickOracleVirtualCircuitID(t *testing.T) string {
 	t.Helper()
 	creds, err := loadCSPCredentials()
@@ -882,22 +883,40 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 		return ""
 	}
 
+	ctx := context.Background()
+	client, clientErr := getTestClient()
+	if clientErr != nil {
+		t.Skipf("skipping: could not get test client: %v", clientErr)
+		return ""
+	}
+
 	oracleClaimedMu.Lock()
 	defer oracleClaimedMu.Unlock()
 	for _, id := range creds.OracleVirtualCircuitIDs {
-		if !oracleClaimedIDs[id] {
-			oracleClaimedIDs[id] = true
-			claimedID := id
-			t.Cleanup(func() {
-				oracleClaimedMu.Lock()
-				delete(oracleClaimedIDs, claimedID)
-				oracleClaimedMu.Unlock()
-			})
-			t.Logf("pickOracleVirtualCircuitID: using ...%s", id[max(0, len(id)-8):])
-			return id
+		if oracleClaimedIDs[id] {
+			continue
 		}
+		// Probe the API to check the VCID is not already attached to a live VXC.
+		_, lookupErr := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
+			Partner:   "ORACLE",
+			Key:       id,
+			PortSpeed: 1000,
+		})
+		if lookupErr != nil {
+			t.Logf("pickOracleVirtualCircuitID: skipping ...%s (lookup failed: %v)", id[max(0, len(id)-8):], lookupErr)
+			continue
+		}
+		oracleClaimedIDs[id] = true
+		claimedID := id
+		t.Cleanup(func() {
+			oracleClaimedMu.Lock()
+			delete(oracleClaimedIDs, claimedID)
+			oracleClaimedMu.Unlock()
+		})
+		t.Logf("pickOracleVirtualCircuitID: using ...%s", id[max(0, len(id)-8):])
+		return id
 	}
-	t.Skip("skipping: all Oracle virtual circuit IDs already claimed by concurrent tests")
+	t.Skip("skipping: no Oracle virtual circuit ID available (all claimed or in use on API)")
 	return ""
 }
 
