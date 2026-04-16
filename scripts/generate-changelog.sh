@@ -63,22 +63,20 @@ echo "" >> "$TMPOUT"
 echo "## Release History" >> "$TMPOUT"
 echo "" >> "$TMPOUT"
 
-# Collect tags newest-first into an array, sorted by version so release ranges
-# follow semantic version progression instead of tag creation time.
+# Restrict to tags merged into the current HEAD so changelog generation only
+# considers releases reachable from this checkout/branch.
 # Exclude prerelease tags (alpha/beta/rc) — their commits are covered by the
 # final release entry and Git's version sort does not follow SemVer prerelease
 # ordering. Tolerate zero matching tags (grep returns 1 on no match).
 tags=()
 while IFS= read -r t; do
     [[ -n "$t" ]] && tags+=("$t")
-done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname | grep -Ev '\-(alpha|beta|rc)' || true)
+done < <(git -C "$REPO_ROOT" tag --merged HEAD --list 'v*' --sort=-version:refname | grep -Ev '\-(alpha|beta|rc)' || true)
 
 if [ "${#tags[@]}" -eq 0 ]; then
-    echo "_No release tags found._" >> "$TMPOUT"
-    echo "" >> "$TMPOUT"
-    mv "$TMPOUT" "$OUT"
-    trap - EXIT
-    exit 0
+    echo "No matching release tags found; leaving existing CHANGELOG.md unchanged." >&2
+    echo "Ensure tags are fetched (for example, in shallow clones or CI environments)." >&2
+    exit 1
 fi
 
 for i in "${!tags[@]}"; do
@@ -103,10 +101,16 @@ for i in "${!tags[@]}"; do
         echo "error: git log failed for range $range" >&2
         exit 1
     }
-    echo "$commits" \
-        | grep -Ev '^- chore:' \
-        | grep -v "^- Merge " \
-        >> "$TMPOUT" || true
+    filtered=$(
+        printf '%s\n' "$commits" \
+            | grep -Ev '^- chore:' \
+            | grep -v "^- Merge " || true
+    )
+    if [ -n "$filtered" ]; then
+        printf '%s\n' "$filtered" >> "$TMPOUT"
+    else
+        echo "- _No user-facing changes._" >> "$TMPOUT"
+    fi
 
     echo "" >> "$TMPOUT"
 done
