@@ -30,7 +30,6 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `bgp_shutdown_default` (Boolean) Whether BGP sessions are shut down by default on the NAT Gateway.
 - `promo_code` (String) A promotional code for the NAT Gateway order.
 - `resource_tags` (Map of String) Resource tags for the NAT Gateway.
-- `service_level_reference` (String) A service level reference for the NAT Gateway.
 
 ### Read-Only
 
@@ -41,3 +40,4 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `last_updated` (String) Last updated by the Terraform provider.
 - `locked` (Boolean) Whether the NAT Gateway is locked.
 - `product_uid` (String) The unique identifier of the NAT Gateway.
+- `service_level_reference` (String) A service level reference for the NAT Gateway.
