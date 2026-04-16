@@ -1446,7 +1446,7 @@ func TestGCPVXCWithProductUID(t *testing.T) {
 func TestOracleVXCWithProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
 	oracleVCID := pickOracleVirtualCircuitID(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
@@ -1943,7 +1943,7 @@ func TestFullEcosystem(t *testing.T) {
 func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
 	oracleVCID := pickOracleVirtualCircuitID(t)
 	portName := RandomTestName()
 	oracleVXCName := RandomTestName()
@@ -4024,7 +4024,7 @@ func TestAccMegaportVXC_ImportDrift_WithInnerVLAN(t *testing.T) {
 func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWSHC")
 	portName := RandomTestName()
 	vxcName := RandomTestName()
 
