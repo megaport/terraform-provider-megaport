@@ -15,6 +15,9 @@ import (
 //
 //nolint:unparam // maxAttempts is constant today but callers may vary it in future
 func retryTransientDelete(ctx context.Context, maxAttempts int, fn func() error) error {
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
 	var err error
 	for attempt := range maxAttempts {
 		err = fn()

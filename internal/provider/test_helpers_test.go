@@ -182,14 +182,25 @@ func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name stri
 		return true
 	}
 
+	mveClaimedMu.Lock()
+	defer mveClaimedMu.Unlock()
+
 	for _, candidateID := range mveTestLocationCandidates {
+		if mveClaimedLocations[candidateID] {
+			continue
+		}
 		if loc, ok := byID[candidateID]; ok && probe(loc) {
+			mveClaimedLocations[candidateID] = true
 			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs", loc.ID, loc.Name, count)
 			return loc.ID, loc.Name
 		}
 	}
 	for _, loc := range locations {
+		if mveClaimedLocations[loc.ID] {
+			continue
+		}
 		if probe(loc) {
+			mveClaimedLocations[loc.ID] = true
 			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", loc.ID, loc.Name, count)
 			return loc.ID, loc.Name
 		}
@@ -383,7 +394,7 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 }
 
 // portLocationHasCapacity returns true when at least one diversity zone at loc
-// lists speedMbps (or higher) in MegaportSpeedMbps.
+// lists exactly speedMbps in MegaportSpeedMbps.
 func portLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
 	if loc.DiversityZones == nil {
 		return false
@@ -403,7 +414,7 @@ func portLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
 }
 
 // mcrLocationHasCapacity returns true when at least one diversity zone at loc
-// lists speedMbps (or higher) in McrSpeedMbps.
+// lists exactly speedMbps in McrSpeedMbps.
 func mcrLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
 	if loc.DiversityZones == nil {
 		return false
@@ -594,8 +605,8 @@ func loadCSPCredentials() cspCredentials {
 //
 //	go test -v -run TestStagingHealthCheck ./internal/provider/
 func TestStagingHealthCheck(t *testing.T) {
-	if testing.Short() {
-		t.Skip("health check requires API access")
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("health check requires TF_ACC")
 	}
 	ctx := context.Background()
 	client, err := getTestClient()
@@ -619,7 +630,7 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 	t.Logf("Locations reporting MVE support (approximate — staging does not populate mveMaxCpuCoreCount): %d", mveCount)
 	if mveCount == 0 {
-		t.Error("WARN: no MVE capacity available — MVE tests will be skipped")
+		t.Log("WARN: no MVE capacity available — MVE tests will be skipped")
 	}
 
 	// Port capacity (1G)
@@ -631,7 +642,7 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 	t.Logf("Locations with 1000 Mbps port capacity: %d", portCount)
 	if portCount == 0 {
-		t.Error("WARN: no 1G port capacity available — port tests will be skipped")
+		t.Log("WARN: no 1G port capacity available — port tests will be skipped")
 	}
 
 	// MCR capacity (2500 Mbps)
@@ -643,7 +654,7 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 	t.Logf("Locations with 2500 Mbps MCR capacity: %d", mcrCount)
 	if mcrCount == 0 {
-		t.Error("WARN: no 2.5G MCR capacity available — MCR tests will be skipped")
+		t.Log("WARN: no 2.5G MCR capacity available — MCR tests will be skipped")
 	}
 
 	// Partner ports
@@ -660,7 +671,7 @@ func TestStagingHealthCheck(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("WARN: no %s partner port found — %s VXC tests will be skipped", partner, partner)
+				t.Logf("WARN: no %s partner port found — %s VXC tests will be skipped", partner, partner)
 			}
 		}
 	}
@@ -683,7 +694,7 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 	t.Logf("Azure service keys with available capacity: %d/%d", azureAvailable, len(creds.AzureServiceKeys))
 	if azureAvailable == 0 {
-		t.Error("WARN: no Azure service key has available capacity — Azure VXC tests will be skipped")
+		t.Log("WARN: no Azure service key has available capacity — Azure VXC tests will be skipped")
 	}
 
 	gcpAvailable := 0
@@ -699,7 +710,7 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 	t.Logf("GCP pairing keys with available capacity: %d/%d", gcpAvailable, len(creds.GooglePairingKeys))
 	if gcpAvailable == 0 {
-		t.Error("WARN: no GCP pairing key has available capacity — GCP VXC tests will be skipped")
+		t.Log("WARN: no GCP pairing key has available capacity — GCP VXC tests will be skipped")
 	}
 }
 
@@ -710,8 +721,8 @@ func TestStagingHealthCheck(t *testing.T) {
 //
 //	go test -v -run TestListMVECapacity ./internal/provider/
 func TestListMVECapacity(t *testing.T) {
-	if testing.Short() {
-		t.Skip("diagnostic only")
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("diagnostic requires TF_ACC")
 	}
 	ctx := context.Background()
 	client, err := getTestClient()
@@ -742,8 +753,8 @@ func TestListMVECapacity(t *testing.T) {
 //
 //	go test -v -run TestListPortCapacity ./internal/provider/
 func TestListPortCapacity(t *testing.T) {
-	if testing.Short() {
-		t.Skip("diagnostic only")
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("diagnostic requires TF_ACC")
 	}
 	ctx := context.Background()
 	client, err := getTestClient()
@@ -781,8 +792,8 @@ var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test res
 //	# Delete:
 //	go test -v -run TestCleanupOrphanedResources -cleanup-delete ./internal/provider/
 func TestCleanupOrphanedResources(t *testing.T) {
-	if testing.Short() {
-		t.Skip("cleanup requires API access")
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("cleanup requires TF_ACC")
 	}
 	const prefix = "tf-acc-test-"
 	ctx := context.Background()
