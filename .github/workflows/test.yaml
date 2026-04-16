@@ -182,6 +182,6 @@ jobs:
   #     - run: go mod download
   #     - env:
   #         TF_ACC: "1"
-  #         MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
-  #         MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
+  #         MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_STAGING_ACCESS_KEY }}
+  #         MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_STAGING_SECRET_KEY }}
   #       run: go test -v -timeout=30m -cover ./internal/provider/
