@@ -451,10 +451,13 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Delete existing order
-	_, err := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
-		MCRID:      state.UID.ValueString(),
-		DeleteNow:  true,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
+			MCRID:      state.UID.ValueString(),
+			DeleteNow:  true,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(

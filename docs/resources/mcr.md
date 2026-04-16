@@ -36,15 +36,69 @@ resource "megaport_mcr" "mcr" {
 - `asn` (Number) Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the MCR is not automatically updated with the MCR service level reference number.
 - `diversity_zone` (String) Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.
+- `prefix_filter_lists` (Attributes List, Deprecated) **DEPRECATED**: Prefix filter list associated with the product. Use the `megaport_mcr_prefix_filter_list` resource instead for better resource management. This attribute will be removed in a future version. (see [below for nested schema](#nestedatt--prefix_filter_lists))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
 
 ### Read-Only
 
+- `admin_locked` (Boolean) Whether the product is admin locked.
+- `aggregation_id` (Number) Numeric ID of the aggregation.
 - `attribute_tags` (Map of String) Attribute tags of the product.
+- `buyout_port` (Boolean) Whether the product is bought out.
+- `cancelable` (Boolean) Whether the product is cancelable.
+- `company_name` (String) Name of the company.
 - `company_uid` (String) Megaport Company UID of the product.
+- `contract_end_date` (String) Contract end date of the product.
+- `contract_start_date` (String) Contract start date of the product.
+- `create_date` (String) The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `created_by` (String) User who created the product.
+- `lag_id` (Number) Numeric ID of the LAG.
+- `lag_primary` (Boolean) Whether the product is a LAG primary.
+- `last_updated` (String) Last updated by the Terraform provider.
+- `live_date` (String) The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `locked` (Boolean) Whether the product is locked.
+- `market` (String) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
+- `product_id` (Number) Numeric ID of the product.
+- `product_type` (String) Type of the product.
 - `product_uid` (String) UID identifier of the product.
+- `provisioning_status` (String) Provisioning status of the product.
+- `secondary_name` (String) Secondary name of the product.
+- `terminate_date` (String) Date the product will be terminated.
+- `usage_algorithm` (String) Usage algorithm of the product.
+- `virtual` (Boolean) Whether the product is virtual.
+- `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
+- `vxc_permitted` (Boolean) Whether VXC is permitted.
+
+<a id="nestedatt--prefix_filter_lists"></a>
+### Nested Schema for `prefix_filter_lists`
+
+Required:
+
+- `address_family` (String) The IP address standard of the IP network addresses in the prefix filter list.
+- `description` (String) Description of the prefix filter list.
+
+Optional:
+
+- `entries` (Attributes List) Entries in the prefix filter list. (see [below for nested schema](#nestedatt--prefix_filter_lists--entries))
+
+Read-Only:
+
+- `id` (Number) Numeric ID of the prefix filter list.
+
+<a id="nestedatt--prefix_filter_lists--entries"></a>
+### Nested Schema for `prefix_filter_lists.entries`
+
+Required:
+
+- `action` (String) The action to take for the network address in the filter list. Accepted values are permit and deny.
+- `prefix` (String) The network address of the prefix filter list entry.
+
+Optional:
+
+- `ge` (Number) The minimum starting prefix length to be matched. Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6). The minimum (ge) must be no greater than or equal to the maximum value (le).
+- `le` (Number) The maximum ending prefix length to be matched. The prefix length is greater than or equal to the minimum value (ge). Valid values are from 0 to 32 (IPv4), or 0 to 128 (IPv6), but the maximum must be no less than the minimum value (ge).
 
 ## Import
 

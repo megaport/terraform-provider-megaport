@@ -1084,9 +1084,12 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	productUID := state.UID.ValueString()
-	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID:      productUID,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
+			MVEID:      productUID,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		addAPIError(&resp.Diagnostics, deleteErrorSummary("MVE", state.UID.ValueString()), err)

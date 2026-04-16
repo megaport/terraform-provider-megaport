@@ -1299,8 +1299,10 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Delete existing order
-	err := r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
-		DeleteNow: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		return r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
+			DeleteNow: true,
+		})
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
