@@ -950,18 +950,17 @@ func TestListMVECapacity(t *testing.T) {
 	if err != nil {
 		t.Skipf("list failed: %v", err)
 	}
-	t.Logf("%-6s %-10s %-8s %s", "ID", "MaxCores", "Status", "Name")
+	var total, withCores int
 	for _, loc := range locations {
 		if !loc.HasMVESupport() {
 			continue
 		}
-		cores := loc.GetMVEMaxCpuCores()
-		coresStr := "nil"
-		if cores != nil {
-			coresStr = fmt.Sprintf("%d", *cores)
+		total++
+		if cores := loc.GetMVEMaxCpuCores(); cores != nil {
+			withCores++
 		}
-		t.Logf("%-6d %-10s %-8s %s", loc.ID, coresStr, loc.Status, loc.Name)
 	}
+	t.Logf("MVE-capable locations: %d (%d with core counts populated)", total, withCores)
 	t.Skip("diagnostic complete")
 }
 
@@ -982,16 +981,24 @@ func TestListPortCapacity(t *testing.T) {
 	if err != nil {
 		t.Skipf("list failed: %v", err)
 	}
-	t.Logf("%-6s %-8s %s", "ID", "Status", "Name")
+	var portCount, mcrCount, bothCount int
 	for _, loc := range locations {
 		if loc.DiversityZones == nil {
 			continue
 		}
-		if !portLocationHasCapacity(loc, 1000) && !mcrLocationHasCapacity(loc, 2500) {
-			continue
+		hasPort := portLocationHasCapacity(loc, 1000)
+		hasMCR := mcrLocationHasCapacity(loc, 2500)
+		if hasPort {
+			portCount++
 		}
-		t.Logf("%-6d %-8s %s", loc.ID, loc.Status, loc.Name)
+		if hasMCR {
+			mcrCount++
+		}
+		if hasPort && hasMCR {
+			bothCount++
+		}
 	}
+	t.Logf("Locations with 1000 Mbps port: %d, 2500 Mbps MCR: %d, both: %d", portCount, mcrCount, bothCount)
 	t.Skip("diagnostic complete")
 }
 
@@ -1019,15 +1026,22 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		t.Skipf("no client: %v", err)
 	}
 
+	// isLive returns true for resources that are not yet decommissioned.
+	isLive := func(status string) bool {
+		return !strings.EqualFold(status, "DECOMMISSIONED")
+	}
+
 	// VXCs first — must be deleted before their A/B-end resources
+	var vxcLive int
 	vxcs, err := client.VXCService.ListVXCs(ctx, &megaport.ListVXCsRequest{})
 	if err != nil {
 		t.Logf("WARN: could not list VXCs: %v", err)
 	}
 	for _, vxc := range vxcs {
-		if !strings.HasPrefix(vxc.Name, prefix) {
+		if !strings.HasPrefix(vxc.Name, prefix) || !isLive(vxc.ProvisioningStatus) {
 			continue
 		}
+		vxcLive++
 		t.Logf("VXC  %s (%s) status=%s", vxc.Name, vxc.UID, vxc.ProvisioningStatus)
 		if *cleanupDelete {
 			if delErr := client.VXCService.DeleteVXC(ctx, vxc.UID, &megaport.DeleteVXCRequest{DeleteNow: true}); delErr != nil {
@@ -1039,14 +1053,16 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	}
 
 	// MVEs
+	var mveLive int
 	mves, err := client.MVEService.ListMVEs(ctx, &megaport.ListMVEsRequest{})
 	if err != nil {
 		t.Logf("WARN: could not list MVEs: %v", err)
 	}
 	for _, mve := range mves {
-		if !strings.HasPrefix(mve.Name, prefix) {
+		if !strings.HasPrefix(mve.Name, prefix) || !isLive(mve.ProvisioningStatus) {
 			continue
 		}
+		mveLive++
 		t.Logf("MVE  %s (%s) status=%s", mve.Name, mve.UID, mve.ProvisioningStatus)
 		if *cleanupDelete {
 			if _, delErr := client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{MVEID: mve.UID}); delErr != nil {
@@ -1058,14 +1074,16 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	}
 
 	// MCRs
+	var mcrLive int
 	mcrs, err := client.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{})
 	if err != nil {
 		t.Logf("WARN: could not list MCRs: %v", err)
 	}
 	for _, mcr := range mcrs {
-		if !strings.HasPrefix(mcr.Name, prefix) {
+		if !strings.HasPrefix(mcr.Name, prefix) || !isLive(mcr.ProvisioningStatus) {
 			continue
 		}
+		mcrLive++
 		t.Logf("MCR  %s (%s) status=%s", mcr.Name, mcr.UID, mcr.ProvisioningStatus)
 		if *cleanupDelete {
 			if _, delErr := client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{MCRID: mcr.UID, DeleteNow: true}); delErr != nil {
@@ -1077,14 +1095,16 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	}
 
 	// Ports (last — must come after VXCs that connect to them)
+	var portLive int
 	ports, err := client.PortService.ListPorts(ctx)
 	if err != nil {
 		t.Logf("WARN: could not list ports: %v", err)
 	}
 	for _, port := range ports {
-		if !strings.HasPrefix(port.Name, prefix) {
+		if !strings.HasPrefix(port.Name, prefix) || !isLive(port.ProvisioningStatus) {
 			continue
 		}
+		portLive++
 		t.Logf("Port %s (%s) status=%s", port.Name, port.UID, port.ProvisioningStatus)
 		if *cleanupDelete {
 			if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true}); delErr != nil {
@@ -1095,5 +1115,6 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		}
 	}
 
+	t.Logf("orphaned test resources (live): %d VXC, %d MVE, %d MCR, %d Port", vxcLive, mveLive, mcrLive, portLive)
 	t.Skip("cleanup scan complete")
 }
