@@ -9,6 +9,7 @@ import (
 
 func TestDynamicLocation(t *testing.T) {
 	t.Parallel()
+	defer acquireAccTestSlot(t)()
 	locID := findAnyActiveLocationID(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

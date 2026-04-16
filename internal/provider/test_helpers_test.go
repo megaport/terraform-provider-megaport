@@ -534,24 +534,33 @@ func findVXCPortAndMCRTestLocations(t *testing.T, count int, mcrSpeedMbps int) [
 		t.Skipf("skipping: could not list locations: %v", err)
 		return nil
 	}
-	portClaimedMu.Lock()
-	defer portClaimedMu.Unlock()
 	var ids []int
 	for _, loc := range locations {
 		if len(ids) >= count {
 			break
 		}
-		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && mcrLocationHasCapacity(loc, mcrSpeedMbps) && !portClaimedLocations[loc.ID] {
+		if !strings.EqualFold(loc.Status, "active") || !portLocationHasCapacity(loc, 1000) || !mcrLocationHasCapacity(loc, mcrSpeedMbps) {
+			continue
+		}
+		portClaimedMu.Lock()
+		mcrClaimedMu.Lock()
+		if !portClaimedLocations[loc.ID] && !mcrClaimedLocations[loc.ID] {
 			portClaimedLocations[loc.ID] = true
+			mcrClaimedLocations[loc.ID] = true
 			locID := loc.ID
 			t.Cleanup(func() {
 				portClaimedMu.Lock()
-				defer portClaimedMu.Unlock()
+				mcrClaimedMu.Lock()
 				delete(portClaimedLocations, locID)
+				delete(mcrClaimedLocations, locID)
+				mcrClaimedMu.Unlock()
+				portClaimedMu.Unlock()
 			})
 			t.Logf("findVXCPortAndMCRTestLocations: claimed location %d (%s)", loc.ID, loc.Name)
 			ids = append(ids, loc.ID)
 		}
+		mcrClaimedMu.Unlock()
+		portClaimedMu.Unlock()
 	}
 	if len(ids) < count {
 		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port + %d Mbps MCR capacity", len(ids), count, mcrSpeedMbps)
