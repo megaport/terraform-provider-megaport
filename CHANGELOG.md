@@ -355,6 +355,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v1.2.6] — 2024-12-12
 
+- chore(deps): bump golang.org/x/crypto from 0.21.0 to 0.31.0
 - fix: add missing ibm partner config in update calls
 - fix: csp connections model
 - fix: add support for ibm in update partner config for vxc
@@ -460,6 +461,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### [v1.1.6] — 2024-09-04
 
 
+
 ### [v1.1.5] — 2024-09-04
 
 - fix: prevent partner port from failing if more than one partner port
@@ -494,46 +496,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: bump go version to v1.0.15
 - Update issue templates to add feature request
 - Update issue templates
-- fix: removes planmodifier for requested_product_uid temporarily
-- fix: remove comments for mve tests
-- fix: make both innerVLANs useStateForUnknown, add inner_vlan to acceptance tests in basic vxc test, move test suites to top of file in vxc and mve
-- fix: import_whitelist naming typo
-- fix: import_whitelist and templating with docs
-- fix: provider docs
-- fix: fix issue with ordered_vlan and updates for VXC end configuration, add documentation
-- fix: provider template file
-- fix: templating for terraform docs
-- fix: adds a PlanModifier to VXCs to handle unexpected deletion when connected product is deleted
-- fix: additional documentation
-- fix: link in provider readme
-- deps: bumps to new megaportgo with port dz issue fixed
-- fix: diversity_zone now requires replacement
-- fix: update move vxc to move from mcr to mcr in the a-end while keeping aws vif on b-end
-- docs: additional examples
-
-### [v1.1.0-beta2] — 2024-07-22
-
-- fix: azure tests pass with added port_choice attribute
-- fix: add terraform to code blocks
-- fix: change naming to endpoint
-- fix: updates more attributes to UseStateForUnknown()
-- fix: rename title of moving vxc end configurations
-- feat: moving vxc docs
-- docs: regenerates azure examples
-- fix: updates examples to include primary/secondary
-- docs: regenerates
-- feat: adds option to select azure primary or secondary when building VXC
-- fix: add testing for diversity zone in single port test
-- fix: swapping between files
-- feat: vrouter vxc docs
-- feat: guides folder, test generation of guide md file
-- fix: remove null check for asn
-- fix: mcr asn assignment for availability on import
-- docs: regenerates for vrouter_config updates
-- fix: updates vrouter_config to be optional
-
-### [v1.1.0-beta] — 2024-07-18
-
 
 ### [v1.1.0] — 2024-07-26
 
@@ -584,10 +546,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: bring back a-end partner config as deprecated
 - fix: change partner-end-config to vrouter-config, add support for vrouter config to b-end, add support for as_path_prepend_count to bgp config
 - adds: .envrc
-- fix: adds checks to see if the product has been deleted in the API so it can be recreated
-
-### [v1.0.2-beta] — 2024-07-11
-
 - fix: bump go version
 - fix: bump megaportgo version
 - fix: remove b-end inner vlan for AWS vxc test
@@ -602,67 +560,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: improves readme and adds CLA
 - docs: regenerates for service_key update
 - fix: updates service_key to be sensitive, closes #28
-- fix: go module update
-- fix: acceptance test and mve resources
-- fix: keep cost centre same in first three tests, but change only in fourth test
-- fix: add check for innerVLAN after update
-- fix: support changing innerVLAN in update
-- fix: vxc term update works and code cleanup
-- fix: import state verify ignore mve resources, can be updated by api
-- fix: remove computed, state for unknown on prefix filter lists
-- fix: mcr test coverage, account for empty list for prefix filter lists value
-- fix: go version
-- fix: go version
-- fix: go version
-- fix: go version update
-- fix: go mod update
-- fix: mcr configs and move some locations around in full ecosystem
-- fix: remove an unnecessary newline
-- fix: aws VXC partner config name field
-- fix: update csp connections field description
-- fix: schema description tweaks
-- fix: transit vxc support
-- fix: full ecosystem vxc example
-- fix: docs
-- fix: support cost centre in MVE, make vnics and vendor config require replace, add update/import mve acceptance tests
-- feat: support update and delete mcr prefix filter list, add test coverage for update/delete in mcr acceptance test
-- fix: generate docs
-- fix: update tests, fix conditional logic for checking prefix filter list entries
-- fix: have mcr reads run concurrently, fix tests
-- fix: update parsing of prefix filter list
-- fix: mcr list endpoint rename
-- fix: import typo
-- fix: imports
-- fix: make location details fully computed in mve
-- fix: mve docs
-- fix: more docs
-- fix: vxc computed fields
-- fix: mcr computed fields
-- fix: lag port computed
-- fix: single port computed vs optional
-- fix: make cancelable computed
-- fix: locationId
-- fix: contract term months
-- fix: mcr docs
-- fix: more docs
-- fix: update docs
-- docs: more examples
-- docs: more docs
-- fix: remove test preCheck
-- fix: bump go version
-- fix: dont run all csp vxc tests in parallel because megaport api gets mad
-- feat: refactor tests to testify and run all tests in parallel to save time
-
-### [v1.0.1-rc2] — 2024-06-17
-
-- fix: version bump and docs
-- docs: regenerates
-- fix: environment variables for provider are now respected, fixes #84
-- fix: add check for prefix filter lists in import, but not entries that are only available on creation
-- fix: add support for cost centre on VXC buy request
-
-### [v1.0.1-rc1] — 2024-06-14
-
+- fix: adds checks to see if the product has been deleted in the API so it can be recreated
 
 ### [v1.0.1] — 2024-06-25
 
@@ -714,6 +612,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: more docs
 - fix: remove test preCheck
 - fix: bump go version
+- chore(deps): bump golang.org/x/net from 0.21.0 to 0.23.0
 - fix: version bump and docs
 - docs: regenerates
 - fix: environment variables for provider are now respected, fixes #84
@@ -768,40 +667,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ci: adds integration testing back to action
 - fix: dont run all csp vxc tests in parallel because megaport api gets mad
 - feat: refactor tests to testify and run all tests in parallel to save time
-- fix: improves VXC error messages
-- fix: move lag port tests and examples down to single lagCount, update docs
-- fix: add full ecosystem tests, update lag port resource to support lagCount of 1
-- fix: update go module
-- fix: test full ecosystem
-
-### [v1.0.0-rc2] — 2024-05-30
-
-- fix: update go module
-- fix: tf files
-- fix: add diversity zone support to mcr, add location details to products, fix vxc update, fix tests
-- fix: add diversity zone to mcr
-
-### [v1.0.0-rc1] — 2024-05-28
-
-- fix: adds error check to ModifyPort call
-- fix: add requested_product_uid and current_product_uid to vxc, update tests and docs
-- fix: marketplace visibility for mcr test
-- fix: name of product uid for data.megaport_partner.aws_port.product_uid
-- cleanup: rename plan to state in update mcr, remove ordered_product_uid from end configs in vxc, remove port_uid from vxc --- note that the megaport API will break provider on aws vxcs because it sometimes will change the product uid after the user has specified one
-- fix: handle error for modify port
-- fix: remove marketplace visibility from buy call
-- cleanup: uncomment tests
-- fix: remove requiresReplaceIf
-- cleanup: update dependencies
-- fix: update examplesd
-- fix: schema updates
-- fix: marketplace visibility for port and mcr
-- fix: vxc update, cost centre in products/mcr/ports, update marketplace_visibility, fix modifying port bug, make market computed across provider in all resources
-- feat: adds user-agent header with useful client info
-- fix: terraform lock cleanup and examples
-
-### [v1.0.0-beta1] — 2024-05-14
-
 
 ### [v1.0.0] — 2024-06-03
 
