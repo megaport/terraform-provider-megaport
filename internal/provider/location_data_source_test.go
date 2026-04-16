@@ -12,9 +12,6 @@ const (
 	MCRTestLocationID        = 65
 	MVETestLocationID        = 65
 	SinglePortTestLocationID = 5
-	VXCLocationIDOne         = 4
-	VXCLocationIDTwo         = 3
-	VXCLocationIDThree       = 23
 )
 
 func TestLagPortLocation(t *testing.T) {
@@ -89,54 +86,18 @@ func TestSinglePortLocation(t *testing.T) {
 	})
 }
 
-func TestVXCLocationOne(t *testing.T) {
+func TestDynamicLocation(t *testing.T) {
 	t.Parallel()
+	locs := findVXCPortTestLocations(t, 1)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Search by VXC ID
 			{
 				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-								id = "%d"
-							}`, VXCLocationIDOne),
+					id = "%d"
+				}`, locs[0]),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDOne)),
-				),
-			},
-		},
-	})
-}
-
-func TestVXCLocationTwo(t *testing.T) {
-	t.Parallel()
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Search by VXC ID
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-								id = "%d"
-							}`, VXCLocationIDTwo),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDTwo)),
-				),
-			},
-		},
-	})
-}
-
-func TestVXCLocationThree(t *testing.T) {
-	t.Parallel()
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Search by VXC ID
-			{
-				Config: providerConfig + fmt.Sprintf(`data "megaport_location" "test_location" {
-								id = "%d"
-							}`, VXCLocationIDThree),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", VXCLocationIDThree)),
+					resource.TestCheckResourceAttr("data.megaport_location.test_location", "id", fmt.Sprintf("%d", locs[0])),
 				),
 			},
 		},
