@@ -109,6 +109,19 @@ func TestReadIXs_GetByUIDError(t *testing.T) {
 	assert.Contains(t, err.Error(), "IX not found")
 }
 
+func TestReadIXs_GetByUIDReturnsNil(t *testing.T) {
+	mockIXService := &MockIXService{
+		GetIXResult: nil,
+		GetIXErr:    nil,
+	}
+	mockClient := &megaport.Client{IXService: mockIXService}
+	ds := &ixsDataSource{client: mockClient}
+
+	ix, err := ds.client.IXService.GetIX(context.Background(), "ix-nonexistent")
+	assert.NoError(t, err)
+	assert.Nil(t, ix)
+}
+
 func TestFromAPIIXDetail(t *testing.T) {
 	t.Run("Maps all fields correctly", func(t *testing.T) {
 		ix := &megaport.IX{
@@ -129,7 +142,8 @@ func TestFromAPIIXDetail(t *testing.T) {
 			},
 		}
 
-		detail := fromAPIIXDetail(ix)
+		detail, diags := fromAPIIXDetail(ix)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "ix-abc-123", detail.UID.ValueString())
 		assert.Equal(t, "My Test IX", detail.Name.ValueString())
@@ -152,7 +166,8 @@ func TestFromAPIIXDetail(t *testing.T) {
 			DeployDate: nil,
 		}
 
-		detail := fromAPIIXDetail(ix)
+		detail, diags := fromAPIIXDetail(ix)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "", detail.CreateDate.ValueString())
 		assert.Equal(t, "", detail.DeployDate.ValueString())
@@ -164,7 +179,8 @@ func TestFromAPIIXDetail(t *testing.T) {
 			AttributeTags: nil,
 		}
 
-		detail := fromAPIIXDetail(ix)
+		detail, diags := fromAPIIXDetail(ix)
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.AttributeTags.IsNull())
 	})
