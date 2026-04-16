@@ -17,7 +17,7 @@ Looks up ports in the Megaport API. Optionally filter by product_uid to retrieve
 
 ### Optional
 
-- `include_resource_tags` (Boolean) Whether to fetch resource tags for each port. Defaults to false. Enabling this causes an additional API call per port, which may be slow for accounts with many ports.
+- `include_resource_tags` (Boolean) Whether to fetch resource tags for each port. Enabling this causes an additional API call per port, which may be slow for accounts with many ports.
 - `product_uid` (String) The unique identifier of a specific port to look up. If not provided, all ports are returned.
 
 ### Read-Only
@@ -50,7 +50,7 @@ Read-Only:
 - `product_name` (String) The name of the port.
 - `product_uid` (String) The unique identifier of the port.
 - `provisioning_status` (String) The provisioning status of the port.
-- `resource_tags` (Map of String) The resource tags associated with the port.
+- `resource_tags` (Map of String) The resource tags associated with the port. Only populated when include_resource_tags is set to true.
 - `secondary_name` (String) The secondary name of the port.
 - `terminate_date` (String) The date the port will be terminated.
 - `vxc_auto_approval` (Boolean) Whether VXC connections are auto-approved on this port.
