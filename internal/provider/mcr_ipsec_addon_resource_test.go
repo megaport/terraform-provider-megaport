@@ -48,10 +48,9 @@ func (suite *MCRIpsecAddonProviderTestSuite) TestAccMegaportMCRIpsecAddon_Basic(
 			},
 			// Import
 			{
-				ResourceName:                         "megaport_mcr_ipsec_addon.test",
-				ImportState:                          true,
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "add_on_uid",
+				ResourceName:      "megaport_mcr_ipsec_addon.test",
+				ImportState:       true,
+				ImportStateVerify: true,
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
 					rs, ok := s.RootModule().Resources["megaport_mcr_ipsec_addon.test"]
 					if !ok {
