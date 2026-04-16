@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -56,7 +57,7 @@ type natGatewayResourceModel struct {
 }
 
 // fromAPINATGateway maps the API NAT Gateway response to the resource schema.
-func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
+func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) diag.Diagnostics {
 	m.ProductUID = types.StringValue(gw.ProductUID)
 	m.ProductName = types.StringValue(gw.ProductName)
 	m.CreateDate = types.StringValue(gw.CreateDate)
@@ -82,19 +83,17 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 	m.BGPShutdownDefault = types.BoolValue(gw.Config.BGPShutdownDefault)
 
 	// Resource tags
+	var diags diag.Diagnostics
 	if len(gw.ResourceTags) > 0 {
 		tagMap := make(map[string]attr.Value, len(gw.ResourceTags))
 		for _, tag := range gw.ResourceTags {
 			tagMap[tag.Key] = types.StringValue(tag.Value)
 		}
-		var diags diag.Diagnostics
 		m.ResourceTags, diags = types.MapValue(types.StringType, tagMap)
-		if diags.HasError() {
-			m.ResourceTags = types.MapNull(types.StringType)
-		}
 	} else {
 		m.ResourceTags = types.MapNull(types.StringType)
 	}
+	return diags
 }
 
 // toResourceTagSlice converts a Terraform map of tags to a slice of ResourceTag for the SDK.
@@ -323,7 +322,8 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 		})
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
-		timeout := time.After(waitForTime)
+		timer := time.NewTimer(waitForTime)
+		defer timer.Stop()
 		provisioned := false
 		for !provisioned {
 			select {
@@ -333,10 +333,10 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 					"Context cancelled while waiting for NAT Gateway "+createdUID+" to provision.",
 				)
 				return
-			case <-timeout:
+			case <-timer.C:
 				resp.Diagnostics.AddError(
 					"NAT Gateway provisioning timed out",
-					fmt.Sprintf("NAT Gateway %s did not leave NEW status within %s.", createdUID, waitForTime),
+					fmt.Sprintf("NAT Gateway %s did not reach CONFIGURED/LIVE status within %s.", createdUID, waitForTime),
 				)
 				return
 			case <-ticker.C:
@@ -348,8 +348,14 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 					)
 					return
 				}
-				if gw.ProvisioningStatus != "NEW" {
+				if slices.Contains(megaport.SERVICE_STATE_READY, gw.ProvisioningStatus) {
 					provisioned = true
+				} else if gw.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || gw.ProvisioningStatus == megaport.STATUS_CANCELLED {
+					resp.Diagnostics.AddError(
+						"NAT Gateway provisioning failed",
+						fmt.Sprintf("NAT Gateway %s reached terminal state %s.", createdUID, gw.ProvisioningStatus),
+					)
+					return
 				}
 			}
 		}
@@ -365,7 +371,10 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	plan.fromAPINATGateway(gw)
+	resp.Diagnostics.Append(plan.fromAPINATGateway(gw)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags = resp.State.Set(ctx, plan)
@@ -407,7 +416,10 @@ func (r *natGatewayResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	state.fromAPINATGateway(gw)
+	resp.Diagnostics.Append(state.fromAPINATGateway(gw)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -486,7 +498,10 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	plan.fromAPINATGateway(gw)
+	resp.Diagnostics.Append(plan.fromAPINATGateway(gw)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags := resp.State.Set(ctx, plan)
