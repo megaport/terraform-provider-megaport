@@ -244,6 +244,9 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 }
 
 // fromAPIIXDetail maps an API IX to an ixDetailModel.
+// This intentionally maps a subset of fields (no resources, promo_code,
+// public_graph, etc.) compared to ixResourceModel.fromAPI, since the data
+// source schema exposes fewer attributes than the resource.
 func fromAPIIXDetail(ix *megaport.IX) (ixDetailModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
