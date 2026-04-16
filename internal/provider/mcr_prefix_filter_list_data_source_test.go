@@ -10,7 +10,7 @@ import (
 func TestAccMegaportMCRPrefixFilterListDataSource_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()

@@ -12,7 +12,7 @@ import (
 func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -334,7 +334,7 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -409,7 +409,7 @@ func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterNameIPv4 := RandomTestName()
 	prefixFilterNameIPv6 := RandomTestName()
@@ -654,7 +654,7 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_CIDRValidation(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -708,7 +708,7 @@ func TestAccMegaportMCRPrefixFilterList_CIDRValidation(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -811,7 +811,7 @@ func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -971,7 +971,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()

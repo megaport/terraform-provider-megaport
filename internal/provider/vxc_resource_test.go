@@ -2954,7 +2954,7 @@ func TestAccMegaportSafeDelete(t *testing.T) {
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortTestLocations(t, 1)
 	mveLocationID, _ := findMVETestLocationBlueZone(t)
-	mcrLocationID, _ := findMCRTestLocation(t, 2500)
+	mcrLocationID, _ := findMCRTestLocation(t, 1000)
 	portName := RandomTestName()
 	mcrName := RandomTestName()
 	mveName := RandomTestName()

@@ -28,6 +28,9 @@ var accTestSemaphore = make(chan struct{}, maxConcurrentAccTests)
 // Returns a release function that must be deferred.
 func acquireAccTestSlot(t *testing.T) func() {
 	t.Helper()
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test helper requires TF_ACC to be set")
+	}
 	accTestSemaphore <- struct{}{}
 	return func() { <-accTestSemaphore }
 }

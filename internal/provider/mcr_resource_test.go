@@ -14,7 +14,7 @@ import (
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -358,7 +358,7 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 func TestAccMegaportMCR_CostCentreRemoval(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 	resource.Test(t, resource.TestCase{
@@ -403,7 +403,7 @@ func TestAccMegaportMCR_CostCentreRemoval(t *testing.T) {
 func TestAccMegaportMCR_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -446,7 +446,7 @@ func TestAccMegaportMCR_ContractTermUpdate(t *testing.T) {
 func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 2500)
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreName := RandomTestName()
