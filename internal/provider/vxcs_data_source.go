@@ -360,12 +360,12 @@ func fromAPIVXCDetail(v *megaport.VXC, tags map[string]string) vxcDetailModel {
 		Locked:             types.BoolValue(v.Locked),
 		AdminLocked:        types.BoolValue(v.AdminLocked),
 		Cancelable:         types.BoolValue(v.Cancelable),
-		AEndUID:        types.StringValue(v.AEndConfiguration.UID),
-		AEndName:       types.StringValue(v.AEndConfiguration.Name),
-		AEndLocationID: types.Int64Value(int64(v.AEndConfiguration.LocationID)),
-		BEndUID:        types.StringValue(v.BEndConfiguration.UID),
-		BEndName:       types.StringValue(v.BEndConfiguration.Name),
-		BEndLocationID: types.Int64Value(int64(v.BEndConfiguration.LocationID)),
+		AEndUID:            types.StringValue(v.AEndConfiguration.UID),
+		AEndName:           types.StringValue(v.AEndConfiguration.Name),
+		AEndLocationID:     types.Int64Value(int64(v.AEndConfiguration.LocationID)),
+		BEndUID:            types.StringValue(v.BEndConfiguration.UID),
+		BEndName:           types.StringValue(v.BEndConfiguration.Name),
+		BEndLocationID:     types.Int64Value(int64(v.BEndConfiguration.LocationID)),
 	}
 
 	// VLAN 0 means unset — map to null to stay consistent with the VXC resource
