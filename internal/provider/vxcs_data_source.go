@@ -55,8 +55,9 @@ type vxcsDataSource struct {
 
 // vxcsModel maps the data source schema data.
 type vxcsModel struct {
-	ProductUID types.String `tfsdk:"product_uid"`
-	VXCs       types.List   `tfsdk:"vxcs"`
+	ProductUID          types.String `tfsdk:"product_uid"`
+	IncludeResourceTags types.Bool   `tfsdk:"include_resource_tags"`
+	VXCs                types.List   `tfsdk:"vxcs"`
 }
 
 // vxcDetailModel maps individual VXC detail attributes.
@@ -110,6 +111,10 @@ func (d *vxcsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"product_uid": schema.StringAttribute{
 				Optional:    true,
 				Description: "The unique identifier of a specific VXC to look up. If not provided, all active VXCs are returned.",
+			},
+			"include_resource_tags": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Whether to fetch resource tags for each VXC. Defaults to false. Enabling this causes an additional API call per VXC, which may be slow for accounts with many VXCs.",
 			},
 			"vxcs": schema.ListNestedAttribute{
 				Description: "List of VXCs with detailed information.",
@@ -297,17 +302,24 @@ func (d *vxcsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		}
 	}
 
+	// Determine whether to fetch resource tags (opt-in to avoid N+1 API calls)
+	fetchTags := !data.IncludeResourceTags.IsNull() && data.IncludeResourceTags.ValueBool()
+
 	// Build detail objects
 	vxcObjects := make([]types.Object, 0, len(vxcs))
 
 	for _, vxc := range vxcs {
-		tags, err := d.client.VXCService.ListVXCResourceTags(ctx, vxc.UID)
-		if err != nil {
-			resp.Diagnostics.AddWarning(
-				"Error fetching VXC tags",
-				fmt.Sprintf("Unable to fetch resource tags for VXC %s: %v", vxc.UID, err),
-			)
-			tags = map[string]string{}
+		var tags map[string]string
+		if fetchTags {
+			var err error
+			tags, err = d.client.VXCService.ListVXCResourceTags(ctx, vxc.UID)
+			if err != nil {
+				resp.Diagnostics.AddWarning(
+					"Error fetching VXC tags",
+					fmt.Sprintf("Unable to fetch resource tags for VXC %s: %v", vxc.UID, err),
+				)
+				tags = map[string]string{}
+			}
 		}
 
 		detail := fromAPIVXCDetail(vxc, tags)
