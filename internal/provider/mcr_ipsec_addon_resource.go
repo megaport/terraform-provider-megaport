@@ -300,6 +300,19 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 			"Error deleting MCR IPSec add-on",
 			fmt.Sprintf("Could not delete IPSec add-on %s for MCR %s: %s", addOnUID, mcrID, err.Error()),
 		)
+		return
+	}
+
+	// Wait for the MCR to return to a ready state so follow-on operations
+	// (e.g., deleting the MCR itself in the same destroy) don't race.
+	if err := r.waitForMCRReady(ctx, mcrID); err != nil {
+		if isMCRNotFoundError(err) {
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error waiting for MCR after deleting IPSec add-on",
+			fmt.Sprintf("IPSec add-on %s was disabled for MCR %s, but the MCR did not return to a ready state: %s", addOnUID, mcrID, err.Error()),
+		)
 	}
 }
 
@@ -356,7 +369,16 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 func (r *mcrIpsecAddonResource) waitForMCRReady(ctx context.Context, mcrID string) error {
 	toWait := waitForTime
 	if toWait == 0 {
-		toWait = 5 * time.Minute
+		toWait = 10 * time.Minute
+	}
+
+	// Check immediately before entering the poll loop.
+	mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
+	if err != nil {
+		return fmt.Errorf("error polling MCR %s: %w", mcrID, err)
+	}
+	if slices.Contains(megaport.SERVICE_STATE_READY, mcr.ProvisioningStatus) {
+		return nil
 	}
 
 	ticker := time.NewTicker(30 * time.Second)
