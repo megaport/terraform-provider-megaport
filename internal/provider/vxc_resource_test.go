@@ -951,7 +951,7 @@ func TestAccMegaportVXC_BasicUntagVLAN(t *testing.T) {
 func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
 	azure := pickAzureServiceKey(t)
 	gcp := pickGCPPairingKey(t)
 	mcrLocationID, _ := findMCRTestLocation(t, 5000)
@@ -1124,7 +1124,9 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 2)
+	mcrLocID, _ := findMCRTestLocation(t, 5000)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
+	locs := []int{mcrLocID, awsLocs[0]}
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
@@ -1693,7 +1695,7 @@ func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 func TestFullEcosystem(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 3)
+	locs := findVXCPortTestLocationsWithPartner(t, 3, "AWS")
 	azure := pickAzureServiceKey(t)
 	gcp := pickGCPPairingKey(t)
 	portName := RandomTestName()
@@ -2024,7 +2026,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 2)
+	locs := findVXCPortTestLocationsWithPartner(t, 2, "TRANSIT")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -2135,7 +2137,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 func TestMVE_TransitVXCAWS(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 2)
+	locs := findVXCPortTestLocationsWithPartner(t, 2, "AWS")
 	portName := RandomTestName()
 	portCostCentreName := RandomTestName()
 	portCostCentreNameNew := RandomTestName()
@@ -2502,7 +2504,7 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 func TestMVE_AWS_VXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 2)
+	locs := findVXCPortTestLocationsWithPartner(t, 2, "AWS")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()

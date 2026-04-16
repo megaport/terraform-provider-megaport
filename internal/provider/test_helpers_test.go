@@ -443,6 +443,8 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 // support Megaport ports at 1000 Mbps. Uses the same portClaimedLocations
 // mechanism as findPortTestLocation so parallel tests don't collide.
 // Calls t.Skip if not enough locations are found.
+//
+//nolint:unparam // count is 1 today but callers may vary it
 func findVXCPortTestLocations(t *testing.T, count int) []int {
 	t.Helper()
 	ctx := context.Background()
@@ -471,6 +473,59 @@ func findVXCPortTestLocations(t *testing.T, count int) []int {
 	}
 	if len(ids) < count {
 		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port capacity", len(ids), count)
+		return nil
+	}
+	return ids
+}
+
+// findVXCPortTestLocationsWithPartner is like findVXCPortTestLocations but also
+// requires that the returned locations have at least one partner port of the
+// given connect type (e.g. "AWS", "TRANSIT"). Use this for tests whose HCL
+// includes a megaport_partner data source filtered by location.
+func findVXCPortTestLocationsWithPartner(t *testing.T, count int, connectType string) []int {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return nil
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return nil
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return nil
+	}
+	partnerLocs := map[int]bool{}
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) && pp.VXCPermitted {
+			partnerLocs[pp.LocationId] = true
+		}
+	}
+	portClaimedMu.Lock()
+	defer portClaimedMu.Unlock()
+	var ids []int
+	for _, loc := range locations {
+		if len(ids) >= count {
+			break
+		}
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && partnerLocs[loc.ID] && !portClaimedLocations[loc.ID] {
+			portClaimedLocations[loc.ID] = true
+			t.Cleanup(func() {
+				portClaimedMu.Lock()
+				defer portClaimedMu.Unlock()
+				delete(portClaimedLocations, loc.ID)
+			})
+			t.Logf("findVXCPortTestLocationsWithPartner(%s): claimed location %d (%s)", connectType, loc.ID, loc.Name)
+			ids = append(ids, loc.ID)
+		}
+	}
+	if len(ids) < count {
+		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port capacity and %s partner ports", len(ids), count, connectType)
 		return nil
 	}
 	return ids
