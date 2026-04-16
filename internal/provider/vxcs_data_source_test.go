@@ -252,6 +252,64 @@ func TestFromAPIVXCDetail(t *testing.T) {
 	})
 }
 
+func TestFromAPIVXCDetail_ResourceTagsOptIn(t *testing.T) {
+	t.Run("Tags nil when not fetched", func(t *testing.T) {
+		vxc := &megaport.VXC{UID: "vxc-1"}
+		detail := fromAPIVXCDetail(vxc, nil)
+		assert.True(t, detail.ResourceTags.IsNull())
+	})
+
+	t.Run("Tags populated when fetched", func(t *testing.T) {
+		vxc := &megaport.VXC{UID: "vxc-1"}
+		tags := map[string]string{"env": "prod"}
+		detail := fromAPIVXCDetail(vxc, tags)
+		assert.False(t, detail.ResourceTags.IsNull())
+	})
+}
+
+func TestReadVXCs_TagsNotFetchedByDefault(t *testing.T) {
+	tagsCalled := false
+	mockVXCService := &MockVXCService{
+		ListVXCsResult: []*megaport.VXC{
+			{UID: "vxc-1", Name: "VXC One"},
+		},
+		ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+			tagsCalled = true
+			return map[string]string{"env": "test"}, nil
+		},
+	}
+	mockClient := &megaport.Client{VXCService: mockVXCService}
+
+	// Simulate Read path: tags should not be fetched when fetchTags is false
+	vxcs, err := mockClient.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
+	assert.NoError(t, err)
+	assert.Len(t, vxcs, 1)
+
+	// fetchTags = false path: do not call ListVXCResourceTags
+	fetchTags := false
+	for _, vxc := range vxcs {
+		var tags map[string]string
+		if fetchTags {
+			tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
+		}
+		detail := fromAPIVXCDetail(vxc, tags)
+		assert.True(t, detail.ResourceTags.IsNull())
+	}
+	assert.False(t, tagsCalled, "ListVXCResourceTags should not be called when include_resource_tags is false")
+
+	// fetchTags = true path: call ListVXCResourceTags
+	fetchTags = true
+	for _, vxc := range vxcs {
+		var tags map[string]string
+		if fetchTags {
+			tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
+		}
+		detail := fromAPIVXCDetail(vxc, tags)
+		assert.False(t, detail.ResourceTags.IsNull())
+	}
+	assert.True(t, tagsCalled, "ListVXCResourceTags should be called when include_resource_tags is true")
+}
+
 // Ensure vxcsModel compiles with the schema.
 func TestVXCsModel_Structure(t *testing.T) {
 	model := vxcsModel{
