@@ -285,46 +285,73 @@ func TestFromAPIVXCDetail_ResourceTagsOptIn(t *testing.T) {
 }
 
 func TestReadVXCs_TagsNotFetchedByDefault(t *testing.T) {
-	tagsCalled := false
-	mockVXCService := &MockVXCService{
-		ListVXCsResult: []*megaport.VXC{
-			{UID: "vxc-1", Name: "VXC One"},
+	// This test exercises the same tag-fetching logic as vxcsDataSource.Read
+	// (line 307): fetchTags is only true when IncludeResourceTags is non-null,
+	// non-unknown, and true.
+	tests := []struct {
+		name                string
+		includeTagsValue    types.Bool
+		expectTagsCalled    bool
+		expectTagsPopulated bool
+	}{
+		{
+			name:                "null (default) — tags not fetched",
+			includeTagsValue:    types.BoolNull(),
+			expectTagsCalled:    false,
+			expectTagsPopulated: false,
 		},
-		ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
-			tagsCalled = true
-			return map[string]string{"env": "test"}, nil
+		{
+			name:                "false — tags not fetched",
+			includeTagsValue:    types.BoolValue(false),
+			expectTagsCalled:    false,
+			expectTagsPopulated: false,
+		},
+		{
+			name:                "true — tags fetched",
+			includeTagsValue:    types.BoolValue(true),
+			expectTagsCalled:    true,
+			expectTagsPopulated: true,
 		},
 	}
-	mockClient := &megaport.Client{VXCService: mockVXCService}
 
-	// Simulate Read path: tags should not be fetched when fetchTags is false
-	vxcs, err := mockClient.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
-	assert.NoError(t, err)
-	assert.Len(t, vxcs, 1)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tagsCalled := false
+			mockVXCService := &MockVXCService{
+				ListVXCsResult: []*megaport.VXC{
+					{UID: "vxc-1", Name: "VXC One"},
+				},
+				ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+					tagsCalled = true
+					return map[string]string{"env": "test"}, nil
+				},
+			}
+			mockClient := &megaport.Client{VXCService: mockVXCService}
 
-	// fetchTags = false path: do not call ListVXCResourceTags
-	fetchTags := false
-	for _, vxc := range vxcs {
-		var tags map[string]string
-		if fetchTags {
-			tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
-		}
-		detail := fromAPIVXCDetail(vxc, tags)
-		assert.True(t, detail.ResourceTags.IsNull())
+			// Replicate the Read logic from vxcsDataSource.Read
+			data := vxcsModel{
+				IncludeResourceTags: tc.includeTagsValue,
+			}
+			fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
+
+			vxcs, err := mockClient.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
+			assert.NoError(t, err)
+
+			for _, vxc := range vxcs {
+				var tags map[string]string
+				if fetchTags {
+					tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
+				}
+				detail := fromAPIVXCDetail(vxc, tags)
+				if tc.expectTagsPopulated {
+					assert.False(t, detail.ResourceTags.IsNull(), "resource_tags should be populated")
+				} else {
+					assert.True(t, detail.ResourceTags.IsNull(), "resource_tags should be null")
+				}
+			}
+			assert.Equal(t, tc.expectTagsCalled, tagsCalled, "ListVXCResourceTags call mismatch")
+		})
 	}
-	assert.False(t, tagsCalled, "ListVXCResourceTags should not be called when include_resource_tags is false")
-
-	// fetchTags = true path: call ListVXCResourceTags
-	fetchTags = true
-	for _, vxc := range vxcs {
-		var tags map[string]string
-		if fetchTags {
-			tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
-		}
-		detail := fromAPIVXCDetail(vxc, tags)
-		assert.False(t, detail.ResourceTags.IsNull())
-	}
-	assert.True(t, tagsCalled, "ListVXCResourceTags should be called when include_resource_tags is true")
 }
 
 // Ensure vxcsModel compiles with the schema.
