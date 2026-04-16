@@ -304,7 +304,7 @@ func (d *vxcsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	// Determine whether to fetch resource tags (opt-in to avoid N+1 API calls)
-	fetchTags := !data.IncludeResourceTags.IsNull() && data.IncludeResourceTags.ValueBool()
+	fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
 
 	// Build detail objects
 	vxcObjects := make([]types.Object, 0, len(vxcs))
