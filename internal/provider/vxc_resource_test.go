@@ -1446,7 +1446,7 @@ func TestGCPVXCWithProductUID(t *testing.T) {
 func TestOracleVXCWithProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
+	locs := findVXCPortAndMCRTestLocations(t, 1, 2500)
 	oracleVCID := pickOracleVirtualCircuitID(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
