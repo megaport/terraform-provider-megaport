@@ -18,26 +18,23 @@ func TestNATGatewayProviderTestSuite(t *testing.T) {
 	suite.Run(t, new(NATGatewayProviderTestSuite))
 }
 
-// getNATGatewayTestConfig queries the staging NAT Gateway sessions API to get a valid
-// speed and session count for acceptance testing.
-func getNATGatewayTestConfig() (speed int, sessionCount int, err error) {
+// getNATGatewayTestSpeed queries the staging NAT Gateway sessions API to get a valid
+// speed for acceptance testing.
+func getNATGatewayTestSpeed() (speed int, err error) {
 	client, err := getTestClient()
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to create test client: %w", err)
+		return 0, fmt.Errorf("failed to create test client: %w", err)
 	}
 
 	sessions, err := client.NATGatewayService.ListNATGatewaySessions(context.Background())
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
+		return 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
 	}
 	if len(sessions) == 0 {
-		return 0, 0, fmt.Errorf("no NAT Gateway sessions available")
-	}
-	if len(sessions[0].SessionCount) == 0 {
-		return 0, 0, fmt.Errorf("no session counts available for speed %d", sessions[0].SpeedMbps)
+		return 0, fmt.Errorf("no NAT Gateway sessions available")
 	}
 
-	return sessions[0].SpeedMbps, sessions[0].SessionCount[0], nil
+	return sessions[0].SpeedMbps, nil
 }
 
 // TestAccMegaportNATGateway_Basic tests the full lifecycle of a NAT Gateway resource
@@ -46,7 +43,7 @@ func (suite *NATGatewayProviderTestSuite) TestAccMegaportNATGateway_Basic() {
 	natGWNameUpdated := RandomTestName()
 	resourceName := "megaport_nat_gateway.test"
 
-	speed, _, err := getNATGatewayTestConfig()
+	speed, err := getNATGatewayTestSpeed()
 	if err != nil {
 		suite.T().Skipf("Skipping NAT Gateway test: %v", err)
 	}

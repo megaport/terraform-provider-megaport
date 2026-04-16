@@ -9,11 +9,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -70,6 +72,8 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 
 	if gw.PromoCode != "" {
 		m.PromoCode = types.StringValue(gw.PromoCode)
+	} else {
+		m.PromoCode = types.StringNull()
 	}
 
 	// Config fields
@@ -83,7 +87,11 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) {
 		for _, tag := range gw.ResourceTags {
 			tagMap[tag.Key] = types.StringValue(tag.Value)
 		}
-		m.ResourceTags = types.MapValueMust(types.StringType, tagMap)
+		var diags diag.Diagnostics
+		m.ResourceTags, diags = types.MapValue(types.StringType, tagMap)
+		if diags.HasError() {
+			m.ResourceTags = types.MapNull(types.StringType)
+		}
 	} else {
 		m.ResourceTags = types.MapNull(types.StringType)
 	}
@@ -97,7 +105,7 @@ func toResourceTagSlice(ctx context.Context, tags types.Map) ([]megaport.Resourc
 	tagMap := map[string]string{}
 	diags := tags.ElementsAs(ctx, &tagMap, false)
 	if diags.HasError() {
-		return nil, fmt.Errorf("error converting resource tags")
+		return nil, fmt.Errorf("error converting resource tags: %v", diags.Errors())
 	}
 	result := make([]megaport.ResourceTag, 0, len(tagMap))
 	for k, v := range tagMap {
@@ -201,7 +209,6 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"service_level_reference": schema.StringAttribute{
 				Description: "A service level reference for the NAT Gateway.",
-				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -218,6 +225,9 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "Resource tags for the NAT Gateway.",
 				Optional:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the NAT Gateway.",
@@ -311,20 +321,37 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 		tflog.Debug(ctx, "Waiting for NAT Gateway provisioning", map[string]interface{}{
 			"product_uid": createdUID,
 		})
-		deadline := time.Now().Add(waitForTime)
-		for time.Now().Before(deadline) {
-			gw, err := r.client.NATGatewayService.GetNATGateway(ctx, createdUID)
-			if err != nil {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		timeout := time.After(waitForTime)
+		provisioned := false
+		for !provisioned {
+			select {
+			case <-ctx.Done():
 				resp.Diagnostics.AddError(
-					"Error waiting for NAT Gateway provisioning",
-					"Could not read NAT Gateway with ID "+createdUID+": "+err.Error(),
+					"NAT Gateway provisioning cancelled",
+					"Context cancelled while waiting for NAT Gateway "+createdUID+" to provision.",
 				)
 				return
+			case <-timeout:
+				resp.Diagnostics.AddError(
+					"NAT Gateway provisioning timed out",
+					fmt.Sprintf("NAT Gateway %s did not leave NEW status within %s.", createdUID, waitForTime),
+				)
+				return
+			case <-ticker.C:
+				gw, err := r.client.NATGatewayService.GetNATGateway(ctx, createdUID)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error waiting for NAT Gateway provisioning",
+						"Could not read NAT Gateway with ID "+createdUID+": "+err.Error(),
+					)
+					return
+				}
+				if gw.ProvisioningStatus != "NEW" {
+					provisioned = true
+				}
 			}
-			if gw.ProvisioningStatus != "NEW" {
-				break
-			}
-			time.Sleep(10 * time.Second)
 		}
 	}
 
