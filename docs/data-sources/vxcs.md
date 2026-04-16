@@ -17,7 +17,7 @@ Looks up VXCs in the Megaport API. Optionally filter by product_uid to retrieve 
 
 ### Optional
 
-- `include_resource_tags` (Boolean) Whether to fetch resource tags for each VXC. Defaults to false. Enabling this causes an additional API call per VXC, which may be slow for accounts with many VXCs.
+- `include_resource_tags` (Boolean) Whether to fetch resource tags for each VXC. Enabling this causes an additional API call per VXC, which may be slow for accounts with many VXCs.
 - `product_uid` (String) The unique identifier of a specific VXC to look up. If not provided, all active VXCs are returned.
 
 ### Read-Only
