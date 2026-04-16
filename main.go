@@ -19,6 +19,8 @@ import (
 //go:generate terraform fmt -recursive ./examples/
 
 // Run the docs generation tool and regenerate CHANGELOG.md from git tags.
+// The changelog generation step requires a Bash-compatible shell. On Windows,
+// run go generate from WSL or Git Bash.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 //go:generate bash ./scripts/generate-changelog.sh
 

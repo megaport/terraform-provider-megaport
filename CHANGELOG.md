@@ -789,10 +789,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update GitHub Action to use Go 1.21
 - Remove toolchain statement from go.mod
+- Merge branch 'feature/add-mve' into 'master'
 
 ### [v0.3.0] — 2023-10-05
 
 - Update GitHub Actions
+- Merge branch 'feature/DEVOPS-2991-auth-updates-CD' into 'master'
 
 ### [v0.2.10] — 2023-07-28
 
@@ -807,7 +809,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v0.2.8] — 2023-02-20
 
-- _No user-facing changes._
+- Merge branch 'feature/DEVOPS-2327-diversity-zone-filtering' into 'master'
 
 ### [v0.2.7] — 2022-12-08
 

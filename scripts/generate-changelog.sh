@@ -104,7 +104,6 @@ for i in "${!tags[@]}"; do
     filtered=$(
         printf '%s\n' "$commits" \
             | grep -Ev '^- chore:' \
-            | grep -v "^- Merge " \
             | sed 's/^- \(#\)/- \\\1/' \
             | sed 's/  */ /g' || true
     )
