@@ -220,6 +220,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs/mcr-cloud-end-to-end-examples
 - docs: clarify IP address format for BGP fields in megaport_vxc resource
 - cleanup: add windows 386 to ignore
+- feat(release): Automate release notes generation from PRs
+- fix: add check for b end product uid being provided before warning about service key uid
 
 ### [v1.3.8] — 2025-06-24
 
@@ -249,6 +251,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: oracle csp connection, add acceptance test
 - fix: language about open tofu compatibility
 - fix: Add acceptance test for safe delete prevention with attached VXCs
+- feat: add safeDelete field to port, mcr, mve
+- fix: make asn require replacement if modified in mcr resource
+- fix: add computed diversity zone field to mcr based on api assignment
+- fix: support updating vnic index in vxc
+- docs: add statement about open tofu compatability and installation
+- fix: add opentofu local plugin directory compatibility to ci workflow
+- fix: fix opentofu test by using project-local plugin directory with init -plugin-dir
+- fix: fix opentofu ci to use protocol v6 binary and plugin path for local provider
+- fix: use opentofu dev_overrides for local provider in ci test
+- fix: fix opentofu ci to use correct plugin path and binary naming
+- fix: have opentofu ci use local provider build via dev plugin path for accurate compatibility testing
+- fix: make sure provider is locally built instead of from registry
+- fix: build provider in repo root and copy to test directory
+- fix: indentation syntax
+- fix: unzip command for installing opentofu
+- feat: ci testing for opentofu-compatability
 
 ### [v1.3.6] — 2025-04-29
 
@@ -402,6 +420,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: schema for filters
 - fix: support filtering of mve images
 - fix: make fields optional for azure peering
+- fix: bump go version
+- fix: add oracle csp connection to vxc resource
+- fix: bump megaportgo version
+- fix: contract term months in update port, mcr, mve
+- fix: change azure service key to 197d927b-90bc-4b1b-bffd-fca17a7ec735
 
 ### [v1.2.1] — 2024-11-06
 
@@ -435,10 +458,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: generate docs
 - feat: add service key to vxc input
 
-### [v1.1.6] — 2024-09-04
-
-
 ### [v1.1.5] — 2024-09-04
+
+
+### [v1.1.6] — 2024-09-04
 
 - fix: prevent partner port from failing if more than one partner port
 
@@ -472,6 +495,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: bump go version to v1.0.15
 - Update issue templates to add feature request
 - Update issue templates
+
+### [v1.1.0] — 2024-07-26
+
 - fix: removes planmodifier for requested_product_uid temporarily
 - fix: remove comments for mve tests
 - fix: make both innerVLANs useStateForUnknown, add inner_vlan to acceptance tests in basic vxc test, move test suites to top of file in vxc and mve
@@ -482,6 +508,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: provider template file
 - fix: templating for terraform docs
 - fix: adds a PlanModifier to VXCs to handle unexpected deletion when connected product is deleted
+- fix: additional documentation
+- fix: link in provider readme
+- deps: bumps to new megaportgo with port dz issue fixed
+- fix: diversity_zone now requires replacement
+- fix: update move vxc to move from mcr to mcr in the a-end while keeping aws vif on b-end
+- docs: additional examples
 
 ### [v1.1.0-beta2] — 2024-07-22
 
@@ -506,29 +538,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v1.1.0-beta] — 2024-07-18
 
-
-### [v1.1.0] — 2024-07-26
-
-- fix: removes planmodifier for requested_product_uid temporarily
-- fix: remove comments for mve tests
-- fix: make both innerVLANs useStateForUnknown, add inner_vlan to acceptance tests in basic vxc test, move test suites to top of file in vxc and mve
-- fix: import_whitelist naming typo
-- fix: import_whitelist and templating with docs
-- fix: provider docs
-- fix: fix issue with ordered_vlan and updates for VXC end configuration, add documentation
-- fix: provider template file
-- fix: templating for terraform docs
-- fix: adds a PlanModifier to VXCs to handle unexpected deletion when connected product is deleted
-- fix: additional documentation
-- fix: link in provider readme
-- deps: bumps to new megaportgo with port dz issue fixed
-- fix: diversity_zone now requires replacement
-- fix: update move vxc to move from mcr to mcr in the a-end while keeping aws vif on b-end
-- docs: additional examples
-- fix: azure tests pass with added port_choice attribute
-- fix: add terraform to code blocks
-- fix: change naming to endpoint
-- fix: updates more attributes to UseStateForUnknown()
+- fix: bumps megaportgo version and adds not found checks
+- docs: regenerates
+- fix: removes resources that are already provided by other parts of the schema / providerr
+- fix: bump go version
+- docs: clearly notate deprecation
+- fix: generation
+- fix: fields for bgp, use as path in both deprecated a end and new vrouter
+- fix: partner config attrs
+- docs: regenerates
+- fix: updates attributes with better PlanModifiers, removes redundant fields
+- fix: bring back a-end partner config as deprecated
+- fix: change partner-end-config to vrouter-config, add support for vrouter config to b-end, add support for as_path_prepend_count to bgp config
+- adds: .envrc
+- fix: adds checks to see if the product has been deleted in the API so it can be recreated
 
 ### [v1.0.2-beta] — 2024-07-11
 
@@ -546,24 +569,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: improves readme and adds CLA
 - docs: regenerates for service_key update
 - fix: updates service_key to be sensitive, closes #28
-- fix: go module update
-- fix: acceptance test and mve resources
-- fix: keep cost centre same in first three tests, but change only in fourth test
-- fix: add check for innerVLAN after update
-- fix: support changing innerVLAN in update
-- fix: vxc term update works and code cleanup
-
-### [v1.0.1-rc2] — 2024-06-17
-
-- chore(deps): bump golang.org/x/net from 0.21.0 to 0.23.0
-- fix: version bump and docs
-- docs: regenerates
-- fix: environment variables for provider are now respected, fixes #84
-- fix: add check for prefix filter lists in import, but not entries that are only available on creation
-- fix: add support for cost centre on VXC buy request
-
-### [v1.0.1-rc1] — 2024-06-14
-
 
 ### [v1.0.1] — 2024-06-25
 
@@ -587,6 +592,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: update csp connections field description
 - fix: schema description tweaks
 - fix: transit vxc support
+- fix: full ecosystem vxc example
+- fix: docs
+- fix: support cost centre in MVE, make vnics and vendor config require replace, add update/import mve acceptance tests
+- feat: support update and delete mcr prefix filter list, add test coverage for update/delete in mcr acceptance test
+- fix: generate docs
+- fix: update tests, fix conditional logic for checking prefix filter list entries
+- fix: have mcr reads run concurrently, fix tests
+- fix: update parsing of prefix filter list
+- fix: mcr list endpoint rename
+- fix: import typo
+- fix: imports
+- fix: make location details fully computed in mve
+- fix: mve docs
+- fix: more docs
+- fix: vxc computed fields
+- fix: mcr computed fields
+- fix: lag port computed
+- fix: single port computed vs optional
+- fix: make cancelable computed
+- fix: locationId
+- fix: contract term months
+- fix: mcr docs
+- fix: more docs
+- fix: update docs
+- docs: more examples
+- docs: more docs
+- fix: remove test preCheck
+- fix: bump go version
+- fix: dont run all csp vxc tests in parallel because megaport api gets mad
+- feat: refactor tests to testify and run all tests in parallel to save time
+
+### [v1.0.1-rc2] — 2024-06-17
+
+- chore(deps): bump golang.org/x/net from 0.21.0 to 0.23.0
+- fix: version bump and docs
+- docs: regenerates
+- fix: environment variables for provider are now respected, fixes #84
+- fix: add check for prefix filter lists in import, but not entries that are only available on creation
+- fix: add support for cost centre on VXC buy request
+
+### [v1.0.1-rc1] — 2024-06-14
+
+- fix: add sources to provider and gen docs
+- docs: generation
+- fix: add missing wait time field to provider struct
+- fix: bump go version
+- docs: generate
+- docs: generate
+- actions: disables unit tests
+- fix: checks out current PR branch
+- fix: update examples
+- fix: transit vxc support and example with megaport internet
+- fix: example for mve vxc aws
+- fix: indentations in example test
+- fix: a-end inner vlan and vnic index, add test for mve-vxc
+- fix: example syntax fix
+- fix: tidy
+- fix: tidy
+- fix: tidy
+- fix: mod tidy
+- fix: change default value in description to 10
+- fix: use package-wide wait time set by provider config for wait time
+- fix: mixups between a-end and b-end ordered vlan in schema description
+- fix: improve documentation of ordered_vlan in vxc svc, improve validation of ordered_vlan
+- Revert "feat: support custom wait time in terraform provider, set default to 20 min"
+- feat: support custom wait time in terraform provider, set default to 20 min
+- fix: remove vlan from vnics, update examples and acceptance tests to include multiple vnics in create calls
+- fix: mcr import state verify
+- feat: promo code in resources
+- feat: mve images and available sizes as data sources
+- fix: check for empty prefix filter list before trying to parse model in create
+- fix: make mcr filter list optional/computed
+- fix: update examples and docs
+- fix: make list of multiple prefix filter lists, get ID from mp api, support read of prefix filter lists, support import of prefix filter lists, update tests
+- fix: mcr and mve resource tests, typo in partner port data source
+- fix: slight example tweaks
+- ci: removes terraform 1.6.* from testing matrix
+- fix: updates buy port error message to correctly identify issue
+- fix: increases test timeout
+- fix: actions should only run once in PRs
+- generate: runs docs generation
+- fix: removes double equal sign in example
+- fix: sets timeout in acceptence tests
+- fix: updates name of context check for sloglint
+- fix: updates name of govet linter
+- fix: param new has same name as predeclared identifier
+- fix: removes dead code
+- fix: typo in 'information'
+- ci: adds integration testing back to action
+
+### [v1.0.0] — 2024-06-03
+
+- fix: improves VXC error messages
+- fix: move lag port tests and examples down to single lagCount, update docs
+- fix: add full ecosystem tests, update lag port resource to support lagCount of 1
+- fix: update go module
+- fix: test full ecosystem
 
 ### [v1.0.0-rc2] — 2024-05-30
 
@@ -616,29 +718,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v1.0.0-beta1] — 2024-05-14
 
-
-### [v1.0.0] — 2024-06-03
-
-- fix: improves VXC error messages
-- fix: move lag port tests and examples down to single lagCount, update docs
-- fix: add full ecosystem tests, update lag port resource to support lagCount of 1
-- fix: update go module
-- fix: update go module
-- fix: test full ecosystem
-- fix: tf files
-- fix: add diversity zone support to mcr, add location details to products, fix vxc update, fix tests
-- fix: add diversity zone to mcr
-- fix: adds error check to ModifyPort call
-- fix: add requested_product_uid and current_product_uid to vxc, update tests and docs
-- fix: marketplace visibility for mcr test
-- fix: name of product uid for data.megaport_partner.aws_port.product_uid
-- cleanup: rename plan to state in update mcr, remove ordered_product_uid from end configs in vxc, remove port_uid from vxc --- note that the megaport API will break provider on aws vxcs because it sometimes will change the product uid after the user has specified one
-- fix: handle error for modify port
-- fix: remove marketplace visibility from buy call
+- fix: sets version to allowed actions
+- upgrade: uses v1 of the megaportgo library
+- deletes: example we don't use
+- feat: adds workflows for releasing
+- fix: add meraki vendor config, add test for versa vendor config on mve, add fields to mve vendor configs
+- fix: update calls
+- fix: improvements to tests, add missing fields in single port and lag port resources
+- feat: pass in "x-app: terraform" header
+- fix: fixes incorrect client name
+- fix: tidies modules
+- fix: mve updates, mve example, docs
+- cleanup: objects in locations data source
+- docs: more tf examples
+- docs: tf examples
+- docs: new docs
+- fix: bugs with bgp a-end partner config
+- fix: mcr prefix filter calls, a-end partner config
+- fix: bug with uid in lag port and import state verify ignore / uid bugs in resource test
+- fix: fix bug for partner a-end config
+- change to a maintained gpg import github action ref PLAT-253
+- docs: update docs
+- fix: gcp/azure tests and fix some partner config stuff in vxc resource
+- fix: vxc config stuff for end configuration, add testing for mcr-vxc-aws
 - cleanup: uncomment tests
-- fix: remove requiresReplaceIf
-- cleanup: update dependencies
-- fix: update examplesd
+- fix: change type of vxc to VROUTER for virtual router csp connection
+- fix: lag port resource
+- fix: object and list marshaling for mve
+- fix: import state ignore fields
+- fix: object marshaling for VXC and add import testing to vxc
+- fix: dont check for errors in diags until end of call
+- fix: diags in vxc
+- fix: diags in mve resource
+- fix: mcr diags
+- cleanup: move dates in mcr helper
+- fix: import logic and testing mcr and port import states
+- fix: clean up vxc resource, add test
+- fix: locations data source, add locations to mcr and port tests
+- fix: refactor vxc to use partner config objects and parse in req
+- fix: error handling for object and map marshaling
+- fix: refactor mve vendor configs
+- fix: start mve refactor for objects
+- fix: remove temp file
+- fix: mcr cleanup, mcr acceptance test
+- feat: single port and provider testing, fixes in single port and location
+- feat: locations data source
+- cleanup: mve fixes
+- cleanup: mcr fixes
+- docs: docs
+- fix: schema for product_uid
+- fix: update schema for mve
+- docs: slight tweak to description for mcr schema
+- docs: change schema description
+- cleanup: change port uid to product_uid to match megaport api
+- cleanup: change port uid to product_uid
+- docs: add description for schema at top level
+- fix: update logic for mcr
+- fix: mve schema and update logic
+- fix: change asn to optional, update docs
+- fix: formatting
+- fix: formatting
+- fix: formatting
+- fix: more schema updates for mve
+- fix: mve schemas and docs
+- fix: schema and add docs
+- feat: add port interface model for mcrs and mves
+- fix: port interface model
+- feat: more mcr stuff and port interface
+- feat: more mve structs
+- docs: mcr and port
+- docs: resource for port
+- docs: resources for port and mve
+- docs: descriptions for port schema
+- fix: descriptions for mve fields
+- fix: descriptions for the schema
+- fix: updates to the schema
+- cleanup: tfsdk field names
+- feat: starter code for mve
+- fix: naming stuffs
+- fix: remove diversity zone from mcr schema
+- feat: start mcr boilerplate
+- wip: ports
 
 ### [v0.4.2] — 2024-04-30
 
