@@ -19,7 +19,7 @@ import (
 
 // accTestSemaphore limits the number of concurrent acceptance tests that
 // provision real infrastructure, preventing staging API overload.
-const maxConcurrentAccTests = 21
+const maxConcurrentAccTests = 20
 
 var accTestSemaphore = make(chan struct{}, maxConcurrentAccTests)
 
@@ -759,7 +759,7 @@ func TestListPortCapacity(t *testing.T) {
 		if loc.DiversityZones == nil {
 			continue
 		}
-		if !portLocationHasCapacity(loc, 1) && !mcrLocationHasCapacity(loc, 1) {
+		if !portLocationHasCapacity(loc, 1000) && !mcrLocationHasCapacity(loc, 2500) {
 			continue
 		}
 		t.Logf("%-6d %-8s %s", loc.ID, loc.Status, loc.Name)

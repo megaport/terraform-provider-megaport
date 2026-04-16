@@ -137,8 +137,8 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 
                     vendor_config = {
-                        vendor = "aruba"
-                        product_size = "SMALL"
+                        vendor = "aRuBa"
+                        product_size = "SmAlL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
 						account_name = "%s"

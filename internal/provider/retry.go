@@ -30,7 +30,11 @@ func retryTransientDelete(ctx context.Context, maxAttempts int, fn func() error)
 					"attempt": attempt + 1,
 					"error":   err.Error(),
 				})
-			time.Sleep(time.Duration(attempt+1) * 2 * time.Second)
+			select {
+			case <-time.After(time.Duration(attempt+1) * 2 * time.Second):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
 	}
 	return err

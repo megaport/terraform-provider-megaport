@@ -4,7 +4,7 @@
 # Usage:
 #   MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx ./scripts/find-test-locations.sh
 set -euo pipefail
-cd "$(git rev-parse --show-toplevel)/terraform-provider-megaport"
+cd "$(git rev-parse --show-toplevel)"
 
 : "${MEGAPORT_ACCESS_KEY:?MEGAPORT_ACCESS_KEY must be set}"
 : "${MEGAPORT_SECRET_KEY:?MEGAPORT_SECRET_KEY must be set}"
