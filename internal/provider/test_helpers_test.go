@@ -478,6 +478,49 @@ func findVXCPortTestLocations(t *testing.T, count int) []int {
 	return ids
 }
 
+// findVXCPortAndMCRTestLocations returns count unique staging location IDs that
+// support both Megaport ports at 1000 Mbps and MCRs at mcrSpeedMbps. Use this
+// for tests that create both a port and an MCR at the same location.
+//
+//nolint:unparam // count is 1 today but callers may vary it
+func findVXCPortAndMCRTestLocations(t *testing.T, count int, mcrSpeedMbps int) []int {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return nil
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return nil
+	}
+	portClaimedMu.Lock()
+	defer portClaimedMu.Unlock()
+	var ids []int
+	for _, loc := range locations {
+		if len(ids) >= count {
+			break
+		}
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && mcrLocationHasCapacity(loc, mcrSpeedMbps) && !portClaimedLocations[loc.ID] {
+			portClaimedLocations[loc.ID] = true
+			t.Cleanup(func() {
+				portClaimedMu.Lock()
+				defer portClaimedMu.Unlock()
+				delete(portClaimedLocations, loc.ID)
+			})
+			t.Logf("findVXCPortAndMCRTestLocations: claimed location %d (%s)", loc.ID, loc.Name)
+			ids = append(ids, loc.ID)
+		}
+	}
+	if len(ids) < count {
+		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port + %d Mbps MCR capacity", len(ids), count, mcrSpeedMbps)
+		return nil
+	}
+	return ids
+}
+
 // findVXCPortTestLocationsWithPartner is like findVXCPortTestLocations but also
 // requires that the returned locations have at least one partner port of the
 // given connect type (e.g. "AWS", "TRANSIT"). Use this for tests whose HCL

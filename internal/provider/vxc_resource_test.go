@@ -1578,7 +1578,7 @@ func TestAzureVXCWithProductUID(t *testing.T) {
 func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrNameA := RandomTestName()
 	mcrNameB := RandomTestName()
 	vxcName := RandomTestName()
@@ -3800,7 +3800,7 @@ func TestAccMegaportVXC_ImportDrift_Basic(t *testing.T) {
 func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocations(t, 1)
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
