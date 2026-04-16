@@ -2137,10 +2137,10 @@ func TestMVE_TransitVXC(t *testing.T) {
 func TestMVE_TransitVXCAWS(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// loc2 needs both AWS and TRANSIT partner ports; loc1 only needs port capacity.
+	// loc1 hosts the MVE (needs MVE capacity); loc2 needs both AWS and TRANSIT partner ports.
+	mveLocID, _ := findMVETestLocation(t, 0)
 	partnerLocs := findVXCPortTestLocationsWithPartners(t, 1, "AWS", "TRANSIT")
-	portLocs := findVXCPortTestLocations(t, 1)
-	locs := []int{portLocs[0], partnerLocs[0]}
+	locs := []int{mveLocID, partnerLocs[0]}
 	portName := RandomTestName()
 	portCostCentreName := RandomTestName()
 	portCostCentreNameNew := RandomTestName()
