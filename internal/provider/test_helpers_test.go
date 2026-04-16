@@ -407,7 +407,7 @@ var (
 	mcrClaimedLocations = map[int]bool{}
 )
 
-//nolint:unparam // name is used in log messages and may be used by future callers
+//nolint:unparam // speedMbps is intentionally parameterized and used by callers with different requested MCR speeds
 func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	t.Helper()
 	ctx := context.Background()
@@ -467,6 +467,12 @@ func findVXCPortTestLocations(t *testing.T, count int) []int {
 		}
 		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && !portClaimedLocations[loc.ID] {
 			portClaimedLocations[loc.ID] = true
+			locID := loc.ID
+			t.Cleanup(func() {
+				portClaimedMu.Lock()
+				defer portClaimedMu.Unlock()
+				delete(portClaimedLocations, locID)
+			})
 			t.Logf("findVXCPortTestLocations: claimed location %d (%s)", loc.ID, loc.Name)
 			ids = append(ids, loc.ID)
 		}
