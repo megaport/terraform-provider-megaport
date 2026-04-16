@@ -65,6 +65,70 @@ func (suite *MCRIpsecAddonProviderTestSuite) TestAccMegaportMCRIpsecAddon_Basic(
 	})
 }
 
+func TestParseImportIDStrings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantLeft  string
+		wantRight string
+		wantErr   bool
+	}{
+		{
+			name:      "valid",
+			input:     "mcr-uid:addon-uid",
+			wantLeft:  "mcr-uid",
+			wantRight: "addon-uid",
+		},
+		{
+			name:    "missing colon",
+			input:   "no-colon-here",
+			wantErr: true,
+		},
+		{
+			name:    "empty left",
+			input:   ":addon-uid",
+			wantErr: true,
+		},
+		{
+			name:    "empty right",
+			input:   "mcr-uid:",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:      "multiple colons",
+			input:     "a:b:c",
+			wantLeft:  "a",
+			wantRight: "b:c",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			left, right, err := parseImportIDStrings(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for input %q, got nil", tc.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for input %q: %v", tc.input, err)
+			}
+			if left != tc.wantLeft || right != tc.wantRight {
+				t.Fatalf("parseImportIDStrings(%q) = (%q, %q), want (%q, %q)", tc.input, left, right, tc.wantLeft, tc.wantRight)
+			}
+		})
+	}
+}
+
 func testAccMCRIpsecAddonConfig(mcrName, costCentreName string, tunnelCount int) string {
 	return fmt.Sprintf(`
 data "megaport_location" "test_location" {

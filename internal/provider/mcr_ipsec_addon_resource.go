@@ -196,6 +196,12 @@ func (r *mcrIpsecAddonResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
+	// If the MCR has been decommissioned, treat the add-on as deleted.
+	if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Find the add-on by UID
 	addOn := r.findIPsecAddOn(mcr, state.AddOnUID.ValueString())
 	if addOn == nil {
@@ -375,7 +381,13 @@ func (r *mcrIpsecAddonResource) waitForMCRReady(ctx context.Context, mcrID strin
 	// Check immediately before entering the poll loop.
 	mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
 	if err != nil {
+		if isMCRNotFoundError(err) {
+			return fmt.Errorf("MCR %s has been deleted", mcrID)
+		}
 		return fmt.Errorf("error polling MCR %s: %w", mcrID, err)
+	}
+	if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		return fmt.Errorf("MCR %s has been decommissioned", mcrID)
 	}
 	if slices.Contains(megaport.SERVICE_STATE_READY, mcr.ProvisioningStatus) {
 		return nil
@@ -395,7 +407,13 @@ func (r *mcrIpsecAddonResource) waitForMCRReady(ctx context.Context, mcrID strin
 		case <-ticker.C:
 			mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
 			if err != nil {
+				if isMCRNotFoundError(err) {
+					return fmt.Errorf("MCR %s has been deleted", mcrID)
+				}
 				return fmt.Errorf("error polling MCR %s: %w", mcrID, err)
+			}
+			if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+				return fmt.Errorf("MCR %s has been decommissioned", mcrID)
 			}
 			if slices.Contains(megaport.SERVICE_STATE_READY, mcr.ProvisioningStatus) {
 				return nil
