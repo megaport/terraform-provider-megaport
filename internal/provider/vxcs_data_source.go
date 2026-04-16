@@ -13,7 +13,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ datasource.DataSource = &vxcsDataSource{}
+	_ datasource.DataSource              = &vxcsDataSource{}
+	_ datasource.DataSourceWithConfigure = &vxcsDataSource{}
 
 	vxcDetailAttrs = map[string]attr.Type{
 		"product_uid":          types.StringType,
