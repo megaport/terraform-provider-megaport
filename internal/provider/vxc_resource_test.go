@@ -2026,7 +2026,10 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocationsWithPartner(t, 2, "TRANSIT")
+	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
+	mveLocID, _ := findMVETestLocation(t, 0)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	locs := []int{mveLocID, transitLocs[0]}
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
