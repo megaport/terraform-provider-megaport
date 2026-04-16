@@ -361,29 +361,29 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailMode
 		DiversityZone:         types.StringValue(p.DiversityZone),
 	}
 
-	// Time fields — use RFC3339 for consistency; null when the API returns nil.
+	// Time fields — use RFC850 for consistency with port resource; null when the API returns nil.
 	if p.CreateDate != nil {
-		detail.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC3339))
+		detail.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	} else {
 		detail.CreateDate = types.StringNull()
 	}
 	if p.LiveDate != nil {
-		detail.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC3339))
+		detail.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
 	} else {
 		detail.LiveDate = types.StringNull()
 	}
 	if p.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC3339))
+		detail.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
 	} else {
 		detail.TerminateDate = types.StringNull()
 	}
 	if p.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC3339))
+		detail.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
 	} else {
 		detail.ContractStartDate = types.StringNull()
 	}
 	if p.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC3339))
+		detail.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
 	} else {
 		detail.ContractEndDate = types.StringNull()
 	}
