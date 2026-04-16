@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -112,7 +113,7 @@ func (d *mvesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			},
 			"include_resource_tags": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to fetch resource tags for each MVE. Defaults to false. Enabling this causes an additional API call per MVE, which may be slow for accounts with many MVEs.",
+				Description: "Whether to fetch resource tags for each MVE. Enabling this causes an additional API call per MVE, which may be slow for accounts with many MVEs.",
 			},
 			"mves": schema.ListNestedAttribute{
 				Description: "List of MVEs with detailed information.",
@@ -226,7 +227,7 @@ func (d *mvesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 						},
 						"resource_tags": schema.MapAttribute{
 							ElementType: types.StringType,
-							Description: "The resource tags associated with the MVE.",
+							Description: "The resource tags associated with the MVE. Only populated when include_resource_tags is enabled.",
 							Computed:    true,
 						},
 					},
@@ -300,7 +301,7 @@ func (d *mvesDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	// Determine whether to fetch resource tags (opt-in to avoid N+1 API calls)
-	fetchTags := !data.IncludeResourceTags.IsNull() && data.IncludeResourceTags.ValueBool()
+	fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
 
 	// Build detail objects
 	mveObjects := make([]types.Object, 0, len(mves))
@@ -369,31 +370,32 @@ func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) (mveDetailModel, 
 		DiversityZone:         types.StringValue(m.DiversityZone),
 	}
 
-	// Time fields
+	// Time fields — use RFC850 format for consistency with the MVE resource,
+	// and null for nil dates rather than empty strings.
 	if m.CreateDate != nil {
-		detail.CreateDate = types.StringValue(m.CreateDate.String())
+		detail.CreateDate = types.StringValue(m.CreateDate.Format(time.RFC850))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if m.LiveDate != nil {
-		detail.LiveDate = types.StringValue(m.LiveDate.String())
+		detail.LiveDate = types.StringValue(m.LiveDate.Format(time.RFC850))
 	} else {
-		detail.LiveDate = types.StringValue("")
+		detail.LiveDate = types.StringNull()
 	}
 	if m.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(m.TerminateDate.String())
+		detail.TerminateDate = types.StringValue(m.TerminateDate.Format(time.RFC850))
 	} else {
-		detail.TerminateDate = types.StringValue("")
+		detail.TerminateDate = types.StringNull()
 	}
 	if m.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(m.ContractStartDate.String())
+		detail.ContractStartDate = types.StringValue(m.ContractStartDate.Format(time.RFC850))
 	} else {
-		detail.ContractStartDate = types.StringValue("")
+		detail.ContractStartDate = types.StringNull()
 	}
 	if m.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+		detail.ContractEndDate = types.StringValue(m.ContractEndDate.Format(time.RFC850))
 	} else {
-		detail.ContractEndDate = types.StringValue("")
+		detail.ContractEndDate = types.StringNull()
 	}
 
 	// Attribute tags

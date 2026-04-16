@@ -203,7 +203,7 @@ func TestFromAPIMVEDetail(t *testing.T) {
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
 
-	t.Run("Nil time fields produce empty strings", func(t *testing.T) {
+	t.Run("Nil time fields produce null values", func(t *testing.T) {
 		mve := &megaport.MVE{
 			UID:               "mve-nil-times",
 			CreateDate:        nil,
@@ -216,11 +216,11 @@ func TestFromAPIMVEDetail(t *testing.T) {
 		detail, diags := fromAPIMVEDetail(mve, nil)
 		assert.False(t, diags.HasError())
 
-		assert.Equal(t, "", detail.CreateDate.ValueString())
-		assert.Equal(t, "", detail.LiveDate.ValueString())
-		assert.Equal(t, "", detail.TerminateDate.ValueString())
-		assert.Equal(t, "", detail.ContractStartDate.ValueString())
-		assert.Equal(t, "", detail.ContractEndDate.ValueString())
+		assert.True(t, detail.CreateDate.IsNull())
+		assert.True(t, detail.LiveDate.IsNull())
+		assert.True(t, detail.TerminateDate.IsNull())
+		assert.True(t, detail.ContractStartDate.IsNull())
+		assert.True(t, detail.ContractEndDate.IsNull())
 	})
 
 	t.Run("Nil tags produce null maps", func(t *testing.T) {

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -342,31 +343,32 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		Cancelable:            types.BoolValue(m.Cancelable),
 	}
 
-	// Time fields
+	// Time fields — use RFC850 format for consistency with resource implementations,
+	// and null for nil dates rather than empty strings.
 	if m.CreateDate != nil {
-		detail.CreateDate = types.StringValue(m.CreateDate.String())
+		detail.CreateDate = types.StringValue(m.CreateDate.Format(time.RFC850))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if m.LiveDate != nil {
-		detail.LiveDate = types.StringValue(m.LiveDate.String())
+		detail.LiveDate = types.StringValue(m.LiveDate.Format(time.RFC850))
 	} else {
-		detail.LiveDate = types.StringValue("")
+		detail.LiveDate = types.StringNull()
 	}
 	if m.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(m.TerminateDate.String())
+		detail.TerminateDate = types.StringValue(m.TerminateDate.Format(time.RFC850))
 	} else {
-		detail.TerminateDate = types.StringValue("")
+		detail.TerminateDate = types.StringNull()
 	}
 	if m.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(m.ContractStartDate.String())
+		detail.ContractStartDate = types.StringValue(m.ContractStartDate.Format(time.RFC850))
 	} else {
-		detail.ContractStartDate = types.StringValue("")
+		detail.ContractStartDate = types.StringNull()
 	}
 	if m.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+		detail.ContractEndDate = types.StringValue(m.ContractEndDate.Format(time.RFC850))
 	} else {
-		detail.ContractEndDate = types.StringValue("")
+		detail.ContractEndDate = types.StringNull()
 	}
 
 	// Attribute tags
