@@ -104,7 +104,9 @@ for i in "${!tags[@]}"; do
     filtered=$(
         printf '%s\n' "$commits" \
             | grep -Ev '^- chore:' \
-            | grep -v "^- Merge " || true
+            | grep -v "^- Merge " \
+            | sed 's/^- \(#\)/- \\\1/' \
+            | sed 's/  */ /g' || true
     )
     if [ -n "$filtered" ]; then
         printf '%s\n' "$filtered" >> "$TMPOUT"

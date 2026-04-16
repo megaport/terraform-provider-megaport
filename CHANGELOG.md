@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: replace noisy CSP port rotation warnings with debug-level tflog and fix B-End comparison logic
 - docs: update terraform mcp server documentation
 - fix: Retry prefix filter list delete on 409 to handle async VXC deprovision race
-- fix: add depends_on to both test VXC resources so Terraform destroys the VXC (and its BGP connection) before attempting to delete the prefix   filter lists
+- fix: add depends_on to both test VXC resources so Terraform destroys the VXC (and its BGP connection) before attempting to delete the prefix filter lists
 - fix: MCR Read/Update to skip prefix filter list API fetch when using standalone resource
 
 ### [v1.5.0] — 2026-03-02
@@ -486,7 +486,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v1.1.1] — 2024-08-12
 
-- fix:  typo
+- fix: typo
 - generate: docs
 - feat: improves vrouter configuration options
 - fix: remove innerVLAN and orderedVLAN changes
@@ -811,53 +811,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v0.2.7] — 2022-12-08
 
-- # 0.2.7-beta (Dec 8, 2022)
+- \# 0.2.7-beta (Dec 8, 2022)
 
 ### [v0.2.6] — 2022-11-02
 
 - Update go.mod
 - Update Makefile
-- # 0.2.6-beta (Nov 2, 2022)
+- \# 0.2.6-beta (Nov 2, 2022)
 
 ### [v0.2.5] — 2022-05-05
 
-- # 0.2.5-beta (May 5, 2022)
+- \# 0.2.5-beta (May 5, 2022)
 - Import `MarshallMcrAEndConfig` from upstream megaportgo client.
 
 ### [v0.2.4] — 2022-04-06
 
 - Remove tab
-- # 0.2.4-beta (April 6, 2022)
+- \# 0.2.4-beta (April 6, 2022)
 - Add import support for megaport_aws_connection Add a connection_name attribute for AWS connection Remove erroneous Required flags on requested_asn and amazon_asn (not supported on AWSHC)
 - Add optional connection_name attribute for AWS connections
 
 ### [v0.2.3] — 2022-03-24
 
-- # 0.2.3-beta (March 24, 2022)
+- \# 0.2.3-beta (March 24, 2022)
 
 ### [v0.2.2] — 2022-03-02
 
-- # 0.2.2-beta (March 2, 2022)
+- \# 0.2.2-beta (March 2, 2022)
 
 ### [v0.2.1] — 2022-02-22
 
-- # 0.2.1-beta (February 22, 2022)
+- \# 0.2.1-beta (February 22, 2022)
 
 ### [v0.2.0] — 2022-01-27
 
-- # 0.2.0-beta (January 27, 2022)
+- \# 0.2.0-beta (January 27, 2022)
 
 ### [v0.1.10] — 2021-11-05
 
-- # 0.1.10-beta (November 5, 2021)
+- \# 0.1.10-beta (November 5, 2021)
 
 ### [v0.1.9] — 2021-08-19
 
-- # 0.1.9-beta (August 19, 2021)
+- \# 0.1.9-beta (August 19, 2021)
 
 ### [v0.1.8] — 2021-06-19
 
-- ## 0.1.8-beta (June 19, 2021) Notes
+- \## 0.1.8-beta (June 19, 2021) Notes
 - updated megaportgo reference to latest tag
 - added requested_product_id to gcp_connection csp settings to allow selecting the google b end location
 
@@ -873,7 +873,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [v0.1.5] — 2021-02-10
 
-- ## 0.1.4-beta (January 12, 2021)
+- \## 0.1.4-beta (January 12, 2021)
 
 ### [v0.1.4] — 2021-01-12
 
