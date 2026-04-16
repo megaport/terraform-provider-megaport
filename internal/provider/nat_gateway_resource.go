@@ -469,8 +469,11 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 	updateReq.Config = config
 
-	// Resource tags
-	if !plan.ResourceTags.IsNull() {
+	// Resource tags — null means the user removed all tags, so send an empty
+	// slice to clear them on the API side (omitting the field would leave stale tags).
+	if plan.ResourceTags.IsNull() {
+		updateReq.ResourceTags = []megaport.ResourceTag{}
+	} else {
 		tags, err := toResourceTagSlice(ctx, plan.ResourceTags)
 		if err != nil {
 			resp.Diagnostics.AddError("Error converting resource tags", err.Error())
