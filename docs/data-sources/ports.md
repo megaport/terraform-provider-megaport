@@ -3,12 +3,12 @@
 page_title: "megaport_ports Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Looks up ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.
+  Looks up active ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.
 ---
 
 # megaport_ports (Data Source)
 
-Looks up ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.
+Looks up active ports in the Megaport API. Optionally filter by product_uid to retrieve a specific port.
 
 
 
@@ -18,7 +18,7 @@ Looks up ports in the Megaport API. Optionally filter by product_uid to retrieve
 ### Optional
 
 - `include_resource_tags` (Boolean) Whether to fetch resource tags for each port. Enabling this causes an additional API call per port, which may be slow for accounts with many ports.
-- `product_uid` (String) The unique identifier of a specific port to look up. If not provided, all ports are returned.
+- `product_uid` (String) The unique identifier of a specific port to look up. If not provided, all active ports are returned.
 
 ### Read-Only
 
