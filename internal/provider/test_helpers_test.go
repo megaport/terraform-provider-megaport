@@ -182,28 +182,59 @@ func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name stri
 		return true
 	}
 
-	mveClaimedMu.Lock()
-	defer mveClaimedMu.Unlock()
-
 	for _, candidateID := range mveTestLocationCandidates {
-		if mveClaimedLocations[candidateID] {
+		loc, ok := byID[candidateID]
+		if !ok {
 			continue
 		}
-		if loc, ok := byID[candidateID]; ok && probe(loc) {
-			mveClaimedLocations[candidateID] = true
-			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs", loc.ID, loc.Name, count)
-			return loc.ID, loc.Name
+		mveClaimedMu.Lock()
+		claimed := mveClaimedLocations[candidateID]
+		mveClaimedMu.Unlock()
+		if claimed {
+			continue
 		}
+		if !probe(loc) {
+			continue
+		}
+		mveClaimedMu.Lock()
+		if mveClaimedLocations[candidateID] {
+			mveClaimedMu.Unlock()
+			continue
+		}
+		mveClaimedLocations[candidateID] = true
+		mveClaimedMu.Unlock()
+		t.Cleanup(func() {
+			mveClaimedMu.Lock()
+			defer mveClaimedMu.Unlock()
+			delete(mveClaimedLocations, candidateID)
+		})
+		t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs", loc.ID, loc.Name, count)
+		return loc.ID, loc.Name
 	}
 	for _, loc := range locations {
-		if mveClaimedLocations[loc.ID] {
+		mveClaimedMu.Lock()
+		claimed := mveClaimedLocations[loc.ID]
+		mveClaimedMu.Unlock()
+		if claimed {
 			continue
 		}
-		if probe(loc) {
-			mveClaimedLocations[loc.ID] = true
-			t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", loc.ID, loc.Name, count)
-			return loc.ID, loc.Name
+		if !probe(loc) {
+			continue
 		}
+		mveClaimedMu.Lock()
+		if mveClaimedLocations[loc.ID] {
+			mveClaimedMu.Unlock()
+			continue
+		}
+		mveClaimedLocations[loc.ID] = true
+		mveClaimedMu.Unlock()
+		t.Cleanup(func() {
+			mveClaimedMu.Lock()
+			defer mveClaimedMu.Unlock()
+			delete(mveClaimedLocations, loc.ID)
+		})
+		t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", loc.ID, loc.Name, count)
+		return loc.ID, loc.Name
 	}
 	t.Skipf("skipping: no location with capacity for %d MVEs found", count)
 	return 0, ""
@@ -293,6 +324,11 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 			return 0, "" // already taken
 		}
 		mveClaimedLocations[locID] = true
+		t.Cleanup(func() {
+			mveClaimedMu.Lock()
+			defer mveClaimedMu.Unlock()
+			delete(mveClaimedLocations, locID)
+		})
 		t.Logf("findMVETestLocation: using location %d (%s) [%s]", locID, locName, source)
 		return locID, locName
 	}
@@ -349,6 +385,11 @@ func findPortTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	for _, loc := range locations {
 		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, speedMbps) && !portClaimedLocations[loc.ID] {
 			portClaimedLocations[loc.ID] = true
+			t.Cleanup(func() {
+				portClaimedMu.Lock()
+				defer portClaimedMu.Unlock()
+				delete(portClaimedLocations, loc.ID)
+			})
 			t.Logf("findPortTestLocation: using location %d (%s)", loc.ID, loc.Name)
 			return loc.ID, loc.Name
 		}
@@ -385,6 +426,11 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	for _, loc := range locations {
 		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, speedMbps) && !mcrClaimedLocations[loc.ID] {
 			mcrClaimedLocations[loc.ID] = true
+			t.Cleanup(func() {
+				mcrClaimedMu.Lock()
+				defer mcrClaimedMu.Unlock()
+				delete(mcrClaimedLocations, loc.ID)
+			})
 			t.Logf("findMCRTestLocation: using location %d (%s)", loc.ID, loc.Name)
 			return loc.ID, loc.Name
 		}
@@ -511,7 +557,11 @@ var (
 // Each key is claimed exclusively so parallel tests get unique keys.
 func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
 	t.Helper()
-	creds := loadCSPCredentials()
+	creds, err := loadCSPCredentials()
+	if err != nil {
+		t.Skipf("skipping: %v", err)
+		return cspPickResult{}
+	}
 
 	var keys []string
 	switch partner {
@@ -551,11 +601,19 @@ func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
 	copy(shuffled, keys)
 	r.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
 
+	mask := func(s string) string {
+		if len(s) <= 8 {
+			return "***"
+		}
+		return "..." + s[len(s)-8:]
+	}
+
 	for _, key := range shuffled {
+		masked := mask(key)
 		cspClaimedMu.Lock()
 		if cspClaimedKeys[key] {
 			cspClaimedMu.Unlock()
-			t.Logf("pick%sKey: key %s already claimed by another test, skipping", partner, key)
+			t.Logf("pick%sKey: key %s already claimed, skipping", partner, masked)
 			continue
 		}
 		cspClaimedMu.Unlock()
@@ -566,26 +624,26 @@ func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
 			PortSpeed: 1000,
 		})
 		if lookupErr != nil {
-			t.Logf("pick%sKey: key %s unavailable: %v", partner, key, lookupErr)
+			t.Logf("pick%sKey: key %s unavailable: %v", partner, masked, lookupErr)
 			continue
 		}
 		locID := portLocation[resp.ProductUID]
 		if locID == 0 {
-			t.Logf("pick%sKey: key %s resolved to port %s but location unknown, skipping", partner, key, resp.ProductUID)
+			t.Logf("pick%sKey: key %s resolved but location unknown, skipping", partner, masked)
 			continue
 		}
 
 		cspClaimedMu.Lock()
 		if cspClaimedKeys[key] || cspClaimedPorts[resp.ProductUID] {
 			cspClaimedMu.Unlock()
-			t.Logf("pick%sKey: key %s or port %s already claimed, skipping", partner, key, resp.ProductUID)
+			t.Logf("pick%sKey: key %s or port already claimed, skipping", partner, masked)
 			continue
 		}
 		cspClaimedKeys[key] = true
 		cspClaimedPorts[resp.ProductUID] = true
 		cspClaimedMu.Unlock()
 
-		t.Logf("pick%sKey: using key %s (port %s, location %d)", partner, key, resp.ProductUID, locID)
+		t.Logf("pick%sKey: using key %s (location %d)", partner, masked, locID)
 		return cspPickResult{Key: key, PartnerPortUID: resp.ProductUID, LocationID: locID}
 	}
 
@@ -606,7 +664,11 @@ var (
 // — no API validation needed. Calls t.Skip if the pool is exhausted.
 func pickOracleVirtualCircuitID(t *testing.T) string {
 	t.Helper()
-	creds := loadCSPCredentials()
+	creds, err := loadCSPCredentials()
+	if err != nil {
+		t.Skipf("skipping: %v", err)
+		return ""
+	}
 	if len(creds.OracleVirtualCircuitIDs) == 0 {
 		t.Skip("skipping: no Oracle virtual circuit IDs in testdata/csp_credentials.json")
 		return ""
@@ -617,7 +679,7 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 	for _, id := range creds.OracleVirtualCircuitIDs {
 		if !oracleClaimedIDs[id] {
 			oracleClaimedIDs[id] = true
-			t.Logf("pickOracleVirtualCircuitID: using %s", id)
+			t.Logf("pickOracleVirtualCircuitID: using ...%s", id[max(0, len(id)-8):])
 			return id
 		}
 	}
@@ -625,21 +687,25 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 	return ""
 }
 
-func loadCSPCredentials() cspCredentials {
+func loadCSPCredentials() (cspCredentials, error) {
 	// Prefer env var so CI can inject credentials from secrets.
 	if raw := os.Getenv("CSP_CREDENTIALS_JSON"); raw != "" {
 		var creds cspCredentials
-		_ = json.Unmarshal([]byte(raw), &creds)
-		return creds
+		if err := json.Unmarshal([]byte(raw), &creds); err != nil {
+			return cspCredentials{}, fmt.Errorf("CSP_CREDENTIALS_JSON: %w", err)
+		}
+		return creds, nil
 	}
 	// Fall back to local file for developer convenience.
 	data, err := os.ReadFile("testdata/csp_credentials.json")
 	if err != nil {
-		return cspCredentials{}
+		return cspCredentials{}, nil //nolint:nilerr // file missing is not an error — tests will skip on empty pools
 	}
 	var creds cspCredentials
-	_ = json.Unmarshal(data, &creds)
-	return creds
+	if err := json.Unmarshal(data, &creds); err != nil {
+		return cspCredentials{}, fmt.Errorf("testdata/csp_credentials.json: %w", err)
+	}
+	return creds, nil
 }
 
 // ── Staging Health Check ──────────────────────────────────────────────────────
@@ -721,7 +787,10 @@ func TestStagingHealthCheck(t *testing.T) {
 	}
 
 	// CSP credentials pool — probe each key for live capacity
-	creds := loadCSPCredentials()
+	creds, credErr := loadCSPCredentials()
+	if credErr != nil {
+		t.Logf("WARN: could not load CSP credentials: %v", credErr)
+	}
 	t.Logf("Azure service keys in pool: %d", len(creds.AzureServiceKeys))
 	t.Logf("GCP pairing keys in pool: %d", len(creds.GooglePairingKeys))
 
