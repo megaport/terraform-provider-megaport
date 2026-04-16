@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -105,7 +106,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 		Attributes: map[string]schema.Attribute{
 			"product_uid": schema.StringAttribute{
 				Optional:    true,
-				Description: "The unique identifier of a specific port to look up. If not provided, all active ports are returned.",
+				Description: "The unique identifier of a specific port to look up. If not provided, all ports are returned.",
 			},
 			"include_resource_tags": schema.BoolAttribute{
 				Optional:    true,
@@ -268,6 +269,13 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			)
 			return
 		}
+		if port == nil {
+			resp.Diagnostics.AddError(
+				"Error reading Port",
+				"Port not found: "+data.ProductUID.ValueString(),
+			)
+			return
+		}
 		ports = []*megaport.Port{port}
 	} else {
 		// List all ports
@@ -302,7 +310,11 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			}
 		}
 
-		detail := fromAPIPortDetail(port, tags)
+		detail, detailDiags := fromAPIPortDetail(port, tags)
+		resp.Diagnostics.Append(detailDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		obj, objDiags := types.ObjectValueFrom(ctx, portDetailAttrs, &detail)
 		resp.Diagnostics.Append(objDiags...)
 		if resp.Diagnostics.HasError() {
@@ -322,7 +334,9 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 }
 
 // fromAPIPortDetail maps an API Port and its resource tags to a portDetailModel.
-func fromAPIPortDetail(p *megaport.Port, tags map[string]string) portDetailModel {
+func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
 	detail := portDetailModel{
 		UID:                   types.StringValue(p.UID),
 		Name:                  types.StringValue(p.Name),
@@ -379,10 +393,12 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) portDetailModel
 		for k, v := range tags {
 			resourceTagValues[k] = types.StringValue(v)
 		}
-		detail.ResourceTags, _ = types.MapValue(types.StringType, resourceTagValues)
+		var mapDiags diag.Diagnostics
+		detail.ResourceTags, mapDiags = types.MapValue(types.StringType, resourceTagValues)
+		diags.Append(mapDiags...)
 	} else {
 		detail.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	return detail
+	return detail, diags
 }
