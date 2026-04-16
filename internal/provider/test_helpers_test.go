@@ -536,10 +536,11 @@ func findVXCPortAndMCRTestLocations(t *testing.T, count int, mcrSpeedMbps int) [
 		}
 		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && mcrLocationHasCapacity(loc, mcrSpeedMbps) && !portClaimedLocations[loc.ID] {
 			portClaimedLocations[loc.ID] = true
+			locID := loc.ID
 			t.Cleanup(func() {
 				portClaimedMu.Lock()
 				defer portClaimedMu.Unlock()
-				delete(portClaimedLocations, loc.ID)
+				delete(portClaimedLocations, locID)
 			})
 			t.Logf("findVXCPortAndMCRTestLocations: claimed location %d (%s)", loc.ID, loc.Name)
 			ids = append(ids, loc.ID)
@@ -589,10 +590,11 @@ func findVXCPortTestLocationsWithPartner(t *testing.T, count int, connectType st
 		}
 		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && partnerLocs[loc.ID] && !portClaimedLocations[loc.ID] {
 			portClaimedLocations[loc.ID] = true
+			locID := loc.ID
 			t.Cleanup(func() {
 				portClaimedMu.Lock()
 				defer portClaimedMu.Unlock()
-				delete(portClaimedLocations, loc.ID)
+				delete(portClaimedLocations, locID)
 			})
 			t.Logf("findVXCPortTestLocationsWithPartner(%s): claimed location %d (%s)", connectType, loc.ID, loc.Name)
 			ids = append(ids, loc.ID)

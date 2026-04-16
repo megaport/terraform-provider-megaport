@@ -2507,7 +2507,8 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 func TestMVE_AWS_VXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocationsWithPartner(t, 2, "AWS")
+	mveLocID, _ := findMVETestLocation(t, 0)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -2598,7 +2599,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
 					}
 				  }
 
-                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
+                  `, mveLocID, awsLocs[0], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2709,7 +2710,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
 					}
 				  }
 
-                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
+                  `, mveLocID, awsLocs[0], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
