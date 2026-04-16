@@ -17,7 +17,7 @@ Looks up MVEs in the Megaport API. Optionally filter by product_uid to retrieve 
 
 ### Optional
 
-- `include_resource_tags` (Boolean) Whether to fetch resource tags for each MVE. Defaults to false. Enabling this causes an additional API call per MVE, which may be slow for accounts with many MVEs.
+- `include_resource_tags` (Boolean) Whether to fetch resource tags for each MVE. Enabling this causes an additional API call per MVE, which may be slow for accounts with many MVEs.
 - `product_uid` (String) The unique identifier of a specific MVE to look up. If not provided, all active MVEs are returned.
 
 ### Read-Only
@@ -49,7 +49,7 @@ Read-Only:
 - `product_name` (String) The name of the MVE.
 - `product_uid` (String) The unique identifier of the MVE.
 - `provisioning_status` (String) The provisioning status of the MVE.
-- `resource_tags` (Map of String) The resource tags associated with the MVE.
+- `resource_tags` (Map of String) The resource tags associated with the MVE. Only populated when include_resource_tags is enabled.
 - `secondary_name` (String) The secondary name of the MVE.
 - `size` (String) The size of the MVE.
 - `terminate_date` (String) The date the MVE will be terminated.
