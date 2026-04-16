@@ -83,10 +83,7 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
       - run: go mod download
-      - env:
-          MEGAPORT_ACCESS_KEY: ${{ secrets.MEGAPORT_ACCESS_KEY }}
-          MEGAPORT_SECRET_KEY: ${{ secrets.MEGAPORT_SECRET_KEY }}
-        run: go test -v -timeout=30m -cover ./internal/provider/
+      - run: go test -v -timeout=30m -cover ./internal/provider/
 
   opentofu-test:
     name: OpenTofu Compatibility Tests

@@ -230,15 +230,16 @@ func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name stri
 			mveClaimedMu.Unlock()
 			continue
 		}
-		mveClaimedLocations[loc.ID] = true
+		locID := loc.ID
+		mveClaimedLocations[locID] = true
 		mveClaimedMu.Unlock()
 		t.Cleanup(func() {
 			mveClaimedMu.Lock()
 			defer mveClaimedMu.Unlock()
-			delete(mveClaimedLocations, loc.ID)
+			delete(mveClaimedLocations, locID)
 		})
-		t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", loc.ID, loc.Name, count)
-		return loc.ID, loc.Name
+		t.Logf("findMVETestLocationHighCapacity: using location %d (%s) for %d MVEs (sweep)", locID, loc.Name, count)
+		return locID, loc.Name
 	}
 	t.Skipf("skipping: no location with capacity for %d MVEs found", count)
 	return 0, ""
@@ -388,14 +389,15 @@ func findPortTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	defer portClaimedMu.Unlock()
 	for _, loc := range locations {
 		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, speedMbps) && !portClaimedLocations[loc.ID] {
-			portClaimedLocations[loc.ID] = true
+			locID := loc.ID
+			portClaimedLocations[locID] = true
 			t.Cleanup(func() {
 				portClaimedMu.Lock()
 				defer portClaimedMu.Unlock()
-				delete(portClaimedLocations, loc.ID)
+				delete(portClaimedLocations, locID)
 			})
-			t.Logf("findPortTestLocation: using location %d (%s)", loc.ID, loc.Name)
-			return loc.ID, loc.Name
+			t.Logf("findPortTestLocation: using location %d (%s)", locID, loc.Name)
+			return locID, loc.Name
 		}
 	}
 	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps Megaport port capacity", speedMbps)
@@ -429,14 +431,15 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	defer mcrClaimedMu.Unlock()
 	for _, loc := range locations {
 		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, speedMbps) && !mcrClaimedLocations[loc.ID] {
-			mcrClaimedLocations[loc.ID] = true
+			locID := loc.ID
+			mcrClaimedLocations[locID] = true
 			t.Cleanup(func() {
 				mcrClaimedMu.Lock()
 				defer mcrClaimedMu.Unlock()
-				delete(mcrClaimedLocations, loc.ID)
+				delete(mcrClaimedLocations, locID)
 			})
-			t.Logf("findMCRTestLocation: using location %d (%s)", loc.ID, loc.Name)
-			return loc.ID, loc.Name
+			t.Logf("findMCRTestLocation: using location %d (%s)", locID, loc.Name)
+			return locID, loc.Name
 		}
 	}
 	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity", speedMbps)
