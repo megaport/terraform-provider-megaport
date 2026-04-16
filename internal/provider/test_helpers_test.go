@@ -564,7 +564,7 @@ func findVXCPortAndMCRTestLocations(t *testing.T, count int, mcrSpeedMbps int) [
 // requires that the returned locations have at least one partner port of the
 // given connect type (e.g. "AWS", "TRANSIT"). Use this for tests whose HCL
 // includes a megaport_partner data source filtered by location.
-func findVXCPortTestLocationsWithPartner(t *testing.T, count int, connectType string) []int {
+func findVXCPortTestLocationsWithPartner(t *testing.T, count int, connectType string) []int { //nolint:unparam // count is parameterized for API consistency with other find* helpers
 	t.Helper()
 	ctx := context.Background()
 	client, err := getTestClient()

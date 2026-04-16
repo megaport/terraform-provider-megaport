@@ -1695,7 +1695,10 @@ func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 func TestFullEcosystem(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocationsWithPartner(t, 3, "AWS")
+	// loc1 hosts the MCR (2500 Mbps) + LAG port; loc2 needs AWS partner ports; loc3 is unused.
+	mcrLocs := findVXCPortAndMCRTestLocations(t, 1, 2500)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
+	locs := []int{mcrLocs[0], awsLocs[0], awsLocs[0]}
 	azure := pickAzureServiceKey(t)
 	gcp := pickGCPPairingKey(t)
 	portName := RandomTestName()
