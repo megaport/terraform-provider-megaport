@@ -393,6 +393,43 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	return 0, ""
 }
 
+// findVXCPortTestLocations returns count unique staging location IDs that
+// support Megaport ports at 1000 Mbps. Uses the same portClaimedLocations
+// mechanism as findPortTestLocation so parallel tests don't collide.
+// Calls t.Skip if not enough locations are found.
+func findVXCPortTestLocations(t *testing.T, count int) []int {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return nil
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return nil
+	}
+	portClaimedMu.Lock()
+	defer portClaimedMu.Unlock()
+	var ids []int
+	for _, loc := range locations {
+		if len(ids) >= count {
+			break
+		}
+		if strings.EqualFold(loc.Status, "active") && portLocationHasCapacity(loc, 1000) && !portClaimedLocations[loc.ID] {
+			portClaimedLocations[loc.ID] = true
+			t.Logf("findVXCPortTestLocations: claimed location %d (%s)", loc.ID, loc.Name)
+			ids = append(ids, loc.ID)
+		}
+	}
+	if len(ids) < count {
+		t.Skipf("skipping: found only %d of %d unclaimed ACTIVE locations with 1000 Mbps port capacity", len(ids), count)
+		return nil
+	}
+	return ids
+}
+
 // portLocationHasCapacity returns true when at least one diversity zone at loc
 // lists exactly speedMbps in MegaportSpeedMbps.
 func portLocationHasCapacity(loc *megaport.LocationV3, speedMbps int) bool {
@@ -589,6 +626,13 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 }
 
 func loadCSPCredentials() cspCredentials {
+	// Prefer env var so CI can inject credentials from secrets.
+	if raw := os.Getenv("CSP_CREDENTIALS_JSON"); raw != "" {
+		var creds cspCredentials
+		_ = json.Unmarshal([]byte(raw), &creds)
+		return creds
+	}
+	// Fall back to local file for developer convenience.
 	data, err := os.ReadFile("testdata/csp_credentials.json")
 	if err != nil {
 		return cspCredentials{}
