@@ -21,7 +21,7 @@ import (
 // Run the docs generation tool, check its repository for more information on how it works and how docs
 // can be customized.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
-//go:generate ./scripts/generate-changelog.sh
+//go:generate bash ./scripts/generate-changelog.sh
 
 var (
 	// these will be set by the goreleaser configuration

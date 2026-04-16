@@ -63,10 +63,13 @@ echo "" >> "$OUT"
 
 # Collect tags newest-first into an array, sorted by version so release ranges
 # follow semantic version progression instead of tag creation time.
+# Exclude prerelease tags (alpha/beta/rc) — their commits are covered by the
+# final release entry and Git's version sort does not follow SemVer prerelease
+# ordering.
 tags=()
 while IFS= read -r t; do
     tags+=("$t")
-done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname)
+done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname | grep -Ev '\-(alpha|beta|rc)')
 
 for i in "${!tags[@]}"; do
     tag="${tags[$i]}"
@@ -84,8 +87,14 @@ for i in "${!tags[@]}"; do
         range="$tag"
     fi
 
-    git -C "$REPO_ROOT" log --no-merges --format="- %s" "$range" 2>/dev/null \
-        | grep -Ev '^- chore(\([^)]*\))?:' \
+    # Filter out unscoped "chore:" commits but keep scoped ones like "chore(deps):"
+    # which carry useful information (dependency bumps, etc.).
+    commits=$(git -C "$REPO_ROOT" log --no-merges --format="- %s" "$range") || {
+        echo "error: git log failed for range $range" >&2
+        exit 1
+    }
+    echo "$commits" \
+        | grep -Ev '^- chore:' \
         | grep -v "^- Merge " \
         >> "$OUT" || true
 
