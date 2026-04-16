@@ -7,8 +7,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${REPO_ROOT}/CHANGELOG.md"
+TMPOUT="$(mktemp "${OUT}.XXXXXX")"
+trap 'rm -f "$TMPOUT"' EXIT
 
-cat > "$OUT" << 'HEADER'
+cat > "$TMPOUT" << 'HEADER'
 # Changelog
 
 All notable changes to the Megaport Terraform Provider will be documented in this file.
@@ -56,26 +58,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 HEADER
 
 # Append release history generated from git tags
-echo "---" >> "$OUT"
-echo "" >> "$OUT"
-echo "## Release History" >> "$OUT"
-echo "" >> "$OUT"
+echo "---" >> "$TMPOUT"
+echo "" >> "$TMPOUT"
+echo "## Release History" >> "$TMPOUT"
+echo "" >> "$TMPOUT"
 
 # Collect tags newest-first into an array, sorted by version so release ranges
 # follow semantic version progression instead of tag creation time.
 # Exclude prerelease tags (alpha/beta/rc) — their commits are covered by the
 # final release entry and Git's version sort does not follow SemVer prerelease
-# ordering.
+# ordering. Tolerate zero matching tags (grep returns 1 on no match).
 tags=()
 while IFS= read -r t; do
-    tags+=("$t")
-done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname | grep -Ev '\-(alpha|beta|rc)')
+    [[ -n "$t" ]] && tags+=("$t")
+done < <(git -C "$REPO_ROOT" tag --list 'v*' --sort=-version:refname | grep -Ev '\-(alpha|beta|rc)' || true)
+
+if [ "${#tags[@]}" -eq 0 ]; then
+    echo "_No release tags found._" >> "$TMPOUT"
+    echo "" >> "$TMPOUT"
+    mv "$TMPOUT" "$OUT"
+    trap - EXIT
+    exit 0
+fi
 
 for i in "${!tags[@]}"; do
     tag="${tags[$i]}"
     date=$(git -C "$REPO_ROOT" log -1 --format="%as" "$tag" 2>/dev/null)
-    echo "### [$tag] — $date" >> "$OUT"
-    echo "" >> "$OUT"
+    echo "### [$tag] — $date" >> "$TMPOUT"
+    echo "" >> "$TMPOUT"
 
     # Range: commits in this tag that are NOT in the next-older tag
     next_idx=$((i + 1))
@@ -96,7 +106,10 @@ for i in "${!tags[@]}"; do
     echo "$commits" \
         | grep -Ev '^- chore:' \
         | grep -v "^- Merge " \
-        >> "$OUT" || true
+        >> "$TMPOUT" || true
 
-    echo "" >> "$OUT"
+    echo "" >> "$TMPOUT"
 done
+
+mv "$TMPOUT" "$OUT"
+trap - EXIT
