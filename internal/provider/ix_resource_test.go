@@ -6,19 +6,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-// IXProviderTestSuite reuses the provider test suite for Megaport
-type IXProviderTestSuite ProviderTestSuite
-
-func TestIXProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(IXProviderTestSuite))
-}
-
 // TestAccMegaportIX_Basic tests the basic lifecycle of an IX resource
-func (suite *IXProviderTestSuite) TestAccMegaportIX_Basic() {
+func TestAccMegaportIX_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	ixName := RandomTestName()
 	portName := RandomTestName()
 	ixNameUpdated := ixName + "-updated"
@@ -46,7 +40,7 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixName, ixRateLimit, ixVLAN)
+`, portName, locationID, ixName, ixRateLimit, ixVLAN)
 
 	// Updated Terraform config
 	configUpdated := fmt.Sprintf(`
@@ -68,11 +62,11 @@ resource "megaport_ix" "test_ix" {
     vlan                = %d
     shutdown            = false
 }
-`, portName, SinglePortTestLocationIDNum, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
+`, portName, locationID, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
 
 	resourceName := "megaport_ix.test_ix"
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
