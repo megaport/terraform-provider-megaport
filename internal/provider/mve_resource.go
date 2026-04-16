@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -766,20 +765,14 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	err := r.client.MVEService.ValidateMVEOrder(ctx, mveReq)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Validation error while attempting to create MVE",
-			"Validation error while attempting to create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, createErrorSummary("MVE", plan.Name.ValueString()), err)
 		return
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading MVE",
-			"Could not create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, createErrorSummary("MVE", plan.Name.ValueString()), err)
 		return
 	}
 
@@ -788,19 +781,13 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// get the created MVE
 	mve, err := r.client.MVEService.GetMVE(ctx, createdID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading newly created MVE",
-			"Could not read newly created MVE with ID "+createdID+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", createdID), err)
 		return
 	}
 
 	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for newly created MVE",
-			"Could not read tags for newly created MVE with ID "+createdID+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", createdID), err)
 		return
 	}
 
@@ -839,10 +826,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			}
 		}
 
-		resp.Diagnostics.AddError(
-			"Error Reading MVE",
-			"Could not read MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -855,10 +839,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Get tags
 	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for MVE",
-			"Could not read tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", state.UID.ValueString()), err)
 		return
 	}
 
@@ -916,19 +897,13 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating MVE",
-			"Could not update MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, updateErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
 	updatedMVE, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading updated MVE",
-			"Could not read updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -940,20 +915,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), tagMap)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating tags for MVE",
-				"Could not update tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-			)
+			addAPIError(&resp.Diagnostics, updateErrorSummary("MVE Tags", state.UID.ValueString()), err)
 			return
 		}
 	}
 
 	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for updated MVE",
-			"Could not read tags for updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", state.UID.ValueString()), err)
 		return
 	}
 
@@ -989,10 +958,7 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return deleteErr
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting MVE",
-			fmt.Sprintf("Could not delete MVE with product UID %s: %s", productUID, err),
-		)
+		addAPIError(&resp.Diagnostics, deleteErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
