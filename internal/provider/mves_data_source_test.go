@@ -176,7 +176,8 @@ func TestFromAPIMVEDetail(t *testing.T) {
 			"owner": "team-a",
 		}
 
-		detail := fromAPIMVEDetail(mve, tags)
+		detail, diags := fromAPIMVEDetail(mve, tags)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "mve-abc-123", detail.UID.ValueString())
 		assert.Equal(t, "My Test MVE", detail.Name.ValueString())
@@ -212,7 +213,8 @@ func TestFromAPIMVEDetail(t *testing.T) {
 			ContractEndDate:   nil,
 		}
 
-		detail := fromAPIMVEDetail(mve, nil)
+		detail, diags := fromAPIMVEDetail(mve, nil)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "", detail.CreateDate.ValueString())
 		assert.Equal(t, "", detail.LiveDate.ValueString())
@@ -227,7 +229,8 @@ func TestFromAPIMVEDetail(t *testing.T) {
 			AttributeTags: nil,
 		}
 
-		detail := fromAPIMVEDetail(mve, nil)
+		detail, diags := fromAPIMVEDetail(mve, nil)
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.AttributeTags.IsNull())
 		assert.True(t, detail.ResourceTags.IsNull())
@@ -238,7 +241,8 @@ func TestFromAPIMVEDetail(t *testing.T) {
 			UID: "mve-empty-tags",
 		}
 
-		detail := fromAPIMVEDetail(mve, map[string]string{})
+		detail, diags := fromAPIMVEDetail(mve, map[string]string{})
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
@@ -247,14 +251,16 @@ func TestFromAPIMVEDetail(t *testing.T) {
 func TestFromAPIMVEDetail_ResourceTagsOptIn(t *testing.T) {
 	t.Run("Tags nil when not fetched", func(t *testing.T) {
 		mve := &megaport.MVE{UID: "mve-1"}
-		detail := fromAPIMVEDetail(mve, nil)
+		detail, diags := fromAPIMVEDetail(mve, nil)
+		assert.False(t, diags.HasError())
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
 
 	t.Run("Tags populated when fetched", func(t *testing.T) {
 		mve := &megaport.MVE{UID: "mve-1"}
 		tags := map[string]string{"env": "prod"}
-		detail := fromAPIMVEDetail(mve, tags)
+		detail, diags := fromAPIMVEDetail(mve, tags)
+		assert.False(t, diags.HasError())
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
 }
@@ -284,7 +290,8 @@ func TestReadMVEs_TagsNotFetchedByDefault(t *testing.T) {
 		if fetchTags {
 			tags, _ = mockClient.MVEService.ListMVEResourceTags(context.Background(), mve.UID)
 		}
-		detail := fromAPIMVEDetail(mve, tags)
+		detail, diags := fromAPIMVEDetail(mve, tags)
+		assert.False(t, diags.HasError())
 		assert.True(t, detail.ResourceTags.IsNull())
 	}
 	assert.False(t, tagsCalled, "ListMVEResourceTags should not be called when include_resource_tags is false")
@@ -296,10 +303,24 @@ func TestReadMVEs_TagsNotFetchedByDefault(t *testing.T) {
 		if fetchTags {
 			tags, _ = mockClient.MVEService.ListMVEResourceTags(context.Background(), mve.UID)
 		}
-		detail := fromAPIMVEDetail(mve, tags)
+		detail, diags := fromAPIMVEDetail(mve, tags)
+		assert.False(t, diags.HasError())
 		assert.False(t, detail.ResourceTags.IsNull())
 	}
 	assert.True(t, tagsCalled, "ListMVEResourceTags should be called when include_resource_tags is true")
+}
+
+func TestReadMVEs_GetByUIDReturnsNil(t *testing.T) {
+	mockMVEService := &MockMVEService{
+		GetMVEResult: nil,
+		GetMVEErr:    nil,
+	}
+	mockClient := &megaport.Client{MVEService: mockMVEService}
+	ds := &mvesDataSource{client: mockClient}
+
+	mve, err := ds.client.MVEService.GetMVE(context.Background(), "mve-nonexistent")
+	assert.NoError(t, err)
+	assert.Nil(t, mve)
 }
 
 // Ensure mvesModel compiles with the schema.

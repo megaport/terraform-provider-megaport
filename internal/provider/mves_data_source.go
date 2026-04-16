@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -275,6 +276,13 @@ func (d *mvesDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			)
 			return
 		}
+		if mve == nil {
+			resp.Diagnostics.AddError(
+				"Error reading MVE",
+				"MVE not found: "+data.ProductUID.ValueString(),
+			)
+			return
+		}
 		mves = []*megaport.MVE{mve}
 	} else {
 		// List all MVEs
@@ -311,7 +319,11 @@ func (d *mvesDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			}
 		}
 
-		detail := fromAPIMVEDetail(mve, tags)
+		detail, detailDiags := fromAPIMVEDetail(mve, tags)
+		resp.Diagnostics.Append(detailDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		obj, objDiags := types.ObjectValueFrom(ctx, mveDetailAttrs, &detail)
 		resp.Diagnostics.Append(objDiags...)
 		if resp.Diagnostics.HasError() {
@@ -331,7 +343,9 @@ func (d *mvesDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 }
 
 // fromAPIMVEDetail maps an API MVE and its resource tags to an mveDetailModel.
-func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) mveDetailModel {
+func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) (mveDetailModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
 	detail := mveDetailModel{
 		UID:                   types.StringValue(m.UID),
 		Name:                  types.StringValue(m.Name),
@@ -388,7 +402,9 @@ func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) mveDetailModel {
 		for k, v := range m.AttributeTags {
 			attrTagValues[k] = types.StringValue(v)
 		}
-		detail.AttributeTags, _ = types.MapValue(types.StringType, attrTagValues)
+		var attrTagDiags diag.Diagnostics
+		detail.AttributeTags, attrTagDiags = types.MapValue(types.StringType, attrTagValues)
+		diags.Append(attrTagDiags...)
 	} else {
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
@@ -399,10 +415,12 @@ func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) mveDetailModel {
 		for k, v := range tags {
 			resourceTagValues[k] = types.StringValue(v)
 		}
-		detail.ResourceTags, _ = types.MapValue(types.StringType, resourceTagValues)
+		var resourceTagDiags diag.Diagnostics
+		detail.ResourceTags, resourceTagDiags = types.MapValue(types.StringType, resourceTagValues)
+		diags.Append(resourceTagDiags...)
 	} else {
 		detail.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	return detail
+	return detail, diags
 }
