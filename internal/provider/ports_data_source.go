@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -110,7 +111,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			},
 			"include_resource_tags": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to fetch resource tags for each port. Defaults to false. Enabling this causes an additional API call per port, which may be slow for accounts with many ports.",
+				Description: "Whether to fetch resource tags for each port. Enabling this causes an additional API call per port, which may be slow for accounts with many ports.",
 			},
 			"ports": schema.ListNestedAttribute{
 				Description: "List of ports with detailed information.",
@@ -219,7 +220,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 						},
 						"resource_tags": schema.MapAttribute{
 							ElementType: types.StringType,
-							Description: "The resource tags associated with the port.",
+							Description: "The resource tags associated with the port. Only populated when include_resource_tags is set to true.",
 							Computed:    true,
 						},
 					},
@@ -271,7 +272,7 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 		if port == nil {
 			resp.Diagnostics.AddError(
-				"Error reading Port",
+				"Error reading port",
 				"Port not found: "+data.ProductUID.ValueString(),
 			)
 			return
@@ -291,7 +292,7 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	// Determine whether to fetch resource tags (opt-in to avoid N+1 API calls)
-	fetchTags := !data.IncludeResourceTags.IsNull() && data.IncludeResourceTags.ValueBool()
+	fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
 
 	// Build detail objects
 	portObjects := make([]types.Object, 0, len(ports))
@@ -360,31 +361,31 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailMode
 		DiversityZone:         types.StringValue(p.DiversityZone),
 	}
 
-	// Time fields
+	// Time fields — use RFC3339 for consistency; null when the API returns nil.
 	if p.CreateDate != nil {
-		detail.CreateDate = types.StringValue(p.CreateDate.String())
+		detail.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC3339))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if p.LiveDate != nil {
-		detail.LiveDate = types.StringValue(p.LiveDate.String())
+		detail.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC3339))
 	} else {
-		detail.LiveDate = types.StringValue("")
+		detail.LiveDate = types.StringNull()
 	}
 	if p.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(p.TerminateDate.String())
+		detail.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC3339))
 	} else {
-		detail.TerminateDate = types.StringValue("")
+		detail.TerminateDate = types.StringNull()
 	}
 	if p.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(p.ContractStartDate.String())
+		detail.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC3339))
 	} else {
-		detail.ContractStartDate = types.StringValue("")
+		detail.ContractStartDate = types.StringNull()
 	}
 	if p.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(p.ContractEndDate.String())
+		detail.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC3339))
 	} else {
-		detail.ContractEndDate = types.StringValue("")
+		detail.ContractEndDate = types.StringNull()
 	}
 
 	// Resource tags

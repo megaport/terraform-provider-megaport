@@ -219,7 +219,7 @@ func TestFromAPIPortDetail(t *testing.T) {
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
 
-	t.Run("Nil time fields produce empty strings", func(t *testing.T) {
+	t.Run("Nil time fields produce null strings", func(t *testing.T) {
 		port := &megaport.Port{
 			UID:               "port-nil-times",
 			CreateDate:        nil,
@@ -232,11 +232,11 @@ func TestFromAPIPortDetail(t *testing.T) {
 		detail, diags := fromAPIPortDetail(port, nil)
 		assert.False(t, diags.HasError())
 
-		assert.Equal(t, "", detail.CreateDate.ValueString())
-		assert.Equal(t, "", detail.LiveDate.ValueString())
-		assert.Equal(t, "", detail.TerminateDate.ValueString())
-		assert.Equal(t, "", detail.ContractStartDate.ValueString())
-		assert.Equal(t, "", detail.ContractEndDate.ValueString())
+		assert.True(t, detail.CreateDate.IsNull())
+		assert.True(t, detail.LiveDate.IsNull())
+		assert.True(t, detail.TerminateDate.IsNull())
+		assert.True(t, detail.ContractStartDate.IsNull())
+		assert.True(t, detail.ContractEndDate.IsNull())
 	})
 
 	t.Run("Nil tags produce null map", func(t *testing.T) {
