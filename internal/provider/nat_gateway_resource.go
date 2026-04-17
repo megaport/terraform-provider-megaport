@@ -47,6 +47,7 @@ type natGatewayResourceModel struct {
 	AdminLocked           types.Bool   `tfsdk:"admin_locked"`
 	ServiceLevelReference types.String `tfsdk:"service_level_reference"`
 	PromoCode             types.String `tfsdk:"promo_code"`
+	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
 	ResourceTags          types.Map    `tfsdk:"resource_tags"`
 
 	// Config fields (flattened from NATGatewayNetworkConfig)
@@ -69,6 +70,7 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) dia
 	m.Locked = types.BoolValue(gw.Locked)
 	m.AdminLocked = types.BoolValue(gw.AdminLocked)
 	m.ServiceLevelReference = types.StringValue(gw.ServiceLevelReference)
+	m.ProvisioningStatus = types.StringValue(gw.ProvisioningStatus)
 
 	if gw.PromoCode != "" {
 		m.PromoCode = types.StringValue(gw.PromoCode)
@@ -131,9 +133,7 @@ func (r *natGatewayResource) Metadata(_ context.Context, req resource.MetadataRe
 func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways. " +
-			"NOTE: This resource currently only creates the NAT Gateway design record (equivalent to `POST /v3/products/nat_gateways`); " +
-			"the gateway remains in DESIGN status and is not purchased or provisioned. " +
-			"Submitting the order via the Megaport Orders API will be wired up in a follow-up release once the megaportgo SDK exposes the required endpoints.",
+			"Creating this resource places a NAT Gateway order: the design record is created, validated, and purchased, and the provider waits for the service to reach CONFIGURED/LIVE before returning.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "Last updated by the Terraform provider.",
@@ -218,6 +218,13 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"promo_code": schema.StringAttribute{
 				Description: "A promotional code for the NAT Gateway order.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"provisioning_status": schema.StringAttribute{
+				Description: "The provisioning status of the NAT Gateway (e.g. CONFIGURED, LIVE).",
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -317,15 +324,31 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 
 	createdUID := createdGW.ProductUID
 
-	// NAT Gateway creation is an order placement that leaves the resource in
-	// DESIGN status — it does not auto-provision to CONFIGURED/LIVE, so we do
-	// not wait here.
+	// The CreateNATGateway call leaves the gateway in DESIGN status. Validate
+	// the order (surfaces pricing/config issues before charging the account),
+	// then submit the purchase via /v3/networkdesign/buy, and wait for the
+	// service to reach CONFIGURED/LIVE.
+	if _, err := r.client.NATGatewayService.ValidateNATGatewayOrder(ctx, createdUID); err != nil {
+		resp.Diagnostics.AddError(
+			"Error validating NAT Gateway order",
+			"Could not validate NAT Gateway order for "+createdUID+": "+err.Error(),
+		)
+		return
+	}
 
-	gw, err := r.client.NATGatewayService.GetNATGateway(ctx, createdUID)
+	if _, err := r.client.NATGatewayService.BuyNATGateway(ctx, createdUID); err != nil {
+		resp.Diagnostics.AddError(
+			"Error purchasing NAT Gateway",
+			"Could not purchase NAT Gateway order for "+createdUID+": "+err.Error(),
+		)
+		return
+	}
+
+	gw, err := r.waitForNATGatewayProvisioned(ctx, createdUID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created NAT Gateway",
-			"Could not read NAT Gateway with ID "+createdUID+": "+err.Error(),
+			"Error waiting for NAT Gateway provisioning",
+			err.Error(),
 		)
 		return
 	}
@@ -340,6 +363,42 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+}
+
+// waitForNATGatewayProvisioned polls the NAT Gateway until it reaches
+// CONFIGURED/LIVE, or returns an error on timeout, terminal state, or
+// context cancellation.
+func (r *natGatewayResource) waitForNATGatewayProvisioned(ctx context.Context, productUID string) (*megaport.NATGateway, error) {
+	const pollInterval = 10 * time.Second
+
+	pollCtx, cancel := context.WithTimeout(ctx, waitForTime)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	var lastStatus string
+	for {
+		gw, err := r.client.NATGatewayService.GetNATGateway(pollCtx, productUID)
+		if err != nil {
+			return nil, fmt.Errorf("polling NAT Gateway %s: %w", productUID, err)
+		}
+		lastStatus = gw.ProvisioningStatus
+		for _, ready := range megaport.SERVICE_STATE_READY {
+			if lastStatus == ready {
+				return gw, nil
+			}
+		}
+		if lastStatus == megaport.STATUS_DECOMMISSIONED || lastStatus == megaport.STATUS_CANCELLED {
+			return nil, fmt.Errorf("NAT Gateway %s reached terminal state %q before provisioning", productUID, lastStatus)
+		}
+
+		select {
+		case <-pollCtx.Done():
+			return nil, fmt.Errorf("NAT Gateway %s did not reach CONFIGURED/LIVE within %s (last status %q)", productUID, waitForTime, lastStatus)
+		case <-ticker.C:
+		}
 	}
 }
 
@@ -484,7 +543,13 @@ func (r *natGatewayResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 	productUID := state.ProductUID.ValueString()
 
-	err := r.client.NATGatewayService.DeleteNATGateway(ctx, productUID)
+	// After Create the gateway has been purchased and provisioned, so cancel
+	// via ProductService (DeleteNow=true = CANCEL_NOW). The NAT Gateway
+	// DESIGN-only DELETE endpoint does not apply once the order has been bought.
+	_, err := r.client.ProductService.DeleteProduct(ctx, &megaport.DeleteProductRequest{
+		ProductID: productUID,
+		DeleteNow: true,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting NAT Gateway",
