@@ -6,26 +6,21 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-type MCRIpsecAddonProviderTestSuite ProviderTestSuite
-
-func TestMCRIpsecAddonProviderTestSuite(t *testing.T) {
+func TestAccMegaportMCRIpsecAddon_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRIpsecAddonProviderTestSuite))
-}
-
-func (suite *MCRIpsecAddonProviderTestSuite) TestAccMegaportMCRIpsecAddon_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create MCR and IPSec add-on with 10 tunnels
 			{
-				Config: providerConfig + testAccMCRIpsecAddonConfig(mcrName, costCentreName, 10),
+				Config: providerConfig + testAccMCRIpsecAddonConfig(locationID, mcrName, costCentreName, 10),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_ipsec_addon.test", "tunnel_count", "10"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_ipsec_addon.test", "add_on_uid"),
@@ -34,13 +29,13 @@ func (suite *MCRIpsecAddonProviderTestSuite) TestAccMegaportMCRIpsecAddon_Basic(
 			},
 			// Plan-only check — no drift
 			{
-				Config:             providerConfig + testAccMCRIpsecAddonConfig(mcrName, costCentreName, 10),
+				Config:             providerConfig + testAccMCRIpsecAddonConfig(locationID, mcrName, costCentreName, 10),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
 			// Update to 20 tunnels
 			{
-				Config: providerConfig + testAccMCRIpsecAddonConfig(mcrName, costCentreName, 20),
+				Config: providerConfig + testAccMCRIpsecAddonConfig(locationID, mcrName, costCentreName, 20),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_ipsec_addon.test", "tunnel_count", "20"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_ipsec_addon.test", "add_on_uid"),
@@ -127,7 +122,7 @@ func TestParseImportIDStrings(t *testing.T) {
 	}
 }
 
-func testAccMCRIpsecAddonConfig(mcrName, costCentreName string, tunnelCount int) string {
+func testAccMCRIpsecAddonConfig(locationID int, mcrName, costCentreName string, tunnelCount int) string {
 	return fmt.Sprintf(`
 data "megaport_location" "test_location" {
 	id = %d
@@ -151,5 +146,5 @@ resource "megaport_mcr_ipsec_addon" "test" {
 	mcr_id       = megaport_mcr.mcr.product_uid
 	tunnel_count = %d
 }
-`, MCRTestLocationIDNum, mcrName, costCentreName, tunnelCount)
+`, locationID, mcrName, costCentreName, tunnelCount)
 }
