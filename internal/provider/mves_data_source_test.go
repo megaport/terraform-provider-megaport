@@ -236,7 +236,7 @@ func TestFromAPIMVEDetail(t *testing.T) {
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
 
-	t.Run("Empty resource tags produce null map", func(t *testing.T) {
+	t.Run("Empty non-nil resource tags produce empty map (fetched but empty)", func(t *testing.T) {
 		mve := &megaport.MVE{
 			UID: "mve-empty-tags",
 		}
@@ -244,7 +244,8 @@ func TestFromAPIMVEDetail(t *testing.T) {
 		detail, diags := fromAPIMVEDetail(mve, map[string]string{})
 		assert.False(t, diags.HasError())
 
-		assert.True(t, detail.ResourceTags.IsNull())
+		assert.False(t, detail.ResourceTags.IsNull())
+		assert.Equal(t, 0, len(detail.ResourceTags.Elements()))
 	})
 }
 

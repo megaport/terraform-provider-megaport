@@ -411,8 +411,9 @@ func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) (mveDetailModel, 
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
 
-	// Resource tags
-	if len(tags) > 0 {
+	// Resource tags — nil means tags were not fetched (include_resource_tags=false)
+	// and maps to null; a non-nil (possibly empty) map means tags were fetched.
+	if tags != nil {
 		resourceTagValues := make(map[string]attr.Value, len(tags))
 		for k, v := range tags {
 			resourceTagValues[k] = types.StringValue(v)
