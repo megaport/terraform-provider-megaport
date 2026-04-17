@@ -299,6 +299,22 @@ func TestIsNotFoundError(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "400 with 'Could not find' is not found",
+			err: &megaport.ErrorResponse{
+				Response: &http.Response{StatusCode: http.StatusBadRequest},
+				Message:  "Could not find prefix filter list with id 12345",
+			},
+			expected: true,
+		},
+		{
+			name: "400 with other message is not 'not found'",
+			err: &megaport.ErrorResponse{
+				Response: &http.Response{StatusCode: http.StatusBadRequest},
+				Message:  "Invalid VLAN value",
+			},
+			expected: false,
+		},
+		{
 			name:     "non-API error",
 			err:      errors.New("something else"),
 			expected: false,

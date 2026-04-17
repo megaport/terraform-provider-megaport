@@ -118,6 +118,9 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 
 	var lastErr error
 	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			if lastErr != nil {
 				return fmt.Errorf("timeout (%v) exceeded: %w", cfg.Timeout, lastErr)
@@ -199,6 +202,9 @@ func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx co
 
 	backoff := cfg.InitialBackoff
 	for {
+		if err := ctx.Err(); err != nil {
+			return zero, err
+		}
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			return zero, fmt.Errorf("%w after %v", ErrPollTimeout, cfg.Timeout)
 		}
