@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
@@ -1448,4 +1449,54 @@ func TestFromAPIExactMatchNormalization(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPlanToAPI_InvalidEntryReturnsError verifies that planToAPI aborts on the
+// first invalid entry and returns a nil API list — no partial conversion is
+// produced. This protects against a prior `continue`-after-error bug where
+// invalid entries were silently skipped.
+func TestPlanToAPI_InvalidEntryReturnsError(t *testing.T) {
+	ctx := context.Background()
+
+	entries := []attr.Value{
+		mustEntryObject(t, "permit", "10.0.0.0/8", 16, 24),
+		mustEntryObject(t, "permit", "not-a-prefix", 16, 24), // invalid
+		mustEntryObject(t, "permit", "192.168.0.0/16", 24, 32),
+	}
+	entriesList, listDiags := types.ListValue(
+		types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListEntryAttributes),
+		entries,
+	)
+	if listDiags.HasError() {
+		t.Fatalf("failed to build entries list: %v", listDiags)
+	}
+
+	model := &mcrPrefixFilterListResourceModel{
+		Description:   types.StringValue("test"),
+		AddressFamily: types.StringValue("IPv4"),
+		Entries:       entriesList,
+	}
+
+	apiList, diags := model.planToAPI(ctx)
+
+	if !diags.HasError() {
+		t.Fatal("planToAPI() expected error diagnostics for invalid entry, got none")
+	}
+	if apiList != nil {
+		t.Errorf("planToAPI() expected nil api list on error, got %+v", apiList)
+	}
+}
+
+func mustEntryObject(t *testing.T, action, prefix string, ge, le int64) types.Object {
+	t.Helper()
+	obj, diags := types.ObjectValue(mcrPrefixFilterListEntryAttributes, map[string]attr.Value{
+		"action": types.StringValue(action),
+		"prefix": types.StringValue(prefix),
+		"ge":     types.Int64Value(ge),
+		"le":     types.Int64Value(le),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build entry object: %v", diags)
+	}
+	return obj
 }

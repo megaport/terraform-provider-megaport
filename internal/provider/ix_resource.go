@@ -594,6 +594,15 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 	// Update the plan with the IX info
 	resp.Diagnostics.Append(plan.fromAPI(ctx, ix)...)
 	if resp.Diagnostics.HasError() {
+		// The IX was created remotely but we can't populate state. Attempt a
+		// best-effort delete to avoid orphaning a billable resource.
+		if cleanupErr := r.client.IXService.DeleteIX(ctx, ixResp.TechnicalServiceUID, &megaport.DeleteIXRequest{DeleteNow: true}); cleanupErr != nil {
+			resp.Diagnostics.AddWarning(
+				"IX cleanup after create failure did not complete",
+				fmt.Sprintf("Terraform created IX %q remotely but failed to populate state, and could not clean it up automatically. The resource may be orphaned and billable. Cleanup error: %s",
+					ixResp.TechnicalServiceUID, cleanupErr.Error()),
+			)
+		}
 		return
 	}
 
