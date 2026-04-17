@@ -21,6 +21,7 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `diversity_zone` (String) The diversity zone of the NAT Gateway.
 - `location_id` (Number) The numeric location ID of the NAT Gateway. This value can be retrieved from the data source megaport_location.
 - `product_name` (String) The name of the NAT Gateway.
+- `session_count` (Number) The NAT session count for the gateway. Must be a valid pairing with speed — see the nat-gateway session matrix for allowed combinations.
 - `speed` (Number) The speed of the NAT Gateway in Mbps.
 
 ### Optional

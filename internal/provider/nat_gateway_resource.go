@@ -54,6 +54,7 @@ type natGatewayResourceModel struct {
 	DiversityZone      types.String `tfsdk:"diversity_zone"`
 	ASN                types.Int64  `tfsdk:"asn"`
 	BGPShutdownDefault types.Bool   `tfsdk:"bgp_shutdown_default"`
+	SessionCount       types.Int64  `tfsdk:"session_count"`
 }
 
 // fromAPINATGateway maps the API NAT Gateway response to the resource schema.
@@ -82,6 +83,7 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) dia
 	m.DiversityZone = types.StringValue(gw.Config.DiversityZone)
 	m.ASN = types.Int64Value(int64(gw.Config.ASN))
 	m.BGPShutdownDefault = types.BoolValue(gw.Config.BGPShutdownDefault)
+	m.SessionCount = types.Int64Value(int64(gw.Config.SessionCount))
 
 	// Resource tags
 	var diags diag.Diagnostics
@@ -257,6 +259,10 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"session_count": schema.Int64Attribute{
+				Description: "The NAT session count for the gateway. Must be a valid pairing with speed — see the nat-gateway session matrix for allowed combinations.",
+				Required:    true,
+			},
 		},
 	}
 }
@@ -288,6 +294,7 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 	// Config fields
 	config := megaport.NATGatewayNetworkConfig{
 		DiversityZone: plan.DiversityZone.ValueString(),
+		SessionCount:  int(plan.SessionCount.ValueInt64()),
 	}
 	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() {
 		config.ASN = int(plan.ASN.ValueInt64())
@@ -478,6 +485,7 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 	// Config fields
 	config := megaport.NATGatewayNetworkConfig{
 		DiversityZone: plan.DiversityZone.ValueString(),
+		SessionCount:  int(plan.SessionCount.ValueInt64()),
 	}
 	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() {
 		config.ASN = int(plan.ASN.ValueInt64())
