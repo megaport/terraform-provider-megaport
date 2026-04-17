@@ -68,6 +68,25 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
+// normalizeRetryConfig clamps invalid RetryConfig values to sensible minimums
+// so that RetryWithBackoff / PollWithBackoff cannot spin on 0-duration timers
+// or call jitterInt63n with a non-positive bound (which would panic).
+func normalizeRetryConfig(cfg RetryConfig) RetryConfig {
+	if cfg.InitialBackoff <= 0 {
+		cfg.InitialBackoff = 1 * time.Second
+	}
+	if cfg.MaxBackoff <= 0 {
+		cfg.MaxBackoff = 30 * time.Second
+	}
+	if cfg.MaxBackoff < cfg.InitialBackoff {
+		cfg.MaxBackoff = cfg.InitialBackoff
+	}
+	if cfg.Multiplier <= 0 {
+		cfg.Multiplier = 1.5
+	}
+	return cfg
+}
+
 // RetryWithBackoff calls fn repeatedly with exponential backoff and full jitter
 // until it succeeds, the context is cancelled, MaxRetries is exhausted, or
 // Timeout expires.
@@ -81,6 +100,7 @@ func DefaultRetryConfig() RetryConfig {
 //
 // If InitialDelay > 0, it is applied before the first attempt.
 func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.Context) error) error {
+	cfg = normalizeRetryConfig(cfg)
 	var deadline time.Time
 	if cfg.Timeout > 0 {
 		deadline = time.Now().Add(cfg.Timeout)
@@ -98,9 +118,6 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 
 	var lastErr error
 	for attempt := 0; ; attempt++ {
-		if cfg.MaxRetries > 0 && attempt >= cfg.MaxRetries {
-			return fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxRetries, lastErr)
-		}
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			if lastErr != nil {
 				return fmt.Errorf("timeout (%v) exceeded: %w", cfg.Timeout, lastErr)
@@ -118,13 +135,28 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 			return lastErr
 		}
 
+		// If no retries remain, return immediately — don't sleep before
+		// giving up, which would add up to MaxBackoff of pointless delay.
+		if cfg.MaxRetries > 0 && attempt+1 >= cfg.MaxRetries {
+			return fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxRetries, lastErr)
+		}
+
 		// Full jitter: sleep = rand(0, min(maxBackoff, initial * multiplier^attempt))
 		calculated := float64(cfg.InitialBackoff) * math.Pow(cfg.Multiplier, float64(attempt))
 		capped := math.Min(calculated, float64(cfg.MaxBackoff))
-		if capped <= 0 {
-			capped = float64(cfg.InitialBackoff)
-		}
 		jittered := time.Duration(jitterInt63n(int64(capped) + 1))
+
+		// Cap the sleep to the remaining time before the deadline so we
+		// don't overshoot Timeout by up to a full backoff interval.
+		if !deadline.IsZero() {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				return fmt.Errorf("timeout (%v) exceeded: %w", cfg.Timeout, lastErr)
+			}
+			if jittered > remaining {
+				jittered = remaining
+			}
+		}
 
 		timer := time.NewTimer(jittered)
 		select {
@@ -147,6 +179,7 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 // On timeout, the returned error wraps ErrPollTimeout so callers can use
 // errors.Is(err, ErrPollTimeout) to distinguish timeouts from API errors.
 func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx context.Context) (T, bool, error)) (T, error) {
+	cfg = normalizeRetryConfig(cfg)
 	var zero T
 	var deadline time.Time
 	if cfg.Timeout > 0 {
