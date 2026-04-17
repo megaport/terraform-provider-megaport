@@ -11,23 +11,27 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// getNATGatewayTestSpeed queries the staging NAT Gateway sessions API to get a valid
-// speed for acceptance testing.
-func getNATGatewayTestSpeed() (speed int, err error) {
+// getNATGatewayTestConfig queries the staging NAT Gateway sessions API to get
+// a valid speed/session-count pair for acceptance testing. The validate
+// endpoint rejects arbitrary combinations, so the test must use a pair the
+// API advertises.
+func getNATGatewayTestConfig() (speed, sessionCount int, err error) {
 	client, err := getTestClient()
 	if err != nil {
-		return 0, fmt.Errorf("failed to create test client: %w", err)
+		return 0, 0, fmt.Errorf("failed to create test client: %w", err)
 	}
 
 	sessions, err := client.NATGatewayService.ListNATGatewaySessions(context.Background())
 	if err != nil {
-		return 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
+		return 0, 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
 	}
-	if len(sessions) == 0 {
-		return 0, fmt.Errorf("no NAT Gateway sessions available")
+	for _, s := range sessions {
+		if s == nil || len(s.SessionCount) == 0 {
+			continue
+		}
+		return s.SpeedMbps, s.SessionCount[0], nil
 	}
-
-	return sessions[0].SpeedMbps, nil
+	return 0, 0, fmt.Errorf("no NAT Gateway session/speed pairs available")
 }
 
 // checkNATGatewayProvisioned asserts the resource's provisioning_status is
@@ -56,7 +60,7 @@ func TestAccMegaportNATGateway_Basic(t *testing.T) {
 	natGWNameUpdated := RandomTestName()
 	resourceName := "megaport_nat_gateway.test"
 
-	speed, err := getNATGatewayTestSpeed()
+	speed, sessionCount, err := getNATGatewayTestConfig()
 	if err != nil {
 		t.Skipf("Skipping NAT Gateway test: %v", err)
 	}
@@ -70,15 +74,17 @@ resource "megaport_nat_gateway" "test" {
     product_name         = "%s"
     location_id          = data.megaport_location.test_location.id
     speed                = %d
+    session_count        = %d
     contract_term_months = 1
     diversity_zone       = "red"
+    asn                  = 64512
 
     resource_tags = {
         "key1" = "value1"
         "key2" = "value2"
     }
 }
-`, locationID, natGWName, speed)
+`, locationID, natGWName, speed, sessionCount)
 
 	configUpdated := providerConfig + fmt.Sprintf(`
 data "megaport_location" "test_location" {
@@ -89,15 +95,17 @@ resource "megaport_nat_gateway" "test" {
     product_name         = "%s"
     location_id          = data.megaport_location.test_location.id
     speed                = %d
+    session_count        = %d
     contract_term_months = 1
     diversity_zone       = "red"
+    asn                  = 64512
 
     resource_tags = {
         "key1" = "value1-updated"
         "key3" = "value3"
     }
 }
-`, locationID, natGWNameUpdated, speed)
+`, locationID, natGWNameUpdated, speed, sessionCount)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
