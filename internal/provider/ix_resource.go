@@ -588,21 +588,14 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 			"Error reading IX",
 			"Could not read IX after creation, unexpected error: "+err.Error(),
 		)
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
 		return
 	}
 
 	// Update the plan with the IX info
 	resp.Diagnostics.Append(plan.fromAPI(ctx, ix)...)
 	if resp.Diagnostics.HasError() {
-		// The IX was created remotely but we can't populate state. Attempt a
-		// best-effort delete to avoid orphaning a billable resource.
-		if cleanupErr := r.client.IXService.DeleteIX(ctx, ixResp.TechnicalServiceUID, &megaport.DeleteIXRequest{DeleteNow: true}); cleanupErr != nil {
-			resp.Diagnostics.AddWarning(
-				"IX cleanup after create failure did not complete",
-				fmt.Sprintf("Terraform created IX %q remotely but failed to populate state, and could not clean it up automatically. The resource may be orphaned and billable. Cleanup error: %s",
-					ixResp.TechnicalServiceUID, cleanupErr.Error()),
-			)
-		}
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
 		return
 	}
 
@@ -610,7 +603,22 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
 		return
+	}
+}
+
+// cleanupOrphanedIX performs a best-effort delete of an IX that was created
+// remotely but for which Terraform could not persist state. Without this,
+// any failure between BuyIX and a successful resp.State.Set would leave the
+// IX provisioned and billable with no record in state.
+func (r *ixResource) cleanupOrphanedIX(ctx context.Context, uid string, diagnostics *diag.Diagnostics) {
+	if cleanupErr := r.client.IXService.DeleteIX(ctx, uid, &megaport.DeleteIXRequest{DeleteNow: true}); cleanupErr != nil {
+		diagnostics.AddWarning(
+			"IX cleanup after create failure did not complete",
+			fmt.Sprintf("Terraform created IX %q remotely but failed to populate state, and could not clean it up automatically. The resource may be orphaned and billable. Cleanup error: %s",
+				uid, cleanupErr.Error()),
+		)
 	}
 }
 
