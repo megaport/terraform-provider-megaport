@@ -47,13 +47,27 @@ func DefaultRetryConfig() RetryConfig {
 // Timeout expires.
 //
 // Full jitter: sleep = rand(0, min(maxBackoff, initialBackoff * multiplier^attempt))
+// (math/rand's global source is auto-seeded per process in Go 1.20+, so jitter
+// varies across provider runs without explicit seeding.)
 //
 // If RetryableFunc is set, only errors matching the predicate are retried;
 // all others are returned immediately.
+//
+// If InitialDelay > 0, it is applied before the first attempt.
 func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.Context) error) error {
 	var deadline time.Time
 	if cfg.Timeout > 0 {
 		deadline = time.Now().Add(cfg.Timeout)
+	}
+
+	if cfg.InitialDelay > 0 {
+		timer := time.NewTimer(cfg.InitialDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 
 	var lastErr error
@@ -162,13 +176,24 @@ func IsRetryableHTTPError(err error) bool {
 		code >= http.StatusInternalServerError
 }
 
-// IsNotFoundError returns true if the error represents an HTTP 404 Not Found.
+// IsNotFoundError returns true if the error represents "resource not found".
+// The Megaport API normally signals this with HTTP 404, but some endpoints
+// (notably MCR prefix filter lists) return 400 Bad Request with a
+// "Could not find" message instead — both are treated as not-found here so
+// callers can uniformly remove the resource from state.
 func IsNotFoundError(err error) bool {
 	var apiErr *megaport.ErrorResponse
 	if !errors.As(err, &apiErr) || apiErr.Response == nil {
 		return false
 	}
-	return apiErr.Response.StatusCode == http.StatusNotFound
+	code := apiErr.Response.StatusCode
+	if code == http.StatusNotFound {
+		return true
+	}
+	if code == http.StatusBadRequest && strings.Contains(apiErr.Message, "Could not find") {
+		return true
+	}
+	return false
 }
 
 // NewAPIRateLimiter creates a context-aware rate limiter using golang.org/x/time/rate.
