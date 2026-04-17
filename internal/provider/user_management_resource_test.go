@@ -6,23 +6,17 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-type UserManagementProviderTestSuite ProviderTestSuite
-
-func TestUserManagementProviderTestSuite(t *testing.T) {
+func TestAccMegaportUser_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(UserManagementProviderTestSuite))
-}
-
-func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_Basic() {
+	defer acquireAccTestSlot(t)()
 	firstName := "Test"
 	lastName := "User" + RandomTestName()
 	email := fmt.Sprintf("test.user.%s@example.com", RandomTestName())
 	position := "Technical Contact"
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -69,13 +63,15 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_Basic() {
 	})
 }
 
-func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_WithDataSourceIntegration() {
+func TestAccMegaportUser_WithDataSourceIntegration(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
 	firstName := "DataSource"
 	lastName := "TestUser" + RandomTestName()
 	email := fmt.Sprintf("datasource.test.%s@example.com", RandomTestName())
 	position := "Technical Contact"
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create user and verify it appears in data source
@@ -130,7 +126,9 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_WithDataSource
 	})
 }
 
-func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_DataSourceFiltering() {
+func TestAccMegaportUser_DataSourceFiltering(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
 	firstName1 := "Filter"
 	lastName1 := "TestUser1" + RandomTestName()
 	email1 := fmt.Sprintf("filter.test1.%s@example.com", RandomTestName())
@@ -141,7 +139,7 @@ func (suite *UserManagementProviderTestSuite) TestAccMegaportUser_DataSourceFilt
 
 	position := "Technical Contact"
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
