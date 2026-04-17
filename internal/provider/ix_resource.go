@@ -611,9 +611,14 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 // cleanupOrphanedIX performs a best-effort delete of an IX that was created
 // remotely but for which Terraform could not persist state. Without this,
 // any failure between BuyIX and a successful resp.State.Set would leave the
-// IX provisioned and billable with no record in state.
+// IX provisioned and billable with no record in state. Uses the same
+// transient-retry policy as the regular Delete path, since cleanup is most
+// valuable exactly when the backend is throwing transient errors.
 func (r *ixResource) cleanupOrphanedIX(ctx context.Context, uid string, diagnostics *diag.Diagnostics) {
-	if cleanupErr := r.client.IXService.DeleteIX(ctx, uid, &megaport.DeleteIXRequest{DeleteNow: true}); cleanupErr != nil {
+	cleanupErr := retryTransientDelete(ctx, 3, func() error {
+		return r.client.IXService.DeleteIX(ctx, uid, &megaport.DeleteIXRequest{DeleteNow: true})
+	})
+	if cleanupErr != nil {
 		diagnostics.AddWarning(
 			"IX cleanup after create failure did not complete",
 			fmt.Sprintf("Terraform created IX %q remotely but failed to populate state, and could not clean it up automatically. The resource may be orphaned and billable. Cleanup error: %s",
