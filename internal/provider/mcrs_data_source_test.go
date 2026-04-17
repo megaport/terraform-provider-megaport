@@ -208,7 +208,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			"owner": "team-a",
 		}
 
-		detail := fromAPIMCRDetail(mcr, tags)
+		detail, diags := fromAPIMCRDetail(mcr, tags)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "mcr-abc-123", detail.UID.ValueString())
 		assert.Equal(t, "My Test MCR", detail.Name.ValueString())
@@ -244,7 +245,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			ContractEndDate:   nil,
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, diags := fromAPIMCRDetail(mcr, nil)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "", detail.CreateDate.ValueString())
 		assert.Equal(t, "", detail.LiveDate.ValueString())
@@ -259,7 +261,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			AttributeTags: nil,
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, diags := fromAPIMCRDetail(mcr, nil)
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.AttributeTags.IsNull())
 		assert.True(t, detail.ResourceTags.IsNull())
@@ -270,7 +273,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			UID: "mcr-empty-tags",
 		}
 
-		detail := fromAPIMCRDetail(mcr, map[string]string{})
+		detail, diags := fromAPIMCRDetail(mcr, map[string]string{})
+		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})

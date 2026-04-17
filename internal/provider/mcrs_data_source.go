@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -298,7 +299,11 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			tags = map[string]string{}
 		}
 
-		detail := fromAPIMCRDetail(mcr, tags)
+		detail, detailDiags := fromAPIMCRDetail(mcr, tags)
+		resp.Diagnostics.Append(detailDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		obj, objDiags := types.ObjectValueFrom(ctx, mcrDetailAttrs, &detail)
 		resp.Diagnostics.Append(objDiags...)
 		if resp.Diagnostics.HasError() {
@@ -318,7 +323,8 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 }
 
 // fromAPIMCRDetail maps an API MCR and its resource tags to an mcrDetailModel.
-func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
+func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) (mcrDetailModel, diag.Diagnostics) {
+	apiDiags := diag.Diagnostics{}
 	detail := mcrDetailModel{
 		UID:                   types.StringValue(m.UID),
 		Name:                  types.StringValue(m.Name),
@@ -375,7 +381,9 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		for k, v := range m.AttributeTags {
 			attrTagValues[k] = types.StringValue(v)
 		}
-		detail.AttributeTags, _ = types.MapValue(types.StringType, attrTagValues)
+		attrTagMap, attrDiags := types.MapValue(types.StringType, attrTagValues)
+		apiDiags.Append(attrDiags...)
+		detail.AttributeTags = attrTagMap
 	} else {
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
@@ -386,10 +394,12 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		for k, v := range tags {
 			resourceTagValues[k] = types.StringValue(v)
 		}
-		detail.ResourceTags, _ = types.MapValue(types.StringType, resourceTagValues)
+		resourceTagMap, resDiags := types.MapValue(types.StringType, resourceTagValues)
+		apiDiags.Append(resDiags...)
+		detail.ResourceTags = resourceTagMap
 	} else {
 		detail.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	return detail
+	return detail, apiDiags
 }

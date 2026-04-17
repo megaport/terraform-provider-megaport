@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -150,7 +151,8 @@ type ixVPLSInterfaceModel struct {
 }
 
 // fromAPI maps the API IX response to the resource schema.
-func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
+func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) diag.Diagnostics {
+	apiDiags := diag.Diagnostics{}
 	// Map basic fields
 	orm.ProductUID = types.StringValue(ix.ProductUID)
 	orm.ProductID = types.Int64Value(int64(ix.ProductID))
@@ -203,11 +205,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			Shutdown:     types.BoolValue(ix.Resources.Interface.Shutdown),
 		}
 		ifObj, diags := types.ObjectValueFrom(ctx, interfaceAttrTypes, iface)
-		if diags.HasError() {
-			res.Interface = types.ObjectNull(interfaceAttrTypes)
-		} else {
-			res.Interface = ifObj
-		}
+		apiDiags.Append(diags...)
+		res.Interface = ifObj
 	} else {
 		res.Interface = types.ObjectNull(interfaceAttrTypes)
 	}
@@ -229,11 +228,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			})
 		}
 		bgpList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: bgpConnectionAttrTypes}, bgpModels)
-		if diags.HasError() {
-			res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
-		} else {
-			res.BGPConnections = bgpList
-		}
+		apiDiags.Append(diags...)
+		res.BGPConnections = bgpList
 	} else {
 		res.BGPConnections = types.ListNull(types.ObjectType{AttrTypes: bgpConnectionAttrTypes})
 	}
@@ -251,11 +247,8 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			})
 		}
 		ipList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ipAddressAttrTypes}, ipModels)
-		if diags.HasError() {
-			res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
-		} else {
-			res.IPAddresses = ipList
-		}
+		apiDiags.Append(diags...)
+		res.IPAddresses = ipList
 	} else {
 		res.IPAddresses = types.ListNull(types.ObjectType{AttrTypes: ipAddressAttrTypes})
 	}
@@ -271,22 +264,18 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 			Shutdown:      types.BoolValue(ix.Resources.VPLSInterface.Shutdown),
 		}
 		vplsObj, diags := types.ObjectValueFrom(ctx, vplsInterfaceAttrTypes, vpls)
-		if diags.HasError() {
-			res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
-		} else {
-			res.VPLSInterface = vplsObj
-		}
+		apiDiags.Append(diags...)
+		res.VPLSInterface = vplsObj
 	} else {
 		res.VPLSInterface = types.ObjectNull(vplsInterfaceAttrTypes)
 	}
 
 	// Convert ixResourcesModel to a Terraform object
 	resObj, diags := types.ObjectValueFrom(ctx, resourcesAttrTypes, res)
-	if diags.HasError() {
-		orm.Resources = types.ObjectNull(resourcesAttrTypes)
-	} else {
-		orm.Resources = resObj
-	}
+	apiDiags.Append(diags...)
+	orm.Resources = resObj
+
+	return apiDiags
 }
 
 // NewIXResource is a helper function to simplify the provider implementation.
@@ -599,17 +588,42 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 			"Error reading IX",
 			"Could not read IX after creation, unexpected error: "+err.Error(),
 		)
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
 		return
 	}
 
 	// Update the plan with the IX info
-	plan.fromAPI(ctx, ix)
+	resp.Diagnostics.Append(plan.fromAPI(ctx, ix)...)
+	if resp.Diagnostics.HasError() {
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
+		return
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		r.cleanupOrphanedIX(ctx, ixResp.TechnicalServiceUID, &resp.Diagnostics)
 		return
+	}
+}
+
+// cleanupOrphanedIX performs a best-effort delete of an IX that was created
+// remotely but for which Terraform could not persist state. Without this,
+// any failure between BuyIX and a successful resp.State.Set would leave the
+// IX provisioned and billable with no record in state. Uses the same
+// transient-retry policy as the regular Delete path, since cleanup is most
+// valuable exactly when the backend is throwing transient errors.
+func (r *ixResource) cleanupOrphanedIX(ctx context.Context, uid string, diagnostics *diag.Diagnostics) {
+	cleanupErr := retryTransientDelete(ctx, 3, func() error {
+		return r.client.IXService.DeleteIX(ctx, uid, &megaport.DeleteIXRequest{DeleteNow: true})
+	})
+	if cleanupErr != nil {
+		diagnostics.AddWarning(
+			"IX cleanup after create failure did not complete",
+			fmt.Sprintf("Terraform created IX %q remotely but failed to populate state, and could not clean it up automatically. The resource may be orphaned and billable. Cleanup error: %s",
+				uid, cleanupErr.Error()),
+		)
 	}
 }
 
@@ -632,7 +646,10 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	// Update the state with the IX info
-	state.fromAPI(ctx, ix)
+	resp.Diagnostics.Append(state.fromAPI(ctx, ix)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -712,7 +729,10 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// Update the state with the IX info
-	state.fromAPI(ctx, updatedIX)
+	resp.Diagnostics.Append(state.fromAPI(ctx, updatedIX)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Persist the new state
 	diags := resp.State.Set(ctx, &state)
