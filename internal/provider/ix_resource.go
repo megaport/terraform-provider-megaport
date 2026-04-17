@@ -728,8 +728,10 @@ func (r *ixResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 
 	// Delete the IX
-	err := r.client.IXService.DeleteIX(ctx, state.ProductUID.ValueString(), &megaport.DeleteIXRequest{
-		DeleteNow: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		return r.client.IXService.DeleteIX(ctx, state.ProductUID.ValueString(), &megaport.DeleteIXRequest{
+			DeleteNow: true,
+		})
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
