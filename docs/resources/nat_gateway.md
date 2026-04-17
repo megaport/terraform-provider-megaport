@@ -3,12 +3,12 @@
 page_title: "megaport_nat_gateway Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways.
+  NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways. NOTE: This resource currently only creates the NAT Gateway design record (equivalent to POST /v3/products/nat_gateways); the gateway remains in DESIGN status and is not purchased or provisioned. Submitting the order via the Megaport Orders API will be wired up in a follow-up release once the megaportgo SDK exposes the required endpoints.
 ---
 
 # megaport_nat_gateway (Resource)
 
-NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways.
+NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways. NOTE: This resource currently only creates the NAT Gateway design record (equivalent to `POST /v3/products/nat_gateways`); the gateway remains in DESIGN status and is not purchased or provisioned. Submitting the order via the Megaport Orders API will be wired up in a follow-up release once the megaportgo SDK exposes the required endpoints.
 
 
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -131,7 +130,10 @@ func (r *natGatewayResource) Metadata(_ context.Context, req resource.MetadataRe
 // Schema defines the schema for the resource.
 func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways.",
+		Description: "NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways. " +
+			"NOTE: This resource currently only creates the NAT Gateway design record (equivalent to `POST /v3/products/nat_gateways`); " +
+			"the gateway remains in DESIGN status and is not purchased or provisioned. " +
+			"Submitting the order via the Megaport Orders API will be wired up in a follow-up release once the megaportgo SDK exposes the required endpoints.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
 				Description: "Last updated by the Terraform provider.",
@@ -315,53 +317,10 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 
 	createdUID := createdGW.ProductUID
 
-	// Wait for provisioning if configured
-	if waitForTime > 0 {
-		tflog.Debug(ctx, "Waiting for NAT Gateway provisioning", map[string]interface{}{
-			"product_uid": createdUID,
-		})
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-		timer := time.NewTimer(waitForTime)
-		defer timer.Stop()
-		provisioned := false
-		for !provisioned {
-			select {
-			case <-ctx.Done():
-				resp.Diagnostics.AddError(
-					"NAT Gateway provisioning cancelled",
-					"Context cancelled while waiting for NAT Gateway "+createdUID+" to provision.",
-				)
-				return
-			case <-timer.C:
-				resp.Diagnostics.AddError(
-					"NAT Gateway provisioning timed out",
-					fmt.Sprintf("NAT Gateway %s did not reach CONFIGURED/LIVE status within %s.", createdUID, waitForTime),
-				)
-				return
-			case <-ticker.C:
-				gw, err := r.client.NATGatewayService.GetNATGateway(ctx, createdUID)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error waiting for NAT Gateway provisioning",
-						"Could not read NAT Gateway with ID "+createdUID+": "+err.Error(),
-					)
-					return
-				}
-				if slices.Contains(megaport.SERVICE_STATE_READY, gw.ProvisioningStatus) {
-					provisioned = true
-				} else if gw.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || gw.ProvisioningStatus == megaport.STATUS_CANCELLED {
-					resp.Diagnostics.AddError(
-						"NAT Gateway provisioning failed",
-						fmt.Sprintf("NAT Gateway %s reached terminal state %s.", createdUID, gw.ProvisioningStatus),
-					)
-					return
-				}
-			}
-		}
-	}
+	// NAT Gateway creation is an order placement that leaves the resource in
+	// DESIGN status — it does not auto-provision to CONFIGURED/LIVE, so we do
+	// not wait here.
 
-	// Read the final state
 	gw, err := r.client.NATGatewayService.GetNATGateway(ctx, createdUID)
 	if err != nil {
 		resp.Diagnostics.AddError(
