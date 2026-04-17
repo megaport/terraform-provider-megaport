@@ -2,18 +2,44 @@ package provider
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 	"golang.org/x/time/rate"
 )
+
+// jitterRand is a process-local PRNG used to compute backoff jitter. Seeding
+// explicitly from crypto/rand ensures parallel provider processes get distinct
+// jitter schedules regardless of Go toolchain defaults for math/rand's global
+// source, preserving the intended thundering-herd protection.
+var (
+	jitterRandMu sync.Mutex
+	jitterRand   = rand.New(rand.NewSource(seedFromCryptoRand())) //nolint:gosec // not used for security
+)
+
+func seedFromCryptoRand() int64 {
+	var b [8]byte
+	if _, err := crand.Read(b[:]); err != nil {
+		return time.Now().UnixNano()
+	}
+	return int64(binary.LittleEndian.Uint64(b[:]))
+}
+
+func jitterInt63n(n int64) int64 {
+	jitterRandMu.Lock()
+	defer jitterRandMu.Unlock()
+	return jitterRand.Int63n(n)
+}
 
 // ErrPollTimeout is returned by PollWithBackoff when the timeout expires before
 // the poll condition is met. Callers can use errors.Is(err, ErrPollTimeout) to
@@ -47,8 +73,8 @@ func DefaultRetryConfig() RetryConfig {
 // Timeout expires.
 //
 // Full jitter: sleep = rand(0, min(maxBackoff, initialBackoff * multiplier^attempt))
-// (math/rand's global source is auto-seeded per process in Go 1.20+, so jitter
-// varies across provider runs without explicit seeding.)
+// using a process-local PRNG seeded from crypto/rand (see jitterRand) so that
+// parallel provider processes get distinct backoff schedules.
 //
 // If RetryableFunc is set, only errors matching the predicate are retried;
 // all others are returned immediately.
@@ -76,6 +102,9 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 			return fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxRetries, lastErr)
 		}
 		if !deadline.IsZero() && time.Now().After(deadline) {
+			if lastErr != nil {
+				return fmt.Errorf("timeout (%v) exceeded: %w", cfg.Timeout, lastErr)
+			}
 			return fmt.Errorf("timeout (%v) exceeded", cfg.Timeout)
 		}
 
@@ -95,7 +124,7 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 		if capped <= 0 {
 			capped = float64(cfg.InitialBackoff)
 		}
-		jittered := time.Duration(rand.Int63n(int64(capped) + 1)) //nolint:gosec
+		jittered := time.Duration(jitterInt63n(int64(capped) + 1))
 
 		timer := time.NewTimer(jittered)
 		select {
