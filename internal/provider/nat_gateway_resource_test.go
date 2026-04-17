@@ -7,16 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
-
-// NATGatewayProviderTestSuite reuses the provider test suite for Megaport
-type NATGatewayProviderTestSuite ProviderTestSuite
-
-func TestNATGatewayProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(NATGatewayProviderTestSuite))
-}
 
 // getNATGatewayTestSpeed queries the staging NAT Gateway sessions API to get a valid
 // speed for acceptance testing.
@@ -38,14 +29,17 @@ func getNATGatewayTestSpeed() (speed int, err error) {
 }
 
 // TestAccMegaportNATGateway_Basic tests the full lifecycle of a NAT Gateway resource
-func (suite *NATGatewayProviderTestSuite) TestAccMegaportNATGateway_Basic() {
+func TestAccMegaportNATGateway_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	natGWName := RandomTestName()
 	natGWNameUpdated := RandomTestName()
 	resourceName := "megaport_nat_gateway.test"
 
 	speed, err := getNATGatewayTestSpeed()
 	if err != nil {
-		suite.T().Skipf("Skipping NAT Gateway test: %v", err)
+		t.Skipf("Skipping NAT Gateway test: %v", err)
 	}
 
 	configInitial := providerConfig + fmt.Sprintf(`
@@ -65,7 +59,7 @@ resource "megaport_nat_gateway" "test" {
         "key2" = "value2"
     }
 }
-`, MCRTestLocationIDNum, natGWName, speed)
+`, locationID, natGWName, speed)
 
 	configUpdated := providerConfig + fmt.Sprintf(`
 data "megaport_location" "test_location" {
@@ -84,9 +78,9 @@ resource "megaport_nat_gateway" "test" {
         "key3" = "value3"
     }
 }
-`, MCRTestLocationIDNum, natGWNameUpdated, speed)
+`, locationID, natGWNameUpdated, speed)
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and verify
