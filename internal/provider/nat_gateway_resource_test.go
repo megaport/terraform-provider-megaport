@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
 )
 
 // getNATGatewayTestSpeed queries the staging NAT Gateway sessions API to get a valid
@@ -26,6 +28,23 @@ func getNATGatewayTestSpeed() (speed int, err error) {
 	}
 
 	return sessions[0].SpeedMbps, nil
+}
+
+// checkNATGatewayProvisioned asserts the resource's provisioning_status is
+// one of the ready states (CONFIGURED or LIVE), confirming the validate/buy
+// flow ran and the service was actually purchased.
+func checkNATGatewayProvisioned(resourceName string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("resource %s not found", resourceName)
+		}
+		status := rs.Primary.Attributes["provisioning_status"]
+		if !slices.Contains(megaport.SERVICE_STATE_READY, status) {
+			return fmt.Errorf("expected provisioning_status in %v, got %q", megaport.SERVICE_STATE_READY, status)
+		}
+		return nil
+	}
 }
 
 // TestAccMegaportNATGateway_Basic tests the full lifecycle of a NAT Gateway resource
@@ -98,6 +117,8 @@ resource "megaport_nat_gateway" "test" {
 					resource.TestCheckResourceAttrSet(resourceName, "created_by"),
 					resource.TestCheckResourceAttrSet(resourceName, "location_id"),
 					resource.TestCheckResourceAttrSet(resourceName, "asn"),
+					resource.TestCheckResourceAttrSet(resourceName, "provisioning_status"),
+					checkNATGatewayProvisioned(resourceName),
 				),
 			},
 			// ImportState testing
@@ -127,6 +148,7 @@ resource "megaport_nat_gateway" "test" {
 					resource.TestCheckResourceAttr(resourceName, "resource_tags.key1", "value1-updated"),
 					resource.TestCheckResourceAttr(resourceName, "resource_tags.key3", "value3"),
 					resource.TestCheckNoResourceAttr(resourceName, "resource_tags.key2"),
+					checkNATGatewayProvisioned(resourceName),
 				),
 			},
 		},
