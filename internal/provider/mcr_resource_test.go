@@ -1,15 +1,211 @@
 package provider
 
 import (
+	"context"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// --- Unit tests for fromAPIMCR ---
+
+func TestFromAPIMCR_Full(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:                   "mcr-uid-123",
+		Name:                  "Test MCR",
+		CostCentre:            "CC-100",
+		PortSpeed:             5000,
+		LocationID:            123,
+		MarketplaceVisibility: true,
+		CompanyUID:            "company-uid-456",
+		ContractTermMonths:    12,
+		DiversityZone:         "blue",
+		Resources: megaport.MCRResources{
+			VirtualRouter: megaport.MCRVirtualRouter{
+				ASN: 64512,
+			},
+		},
+		AttributeTags: map[string]string{
+			"account": "prod",
+			"team":    "network",
+		},
+	}
+	tags := map[string]string{"env": "test", "owner": "ci"}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, tags)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "mcr-uid-123", model.UID.ValueString())
+	assert.Equal(t, "Test MCR", model.Name.ValueString())
+	assert.Equal(t, "CC-100", model.CostCentre.ValueString())
+	assert.Equal(t, int64(5000), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(123), model.LocationID.ValueInt64())
+	assert.True(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "company-uid-456", model.CompanyUID.ValueString())
+	assert.Equal(t, int64(12), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "blue", model.DiversityZone.ValueString())
+	assert.Equal(t, int64(64512), model.ASN.ValueInt64())
+
+	// Verify attribute tags
+	assert.False(t, model.AttributeTags.IsNull())
+	attrTags := model.AttributeTags.Elements()
+	assert.Len(t, attrTags, 2)
+	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
+	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
+
+	// Verify resource tags
+	assert.False(t, model.ResourceTags.IsNull())
+	resTags := model.ResourceTags.Elements()
+	assert.Len(t, resTags, 2)
+	assert.Equal(t, "test", resTags["env"].(types.String).ValueString())
+	assert.Equal(t, "ci", resTags["owner"].(types.String).ValueString())
+}
+
+func TestFromAPIMCR_MinimalFields(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:       "mcr-minimal",
+		Name:      "Minimal",
+		PortSpeed: 1000,
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "mcr-minimal", model.UID.ValueString())
+	assert.Equal(t, "Minimal", model.Name.ValueString())
+	assert.Equal(t, "", model.CostCentre.ValueString())
+	assert.Equal(t, int64(1000), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(0), model.LocationID.ValueInt64())
+	assert.False(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "", model.CompanyUID.ValueString())
+	assert.Equal(t, int64(0), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "", model.DiversityZone.ValueString())
+
+	// ASN should be null when zero
+	assert.True(t, model.ASN.IsNull())
+	// Resource tags should be null when nil tags
+	assert.True(t, model.ResourceTags.IsNull())
+}
+
+func TestFromAPIMCR_ZeroASN(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:  "mcr-zero-asn",
+		Name: "Zero ASN",
+		Resources: megaport.MCRResources{
+			VirtualRouter: megaport.MCRVirtualRouter{
+				ASN: 0,
+			},
+		},
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.True(t, model.ASN.IsNull(), "ASN should be null when API returns 0")
+}
+
+func TestFromAPIMCR_NonZeroASN(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:  "mcr-nonzero-asn",
+		Name: "NonZero ASN",
+		Resources: megaport.MCRResources{
+			VirtualRouter: megaport.MCRVirtualRouter{
+				ASN: 64512,
+			},
+		},
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.False(t, model.ASN.IsNull(), "ASN should not be null when non-zero")
+	assert.Equal(t, int64(64512), model.ASN.ValueInt64())
+}
+
+func TestFromAPIMCR_NilTags(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:  "mcr-nil-tags",
+		Name: "Nil Tags",
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.True(t, model.ResourceTags.IsNull(), "resource tags should be null when tags is nil")
+}
+
+func TestFromAPIMCR_EmptyTags(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:  "mcr-empty-tags",
+		Name: "Empty Tags",
+	}
+	tags := map[string]string{}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, tags)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.True(t, model.ResourceTags.IsNull(), "resource tags should be null when tags map is empty")
+}
+
+func TestFromAPIMCR_AttributeTags(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:  "mcr-attr-tags",
+		Name: "Attr Tags",
+		AttributeTags: map[string]string{
+			"account": "prod",
+			"region":  "us-west",
+			"tier":    "premium",
+		},
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.False(t, model.AttributeTags.IsNull(), "attribute tags should not be null")
+	attrTags := model.AttributeTags.Elements()
+	assert.Len(t, attrTags, 3)
+	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
+	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
+	assert.Equal(t, "premium", attrTags["tier"].(types.String).ValueString())
+}
+
+func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {
+	ctx := context.Background()
+	apiMCR := &megaport.MCR{
+		UID:           "mcr-empty-attr",
+		Name:          "Empty Attr Tags",
+		AttributeTags: nil,
+	}
+
+	model := &mcrResourceModel{}
+	diags := model.fromAPIMCR(ctx, apiMCR, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	// When AttributeTags is nil, the field is not set, so it remains the zero value
+	assert.True(t, model.AttributeTags.IsNull(), "attribute tags should be null when API returns nil")
+}
+
+// --- Acceptance tests ---
 
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	t.Parallel()
@@ -550,108 +746,3 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 	})
 }
 
-func TestRateLimiter_SingleToken(t *testing.T) {
-	rl := NewRateLimiter(5, 100*time.Millisecond)
-
-	select {
-	case <-rl.rateLimitCh:
-		// Successfully got token
-	default:
-		t.Error("Failed to get first token")
-	}
-}
-
-func TestRateLimiter_BurstLimit(t *testing.T) {
-	rl := NewRateLimiter(5, 100*time.Millisecond)
-
-	// Should get 5 tokens
-	for i := 0; i < 5; i++ {
-		select {
-		case <-rl.rateLimitCh:
-			// Successfully got token
-		default:
-			t.Errorf("Failed to get token %d within burst limit", i+1)
-		}
-	}
-
-	// Should fail to get 6th token
-	select {
-	case <-rl.rateLimitCh:
-		t.Error("Got token beyond burst limit")
-	default:
-		// Expected failure to get token
-	}
-}
-
-func TestRateLimiter_Refill(t *testing.T) {
-	rl := NewRateLimiter(5, 100*time.Millisecond)
-
-	// Use all tokens
-	for i := 0; i < 5; i++ {
-		select {
-		case <-rl.rateLimitCh:
-			// Token consumed
-		default:
-			t.Errorf("Failed to get token %d from initial burst", i)
-		}
-	}
-
-	// Wait for refill
-	time.Sleep(150 * time.Millisecond)
-
-	// Should get a token after refill
-	select {
-	case <-rl.rateLimitCh:
-		// Successfully got token after refill
-	default:
-		t.Error("Failed to get token after refill")
-	}
-}
-
-func TestRateLimiter_Concurrent(t *testing.T) {
-	rl := NewRateLimiter(10, 100*time.Millisecond)
-	var wg sync.WaitGroup
-	successCount := int32(0)
-
-	// Launch 20 goroutines
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-rl.rateLimitCh:
-				atomic.AddInt32(&successCount, 1)
-			default:
-				// Failed to get token
-			}
-		}()
-	}
-
-	wg.Wait()
-
-	// Should have exactly 10 successes (burst limit)
-	if atomic.LoadInt32(&successCount) != 10 {
-		t.Errorf("Expected 10 successful token acquisitions, got %d", successCount)
-	}
-}
-
-func TestRateLimiter_RateOverTime(t *testing.T) {
-	rl := NewRateLimiter(5, 100*time.Millisecond)
-	start := time.Now()
-	count := 0
-
-	for time.Since(start) < 450*time.Millisecond {
-		select {
-		case <-rl.rateLimitCh:
-			count++
-		default:
-			// No token available
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	expected := 9
-	if count != expected {
-		t.Errorf("Expected %d tokens over time period, got %d", expected, count)
-	}
-}

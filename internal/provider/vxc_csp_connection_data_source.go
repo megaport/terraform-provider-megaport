@@ -401,7 +401,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		m.ResourceType = types.StringValue(provider.ResourceType)
 		m.VLAN = types.Int64Value(int64(provider.VLAN))
 		m.VirtualRouterName = types.StringValue(provider.VirtualRouterName)
-		ipList, ipListDiags := convertStringList(ctx, []string{})
+		ipList, ipListDiags := convertStringList(ctx, provider.IPAddresses)
 		apiDiags = append(apiDiags, ipListDiags...)
 		m.IPAddresses = ipList
 	case megaport.CSPConnectionTransit:
