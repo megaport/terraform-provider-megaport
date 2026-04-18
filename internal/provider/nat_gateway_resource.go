@@ -551,14 +551,13 @@ func (r *natGatewayResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 	productUID := state.ProductUID.ValueString()
 
-	// After Create the gateway has been purchased and provisioned, so cancel
-	// via ProductService (DeleteNow=true = CANCEL_NOW). The NAT Gateway
-	// DESIGN-only DELETE endpoint does not apply once the order has been bought.
-	_, err := r.client.ProductService.DeleteProduct(ctx, &megaport.DeleteProductRequest{
-		ProductID: productUID,
-		DeleteNow: true,
-	})
-	if err != nil {
+	// NATGatewayService.DeleteNATGateway inspects ProvisioningStatus and
+	// routes DESIGN-state records to the design-only DELETE endpoint and
+	// provisioned records through CANCEL_NOW. The Terraform resource
+	// provisions the gateway on Create, so Delete reaches the CANCEL_NOW
+	// branch — but relying on the SDK routing keeps the provider correct
+	// if a create fails mid-way and leaves the record in DESIGN.
+	if err := r.client.NATGatewayService.DeleteNATGateway(ctx, productUID); err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting NAT Gateway",
 			"Could not delete NAT Gateway with ID "+productUID+": "+err.Error(),
