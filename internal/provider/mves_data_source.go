@@ -370,30 +370,30 @@ func fromAPIMVEDetail(m *megaport.MVE, tags map[string]string) (mveDetailModel, 
 		DiversityZone:         types.StringValue(m.DiversityZone),
 	}
 
-	// Time fields — use RFC850 format for consistency with the MVE resource,
-	// and null for nil dates rather than empty strings.
+	// Time fields — emit RFC3339 so values are consumable by Terraform's
+	// formatdate() function; nil dates map to null rather than an empty string.
 	if m.CreateDate != nil {
-		detail.CreateDate = types.StringValue(m.CreateDate.Format(time.RFC850))
+		detail.CreateDate = types.StringValue(m.CreateDate.Format(time.RFC3339))
 	} else {
 		detail.CreateDate = types.StringNull()
 	}
 	if m.LiveDate != nil {
-		detail.LiveDate = types.StringValue(m.LiveDate.Format(time.RFC850))
+		detail.LiveDate = types.StringValue(m.LiveDate.Format(time.RFC3339))
 	} else {
 		detail.LiveDate = types.StringNull()
 	}
 	if m.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(m.TerminateDate.Format(time.RFC850))
+		detail.TerminateDate = types.StringValue(m.TerminateDate.Format(time.RFC3339))
 	} else {
 		detail.TerminateDate = types.StringNull()
 	}
 	if m.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(m.ContractStartDate.Format(time.RFC850))
+		detail.ContractStartDate = types.StringValue(m.ContractStartDate.Format(time.RFC3339))
 	} else {
 		detail.ContractStartDate = types.StringNull()
 	}
 	if m.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(m.ContractEndDate.Format(time.RFC850))
+		detail.ContractEndDate = types.StringValue(m.ContractEndDate.Format(time.RFC3339))
 	} else {
 		detail.ContractEndDate = types.StringNull()
 	}
