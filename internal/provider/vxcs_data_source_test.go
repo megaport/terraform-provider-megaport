@@ -5,8 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -86,60 +90,183 @@ func (m *MockVXCService) UpdateVXCResourceTags(ctx context.Context, vxcID string
 	return nil
 }
 
+// vxcsReadRequest builds a datasource.ReadRequest and ReadResponse for the vxcs
+// data source schema. Non-nil productUID sets product_uid; non-nil
+// includeResourceTags sets include_resource_tags; otherwise each is null.
+func vxcsReadRequest(t *testing.T, ds *vxcsDataSource, productUID *string, includeResourceTags *bool) (datasource.ReadRequest, *datasource.ReadResponse) {
+	t.Helper()
+	ctx := context.Background()
+
+	schemaResp := datasource.SchemaResponse{}
+	ds.Schema(ctx, datasource.SchemaRequest{}, &schemaResp)
+
+	tfType := schemaResp.Schema.Type().TerraformType(ctx)
+
+	var uidVal tftypes.Value
+	if productUID != nil {
+		uidVal = tftypes.NewValue(tftypes.String, *productUID)
+	} else {
+		uidVal = tftypes.NewValue(tftypes.String, nil)
+	}
+
+	var tagsVal tftypes.Value
+	if includeResourceTags != nil {
+		tagsVal = tftypes.NewValue(tftypes.Bool, *includeResourceTags)
+	} else {
+		tagsVal = tftypes.NewValue(tftypes.Bool, nil)
+	}
+
+	vxcsAttrType := schemaResp.Schema.Attributes["vxcs"].GetType().TerraformType(ctx)
+	configRaw := tftypes.NewValue(tfType, map[string]tftypes.Value{
+		"product_uid":           uidVal,
+		"include_resource_tags": tagsVal,
+		"vxcs":                  tftypes.NewValue(vxcsAttrType, nil),
+	})
+
+	req := datasource.ReadRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: configRaw},
+	}
+	resp := &datasource.ReadResponse{
+		State: tfsdk.State{Schema: schemaResp.Schema},
+	}
+	return req, resp
+}
+
 func TestReadVXCs_ListAll(t *testing.T) {
+	ctx := context.Background()
 	mockVXCService := &MockVXCService{
 		ListVXCsResult: []*megaport.VXC{
 			{UID: "vxc-1", Name: "VXC One"},
 			{UID: "vxc-2", Name: "VXC Two"},
 		},
 	}
-	mockClient := &megaport.Client{VXCService: mockVXCService}
-	ds := &vxcsDataSource{client: mockClient}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
 
-	vxcs, err := ds.client.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
-	assert.NoError(t, err)
-	assert.Len(t, vxcs, 2)
-	assert.Equal(t, "vxc-1", vxcs[0].UID)
-	assert.Equal(t, "vxc-2", vxcs[1].UID)
+	req, resp := vxcsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state vxcsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+
+	var details []vxcDetailModel
+	diags = state.VXCs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 2)
+	assert.Equal(t, "vxc-1", details[0].UID.ValueString())
+	assert.Equal(t, "VXC One", details[0].Name.ValueString())
+	assert.Equal(t, "vxc-2", details[1].UID.ValueString())
+	assert.Equal(t, "VXC Two", details[1].Name.ValueString())
 }
 
 func TestReadVXCs_GetByUID(t *testing.T) {
+	ctx := context.Background()
 	mockVXCService := &MockVXCService{
 		GetVXCResult: &megaport.VXC{UID: "vxc-1", Name: "VXC One"},
 	}
-	mockClient := &megaport.Client{VXCService: mockVXCService}
-	ds := &vxcsDataSource{client: mockClient}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
 
-	vxc, err := ds.client.VXCService.GetVXC(context.Background(), "vxc-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "vxc-1", vxc.UID)
-	assert.Equal(t, "VXC One", vxc.Name)
+	uid := "vxc-1"
+	req, resp := vxcsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state vxcsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.Equal(t, "vxc-1", state.ProductUID.ValueString())
+
+	var details []vxcDetailModel
+	diags = state.VXCs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 1)
+	assert.Equal(t, "vxc-1", details[0].UID.ValueString())
+	assert.Equal(t, "VXC One", details[0].Name.ValueString())
 }
 
 func TestReadVXCs_ListError(t *testing.T) {
-	mockVXCService := &MockVXCService{
-		ListVXCsErr: errors.New("API error"),
-	}
-	mockClient := &megaport.Client{VXCService: mockVXCService}
-	ds := &vxcsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockVXCService := &MockVXCService{ListVXCsErr: errors.New("API error")}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
 
-	vxcs, err := ds.client.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
-	assert.Error(t, err)
-	assert.Nil(t, vxcs)
-	assert.Contains(t, err.Error(), "API error")
+	req, resp := vxcsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "API error")
 }
 
 func TestReadVXCs_GetByUIDError(t *testing.T) {
-	mockVXCService := &MockVXCService{
-		GetVXCErr: errors.New("VXC not found"),
-	}
-	mockClient := &megaport.Client{VXCService: mockVXCService}
-	ds := &vxcsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockVXCService := &MockVXCService{GetVXCErr: errors.New("VXC not found")}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
 
-	vxc, err := ds.client.VXCService.GetVXC(context.Background(), "vxc-nonexistent")
-	assert.Error(t, err)
-	assert.Nil(t, vxc)
-	assert.Contains(t, err.Error(), "VXC not found")
+	uid := "vxc-nonexistent"
+	req, resp := vxcsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "VXC not found")
+}
+
+func TestReadVXCs_TagsNotFetchedByDefault(t *testing.T) {
+	ctx := context.Background()
+	tagsCalled := false
+	mockVXCService := &MockVXCService{
+		ListVXCsResult: []*megaport.VXC{{UID: "vxc-1", Name: "VXC One"}},
+		ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+			tagsCalled = true
+			return map[string]string{"env": "test"}, nil
+		},
+	}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
+
+	req, resp := vxcsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	assert.False(t, tagsCalled, "ListVXCResourceTags should not be called when include_resource_tags is null")
+
+	var state vxcsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []vxcDetailModel
+	require.False(t, state.VXCs.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.True(t, details[0].ResourceTags.IsNull())
+}
+
+func TestReadVXCs_TagsFetchedWhenOptedIn(t *testing.T) {
+	ctx := context.Background()
+	tagsCalled := false
+	mockVXCService := &MockVXCService{
+		ListVXCsResult: []*megaport.VXC{{UID: "vxc-1", Name: "VXC One"}},
+		ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+			tagsCalled = true
+			return map[string]string{"env": "test"}, nil
+		},
+	}
+	ds := &vxcsDataSource{client: &megaport.Client{VXCService: mockVXCService}}
+
+	yes := true
+	req, resp := vxcsReadRequest(t, ds, nil, &yes)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	assert.True(t, tagsCalled, "ListVXCResourceTags should be called when include_resource_tags=true")
+
+	var state vxcsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []vxcDetailModel
+	require.False(t, state.VXCs.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.False(t, details[0].ResourceTags.IsNull())
+	assert.Equal(t, "vxc-1", mockVXCService.CapturedResourceTagVXCUID)
 }
 
 func TestFromAPIVXCDetail(t *testing.T) {
@@ -282,76 +409,6 @@ func TestFromAPIVXCDetail_ResourceTagsOptIn(t *testing.T) {
 		detail := fromAPIVXCDetail(vxc, tags)
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
-}
-
-func TestReadVXCs_TagsNotFetchedByDefault(t *testing.T) {
-	// This test exercises the same tag-fetching logic as vxcsDataSource.Read
-	// (line 307): fetchTags is only true when IncludeResourceTags is non-null,
-	// non-unknown, and true.
-	tests := []struct {
-		name                string
-		includeTagsValue    types.Bool
-		expectTagsCalled    bool
-		expectTagsPopulated bool
-	}{
-		{
-			name:                "null (default) — tags not fetched",
-			includeTagsValue:    types.BoolNull(),
-			expectTagsCalled:    false,
-			expectTagsPopulated: false,
-		},
-		{
-			name:                "false — tags not fetched",
-			includeTagsValue:    types.BoolValue(false),
-			expectTagsCalled:    false,
-			expectTagsPopulated: false,
-		},
-		{
-			name:                "true — tags fetched",
-			includeTagsValue:    types.BoolValue(true),
-			expectTagsCalled:    true,
-			expectTagsPopulated: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tagsCalled := false
-			mockVXCService := &MockVXCService{
-				ListVXCsResult: []*megaport.VXC{
-					{UID: "vxc-1", Name: "VXC One"},
-				},
-				ListVXCResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
-					tagsCalled = true
-					return map[string]string{"env": "test"}, nil
-				},
-			}
-			mockClient := &megaport.Client{VXCService: mockVXCService}
-
-			// Replicate the Read logic from vxcsDataSource.Read
-			data := vxcsModel{
-				IncludeResourceTags: tc.includeTagsValue,
-			}
-			fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
-
-			vxcs, err := mockClient.VXCService.ListVXCs(context.Background(), &megaport.ListVXCsRequest{IncludeInactive: false})
-			assert.NoError(t, err)
-
-			for _, vxc := range vxcs {
-				var tags map[string]string
-				if fetchTags {
-					tags, _ = mockClient.VXCService.ListVXCResourceTags(context.Background(), vxc.UID)
-				}
-				detail := fromAPIVXCDetail(vxc, tags)
-				if tc.expectTagsPopulated {
-					assert.False(t, detail.ResourceTags.IsNull(), "resource_tags should be populated")
-				} else {
-					assert.True(t, detail.ResourceTags.IsNull(), "resource_tags should be null")
-				}
-			}
-			assert.Equal(t, tc.expectTagsCalled, tagsCalled, "ListVXCResourceTags call mismatch")
-		})
-	}
 }
 
 // Ensure vxcsModel compiles with the schema.
