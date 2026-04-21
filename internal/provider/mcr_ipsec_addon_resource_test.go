@@ -53,7 +53,6 @@ func TestAccMegaportMCRIpsecAddon_Basic(t *testing.T) {
 					}
 					return rs.Primary.Attributes["mcr_id"] + ":" + rs.Primary.Attributes["add_on_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})

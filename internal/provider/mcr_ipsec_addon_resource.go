@@ -42,7 +42,6 @@ type mcrIpsecAddonResourceModel struct {
 	MCRID       types.String `tfsdk:"mcr_id"`
 	TunnelCount types.Int64  `tfsdk:"tunnel_count"`
 	AddOnUID    types.String `tfsdk:"add_on_uid"`
-	LastUpdated types.String `tfsdk:"last_updated"`
 }
 
 // Metadata returns the resource type name.
@@ -75,10 +74,6 @@ func (r *mcrIpsecAddonResource) Schema(_ context.Context, _ resource.SchemaReque
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-			},
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated by Terraform.",
-				Computed:    true,
 			},
 		},
 	}
@@ -167,7 +162,6 @@ func (r *mcrIpsecAddonResource) Create(ctx context.Context, req resource.CreateR
 
 	plan.AddOnUID = types.StringValue(addOn.AddOnUID)
 	plan.TunnelCount = types.Int64Value(int64(addOn.TunnelCount))
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -273,7 +267,6 @@ func (r *mcrIpsecAddonResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	state.TunnelCount = types.Int64Value(int64(addOn.TunnelCount))
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -368,7 +361,6 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tunnel_count"), int64(addOn.TunnelCount))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), time.Now().Format(time.RFC850))...)
 }
 
 // waitForMCRReady polls the MCR until it reaches a ready provisioning state.

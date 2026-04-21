@@ -30,4 +30,3 @@ resource "megaport_mcr_ipsec_addon" "example" {
 ### Read-Only
 
 - `add_on_uid` (String) The UID of the IPSec add-on, assigned by the API.
-- `last_updated` (String) The last time the resource was updated by Terraform.
