@@ -381,24 +381,25 @@ func fromAPIVXCDetail(v *megaport.VXC, tags map[string]string) vxcDetailModel {
 		detail.BEndVLAN = types.Int64Value(int64(v.BEndConfiguration.VLAN))
 	}
 
-	// Time fields — use RFC850 and null for nil, consistent with the VXC resource
+	// Time fields — emit RFC3339 so values are consumable by Terraform's
+	// formatdate() function; nil dates map to null rather than an empty string.
 	if v.CreateDate != nil {
-		detail.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
+		detail.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC3339))
 	} else {
 		detail.CreateDate = types.StringNull()
 	}
 	if v.LiveDate != nil {
-		detail.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
+		detail.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC3339))
 	} else {
 		detail.LiveDate = types.StringNull()
 	}
 	if v.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
+		detail.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC3339))
 	} else {
 		detail.ContractStartDate = types.StringNull()
 	}
 	if v.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
+		detail.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC3339))
 	} else {
 		detail.ContractEndDate = types.StringNull()
 	}
