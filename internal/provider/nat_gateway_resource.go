@@ -33,7 +33,6 @@ var (
 
 // natGatewayResourceModel maps the resource schema data.
 type natGatewayResourceModel struct {
-	LastUpdated           types.String `tfsdk:"last_updated"`
 	ProductUID            types.String `tfsdk:"product_uid"`
 	ProductName           types.String `tfsdk:"product_name"`
 	CreateDate            types.String `tfsdk:"create_date"`
@@ -137,10 +136,6 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		Description: "NAT Gateway Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport NAT Gateways. " +
 			"Creating this resource places a NAT Gateway order: the design record is created, validated, and purchased, and the provider waits for the service to reach CONFIGURED/LIVE before returning.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "Last updated by the Terraform provider.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the NAT Gateway.",
 				Computed:    true,
@@ -364,7 +359,6 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -531,7 +525,6 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags := resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

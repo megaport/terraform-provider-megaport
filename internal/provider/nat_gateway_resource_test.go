@@ -146,7 +146,6 @@ resource "megaport_nat_gateway" "test" {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 			// Update and verify
 			{

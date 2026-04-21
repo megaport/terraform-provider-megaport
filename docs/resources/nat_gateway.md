@@ -38,7 +38,6 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `contract_end_date` (String) The end date of the contract for the NAT Gateway.
 - `create_date` (String) The date the NAT Gateway was created.
 - `created_by` (String) The user who created the NAT Gateway.
-- `last_updated` (String) Last updated by the Terraform provider.
 - `locked` (Boolean) Whether the NAT Gateway is locked.
 - `product_uid` (String) The unique identifier of the NAT Gateway.
 - `provisioning_status` (String) The provisioning status of the NAT Gateway (e.g. CONFIGURED, LIVE).
