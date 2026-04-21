@@ -436,6 +436,81 @@ func TestAccMegaportVXC_CostCentreRemoval(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_PromoCode exercises promo_code on megaport_vxc against
+// the v1.8.0 ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportVXC_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+	const initialPromo = "tf-acc-test-promo-initial"
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+		resource "megaport_port" "port_1" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_port" "port_2" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_vxc" "vxc" {
+			product_name         = "%s"
+			rate_limit           = 200
+			contract_term_months = 1
+			%s
+			a_end = {
+				requested_product_uid = megaport_port.port_1.product_uid
+				ordered_vlan          = 100
+				inner_vlan            = 300
+			}
+			b_end = {
+				requested_product_uid = megaport_port.port_2.product_uid
+				ordered_vlan          = 101
+				inner_vlan            = 301
+			}
+		}`, locs[0], portName1, portName2, vxcName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccMegaportVXC_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()

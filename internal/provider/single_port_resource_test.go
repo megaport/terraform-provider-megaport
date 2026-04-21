@@ -163,6 +163,59 @@ func TestAccMegaportSinglePort_CostCentreRemoval(t *testing.T) {
 	})
 }
 
+// TestAccMegaportSinglePort_PromoCode exercises the promo_code attribute
+// against the v1.8.0 ordering endpoint. promo_code is sent to the API at
+// create time and stored in state as the user-supplied value; the Megaport
+// API does not round-trip it, so state simply tracks config.
+func TestAccMegaportSinglePort_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
+	portName := RandomTestName()
+	const initialPromo = "tf-acc-test-promo-initial"
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_port" "port" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.test_location.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+			%s
+		}`, locationID, portName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_port.port", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccMegaportSinglePort_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()

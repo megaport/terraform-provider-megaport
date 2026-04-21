@@ -108,3 +108,64 @@ resource "megaport_ix" "test_ix" {
 		},
 	})
 }
+
+// TestAccMegaportIX_PromoCode exercises promo_code on megaport_ix against
+// the v1.8.0 ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportIX_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
+	ixName := RandomTestName()
+	portName := RandomTestName()
+	const initialPromo = "tf-acc-test-promo-initial"
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return fmt.Sprintf(`
+resource "megaport_port" "test_port" {
+    product_name           = "%s"
+    location_id            = %d
+    port_speed             = 1000
+    marketplace_visibility = false
+    contract_term_months   = 1
+}
+
+resource "megaport_ix" "test_ix" {
+    product_name          = "%s"
+    requested_product_uid = megaport_port.test_port.product_uid
+    network_service_type  = "Sydney IX"
+    asn                   = 12345
+    mac_address           = "00:CA:FE:BA:BE:01"
+    rate_limit            = 500
+    vlan                  = 2001
+    shutdown              = false
+    %s
+}
+`, portName, locationID, ixName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_ix.test_ix", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_ix.test_ix", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_ix.test_ix", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_ix.test_ix", "promo_code"),
+				),
+			},
+		},
+	})
+}

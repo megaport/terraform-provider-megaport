@@ -961,6 +961,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 
 	diags := resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)

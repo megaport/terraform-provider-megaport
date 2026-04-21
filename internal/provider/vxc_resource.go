@@ -2389,6 +2389,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// In Update, pass plan to preserve user-only configuration values
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state

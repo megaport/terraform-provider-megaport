@@ -307,6 +307,82 @@ func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
 	})
 }
 
+// TestAccMegaportMVEAruba_PromoCode exercises promo_code on megaport_mve
+// against the v1.8.0 ordering endpoint. State tracks the config-supplied
+// value.
+func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	const initialPromo = "tf-acc-test-promo-initial"
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		data "megaport_mve_images" "aruba" {
+			vendor_filter = "Aruba"
+			id_filter = %d
+		}
+		resource "megaport_mve" "mve" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 1
+			%s
+			vendor_config = {
+				vendor       = "aruba"
+				product_size = "SMALL"
+				mve_label    = "MVE 2/8"
+				image_id     = data.megaport_mve_images.aruba.mve_images.0.id
+				account_name = "%s"
+				account_key  = "%s"
+				system_tag   = "Preconfiguration-aruba-test-1"
+			}
+			vnics = [{
+				description = "Data Plane"
+			},
+			{
+				description = "Control Plane"
+			},
+			{
+				description = "Management Plane"
+			},
+			{
+				description = "Extra Plane"
+			}]
+		}`, locationID, MVEArubaImageIDMVE, mveName, promoLine, mveName, mveKey)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_mve.mve", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
