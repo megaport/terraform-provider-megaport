@@ -55,7 +55,6 @@ func checkNATGatewayProvisioned(resourceName string) resource.TestCheckFunc {
 func TestAccMegaportNATGateway_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMCRTestLocation(t, 1000)
 	natGWName := RandomTestName()
 	natGWNameUpdated := RandomTestName()
 	resourceName := "megaport_nat_gateway.test"
@@ -64,6 +63,7 @@ func TestAccMegaportNATGateway_Basic(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping NAT Gateway test: %v", err)
 	}
+	locationID, _ := findNATGatewayTestLocation(t, speed)
 
 	configInitial := providerConfig + fmt.Sprintf(`
 data "megaport_location" "test_location" {

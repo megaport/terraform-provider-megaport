@@ -446,6 +446,45 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	return 0, ""
 }
 
+// findNATGatewayTestLocation returns a staging location ID that supports NAT
+// Gateway at the given speed (Mbps). Calls t.Skip if none found.
+var (
+	natGatewayClaimedMu        sync.Mutex
+	natGatewayClaimedLocations = map[int]bool{}
+)
+
+func findNATGatewayTestLocation(t *testing.T, speedMbps int) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	natGatewayClaimedMu.Lock()
+	defer natGatewayClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && loc.SupportsNATGatewaySpeed(speedMbps) && !natGatewayClaimedLocations[loc.ID] {
+			locID := loc.ID
+			natGatewayClaimedLocations[locID] = true
+			t.Cleanup(func() {
+				natGatewayClaimedMu.Lock()
+				defer natGatewayClaimedMu.Unlock()
+				delete(natGatewayClaimedLocations, locID)
+			})
+			t.Logf("findNATGatewayTestLocation: using location %d (%s) for speed %d", locID, loc.Name, speedMbps)
+			return locID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps NAT Gateway capacity", speedMbps)
+	return 0, ""
+}
+
 // findVXCPortTestLocations returns count unique staging location IDs that
 // support Megaport ports at 1000 Mbps. Uses the same portClaimedLocations
 // mechanism as findPortTestLocation so parallel tests don't collide.
