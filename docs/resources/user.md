@@ -44,7 +44,6 @@ Megaport User resource for managing users in your company. **User Lifecycle**: W
 - `employee_id` (Number) The employee ID of the user.
 - `feature_flags` (List of String) List of feature flags enabled for the user.
 - `invitation_pending` (Boolean) Whether the user has a pending invitation. Users with a pending invitation cannot be updated in the provider until the invitation has been accepted. **Important for resource deletion**: Users with `invitation_pending = true` can be deleted directly, while users with `invitation_pending = false` (who have logged in) can only be deactivated. When you run `terraform destroy` on a user resource, Terraform will automatically delete users with pending invitations or deactivate users who have already logged in, based on this field.
-- `last_updated` (String)
 - `mfa_enabled` (Boolean) Whether multi-factor authentication is enabled for the user.
 - `name` (String) The full name of the user.
 - `party_id` (Number) The party ID of the user.
