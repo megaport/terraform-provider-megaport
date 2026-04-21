@@ -5,8 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -114,60 +118,123 @@ func (m *MockMCRService) GetMCRPrefixFilterLists(ctx context.Context, mcrId stri
 	return nil, nil
 }
 
+// mcrsReadRequest builds a datasource.ReadRequest and ReadResponse for the mcrs
+// data source schema. When productUID is non-nil the config sets product_uid to
+// that value; otherwise the attribute is null (triggering a list-all call).
+func mcrsReadRequest(t *testing.T, ds *mcrsDataSource, productUID *string) (datasource.ReadRequest, *datasource.ReadResponse) {
+	t.Helper()
+	ctx := context.Background()
+
+	schemaResp := datasource.SchemaResponse{}
+	ds.Schema(ctx, datasource.SchemaRequest{}, &schemaResp)
+
+	tfType := schemaResp.Schema.Type().TerraformType(ctx)
+
+	var uidVal tftypes.Value
+	if productUID != nil {
+		uidVal = tftypes.NewValue(tftypes.String, *productUID)
+	} else {
+		uidVal = tftypes.NewValue(tftypes.String, nil)
+	}
+
+	mcrsAttrType := schemaResp.Schema.Attributes["mcrs"].GetType().TerraformType(ctx)
+	configRaw := tftypes.NewValue(tfType, map[string]tftypes.Value{
+		"product_uid": uidVal,
+		"mcrs":        tftypes.NewValue(mcrsAttrType, nil),
+	})
+
+	req := datasource.ReadRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: configRaw},
+	}
+	resp := &datasource.ReadResponse{
+		State: tfsdk.State{Schema: schemaResp.Schema},
+	}
+	return req, resp
+}
+
 func TestReadMCRs_ListAll(t *testing.T) {
+	ctx := context.Background()
 	mockMCRService := &MockMCRService{
 		ListMCRsResult: []*megaport.MCR{
 			{UID: "mcr-1", Name: "MCR One"},
 			{UID: "mcr-2", Name: "MCR Two"},
 		},
 	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcrs, err := ds.client.MCRService.ListMCRs(context.Background(), &megaport.ListMCRsRequest{IncludeInactive: false})
-	assert.NoError(t, err)
-	assert.Len(t, mcrs, 2)
-	assert.Equal(t, "mcr-1", mcrs[0].UID)
-	assert.Equal(t, "mcr-2", mcrs[1].UID)
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state mcrsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+
+	var details []mcrDetailModel
+	diags = state.MCRs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 2)
+	assert.Equal(t, "mcr-1", details[0].UID.ValueString())
+	assert.Equal(t, "MCR One", details[0].Name.ValueString())
+	assert.Equal(t, "mcr-2", details[1].UID.ValueString())
+	assert.Equal(t, "MCR Two", details[1].Name.ValueString())
 }
 
 func TestReadMCRs_GetByUID(t *testing.T) {
+	ctx := context.Background()
 	mockMCRService := &MockMCRService{
 		GetMCRResult: &megaport.MCR{UID: "mcr-1", Name: "MCR One"},
 	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcr, err := ds.client.MCRService.GetMCR(context.Background(), "mcr-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "mcr-1", mcr.UID)
-	assert.Equal(t, "MCR One", mcr.Name)
+	uid := "mcr-1"
+	req, resp := mcrsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state mcrsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.Equal(t, "mcr-1", state.ProductUID.ValueString())
+
+	var details []mcrDetailModel
+	diags = state.MCRs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 1)
+	assert.Equal(t, "mcr-1", details[0].UID.ValueString())
+	assert.Equal(t, "MCR One", details[0].Name.ValueString())
 }
 
 func TestReadMCRs_ListError(t *testing.T) {
-	mockMCRService := &MockMCRService{
-		ListMCRsErr: errors.New("API error"),
-	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockMCRService := &MockMCRService{ListMCRsErr: errors.New("API error")}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcrs, err := ds.client.MCRService.ListMCRs(context.Background(), &megaport.ListMCRsRequest{IncludeInactive: false})
-	assert.Error(t, err)
-	assert.Nil(t, mcrs)
-	assert.Contains(t, err.Error(), "API error")
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "API error")
 }
 
 func TestReadMCRs_GetByUIDError(t *testing.T) {
-	mockMCRService := &MockMCRService{
-		GetMCRErr: errors.New("MCR not found"),
-	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockMCRService := &MockMCRService{GetMCRErr: errors.New("MCR not found")}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcr, err := ds.client.MCRService.GetMCR(context.Background(), "mcr-nonexistent")
-	assert.Error(t, err)
-	assert.Nil(t, mcr)
-	assert.Contains(t, err.Error(), "MCR not found")
+	uid := "mcr-nonexistent"
+	req, resp := mcrsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "MCR not found")
 }
 
 func TestFromAPIMCRDetail(t *testing.T) {
@@ -276,7 +343,7 @@ func TestFromAPIMCRDetail(t *testing.T) {
 	})
 }
 
-// Ensure mcrsModel compiles with the new schema (no filter/tags fields).
+// Ensure mcrsModel compiles with the schema.
 func TestMCRsModel_Structure(t *testing.T) {
 	model := mcrsModel{
 		ProductUID: types.StringValue("mcr-123"),
