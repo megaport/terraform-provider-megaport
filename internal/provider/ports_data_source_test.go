@@ -5,8 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -94,73 +98,196 @@ func (m *MockPortService) UpdatePortResourceTags(ctx context.Context, portID str
 	return nil
 }
 
+// portsReadRequest builds a datasource.ReadRequest and ReadResponse for the ports
+// data source schema. Non-nil productUID sets product_uid; non-nil
+// includeResourceTags sets include_resource_tags; otherwise each is null.
+func portsReadRequest(t *testing.T, ds *portsDataSource, productUID *string, includeResourceTags *bool) (datasource.ReadRequest, *datasource.ReadResponse) {
+	t.Helper()
+	ctx := context.Background()
+
+	schemaResp := datasource.SchemaResponse{}
+	ds.Schema(ctx, datasource.SchemaRequest{}, &schemaResp)
+
+	tfType := schemaResp.Schema.Type().TerraformType(ctx)
+
+	var uidVal tftypes.Value
+	if productUID != nil {
+		uidVal = tftypes.NewValue(tftypes.String, *productUID)
+	} else {
+		uidVal = tftypes.NewValue(tftypes.String, nil)
+	}
+
+	var tagsVal tftypes.Value
+	if includeResourceTags != nil {
+		tagsVal = tftypes.NewValue(tftypes.Bool, *includeResourceTags)
+	} else {
+		tagsVal = tftypes.NewValue(tftypes.Bool, nil)
+	}
+
+	portsAttrType := schemaResp.Schema.Attributes["ports"].GetType().TerraformType(ctx)
+	configRaw := tftypes.NewValue(tfType, map[string]tftypes.Value{
+		"product_uid":           uidVal,
+		"include_resource_tags": tagsVal,
+		"ports":                 tftypes.NewValue(portsAttrType, nil),
+	})
+
+	req := datasource.ReadRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: configRaw},
+	}
+	resp := &datasource.ReadResponse{
+		State: tfsdk.State{Schema: schemaResp.Schema},
+	}
+	return req, resp
+}
+
 func TestReadPorts_ListAll(t *testing.T) {
+	ctx := context.Background()
 	mockPortService := &MockPortService{
 		ListPortsResult: []*megaport.Port{
 			{UID: "port-1", Name: "Port One"},
 			{UID: "port-2", Name: "Port Two"},
 		},
 	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-	ds := &portsDataSource{client: mockClient}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
-	ports, err := ds.client.PortService.ListPorts(context.Background())
-	assert.NoError(t, err)
-	assert.Len(t, ports, 2)
-	assert.Equal(t, "port-1", ports[0].UID)
-	assert.Equal(t, "port-2", ports[1].UID)
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+
+	var details []portDetailModel
+	diags = state.Ports.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 2)
+	assert.Equal(t, "port-1", details[0].UID.ValueString())
+	assert.Equal(t, "Port One", details[0].Name.ValueString())
+	assert.Equal(t, "port-2", details[1].UID.ValueString())
+	assert.Equal(t, "Port Two", details[1].Name.ValueString())
 }
 
 func TestReadPorts_GetByUID(t *testing.T) {
+	ctx := context.Background()
 	mockPortService := &MockPortService{
 		GetPortResult: &megaport.Port{UID: "port-1", Name: "Port One"},
 	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-	ds := &portsDataSource{client: mockClient}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
-	port, err := ds.client.PortService.GetPort(context.Background(), "port-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "port-1", port.UID)
-	assert.Equal(t, "Port One", port.Name)
+	uid := "port-1"
+	req, resp := portsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.Equal(t, "port-1", state.ProductUID.ValueString())
+
+	var details []portDetailModel
+	diags = state.Ports.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 1)
+	assert.Equal(t, "port-1", details[0].UID.ValueString())
+	assert.Equal(t, "Port One", details[0].Name.ValueString())
 }
 
 func TestReadPorts_ListError(t *testing.T) {
-	mockPortService := &MockPortService{
-		ListPortsErr: errors.New("API error"),
-	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-	ds := &portsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockPortService := &MockPortService{ListPortsErr: errors.New("API error")}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
-	ports, err := ds.client.PortService.ListPorts(context.Background())
-	assert.Error(t, err)
-	assert.Nil(t, ports)
-	assert.Contains(t, err.Error(), "API error")
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "API error")
 }
 
 func TestReadPorts_GetByUIDError(t *testing.T) {
-	mockPortService := &MockPortService{
-		GetPortErr: errors.New("port not found"),
-	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-	ds := &portsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockPortService := &MockPortService{GetPortErr: errors.New("port not found")}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
-	port, err := ds.client.PortService.GetPort(context.Background(), "port-nonexistent")
-	assert.Error(t, err)
-	assert.Nil(t, port)
-	assert.Contains(t, err.Error(), "port not found")
+	uid := "port-nonexistent"
+	req, resp := portsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "port not found")
 }
 
 func TestReadPorts_GetByUIDReturnsNil(t *testing.T) {
-	mockPortService := &MockPortService{
-		GetPortResult: nil,
-		GetPortErr:    nil,
-	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-	ds := &portsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockPortService := &MockPortService{GetPortResult: nil, GetPortErr: nil}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
-	port, err := ds.client.PortService.GetPort(context.Background(), "port-nonexistent")
-	assert.NoError(t, err)
-	assert.Nil(t, port)
+	uid := "port-nonexistent"
+	req, resp := portsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "not found")
+}
+
+func TestReadPorts_TagsNotFetchedByDefault(t *testing.T) {
+	ctx := context.Background()
+	tagsCalled := false
+	mockPortService := &MockPortService{
+		ListPortsResult: []*megaport.Port{{UID: "port-1", Name: "Port One"}},
+		ListPortResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+			tagsCalled = true
+			return map[string]string{"env": "test"}, nil
+		},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	assert.False(t, tagsCalled, "ListPortResourceTags should not be called when include_resource_tags is null")
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.True(t, details[0].ResourceTags.IsNull())
+}
+
+func TestReadPorts_TagsFetchedWhenOptedIn(t *testing.T) {
+	ctx := context.Background()
+	tagsCalled := false
+	mockPortService := &MockPortService{
+		ListPortsResult: []*megaport.Port{{UID: "port-1", Name: "Port One"}},
+		ListPortResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+			tagsCalled = true
+			return map[string]string{"env": "test"}, nil
+		},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	yes := true
+	req, resp := portsReadRequest(t, ds, nil, &yes)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	assert.True(t, tagsCalled, "ListPortResourceTags should be called when include_resource_tags=true")
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.False(t, details[0].ResourceTags.IsNull())
+	assert.Equal(t, "port-1", mockPortService.CapturedResourceTagPortUID)
 }
 
 func TestFromAPIPortDetail(t *testing.T) {
@@ -277,51 +404,6 @@ func TestFromAPIPortDetail_ResourceTagsOptIn(t *testing.T) {
 		assert.False(t, diags.HasError())
 		assert.False(t, detail.ResourceTags.IsNull())
 	})
-}
-
-func TestReadPorts_TagsNotFetchedByDefault(t *testing.T) {
-	tagsCalled := false
-	mockPortService := &MockPortService{
-		ListPortsResult: []*megaport.Port{
-			{UID: "port-1", Name: "Port One"},
-		},
-		ListPortResourceTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
-			tagsCalled = true
-			return map[string]string{"env": "test"}, nil
-		},
-	}
-	mockClient := &megaport.Client{PortService: mockPortService}
-
-	// Simulate Read path: tags should not be fetched when fetchTags is false
-	ports, err := mockClient.PortService.ListPorts(context.Background())
-	assert.NoError(t, err)
-	assert.Len(t, ports, 1)
-
-	// fetchTags = false path: do not call ListPortResourceTags
-	fetchTags := false
-	for _, port := range ports {
-		var tags map[string]string
-		if fetchTags {
-			tags, _ = mockClient.PortService.ListPortResourceTags(context.Background(), port.UID)
-		}
-		detail, diags := fromAPIPortDetail(port, tags)
-		assert.False(t, diags.HasError())
-		assert.True(t, detail.ResourceTags.IsNull())
-	}
-	assert.False(t, tagsCalled, "ListPortResourceTags should not be called when include_resource_tags is false")
-
-	// fetchTags = true path: call ListPortResourceTags
-	fetchTags = true
-	for _, port := range ports {
-		var tags map[string]string
-		if fetchTags {
-			tags, _ = mockClient.PortService.ListPortResourceTags(context.Background(), port.UID)
-		}
-		detail, diags := fromAPIPortDetail(port, tags)
-		assert.False(t, diags.HasError())
-		assert.False(t, detail.ResourceTags.IsNull())
-	}
-	assert.True(t, tagsCalled, "ListPortResourceTags should be called when include_resource_tags is true")
 }
 
 // Ensure portsModel compiles with the schema.
