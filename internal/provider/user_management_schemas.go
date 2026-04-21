@@ -29,9 +29,6 @@ func userSchema() schema.Schema {
 		Description: "Megaport User resource for managing users in your company. **User Lifecycle**: When created, users have a pending invitation status. Users with pending invitations can be updated minimally and deleted completely. Once a user accepts their invitation and logs in, they can be fully updated but can only be deactivated (not deleted) via Terraform. The provider automatically handles the appropriate deletion/deactivation behavior based on the user's invitation status.",
 
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Computed: true,
-			},
 			"employee_id": schema.Int64Attribute{
 				Description: "The employee ID of the user.",
 				Computed:    true,

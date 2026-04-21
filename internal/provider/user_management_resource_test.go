@@ -57,7 +57,6 @@ func TestAccMegaportUser_Basic(t *testing.T) {
 					}
 					return rawState["employee_id"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})

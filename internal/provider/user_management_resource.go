@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -25,8 +24,6 @@ var (
 
 // userResourceModel maps the resource schema data.
 type userResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	EmployeeID                 types.Int64  `tfsdk:"employee_id"`
 	PartyID                    types.Int64  `tfsdk:"party_id"`
 	FirstName                  types.String `tfsdk:"first_name"`
@@ -68,9 +65,6 @@ type userEmailModel struct {
 
 func (orm *userResourceModel) fromAPIUser(ctx context.Context, u *megaport.User) diag.Diagnostics {
 	diags := diag.Diagnostics{}
-
-	// Set the last updated timestamp
-	orm.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Basic user information
 	orm.PartyID = types.Int64Value(int64(u.PartyId))
