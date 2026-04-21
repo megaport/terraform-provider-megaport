@@ -407,7 +407,7 @@ func TestAccMegaportMCR_PromoCode(t *testing.T) {
 	defer acquireAccTestSlot(t)()
 	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
-	const initialPromo = "tf-acc-test-promo-initial"
+	initialPromo := testPromoCode()
 	const otherPromo = "tf-acc-test-promo-other"
 
 	configFor := func(promoLine string) string {

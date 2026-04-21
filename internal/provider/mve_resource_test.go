@@ -316,7 +316,7 @@ func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
 	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
-	const initialPromo = "tf-acc-test-promo-initial"
+	initialPromo := testPromoCode()
 	const otherPromo = "tf-acc-test-promo-other"
 
 	configFor := func(promoLine string) string {

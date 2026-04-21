@@ -1265,3 +1265,18 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	t.Logf("orphaned test resources (live): %d VXC, %d MVE, %d MCR, %d Port", vxcLive, mveLive, mcrLive, portLive)
 	t.Skip("cleanup scan complete")
 }
+
+// testPromoCode returns the promo code string to use in promo_code acceptance
+// tests. Set MEGAPORT_TEST_PROMO_CODE to a live staging code to verify the
+// code is persisted on the billing record (j_billable.promocode_id). When
+// unset, tests use a placeholder — the staging API accepts unknown codes
+// silently, so tests still exercise the provider contract but skip backend
+// verification. Staging promo codes are short-lived (daily DB refresh), so
+// hardcoding a real code would cause the tests to silently stop verifying
+// anything real.
+func testPromoCode() string {
+	if v := os.Getenv("MEGAPORT_TEST_PROMO_CODE"); v != "" {
+		return v
+	}
+	return "tf-acc-test-promo-initial"
+}

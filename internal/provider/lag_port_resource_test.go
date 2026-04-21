@@ -172,7 +172,7 @@ func TestAccMegaportLAGPort_PromoCode(t *testing.T) {
 	defer acquireAccTestSlot(t)()
 	locationID, _ := findPortTestLocation(t, 10000)
 	portName := RandomTestName()
-	const initialPromo = "tf-acc-test-promo-initial"
+	initialPromo := testPromoCode()
 	const otherPromo = "tf-acc-test-promo-other"
 
 	configFor := func(promoLine string) string {

@@ -445,7 +445,7 @@ func TestAccMegaportVXC_PromoCode(t *testing.T) {
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
-	const initialPromo = "tf-acc-test-promo-initial"
+	initialPromo := testPromoCode()
 	const otherPromo = "tf-acc-test-promo-other"
 
 	configFor := func(promoLine string) string {
