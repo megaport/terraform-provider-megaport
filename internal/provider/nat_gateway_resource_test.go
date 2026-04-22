@@ -161,3 +161,66 @@ resource "megaport_nat_gateway" "test" {
 		},
 	})
 }
+
+// TestAccMegaportNATGateway_PromoCode exercises promo_code on megaport_nat_gateway.
+// The API does not echo back the promo code, so state must track the config-supplied
+// value; this test verifies: create with promo → change promo → remove promo.
+func TestAccMegaportNATGateway_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	speed, sessionCount, err := getNATGatewayTestConfig()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway promo code test: %v", err)
+	}
+	locationID, _ := findNATGatewayTestLocation(t, speed)
+	natGWName := RandomTestName()
+	resourceName := "megaport_nat_gateway.test"
+	const initialPromo = "tf-acc-test-promo-initial"
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+data "megaport_location" "test_location" {
+    id = %d
+}
+
+resource "megaport_nat_gateway" "test" {
+    product_name         = "%s"
+    location_id          = data.megaport_location.test_location.id
+    speed                = %d
+    session_count        = %d
+    contract_term_months = 1
+    diversity_zone       = "red"
+    asn                  = 64512
+    %s
+}
+`, locationID, natGWName, speed, sessionCount, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet(resourceName, "product_uid"),
+					checkNATGatewayProvisioned(resourceName),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr(resourceName, "promo_code"),
+				),
+			},
+		},
+	})
+}

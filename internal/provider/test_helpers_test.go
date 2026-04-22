@@ -453,7 +453,7 @@ var (
 	natGatewayClaimedLocations = map[int]bool{}
 )
 
-func findNATGatewayTestLocation(t *testing.T, speedMbps int) (id int, name string) {
+func findNATGatewayTestLocation(t *testing.T, speedMbps int) (id int, name string) { //nolint:unparam // name return is available for callers that want it
 	t.Helper()
 	ctx := context.Background()
 	client, err := getTestClient()

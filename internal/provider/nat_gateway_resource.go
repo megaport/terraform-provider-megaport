@@ -72,12 +72,6 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) dia
 	m.ServiceLevelReference = types.StringValue(gw.ServiceLevelReference)
 	m.ProvisioningStatus = types.StringValue(gw.ProvisioningStatus)
 
-	if gw.PromoCode != "" {
-		m.PromoCode = types.StringValue(gw.PromoCode)
-	} else {
-		m.PromoCode = types.StringNull()
-	}
-
 	// Config fields
 	m.DiversityZone = types.StringValue(gw.Config.DiversityZone)
 	m.ASN = types.Int64Value(int64(gw.Config.ASN))
