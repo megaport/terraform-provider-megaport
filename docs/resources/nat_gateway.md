@@ -29,7 +29,7 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 - `asn` (Number) The Autonomous System Number (ASN) for the NAT Gateway.
 - `auto_renew_term` (Boolean) Whether the NAT Gateway contract will auto-renew.
 - `bgp_shutdown_default` (Boolean) Whether BGP sessions are shut down by default on the NAT Gateway.
-- `promo_code` (String) A promotional code for the NAT Gateway order.
+- `promo_code` (String) A promotional code for the NAT Gateway order. Changing this value requires the resource to be replaced, as promo codes can only be applied during initial provisioning.
 - `resource_tags` (Map of String) Resource tags for the NAT Gateway.
 
 ### Read-Only
