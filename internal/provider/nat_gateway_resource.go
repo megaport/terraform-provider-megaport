@@ -207,10 +207,10 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"promo_code": schema.StringAttribute{
-				Description: "A promotional code for the NAT Gateway order.",
+				Description: "A promotional code for the NAT Gateway order. Changing this value requires the resource to be replaced, as promo codes can only be applied during initial provisioning.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
@@ -464,10 +464,6 @@ func (r *natGatewayResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	if !plan.AutoRenewTerm.IsNull() && !plan.AutoRenewTerm.IsUnknown() {
 		updateReq.AutoRenewTerm = plan.AutoRenewTerm.ValueBool()
-	}
-
-	if !plan.PromoCode.IsNull() && !plan.PromoCode.IsUnknown() {
-		updateReq.PromoCode = plan.PromoCode.ValueString()
 	}
 
 	// Config fields
