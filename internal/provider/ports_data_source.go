@@ -270,7 +270,7 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			)
 			return
 		}
-		if port == nil {
+		if port == nil || isPortInactive(port) {
 			resp.Diagnostics.AddError(
 				"Error reading port",
 				"Port not found: "+data.ProductUID.ValueString(),
@@ -279,15 +279,23 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 		ports = []*megaport.Port{port}
 	} else {
-		// List all ports
-		var err error
-		ports, err = d.client.PortService.ListPorts(ctx)
+		// List all ports — megaportgo's ListPorts does not filter by status,
+		// so exclude decommissioned/cancelled ports here to match the
+		// "active ports" contract advertised by the schema.
+		all, err := d.client.PortService.ListPorts(ctx)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error listing ports",
 				fmt.Sprintf("Unable to list ports: %v", err),
 			)
 			return
+		}
+		ports = make([]*megaport.Port, 0, len(all))
+		for _, p := range all {
+			if p == nil || isPortInactive(p) {
+				continue
+			}
+			ports = append(ports, p)
 		}
 	}
 
@@ -332,6 +340,13 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	data.Ports = portsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// isPortInactive reports whether a port is in a cancellation state and should
+// be excluded from the "active ports" data source result.
+func isPortInactive(p *megaport.Port) bool {
+	return p.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED ||
+		p.ProvisioningStatus == megaport.STATUS_CANCELLED
 }
 
 // fromAPIPortDetail maps an API Port and its resource tags to a portDetailModel.

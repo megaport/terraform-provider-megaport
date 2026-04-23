@@ -238,6 +238,53 @@ func TestReadPorts_GetByUIDReturnsNil(t *testing.T) {
 	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "not found")
 }
 
+func TestReadPorts_ListSkipsInactive(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		ListPortsResult: []*megaport.Port{
+			{UID: "port-live", Name: "Live Port", ProvisioningStatus: "LIVE"},
+			{UID: "port-decom", Name: "Decom Port", ProvisioningStatus: megaport.STATUS_DECOMMISSIONED},
+			{UID: "port-cancel", Name: "Cancel Port", ProvisioningStatus: megaport.STATUS_CANCELLED},
+			{UID: "port-config", Name: "Configured Port", ProvisioningStatus: "CONFIGURED"},
+		},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+
+	require.Len(t, details, 2)
+	assert.Equal(t, "port-live", details[0].UID.ValueString())
+	assert.Equal(t, "port-config", details[1].UID.ValueString())
+}
+
+func TestReadPorts_GetByUIDRejectsInactive(t *testing.T) {
+	ctx := context.Background()
+	for _, status := range []string{megaport.STATUS_DECOMMISSIONED, megaport.STATUS_CANCELLED} {
+		t.Run(status, func(t *testing.T) {
+			mockPortService := &MockPortService{
+				GetPortResult: &megaport.Port{UID: "port-inactive", ProvisioningStatus: status},
+			}
+			ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+			uid := "port-inactive"
+			req, resp := portsReadRequest(t, ds, &uid, nil)
+			ds.Read(ctx, req, resp)
+
+			require.True(t, resp.Diagnostics.HasError())
+			assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "not found")
+		})
+	}
+}
+
 func TestReadPorts_TagsNotFetchedByDefault(t *testing.T) {
 	ctx := context.Background()
 	tagsCalled := false
