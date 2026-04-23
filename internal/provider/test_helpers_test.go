@@ -485,6 +485,55 @@ func findNATGatewayTestLocation(t *testing.T, speedMbps int) (id int, name strin
 	return 0, ""
 }
 
+// findNATGatewayAndPortTestLocation returns a single staging location ID that
+// supports both NAT Gateway at the given speed and Megaport ports at 1000 Mbps.
+// Used for tests that need to provision a NAT Gateway and a Port at the same
+// site (e.g. VXC A-End = NAT Gateway, B-End = Port).
+func findNATGatewayAndPortTestLocation(t *testing.T, natSpeedMbps int) (id int, name string) { //nolint:unparam // name return is available for callers that want it
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	natGatewayClaimedMu.Lock()
+	portClaimedMu.Lock()
+	defer natGatewayClaimedMu.Unlock()
+	defer portClaimedMu.Unlock()
+	for _, loc := range locations {
+		if !strings.EqualFold(loc.Status, "active") {
+			continue
+		}
+		if !loc.SupportsNATGatewaySpeed(natSpeedMbps) || !portLocationHasCapacity(loc, 1000) {
+			continue
+		}
+		if natGatewayClaimedLocations[loc.ID] || portClaimedLocations[loc.ID] {
+			continue
+		}
+		locID := loc.ID
+		natGatewayClaimedLocations[locID] = true
+		portClaimedLocations[locID] = true
+		t.Cleanup(func() {
+			natGatewayClaimedMu.Lock()
+			portClaimedMu.Lock()
+			defer natGatewayClaimedMu.Unlock()
+			defer portClaimedMu.Unlock()
+			delete(natGatewayClaimedLocations, locID)
+			delete(portClaimedLocations, locID)
+		})
+		t.Logf("findNATGatewayAndPortTestLocation: using location %d (%s) for NAT speed %d", locID, loc.Name, natSpeedMbps)
+		return locID, loc.Name
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps NAT Gateway + 1000 Mbps port capacity", natSpeedMbps)
+	return 0, ""
+}
+
 // findVXCPortTestLocations returns count unique staging location IDs that
 // support Megaport ports at 1000 Mbps. Uses the same portClaimedLocations
 // mechanism as findPortTestLocation so parallel tests don't collide.
