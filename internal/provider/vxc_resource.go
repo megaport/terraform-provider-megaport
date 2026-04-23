@@ -149,13 +149,22 @@ var (
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs)),
 	}
 
-	// deprecated
+	// deprecated. The four NAT-Gateway-only fields (description, interface_type,
+	// packet_filter_in, packet_filter_out) are listed here so the shared
+	// vxcPartnerConfigInterfaceModel can decode from objects of either attr map.
+	// They are not surfaced on the deprecated partner_a_end_config schema.
 	vxcInterfaceAttrs = map[string]attr.Type{
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
+		"ip_addresses":      types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses":  types.ListType{}.WithElementType(types.StringType),
+		"bfd":               types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"bgp_connections":   types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
+		"ip_mtu":            types.Int64Type,
+		"vlan":              types.Int64Type,
+		"description":       types.StringType,
+		"interface_type":    types.StringType,
+		"packet_filter_in":  types.Int64Type,
+		"packet_filter_out": types.Int64Type,
 	}
 
 	// deprecated
@@ -185,13 +194,17 @@ var (
 	}
 
 	vxcVrouterInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":           types.Int64Type,
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"vlan":             types.Int64Type,
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"ip_mtu":            types.Int64Type,
+		"ip_addresses":      types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses":  types.ListType{}.WithElementType(types.StringType),
+		"bfd":               types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":              types.Int64Type,
+		"bgp_connections":   types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"description":       types.StringType,
+		"interface_type":    types.StringType,
+		"packet_filter_in":  types.Int64Type,
+		"packet_filter_out": types.Int64Type,
 	}
 
 	ipRouteAttrs = map[string]attr.Type{
@@ -407,13 +420,17 @@ type vxcPartnerConfigIbmModel struct {
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
 type vxcPartnerConfigInterfaceModel struct {
-	IpMtu          types.Int64  `tfsdk:"ip_mtu"`
-	IPAddresses    types.List   `tfsdk:"ip_addresses"`
-	IPRoutes       types.List   `tfsdk:"ip_routes"`
-	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
-	Bfd            types.Object `tfsdk:"bfd"`
-	BgpConnections types.List   `tfsdk:"bgp_connections"`
-	VLAN           types.Int64  `tfsdk:"vlan"`
+	IpMtu           types.Int64  `tfsdk:"ip_mtu"`
+	IPAddresses     types.List   `tfsdk:"ip_addresses"`
+	IPRoutes        types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses  types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd             types.Object `tfsdk:"bfd"`
+	BgpConnections  types.List   `tfsdk:"bgp_connections"`
+	VLAN            types.Int64  `tfsdk:"vlan"`
+	Description     types.String `tfsdk:"description"`
+	InterfaceType   types.String `tfsdk:"interface_type"`
+	PacketFilterIn  types.Int64  `tfsdk:"packet_filter_in"`
+	PacketFilterOut types.Int64  `tfsdk:"packet_filter_out"`
 }
 
 // ipRouteModel maps the IP route schema data.

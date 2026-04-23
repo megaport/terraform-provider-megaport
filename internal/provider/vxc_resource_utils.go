@@ -480,6 +480,18 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 		if !iface.IpMtu.IsNull() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
 		}
+		if !iface.Description.IsNull() {
+			toAppend.Description = iface.Description.ValueString()
+		}
+		if !iface.InterfaceType.IsNull() {
+			toAppend.InterfaceType = iface.InterfaceType.ValueString()
+		}
+		if !iface.PacketFilterIn.IsNull() {
+			toAppend.PacketFilterIn = megaport.PtrTo(iface.PacketFilterIn.ValueInt64())
+		}
+		if !iface.PacketFilterOut.IsNull() {
+			toAppend.PacketFilterOut = megaport.PtrTo(iface.PacketFilterOut.ValueInt64())
+		}
 		if !iface.IPAddresses.IsNull() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)

@@ -171,6 +171,25 @@ var (
 				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
+						"description": schema.StringAttribute{
+							Description: "Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.",
+							Optional:    true,
+						},
+						"interface_type": schema.StringAttribute{
+							Description: "Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.",
+							Optional:    true,
+							Validators: []validator.String{
+								stringvalidator.OneOf("subInterface", "ipSecTunnel"),
+							},
+						},
+						"packet_filter_in": schema.Int64Attribute{
+							Description: "ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.",
+							Optional:    true,
+						},
+						"packet_filter_out": schema.Int64Attribute{
+							Description: "ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.",
+							Optional:    true,
+						},
 						"ip_mtu": schema.Int64Attribute{
 							Description: "The IP MTU of the partner configuration interface. Defaults to 1500.",
 							Optional:    true,
