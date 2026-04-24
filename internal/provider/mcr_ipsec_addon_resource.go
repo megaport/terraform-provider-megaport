@@ -114,28 +114,20 @@ func (r *mcrIpsecAddonResource) Create(ctx context.Context, req resource.CreateR
 		"tunnel_count": tunnelCount,
 	})
 
-	// Create the IPSec add-on
+	// Create the IPSec add-on and wait for the MCR to reach a ready state.
 	addOnReq := megaport.MCRAddOnRequest{
 		AddOn: &megaport.MCRAddOnIPsecConfig{
 			AddOnType:   megaport.AddOnTypeIPsec,
 			TunnelCount: tunnelCount,
 		},
+		WaitForProvision: true,
+		WaitForTime:      waitForTime,
 	}
 
-	err := r.client.MCRService.UpdateMCRWithAddOn(ctx, mcrID, addOnReq)
-	if err != nil {
+	if err := r.client.MCRService.UpdateMCRWithAddOn(ctx, mcrID, addOnReq); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating MCR IPSec add-on",
 			fmt.Sprintf("Could not create IPSec add-on for MCR %s: %s", mcrID, err.Error()),
-		)
-		return
-	}
-
-	// Wait for the MCR to reach a ready state
-	if err := r.waitForMCRReady(ctx, mcrID); err != nil {
-		resp.Diagnostics.AddError(
-			"Error waiting for MCR to be ready",
-			fmt.Sprintf("MCR %s did not reach a ready state after adding IPSec add-on: %s", mcrID, err.Error()),
 		)
 		return
 	}
