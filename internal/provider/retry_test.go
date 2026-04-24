@@ -21,7 +21,7 @@ func TestRetryWithBackoff_SuccessOnFirstAttempt(t *testing.T) {
 		InitialBackoff: 10 * time.Millisecond,
 		MaxBackoff:     100 * time.Millisecond,
 		Multiplier:     2.0,
-		MaxRetries:     5,
+		MaxAttempts:    5,
 	}, func(_ context.Context) error {
 		calls++
 		return nil
@@ -37,7 +37,7 @@ func TestRetryWithBackoff_SuccessAfterRetries(t *testing.T) {
 		InitialBackoff: 1 * time.Millisecond,
 		MaxBackoff:     10 * time.Millisecond,
 		Multiplier:     2.0,
-		MaxRetries:     5,
+		MaxAttempts:    5,
 	}, func(_ context.Context) error {
 		calls++
 		if calls < 3 {
@@ -50,20 +50,20 @@ func TestRetryWithBackoff_SuccessAfterRetries(t *testing.T) {
 	assert.Equal(t, 3, calls)
 }
 
-func TestRetryWithBackoff_MaxRetriesExhausted(t *testing.T) {
+func TestRetryWithBackoff_MaxAttemptsExhausted(t *testing.T) {
 	calls := 0
 	err := RetryWithBackoff(context.Background(), RetryConfig{
 		InitialBackoff: 1 * time.Millisecond,
 		MaxBackoff:     10 * time.Millisecond,
 		Multiplier:     2.0,
-		MaxRetries:     3,
+		MaxAttempts:    3,
 	}, func(_ context.Context) error {
 		calls++
 		return errors.New("always fails")
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "max retries (3) exceeded")
+	assert.Contains(t, err.Error(), "max attempts (3) exceeded")
 	assert.Equal(t, 3, calls)
 }
 
@@ -91,7 +91,7 @@ func TestRetryWithBackoff_NonRetryableError(t *testing.T) {
 		InitialBackoff: 1 * time.Millisecond,
 		MaxBackoff:     10 * time.Millisecond,
 		Multiplier:     2.0,
-		MaxRetries:     10,
+		MaxAttempts:    10,
 		RetryableFunc:  func(err error) bool { return err.Error() == "transient" },
 	}, func(_ context.Context) error {
 		calls++
@@ -109,7 +109,7 @@ func TestRetryWithBackoff_ContextCancelled(t *testing.T) {
 		InitialBackoff: 500 * time.Millisecond,
 		MaxBackoff:     500 * time.Millisecond,
 		Multiplier:     1.0,
-		MaxRetries:     100,
+		MaxAttempts:    100,
 	}, func(_ context.Context) error {
 		calls++
 		if calls == 1 {

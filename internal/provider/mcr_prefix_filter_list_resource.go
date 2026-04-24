@@ -247,7 +247,7 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 		InitialBackoff: 10 * time.Second,
 		MaxBackoff:     30 * time.Second,
 		Multiplier:     1.5,
-		MaxRetries:     12,
+		MaxAttempts:    12,
 		RetryableFunc: func(err error) bool {
 			var apiErr *megaport.ErrorResponse
 			if errors.As(err, &apiErr) && apiErr.Response != nil {

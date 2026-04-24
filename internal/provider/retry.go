@@ -51,8 +51,8 @@ type RetryConfig struct {
 	InitialBackoff time.Duration    // starting backoff duration (e.g. 2s)
 	MaxBackoff     time.Duration    // upper bound on backoff (e.g. 30s)
 	Multiplier     float64          // backoff growth factor (e.g. 1.5)
-	MaxRetries     int              // 0 = unlimited (use Timeout instead)
-	Timeout        time.Duration    // overall deadline; 0 = unlimited (use MaxRetries)
+	MaxAttempts    int              // total attempts including the first; 0 = unlimited (use Timeout instead). MaxAttempts=2 means 2 calls total (1 initial + 1 retry).
+	Timeout        time.Duration    // overall deadline; 0 = unlimited (use MaxAttempts)
 	InitialDelay   time.Duration    // delay before the first attempt (useful for poll loops)
 	RetryableFunc  func(error) bool // predicate: should we retry this error? nil = retry all
 }
@@ -88,7 +88,7 @@ func normalizeRetryConfig(cfg RetryConfig) RetryConfig {
 }
 
 // RetryWithBackoff calls fn repeatedly with exponential backoff and full jitter
-// until it succeeds, the context is cancelled, MaxRetries is exhausted, or
+// until it succeeds, the context is cancelled, MaxAttempts is exhausted, or
 // Timeout expires.
 //
 // Full jitter: sleep = rand(0, min(maxBackoff, initialBackoff * multiplier^attempt))
@@ -138,10 +138,10 @@ func RetryWithBackoff(ctx context.Context, cfg RetryConfig, fn func(ctx context.
 			return lastErr
 		}
 
-		// If no retries remain, return immediately — don't sleep before
+		// If no attempts remain, return immediately — don't sleep before
 		// giving up, which would add up to MaxBackoff of pointless delay.
-		if cfg.MaxRetries > 0 && attempt+1 >= cfg.MaxRetries {
-			return fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxRetries, lastErr)
+		if cfg.MaxAttempts > 0 && attempt+1 >= cfg.MaxAttempts {
+			return fmt.Errorf("max attempts (%d) exceeded: %w", cfg.MaxAttempts, lastErr)
 		}
 
 		// Full jitter: sleep = rand(0, min(maxBackoff, initial * multiplier^attempt))
@@ -217,7 +217,20 @@ func PollWithBackoff[T any](ctx context.Context, cfg RetryConfig, fn func(ctx co
 			return val, nil
 		}
 
-		timer := time.NewTimer(backoff)
+		// Cap the sleep to the remaining time before the deadline so we
+		// don't overshoot Timeout by up to a full backoff interval.
+		sleep := backoff
+		if !deadline.IsZero() {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				return zero, fmt.Errorf("%w after %v", ErrPollTimeout, cfg.Timeout)
+			}
+			if sleep > remaining {
+				sleep = remaining
+			}
+		}
+
+		timer := time.NewTimer(sleep)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
