@@ -2,11 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net/http"
-	"slices"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -171,7 +169,7 @@ func (r *mcrIpsecAddonResource) Read(ctx context.Context, req resource.ReadReque
 
 	mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
 	if err != nil {
-		if isMCRNotFoundError(err) {
+		if megaport.IsServiceNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -231,7 +229,7 @@ func (r *mcrIpsecAddonResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Wait for the MCR to reach a ready state
-	if err := r.waitForMCRReady(ctx, mcrID); err != nil {
+	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, waitForTime); err != nil {
 		resp.Diagnostics.AddError(
 			"Error waiting for MCR to be ready",
 			fmt.Sprintf("MCR %s did not reach a ready state after updating IPSec add-on: %s", mcrID, err.Error()),
@@ -283,7 +281,7 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 	// Setting tunnel count to 0 disables/removes the add-on
 	err := r.client.MCRService.UpdateMCRIPsecAddOn(ctx, mcrID, addOnUID, 0)
 	if err != nil {
-		if isMCRNotFoundError(err) {
+		if megaport.IsServiceNotFoundError(err) {
 			// MCR or add-on already deleted
 			return
 		}
@@ -296,8 +294,8 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 
 	// Wait for the MCR to return to a ready state so follow-on operations
 	// (e.g., deleting the MCR itself in the same destroy) don't race.
-	if err := r.waitForMCRReady(ctx, mcrID); err != nil {
-		if isMCRNotFoundError(err) {
+	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, waitForTime); err != nil {
+		if errors.Is(err, megaport.ErrMCRNotFound) || errors.Is(err, megaport.ErrMCRDecommissioned) {
 			return
 		}
 		resp.Diagnostics.AddError(
@@ -329,7 +327,7 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 	// Verify the resource exists
 	mcr, err := r.client.MCRService.GetMCR(ctx, mcrUID)
 	if err != nil {
-		if isMCRNotFoundError(err) {
+		if megaport.IsServiceNotFoundError(err) {
 			resp.Diagnostics.AddError(
 				"Resource not found",
 				fmt.Sprintf("MCR %s does not exist", mcrUID),
@@ -355,61 +353,6 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tunnel_count"), int64(addOn.TunnelCount))...)
 }
 
-// waitForMCRReady polls the MCR until it reaches a ready provisioning state.
-func (r *mcrIpsecAddonResource) waitForMCRReady(ctx context.Context, mcrID string) error {
-	toWait := waitForTime
-	if toWait == 0 {
-		toWait = 10 * time.Minute
-	}
-
-	// Check immediately before entering the poll loop.
-	mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
-	if err != nil {
-		if isMCRNotFoundError(err) {
-			return fmt.Errorf("MCR %s has been deleted", mcrID)
-		}
-		return fmt.Errorf("error polling MCR %s: %w", mcrID, err)
-	}
-	if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
-		return fmt.Errorf("MCR %s has been decommissioned", mcrID)
-	}
-	if slices.Contains(megaport.SERVICE_STATE_READY, mcr.ProvisioningStatus) {
-		return nil
-	}
-
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	timeout := time.After(toWait)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timeout:
-			return fmt.Errorf("timed out waiting for MCR %s to reach a ready state", mcrID)
-		case <-ticker.C:
-			mcr, err := r.client.MCRService.GetMCR(ctx, mcrID)
-			if err != nil {
-				if isMCRNotFoundError(err) {
-					return fmt.Errorf("MCR %s has been deleted", mcrID)
-				}
-				return fmt.Errorf("error polling MCR %s: %w", mcrID, err)
-			}
-			if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
-				return fmt.Errorf("MCR %s has been decommissioned", mcrID)
-			}
-			if slices.Contains(megaport.SERVICE_STATE_READY, mcr.ProvisioningStatus) {
-				return nil
-			}
-			tflog.Debug(ctx, "MCR not yet ready, continuing to poll", map[string]interface{}{
-				"mcr_id": mcrID,
-				"status": mcr.ProvisioningStatus,
-			})
-		}
-	}
-}
-
 // findIPsecAddOn finds an IPSec add-on in the MCR's add-ons list.
 // If addOnUID is empty, it returns the first IPSec add-on found.
 // If addOnUID is provided, it returns the add-on with that specific UID.
@@ -423,23 +366,6 @@ func (r *mcrIpsecAddonResource) findIPsecAddOn(mcr *megaport.MCR, addOnUID strin
 		}
 	}
 	return nil
-}
-
-// isMCRNotFoundError checks if an error indicates the MCR was not found.
-// The API can return either HTTP 404 or HTTP 400 with "Could not find a service with UID".
-func isMCRNotFoundError(err error) bool {
-	apiErr, ok := err.(*megaport.ErrorResponse)
-	if !ok || apiErr.Response == nil {
-		return false
-	}
-	if apiErr.Response.StatusCode == http.StatusNotFound {
-		return true
-	}
-	if apiErr.Response.StatusCode == http.StatusBadRequest &&
-		strings.Contains(apiErr.Message, "Could not find a service with UID") {
-		return true
-	}
-	return false
 }
 
 // parseImportIDStrings parses an import ID in the format "part1:part2" and returns both parts as strings.
