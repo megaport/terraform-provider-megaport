@@ -1,32 +1,137 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
+	megaport "github.com/megaport/megaportgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-const (
-	SinglePortTestLocation      = "NextDC B1"
-	SinglePortTestLocationIDNum = 5 // "NextDC B1"
-)
+func TestFromAPIPort_Full(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:                   "port-uid-123",
+		Name:                  "Test Port",
+		PortSpeed:             10000,
+		LocationID:            42,
+		MarketplaceVisibility: true,
+		CompanyUID:            "company-uid-456",
+		CostCentre:            "cost-centre-1",
+		ContractTermMonths:    12,
+		DiversityZone:         "red",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{
+				Demarcation: "Test Demarcation",
+				Up:          1,
+			},
+		},
+	}
+	tags := map[string]string{"env": "test", "team": "platform"}
 
-type SinglePortProviderTestSuite ProviderTestSuite
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, tags)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 
-func TestSinglePortProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(SinglePortProviderTestSuite))
+	assert.Equal(t, "port-uid-123", model.UID.ValueString())
+	assert.Equal(t, "Test Port", model.Name.ValueString())
+	assert.Equal(t, int64(10000), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(42), model.LocationID.ValueInt64())
+	assert.True(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "company-uid-456", model.CompanyUID.ValueString())
+	assert.Equal(t, "cost-centre-1", model.CostCentre.ValueString())
+	assert.Equal(t, int64(12), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "red", model.DiversityZone.ValueString())
+
+	// Verify resources object is set (not null)
+	assert.False(t, model.Resources.IsNull())
+	assert.False(t, model.Resources.IsUnknown())
+
+	// Verify resource tags
+	assert.False(t, model.ResourceTags.IsNull())
+	tagElements := model.ResourceTags.Elements()
+	require.Len(t, tagElements, 2)
+	assert.Equal(t, "test", tagElements["env"].(types.String).ValueString())
+	assert.Equal(t, "platform", tagElements["team"].(types.String).ValueString())
 }
 
-func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
+func TestFromAPIPort_MinimalFields(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-minimal",
+		Name: "Minimal Port",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "port-minimal", model.UID.ValueString())
+	assert.Equal(t, "Minimal Port", model.Name.ValueString())
+	assert.Equal(t, int64(0), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(0), model.LocationID.ValueInt64())
+	assert.False(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "", model.CompanyUID.ValueString())
+	assert.Equal(t, "", model.CostCentre.ValueString())
+	assert.Equal(t, int64(0), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "", model.DiversityZone.ValueString())
+
+	// Resources should still be populated (zero-value interface)
+	assert.False(t, model.Resources.IsNull())
+
+	// Tags should be null for nil input
+	assert.True(t, model.ResourceTags.IsNull())
+}
+
+func TestFromAPIPort_NilTags(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-nil-tags",
+		Name: "Port Nil Tags",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.True(t, model.ResourceTags.IsNull(), "expected null tags for nil input")
+}
+
+func TestFromAPIPort_EmptyTags(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-empty-tags",
+		Name: "Port Empty Tags",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, map[string]string{})
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.True(t, model.ResourceTags.IsNull(), "expected null tags for empty map")
+}
+
+func TestAccMegaportSinglePort_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
 	portNameNew := RandomTestName()
 	costCentreName := RandomTestName()
 	costCentreNameNew := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -46,8 +151,8 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource_tags = {
 						"key1" = "value1"
 						"key2" = "value2"
-  					}
-			      }`, SinglePortTestLocationIDNum, portName, costCentreName),
+					}
+			      }`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -58,10 +163,6 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
 				),
@@ -84,7 +185,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"resources"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -103,7 +204,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 						"key1-updated" = "value1-updated"
 						"key2-updated" = "value2-updated"
 					}
-			      }`, SinglePortTestLocationIDNum, portNameNew, costCentreNameNew),
+			      }`, locationID, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -114,10 +215,6 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key1-updated", "value1-updated"),
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key2-updated", "value2-updated"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
 				),
@@ -126,10 +223,13 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_Basic() {
 	})
 }
 
-func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRemoval() {
+func TestAccMegaportSinglePort_CostCentreRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -144,7 +244,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName, costCentreName),
+				}`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", costCentreName),
 				),
@@ -161,7 +261,7 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "cost_centre", ""),
 				),
@@ -170,9 +270,12 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_CostCentreRe
 	})
 }
 
-func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTermUpdate() {
+func TestAccMegaportSinglePort_ContractTermUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -184,11 +287,11 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 					product_name  = "%s"
 					port_speed  = 1000
 					location_id = data.megaport_location.test_location.id
-					contract_term_months = 1
+					contract_term_months = 12
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
 					waitForProvisioningStatus("megaport_port.port"),
 				),
 			},
@@ -201,11 +304,11 @@ func (suite *SinglePortProviderTestSuite) TestAccMegaportSinglePort_ContractTerm
 					product_name  = "%s"
 					port_speed  = 1000
 					location_id = data.megaport_location.test_location.id
-					contract_term_months = 12
+					contract_term_months = 24
 					marketplace_visibility = false
-				}`, SinglePortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_port.port", "contract_term_months", "24"),
 				),
 			},
 		},
