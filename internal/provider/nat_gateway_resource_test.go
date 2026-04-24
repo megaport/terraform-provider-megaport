@@ -135,6 +135,10 @@ resource "megaport_nat_gateway" "test" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
+				// provisioning_status is a runtime field that transitions
+				// CONFIGURED -> LIVE after Create returns on the earliest
+				// ready state. Skip the equality check for it on import.
+				ImportStateVerifyIgnore: []string{"provisioning_status"},
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					var rawState map[string]string
 					for _, m := range state.Modules {

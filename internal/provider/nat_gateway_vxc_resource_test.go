@@ -137,11 +137,11 @@ resource "megaport_vxc" "vxc" {
 					resource.TestCheckResourceAttr(vxcResource, "product_name", vxcName),
 					resource.TestCheckResourceAttr(vxcResource, "rate_limit", "100"),
 					resource.TestCheckResourceAttrPair(
-						vxcResource, "a_end.product_uid",
+						vxcResource, "a_end.current_product_uid",
 						natResource, "product_uid",
 					),
 					resource.TestCheckResourceAttrPair(
-						vxcResource, "b_end.product_uid",
+						vxcResource, "b_end.current_product_uid",
 						portResource, "product_uid",
 					),
 					resource.TestCheckResourceAttr(vxcResource, "a_end_partner_config.partner", "vrouter"),
