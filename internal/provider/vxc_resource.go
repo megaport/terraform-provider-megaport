@@ -1014,7 +1014,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
+						Description: "The Product UID of the B-End product. For partner connections (AWS, Google, etc.), use the `megaport_partner` data source to look up the correct UID. For Google connections this field is especially important: Google exposes multiple partner ports across different locations and diversity zones, so omitting it allows the API to select any available port — which may be in an unexpected region. Set this to a specific Google partner port UID to control the on-ramp location and diversity zone. The value stored in state may differ from the requested UID when Megaport rotates a partner port within the same location and diversity zone.",
 						Optional:    true,
 						Computed:    true,
 						// PlanModifiers: []planmodifier.String{

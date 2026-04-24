@@ -32,6 +32,18 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
+# Look up the Google partner port for the desired location and diversity zone.
+# The diversity_zone must match the availability domain encoded in the pairing key
+# (e.g. a pairing key ending in "/2" corresponds to diversity zone "blue").
+# Omitting requested_product_uid in b_end lets the API pick any Google port,
+# which may be in a different region than intended.
+data "megaport_partner" "gcp_port" {
+  connect_type   = "GOOGLE"
+  company_name   = "Google"
+  location_id    = data.megaport_location.syd_gs.id
+  diversity_zone = "blue"
+}
+
 resource "megaport_port" "port" {
   product_name           = "Megaport Port Example"
   port_speed             = 1000
@@ -206,7 +218,9 @@ resource "megaport_vxc" "gcp_vxc" {
     ordered_vlan          = 182
   }
 
-  b_end = {}
+  b_end = {
+    requested_product_uid = data.megaport_partner.gcp_port.product_uid
+  }
 
   b_end_partner_config = {
     partner = "google"
@@ -347,7 +361,7 @@ Optional:
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
-- `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
+- `requested_product_uid` (String) The Product UID of the B-End product. For partner connections (AWS, Google, etc.), use the `megaport_partner` data source to look up the correct UID. For Google connections this field is especially important: Google exposes multiple partner ports across different locations and diversity zones, so omitting it allows the API to select any available port — which may be in an unexpected region. Set this to a specific Google partner port UID to control the on-ramp location and diversity zone. The value stored in state may differ from the requested UID when Megaport rotates a partner port within the same location and diversity zone.
 - `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.
 
 Read-Only:
@@ -371,7 +385,7 @@ Optional:
 
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
+- `google_config` (Attributes) The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = "GOOGLE"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
@@ -603,7 +617,7 @@ Optional:
 
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
+- `google_config` (Attributes) The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = "GOOGLE"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))

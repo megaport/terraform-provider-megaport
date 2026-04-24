@@ -116,7 +116,7 @@ var (
 		},
 	}
 	googlePartnerConfigSchema = schema.SingleNestedAttribute{
-		Description: "The Google partner configuration.",
+		Description: "The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = \"GOOGLE\"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"pairing_key": schema.StringAttribute{
