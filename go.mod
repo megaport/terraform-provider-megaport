@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.30.0
 	github.com/hashicorp/terraform-plugin-log v0.10.0
-	github.com/megaport/megaportgo v1.8.1-0.20260423214029-3fd4cbc5b00d
+	github.com/megaport/megaportgo v1.10.0
 )
 
 require (
