@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -143,12 +143,10 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx,
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
-			if apiErr.Response.StatusCode == http.StatusNotFound ||
-				(apiErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(apiErr.Message, "Could not find")) {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		// Check if the resource was deleted
+		if IsNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error reading MCR prefix filter list",
@@ -245,36 +243,47 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 
 	// Delete the prefix filter list via API, retrying on 409 Conflict (e.g. when a
 	// VXC with a BGP connection referencing this list is still being deprovisioned).
-	maxRetries := 12
-	retryInterval := 10 * time.Second
-	for attempt := range maxRetries {
-		_, err := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
+	cfg := RetryConfig{
+		InitialBackoff: 10 * time.Second,
+		MaxBackoff:     30 * time.Second,
+		Multiplier:     1.5,
+		MaxAttempts:    12,
+		RetryableFunc: func(err error) bool {
+			var apiErr *megaport.ErrorResponse
+			if errors.As(err, &apiErr) && apiErr.Response != nil {
+				return apiErr.Response.StatusCode == http.StatusConflict
+			}
+			return false
+		},
+	}
+
+	err := RetryWithBackoff(ctx, cfg, func(ctx context.Context) error {
+		_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx,
 			state.MCRID.ValueString(), int(state.ID.ValueInt64()))
-		if err == nil {
-			return
-		}
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok && apiErr.Response != nil {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				// Resource was already deleted, which is fine
-				return
+		if deleteErr != nil {
+			if IsNotFoundError(deleteErr) {
+				return nil // already deleted
 			}
-			if apiErr.Response.StatusCode == http.StatusConflict && attempt < maxRetries-1 {
-				tflog.Debug(ctx, "Prefix filter list still associated with a BGP connection, retrying delete",
-					map[string]interface{}{
-						"prefix_list_id": state.ID.ValueInt64(),
-						"mcr_id":         state.MCRID.ValueString(),
-						"attempt":        attempt + 1,
-					})
-				time.Sleep(retryInterval)
-				continue
+			msg := "Prefix filter list delete attempt failed, will not retry"
+			if cfg.RetryableFunc(deleteErr) {
+				msg = "Prefix filter list delete attempt failed, will retry"
 			}
+			tflog.Debug(ctx, msg,
+				map[string]interface{}{
+					"prefix_list_id": state.ID.ValueInt64(),
+					"mcr_id":         state.MCRID.ValueString(),
+					"error":          deleteErr.Error(),
+				})
+			return deleteErr
 		}
+		return nil
+	})
+	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting MCR prefix filter list",
 			fmt.Sprintf("Could not delete prefix filter list %d for MCR %s: %s",
 				state.ID.ValueInt64(), state.MCRID.ValueString(), err.Error()),
 		)
-		return
 	}
 }
 
@@ -301,14 +310,12 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Verify the resource exists by attempting to read it
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
-				)
-				return
-			}
+		if IsNotFoundError(err) {
+			resp.Diagnostics.AddError(
+				"Resource not found",
+				fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
+			)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error verifying resource during import",
