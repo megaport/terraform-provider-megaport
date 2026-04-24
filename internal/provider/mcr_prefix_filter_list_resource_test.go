@@ -46,12 +46,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 						"key2" = "value2"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -103,7 +97,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 
 					// Prefix filter list 1 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "description", prefixFilterName),
@@ -118,7 +111,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.ge", "25"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.le", "27"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "last_updated"),
 
 					// Prefix filter list 2 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "description", prefixFilterName2),
@@ -133,7 +125,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.le", "25"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "last_updated"),
 				),
 			},
 			// Test ImportState for prefix filter list 1
@@ -158,7 +149,7 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Update Test 1: Modify existing prefix filter lists and add a new one
 			{
@@ -179,12 +170,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -294,12 +279,6 @@ func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_single" {
@@ -355,12 +334,6 @@ func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "ipv6_list" {
@@ -432,12 +405,6 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -545,12 +512,6 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -642,7 +603,7 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 				// for exact match entries. During normal operation, we normalize this back to
 				// the user's configured value (ge=le). But during import, we can't know the
 				// user's intention, so we return raw API values.
-				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+				ImportStateVerifyIgnore: []string{"entries.0.le", "entries.1.le", "entries.2.le"},
 			},
 		},
 	})
@@ -676,11 +637,6 @@ func TestAccMegaportMCRPrefixFilterList_CIDRValidation(t *testing.T) {
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "cidr_test" {
@@ -729,12 +685,6 @@ func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "mixed" {
@@ -832,12 +782,6 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl" {
@@ -943,7 +887,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Apply the same config after import - reconcile any import differences
 			{
@@ -994,12 +938,6 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl_whitelist" {
@@ -1135,7 +1073,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Import prefix filter list 2 (blacklist)
 			{
@@ -1156,7 +1094,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 4: Import prefix filter list 3 (export)
 			{
@@ -1177,7 +1115,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 5: Apply same config to reconcile any import state differences
 			{

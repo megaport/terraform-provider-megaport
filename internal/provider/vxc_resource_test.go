@@ -1154,25 +1154,6 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
-
-					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
-						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 24
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					}]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
@@ -1238,7 +1219,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						"key2" = "value2"
 					}
 				  }
-                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1289,25 +1270,6 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
-
-					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
-						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 24
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					}]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
@@ -1373,7 +1335,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 				  }
-                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
