@@ -27,6 +27,7 @@ var (
 		"vendor_description": types.StringType,
 		"release_image":      types.BoolType,
 		"product_code":       types.StringType,
+		"available_sizes":    types.ListType{ElemType: types.StringType},
 	}
 )
 
@@ -55,6 +56,7 @@ type mveImageDetailsModel struct {
 	VendorDescription types.String `tfsdk:"vendor_description"`
 	ReleaseImage      types.Bool   `tfsdk:"release_image"`
 	ProductCode       types.String `tfsdk:"product_code"`
+	AvailableSizes    types.List   `tfsdk:"available_sizes"`
 }
 
 // NewMVEImageDataSource is a helper function to simplify the provider implementation.
@@ -104,6 +106,11 @@ func (d *mveImageDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 						"product_code": schema.StringAttribute{
 							Description: "The product code of the MVE Image",
 							Computed:    true,
+						},
+						"available_sizes": schema.ListAttribute{
+							Description: "List of available MVE sizes for this image (e.g., 'MVE 2/8', 'MVE 4/16')",
+							Computed:    true,
+							ElementType: types.StringType,
 						},
 					},
 				},
@@ -249,6 +256,17 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.VendorDescription = types.StringValue(image.VendorDescription)
 	orm.ReleaseImage = types.BoolValue(image.ReleaseImage)
 	orm.ProductCode = types.StringValue(image.ProductCode)
+
+	// Convert AvailableSizes from []string to types.List
+	if len(image.AvailableSizes) > 0 {
+		sizeValues := make([]attr.Value, len(image.AvailableSizes))
+		for i, size := range image.AvailableSizes {
+			sizeValues[i] = types.StringValue(size)
+		}
+		orm.AvailableSizes, _ = types.ListValue(types.StringType, sizeValues)
+	} else {
+		orm.AvailableSizes = types.ListNull(types.StringType)
+	}
 }
 
 func runImageFiltersAndSort(images []*megaport.MVEImage, filters [](func(*megaport.MVEImage) bool)) []*megaport.MVEImage {
