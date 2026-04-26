@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/megaport/terraform-provider-megaport/internal/provider"
+	"github.com/megaport/terraform-provider-megaport/v2/internal/provider"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website
@@ -18,9 +18,11 @@ import (
 // ensure the documentation is formatted properly.
 //go:generate terraform fmt -recursive ./examples/
 
-// Run the docs generation tool, check its repository for more information on how it works and how docs
-// can be customized.
+// Run the docs generation tool and regenerate CHANGELOG.md from git tags.
+// The changelog generation step requires a Bash-compatible shell. On Windows,
+// run go generate from WSL or Git Bash.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
+//go:generate bash ./scripts/generate-changelog.sh
 
 var (
 	// these will be set by the goreleaser configuration
