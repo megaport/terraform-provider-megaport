@@ -678,7 +678,6 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 			"Unexpected Provider Data Type",
 			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 
@@ -686,7 +685,6 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 
 	r.client = client
 	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
-
 }
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
