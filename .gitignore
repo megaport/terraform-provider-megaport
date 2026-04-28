@@ -41,4 +41,4 @@ website/vendor
 # CSP test credentials — use csp_credentials.json.example as a template
 internal/provider/testdata/csp_credentials.json
 
-.claude
+.claudeterraform-provider-megaport

@@ -146,11 +146,16 @@ var (
 
 	// deprecated
 	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs)),
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// deprecated
-	vxcInterfaceAttrs = map[string]attr.Type{
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
+	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
+	// shape; on decode into the model, unmatched attrs remain null, and on
+	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
+	// this map to match the struct breaks encoding with a Value Conversion
+	// Error because the framework requires attr.Type ↔ schema equality.
+	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
@@ -185,13 +190,17 @@ var (
 	}
 
 	vxcVrouterInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":           types.Int64Type,
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"vlan":             types.Int64Type,
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"ip_mtu":            types.Int64Type,
+		"ip_addresses":      types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses":  types.ListType{}.WithElementType(types.StringType),
+		"bfd":               types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":              types.Int64Type,
+		"bgp_connections":   types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"description":       types.StringType,
+		"interface_type":    types.StringType,
+		"packet_filter_in":  types.Int64Type,
+		"packet_filter_out": types.Int64Type,
 	}
 
 	ipRouteAttrs = map[string]attr.Type{
@@ -407,13 +416,17 @@ type vxcPartnerConfigIbmModel struct {
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
 type vxcPartnerConfigInterfaceModel struct {
-	IpMtu          types.Int64  `tfsdk:"ip_mtu"`
-	IPAddresses    types.List   `tfsdk:"ip_addresses"`
-	IPRoutes       types.List   `tfsdk:"ip_routes"`
-	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
-	Bfd            types.Object `tfsdk:"bfd"`
-	BgpConnections types.List   `tfsdk:"bgp_connections"`
-	VLAN           types.Int64  `tfsdk:"vlan"`
+	IpMtu           types.Int64  `tfsdk:"ip_mtu"`
+	IPAddresses     types.List   `tfsdk:"ip_addresses"`
+	IPRoutes        types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses  types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd             types.Object `tfsdk:"bfd"`
+	BgpConnections  types.List   `tfsdk:"bgp_connections"`
+	VLAN            types.Int64  `tfsdk:"vlan"`
+	Description     types.String `tfsdk:"description"`
+	InterfaceType   types.String `tfsdk:"interface_type"`
+	PacketFilterIn  types.Int64  `tfsdk:"packet_filter_in"`
+	PacketFilterOut types.Int64  `tfsdk:"packet_filter_out"`
 }
 
 // ipRouteModel maps the IP route schema data.
@@ -466,6 +479,29 @@ type vxcResource struct {
 // Metadata returns the resource type name.
 func (r *vxcResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_vxc"
+}
+
+// mcrPrefixFilterListsForEndpoint returns MCR prefix filter lists for the
+// given endpoint product only when that product is actually an MCR. VXC
+// endpoints can also be NAT Gateways (vrouter partner config) or other
+// product types that do not support the MCR prefix-list endpoint — calling
+// GET /v2/product/mcr2/{uid}/prefixLists for a NAT Gateway returns
+// 400 "Not supported service type" and would otherwise abort the whole
+// Create/Update/Read path.
+//
+// The returned slice is consumed by createVrouterPartnerConfig /
+// createAEndPartnerConfig to translate MCR prefix-list *names* to numeric
+// IDs; non-MCR endpoints have no such names in scope, so returning nil is
+// semantically correct.
+func (r *vxcResource) mcrPrefixFilterListsForEndpoint(ctx context.Context, productUID string) ([]*megaport.PrefixFilterList, error) {
+	productType, err := r.client.ProductService.GetProductType(ctx, productUID)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(productType, megaport.PRODUCT_MCR) {
+		return nil, nil
+	}
+	return r.client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
 }
 
 // Schema defines the schema for the resource.
@@ -1432,7 +1468,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1462,7 +1498,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1757,7 +1793,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, b.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, b.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2170,7 +2206,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndPlan.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, aEndPlan.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2199,7 +2235,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, aEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2247,7 +2283,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, bEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",

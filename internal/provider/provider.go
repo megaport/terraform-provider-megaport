@@ -332,6 +332,9 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 		NewVXCResource,
 		NewIXResource,
 		NewServiceKeyResource,
+		NewNATGatewayResource,
+		NewNATGatewayPacketFilterResource,
+		NewNATGatewayPrefixListResource,
 	}
 }
 
