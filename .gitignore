@@ -1,5 +1,6 @@
 *.dll
 *.exe
+terraform-provider-megaport
 .DS_Store
 example.tf
 terraform.tfplan
