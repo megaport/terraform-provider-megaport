@@ -159,7 +159,6 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	orm.ASN = types.Int64Value(int64(ix.ASN))
 	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
 	orm.VLAN = types.Int64Value(int64(ix.VLAN))
-	orm.PromoCode = types.StringValue(ix.PromoCode)
 	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
 	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
 	orm.Term = types.Int64Value(int64(ix.Term))
@@ -167,12 +166,6 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	orm.SecondaryName = types.StringValue(ix.SecondaryName)
 	orm.IXPeerMacro = types.StringValue(ix.IXPeerMacro)
 	orm.UsageAlgorithm = types.StringValue(ix.UsageAlgorithm)
-
-	if ix.PromoCode != "" {
-		orm.PromoCode = types.StringValue(ix.PromoCode)
-	} else {
-		orm.PromoCode = types.StringNull()
-	}
 
 	// Handle dates
 	if ix.CreateDate != nil {
@@ -713,6 +706,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 
 	// Update the state with the IX info
 	state.fromAPI(ctx, updatedIX)
+	state.PromoCode = plan.PromoCode
 
 	// Persist the new state
 	diags := resp.State.Set(ctx, &state)

@@ -628,6 +628,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Update the state
 	state.fromAPIPort(ctx, port, tags)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 
 	// Set state to fully populated data
 	diags := resp.State.Set(ctx, &state)

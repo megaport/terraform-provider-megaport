@@ -400,6 +400,56 @@ func TestAccMegaportMCR_CostCentreRemoval(t *testing.T) {
 	})
 }
 
+// TestAccMegaportMCR_PromoCode exercises promo_code against the v1.8.0
+// ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportMCR_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	initialPromo := testPromoCode()
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed            = 1000
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 1
+			%s
+		}`, locationID, mcrName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_mcr.mcr", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccMegaportMCR_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()

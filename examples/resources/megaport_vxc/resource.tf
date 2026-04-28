@@ -17,6 +17,18 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
+# Look up the Google partner port for the desired location and diversity zone.
+# The diversity_zone must match the availability domain encoded in the pairing key
+# (e.g. a pairing key ending in "/2" corresponds to diversity zone "blue").
+# Omitting requested_product_uid in b_end lets the API pick any Google port,
+# which may be in a different region than intended.
+data "megaport_partner" "gcp_port" {
+  connect_type   = "GOOGLE"
+  company_name   = "Google"
+  location_id    = data.megaport_location.syd_gs.id
+  diversity_zone = "blue"
+}
+
 resource "megaport_port" "port" {
   product_name           = "Megaport Port Example"
   port_speed             = 1000
@@ -191,7 +203,9 @@ resource "megaport_vxc" "gcp_vxc" {
     ordered_vlan          = 182
   }
 
-  b_end = {}
+  b_end = {
+    requested_product_uid = data.megaport_partner.gcp_port.product_uid
+  }
 
   b_end_partner_config = {
     partner = "google"
