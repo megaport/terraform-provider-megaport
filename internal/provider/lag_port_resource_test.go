@@ -1,12 +1,97 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestFromAPILagPort_Full(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:                   "lag-uid-123",
+		Name:                  "Test LAG Port",
+		PortSpeed:             10000,
+		LocationID:            42,
+		MarketplaceVisibility: true,
+		CompanyUID:            "company-uid-456",
+		CostCentre:            "cost-centre-1",
+		ContractTermMonths:    24,
+		DiversityZone:         "blue",
+		LagCount:              4,
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{
+				Demarcation: "LAG Demarcation",
+				Up:          1,
+			},
+		},
+	}
+	tags := map[string]string{"env": "prod"}
+
+	model := &lagPortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, tags)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "lag-uid-123", model.UID.ValueString())
+	assert.Equal(t, "Test LAG Port", model.Name.ValueString())
+	assert.Equal(t, int64(10000), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(42), model.LocationID.ValueInt64())
+	assert.True(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "company-uid-456", model.CompanyUID.ValueString())
+	assert.Equal(t, "cost-centre-1", model.CostCentre.ValueString())
+	assert.Equal(t, int64(24), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "blue", model.DiversityZone.ValueString())
+	assert.Equal(t, int64(4), model.LagCount.ValueInt64())
+
+	// Verify resources object is set
+	assert.False(t, model.Resources.IsNull())
+	assert.False(t, model.Resources.IsUnknown())
+
+	// Verify resource tags
+	assert.False(t, model.ResourceTags.IsNull())
+	tagElements := model.ResourceTags.Elements()
+	require.Len(t, tagElements, 1)
+	assert.Equal(t, "prod", tagElements["env"].(types.String).ValueString())
+}
+
+func TestFromAPILagPort_MinimalFields(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "lag-minimal",
+		Name: "Minimal LAG",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &lagPortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "lag-minimal", model.UID.ValueString())
+	assert.Equal(t, "Minimal LAG", model.Name.ValueString())
+	assert.Equal(t, int64(0), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(0), model.LocationID.ValueInt64())
+	assert.False(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "", model.CompanyUID.ValueString())
+	assert.Equal(t, "", model.CostCentre.ValueString())
+	assert.Equal(t, int64(0), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "", model.DiversityZone.ValueString())
+	assert.Equal(t, int64(0), model.LagCount.ValueInt64())
+
+	// Resources should still be populated
+	assert.False(t, model.Resources.IsNull())
+
+	// Tags should be null
+	assert.True(t, model.ResourceTags.IsNull())
+}
 
 func TestAccMegaportLAGPort_Basic(t *testing.T) {
 	t.Parallel()

@@ -1,12 +1,127 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestFromAPIPort_Full(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:                   "port-uid-123",
+		Name:                  "Test Port",
+		PortSpeed:             10000,
+		LocationID:            42,
+		MarketplaceVisibility: true,
+		CompanyUID:            "company-uid-456",
+		CostCentre:            "cost-centre-1",
+		ContractTermMonths:    12,
+		DiversityZone:         "red",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{
+				Demarcation: "Test Demarcation",
+				Up:          1,
+			},
+		},
+	}
+	tags := map[string]string{"env": "test", "team": "platform"}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, tags)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "port-uid-123", model.UID.ValueString())
+	assert.Equal(t, "Test Port", model.Name.ValueString())
+	assert.Equal(t, int64(10000), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(42), model.LocationID.ValueInt64())
+	assert.True(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "company-uid-456", model.CompanyUID.ValueString())
+	assert.Equal(t, "cost-centre-1", model.CostCentre.ValueString())
+	assert.Equal(t, int64(12), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "red", model.DiversityZone.ValueString())
+
+	// Verify resources object is set (not null)
+	assert.False(t, model.Resources.IsNull())
+	assert.False(t, model.Resources.IsUnknown())
+
+	// Verify resource tags
+	assert.False(t, model.ResourceTags.IsNull())
+	tagElements := model.ResourceTags.Elements()
+	require.Len(t, tagElements, 2)
+	assert.Equal(t, "test", tagElements["env"].(types.String).ValueString())
+	assert.Equal(t, "platform", tagElements["team"].(types.String).ValueString())
+}
+
+func TestFromAPIPort_MinimalFields(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-minimal",
+		Name: "Minimal Port",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	assert.Equal(t, "port-minimal", model.UID.ValueString())
+	assert.Equal(t, "Minimal Port", model.Name.ValueString())
+	assert.Equal(t, int64(0), model.PortSpeed.ValueInt64())
+	assert.Equal(t, int64(0), model.LocationID.ValueInt64())
+	assert.False(t, model.MarketplaceVisibility.ValueBool())
+	assert.Equal(t, "", model.CompanyUID.ValueString())
+	assert.Equal(t, "", model.CostCentre.ValueString())
+	assert.Equal(t, int64(0), model.ContractTermMonths.ValueInt64())
+	assert.Equal(t, "", model.DiversityZone.ValueString())
+
+	// Resources should still be populated (zero-value interface)
+	assert.False(t, model.Resources.IsNull())
+
+	// Tags should be null for nil input
+	assert.True(t, model.ResourceTags.IsNull())
+}
+
+func TestFromAPIPort_NilTags(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-nil-tags",
+		Name: "Port Nil Tags",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, nil)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.True(t, model.ResourceTags.IsNull(), "expected null tags for nil input")
+}
+
+func TestFromAPIPort_EmptyTags(t *testing.T) {
+	ctx := context.Background()
+	apiPort := &megaport.Port{
+		UID:  "port-empty-tags",
+		Name: "Port Empty Tags",
+		VXCResources: megaport.PortResources{
+			Interface: megaport.PortInterface{},
+		},
+	}
+
+	model := &singlePortResourceModel{}
+	diags := model.fromAPIPort(ctx, apiPort, map[string]string{})
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.True(t, model.ResourceTags.IsNull(), "expected null tags for empty map")
+}
 
 func TestAccMegaportSinglePort_Basic(t *testing.T) {
 	t.Parallel()
