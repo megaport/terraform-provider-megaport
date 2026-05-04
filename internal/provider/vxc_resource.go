@@ -27,7 +27,6 @@ import (
 )
 
 // Update Timeout for VXC Update Verification - will be configurable in future release.
-const updateTimeout = 120 * time.Second
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -1187,7 +1186,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 
 		// Add retry logic to wait for API propagation
-		waitErr = r.waitForVXCUpdate(ctx, plan.UID.ValueString(), updateReq, updateTimeout)
+		waitErr = r.waitForVXCUpdate(ctx, state.UID.ValueString(), updateReq, r.waitForTime)
 		if waitErr != nil {
 			resp.Diagnostics.AddWarning(
 				"VXC Update Propagation Delay",
@@ -1216,7 +1215,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Get refreshed vxc value from API, waiting for vnic_index to propagate
-	vxc, err := r.waitForVnicIndex(ctx, state.UID.ValueString(), expectedAEndVnic, expectedBEndVnic, updateTimeout)
+	vxc, err := r.waitForVnicIndex(ctx, state.UID.ValueString(), expectedAEndVnic, expectedBEndVnic, r.waitForTime)
 	if err != nil {
 		if vxc == nil {
 			resp.Diagnostics.AddError(

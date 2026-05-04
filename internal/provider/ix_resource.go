@@ -579,7 +579,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Shutdown:           plan.Shutdown.ValueBool(),
 		PromoCode:          plan.PromoCode.ValueString(),
 		WaitForProvision:   true,
-		WaitForTime:        10 * time.Minute,
+		WaitForTime:        r.waitForTime,
 	}
 
 	// Create the IX
@@ -650,7 +650,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// Create update request with only fields that have changed
 	updateReq := &megaport.UpdateIXRequest{
 		WaitForUpdate: true,
-		WaitForTime:   10 * time.Minute,
+		WaitForTime:   r.waitForTime,
 	}
 
 	if !plan.ProductName.Equal(state.ProductName) {
