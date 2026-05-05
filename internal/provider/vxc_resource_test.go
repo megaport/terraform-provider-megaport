@@ -4397,8 +4397,9 @@ func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
 			// PlanOnly: the goal is to verify planning succeeds without crashing;
 			// the location may not support 10 G ports so we do not apply.
 			{
-				Config:   configWithSpeed(10000),
-				PlanOnly: true,
+				Config:             configWithSpeed(10000),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
 			},
 		},
 	})
