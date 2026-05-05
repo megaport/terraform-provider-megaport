@@ -2680,11 +2680,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			if bEndStateConfig.OrderedVLAN.IsUnknown() {
 				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
 			}
-			if !plan.AEndPartnerConfig.IsUnknown() {
+			if !plan.AEndPartnerConfig.IsNull() && !plan.AEndPartnerConfig.IsUnknown() {
 				partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
 				diags = append(diags, partnerConfigDiags...)
-			}
-			if !plan.AEndPartnerConfig.IsNull() && !plan.AEndPartnerConfig.IsUnknown() {
 				if !aEndPartnerConfigModel.Partner.IsNull() {
 					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
 						aEndCSP = true
@@ -2722,16 +2720,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 			}
 
-			if !plan.BEndPartnerConfig.IsUnknown() {
+			if !plan.BEndPartnerConfig.IsNull() && !plan.BEndPartnerConfig.IsUnknown() {
 				partnerConfigDiags := plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
 				diags = append(diags, partnerConfigDiags...)
-			}
-			if !plan.BEndPartnerConfig.IsNull() && !plan.BEndPartnerConfig.IsUnknown() {
 				if !bEndPartnerConfigModel.Partner.IsNull() {
-					if !bEndPartnerConfigModel.Partner.IsNull() {
-						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-							bEndCSP = true
-						}
+					if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
+						bEndCSP = true
 					}
 				}
 			}
