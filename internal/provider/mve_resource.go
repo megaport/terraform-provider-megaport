@@ -108,6 +108,7 @@ type vendorConfigModel struct {
 	CloudInit          types.String `tfsdk:"cloud_init"`
 	LicenseData        types.String `tfsdk:"license_data"`
 	AdminPasswordHash  types.String `tfsdk:"admin_password_hash"`
+	AdminPassword      types.String `tfsdk:"admin_password"`
 	DirectorAddress    types.String `tfsdk:"director_address"`
 	ControllerAddress  types.String `tfsdk:"controller_address"`
 	LocalAuth          types.String `tfsdk:"local_auth"`
@@ -252,6 +253,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			MVELabel:           v.MVELabel.ValueString(),
 			AdminSSHPublicKey:  v.AdminSSHPublicKey.ValueString(),
 			SSHPublicKey:       v.SSHPublicKey.ValueString(),
+			AdminPassword:      v.AdminPassword.ValueString(),
 			ManageLocally:      v.ManageLocally.ValueBool(),
 			CloudInit:          v.CloudInit.ValueString(),
 			FMCIPAddress:       v.FMCIPAddress.ValueString(),
@@ -641,6 +643,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					"admin_password_hash": schema.StringAttribute{
 						Description: `The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".`,
 						Optional:    true,
+					},
+					"admin_password": schema.StringAttribute{
+						Description: "The admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Optional:    true,
+						Sensitive:   true,
 					},
 					"director_address": schema.StringAttribute{
 						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
