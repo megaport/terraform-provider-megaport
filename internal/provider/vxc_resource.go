@@ -2668,8 +2668,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			diags = append(diags, bEndDiags...)
 			aEndPlanConfig := &vxcEndConfigurationModel{}
 			bEndPlanConfig := &vxcEndConfigurationModel{}
-			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
+			var aEndPartnerConfigModel vxcPartnerConfigurationModel
+			var bEndPartnerConfigModel vxcPartnerConfigurationModel
 			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
 			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
 			diags = append(diags, aEndDiags...)
