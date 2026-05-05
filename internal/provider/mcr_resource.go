@@ -1125,49 +1125,47 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Only delete prefix filter lists that are in state but not in plan when the user
-	// is managing inline lists. When plan is empty, the user manages lists via standalone
-	// resources — deleting would destroy those resources.
-	if len(planPrefixFilterLists) > 0 {
-		// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
-		deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
+	// Delete prefix filter lists in state but not in plan. When plan is empty the
+	// map is also empty, so every state list is deleted — this handles explicit
+	// clear (prefix_filter_lists = []). For standalone-resource users,
+	// statePrefixFilterLists is already empty so the loop is a no-op.
+	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
-		for _, stateModel := range statePrefixFilterLists {
-			wg.Add(1)
-			go func(stateModel *mcrPrefixFilterListModel) {
-				defer wg.Done()
+	for _, stateModel := range statePrefixFilterLists {
+		wg.Add(1)
+		go func(stateModel *mcrPrefixFilterListModel) {
+			defer wg.Done()
 
-				<-deleteRateLimiter.rateLimitCh
+			<-deleteRateLimiter.rateLimitCh
 
-				// If the prefix filter list does not exist in the plan, delete it.
-				if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
-					_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
-					if deleteErr != nil {
-						mux.Lock()
-						errs = append(errs, deleteErr)
-						mux.Unlock()
-					}
+			// If the prefix filter list does not exist in the plan, delete it.
+			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
+				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
+				if deleteErr != nil {
+					mux.Lock()
+					errs = append(errs, deleteErr)
+					mux.Unlock()
 				}
-			}(stateModel)
-		}
-		wg.Wait()
-
-		if len(errs) > 0 {
-			var errStr string
-			for _, err := range errs {
-				errStr += err.Error() + ", "
 			}
-			resp.Diagnostics.AddError(
-				"Error Deleting Prefix Filter Lists",
-				"Could not delete prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-			)
-			return
+		}(stateModel)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		var errStr string
+		for _, err := range errs {
+			errStr += err.Error() + ", "
 		}
+		resp.Diagnostics.AddError(
+			"Error Deleting Prefix Filter Lists",
+			"Could not delete prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
+		)
+		return
 	}
 
-	// Only re-read prefix filter lists from API when the user manages them inline.
-	// When plan is empty, preserve the empty state to avoid triggering update loops
-	// for standalone-managed prefix filter lists.
+	// Re-read prefix filter lists from API when the user manages them inline.
+	// When plan is empty, set state to an empty list — the delete loop above
+	// already removed any lists that were in state.
 	if len(planPrefixFilterLists) > 0 {
 		pfFilterListModels := []*mcrPrefixFilterListModel{}
 
@@ -1248,6 +1246,11 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			resp.Diagnostics.Append(pfFilterListDiags...)
 			state.PrefixFilterLists = pfFilterLists
 		}
+	} else {
+		emptyList := []types.Object{}
+		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
+		resp.Diagnostics.Append(pfFilterListDiags...)
+		state.PrefixFilterLists = pfFilterLists
 	}
 
 	// Update the state with the new values
