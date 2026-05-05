@@ -4332,3 +4332,75 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 		},
 	})
 }
+
+// TestAccMegaportVXC_AttachedProductReplace exercises ESD-1095: when an
+// upstream Port attached to a VXC's a_end is forced to replace (here by
+// changing port_speed, which is RequiresReplace), the dependent VXC's
+// a_end.requested_product_uid becomes unknown at plan time. The VXC
+// ModifyPlan must handle that gracefully rather than failing with
+// "Value Conversion Error / Target Type: provider.vxcEndConfigurationModel".
+func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	configWithSpeed := func(aEndSpeed int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = %d
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 200
+				}
+				b_end = {
+					requested_product_uid = megaport_port.port_2.product_uid
+					ordered_vlan          = 201
+				}
+			}
+		`, locs[0], portName1, aEndSpeed, portName2, vxcName)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithSpeed(1000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+				),
+			},
+			// Bump port_1's speed — port_1 is RequiresReplace, so its product_uid
+			// is unknown in the plan. Pre-fix, the VXC ModifyPlan crashed here.
+			{
+				Config: configWithSpeed(10000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "10000"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "a_end.requested_product_uid"),
+				),
+			},
+		},
+	})
+}

@@ -2646,14 +2646,26 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			var aEndCSP, bEndCSP bool
 			aEndStateObj := state.AEndConfiguration
 			bEndStateObj := state.BEndConfiguration
+			aEndPlanObj := plan.AEndConfiguration
+			bEndPlanObj := plan.BEndConfiguration
+
+			// If any of the end-config objects are wholly unknown (typically because
+			// the attached Port/MCR/MVE is being replaced and its product_uid is
+			// unknown at plan time), skip the partner-config / UID reconciliation
+			// below — decoding an unknown types.Object into a struct fails with a
+			// "Value Conversion Error" and there is nothing meaningful to do here
+			// until the upstream resource is applied.
+			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
+				resp.Diagnostics.Append(diags...)
+				return
+			}
+
 			aEndStateConfig := &vxcEndConfigurationModel{}
 			bEndStateConfig := &vxcEndConfigurationModel{}
 			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
 			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
 			diags = append(diags, aEndDiags...)
 			diags = append(diags, bEndDiags...)
-			aEndPlanObj := plan.AEndConfiguration
-			bEndPlanObj := plan.BEndConfiguration
 			aEndPlanConfig := &vxcEndConfigurationModel{}
 			bEndPlanConfig := &vxcEndConfigurationModel{}
 			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
@@ -2668,9 +2680,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			if bEndStateConfig.OrderedVLAN.IsUnknown() {
 				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
 			}
-			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.AEndPartnerConfig.IsNull() {
+			if !plan.AEndPartnerConfig.IsUnknown() {
+				partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+				diags = append(diags, partnerConfigDiags...)
+			}
+			if !plan.AEndPartnerConfig.IsNull() && !plan.AEndPartnerConfig.IsUnknown() {
 				if !aEndPartnerConfigModel.Partner.IsNull() {
 					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
 						aEndCSP = true
@@ -2708,9 +2722,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
 			}
 
-			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.BEndPartnerConfig.IsNull() {
+			if !plan.BEndPartnerConfig.IsUnknown() {
+				partnerConfigDiags := plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
+				diags = append(diags, partnerConfigDiags...)
+			}
+			if !plan.BEndPartnerConfig.IsNull() && !plan.BEndPartnerConfig.IsUnknown() {
 				if !bEndPartnerConfigModel.Partner.IsNull() {
 					if !bEndPartnerConfigModel.Partner.IsNull() {
 						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
