@@ -710,6 +710,18 @@ func TestAccMegaportMCR_UpdateASN(t *testing.T) {
 		`, locationID, mcrName, asn)
 	}
 
+	configNoASN := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed           = 1000
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 12
+		}
+	`, locationID, mcrName)
+
 	var originalUID string
 
 	resource.Test(t, resource.TestCase{
@@ -751,6 +763,12 @@ func TestAccMegaportMCR_UpdateASN(t *testing.T) {
 			{
 				Config:   configWithASN(64513),
 				PlanOnly: true,
+			},
+			// Omit asn from config — must NOT plan a reset to the default 133937.
+			{
+				Config:             configNoASN,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
 			},
 		},
 	})
