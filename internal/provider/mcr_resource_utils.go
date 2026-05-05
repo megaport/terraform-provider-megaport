@@ -8,6 +8,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// unknownWhenNoPriorStatePlanModifier marks a Computed attribute as unknown when
+// there is no prior state value. This is needed for Computed-only attributes inside
+// ListNestedAttribute elements: the TF Plugin Framework does not automatically set
+// them to unknown when a new list element is added during an update, so without this
+// modifier the provider cannot write a real value (inconsistency error).
+type unknownWhenNoPriorStatePlanModifier struct{}
+
+func (m unknownWhenNoPriorStatePlanModifier) Description(_ context.Context) string {
+	return "Sets the planned value to unknown when there is no prior state value"
+}
+
+func (m unknownWhenNoPriorStatePlanModifier) MarkdownDescription(_ context.Context) string {
+	return "Sets the planned value to unknown when there is no prior state value"
+}
+
+func (m unknownWhenNoPriorStatePlanModifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	if req.StateValue.IsNull() {
+		resp.PlanValue = types.Int64Unknown()
+	}
+}
+
+func unknownWhenNoPriorState() planmodifier.Int64 {
+	return unknownWhenNoPriorStatePlanModifier{}
+}
+
 type emptyPrefixFilterListPlanModifier struct{}
 
 // Description returns a plain text description of the validator's behavior.
