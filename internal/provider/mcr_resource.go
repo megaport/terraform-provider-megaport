@@ -530,11 +530,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"asn": schema.Int64Attribute{
-				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.",
+				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections. Updating this attribute modifies the ASN in place; the MCR is not destroyed and recreated. Note that any BGP peers attached to VXCs on this MCR will renegotiate against the new ASN.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"vxc_permitted": schema.BoolAttribute{
@@ -981,12 +981,19 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		contractTermMonths = &months
 	}
 
+	var mcrAsn *int
+	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() && !plan.ASN.Equal(state.ASN) {
+		asn := int(plan.ASN.ValueInt64())
+		mcrAsn = &asn
+	}
+
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
 		ContractTermMonths:    contractTermMonths,
 		CostCentre:            costCentre,
+		MCRAsn:                mcrAsn,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
