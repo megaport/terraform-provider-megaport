@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -931,16 +930,12 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 
 // TestAccMegaportMVEPaloAlto_Basic exercises Palo Alto VM-Series MVE provisioning
 // end-to-end. Required fields per the Megaport API: adminPasswordHash (sha256crypt
-// format) and sshPublicKey (RSA 2048 bit).
-// Set MEGAPORT_TEST_SSH_PUBLIC_KEY to an RSA 2048 OpenSSH public key; test skips
-// if the variable is absent.
+// format) and sshPublicKey (RSA 2048 bit). The SSH key is generated freshly per
+// test run via mveTestSSHPublicKey — no external setup needed.
 func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	sshPublicKey := os.Getenv("MEGAPORT_TEST_SSH_PUBLIC_KEY")
-	if sshPublicKey == "" {
-		t.Skip("skipping: MEGAPORT_TEST_SSH_PUBLIC_KEY not set — export an RSA 2048 public key to run this test")
-	}
+	sshPublicKey := mveTestSSHPublicKey(t)
 	locationID, imageID, _ := findMVEPaloAltoTestLocation(t)
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
