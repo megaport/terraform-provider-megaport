@@ -2019,12 +2019,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
-	// Defence-in-depth: even if the user did not write a partner_config block,
-	// the existing state may show a CSP connection (TRANSIT/AWS/AWSHC) for
-	// which the API rejects VLAN updates. In that case the partner-type-based
-	// gate is empty and would otherwise let a VLAN mutation through.
-	cspBlocksVLANUpdate := stateHasUnsupportedVLANCSPConnection(ctx, state.CSPConnections)
-
 	// Only send a VLAN update when the user has actually changed ordered_vlan.
 	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
 	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
@@ -2032,7 +2026,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
 	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
 		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
-		supportVLANUpdates(aEndPartnerType) && !cspBlocksVLANUpdate {
+		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
@@ -2042,7 +2036,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
-		if supportVLANUpdates(aEndPartnerType) && !cspBlocksVLANUpdate &&
+		if supportVLANUpdates(aEndPartnerType) &&
 			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !aEndPlan.OrderedVLAN.IsNull() &&
@@ -2069,7 +2063,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
 		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
-		supportVLANUpdates(bEndPartnerType) && !cspBlocksVLANUpdate {
+		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
@@ -2077,7 +2071,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Prevent setting inner_vlan during updates for partners that don't support VLAN changes
 	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() &&
 		!aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) &&
-		supportVLANUpdates(aEndPartnerType) && !cspBlocksVLANUpdate {
+		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
@@ -2088,7 +2082,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Similarly add for B-End
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
 		!bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) &&
-		supportVLANUpdates(bEndPartnerType) && !cspBlocksVLANUpdate {
+		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
@@ -2101,7 +2095,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
 		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
-		if supportVLANUpdates(bEndPartnerType) && !cspBlocksVLANUpdate &&
+		if supportVLANUpdates(bEndPartnerType) &&
 			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !bEndPlan.OrderedVLAN.IsNull() &&
@@ -2677,36 +2671,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			}
 			if bEndStateConfig.OrderedVLAN.IsUnknown() {
 				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
-			}
-
-			// Reject ordered_vlan / inner_vlan changes at plan time on VXCs whose
-			// existing CSP connection does not allow VLAN updates (TRANSIT, AWS,
-			// AWSHC). Without this gate the user sees either a silent no-op (the
-			// runtime gate suppresses the request) or a raw API 400 — both poor
-			// experiences for someone genuinely trying to change a VLAN that the
-			// API will not let them change.
-			if stateHasUnsupportedVLANCSPConnection(ctx, state.CSPConnections) {
-				const vlanChangeSummary = "VLAN change not supported on Transit/AWS VXC"
-				const vlanChangeDetail = "The Megaport API does not allow changing the VLAN on VXCs whose endpoint connect_type is TRANSIT, AWS, or AWSHC. Recreate the VXC if you need a different VLAN."
-				if !aEndPlanConfig.OrderedVLAN.IsUnknown() && !aEndPlanConfig.OrderedVLAN.IsNull() &&
-					!aEndPlanConfig.OrderedVLAN.Equal(aEndStateConfig.OrderedVLAN) {
-					resp.Diagnostics.AddAttributeError(path.Root("a_end").AtName("ordered_vlan"), vlanChangeSummary, vlanChangeDetail)
-				}
-				if !bEndPlanConfig.OrderedVLAN.IsUnknown() && !bEndPlanConfig.OrderedVLAN.IsNull() &&
-					!bEndPlanConfig.OrderedVLAN.Equal(bEndStateConfig.OrderedVLAN) {
-					resp.Diagnostics.AddAttributeError(path.Root("b_end").AtName("ordered_vlan"), vlanChangeSummary, vlanChangeDetail)
-				}
-				if !aEndPlanConfig.InnerVLAN.IsUnknown() && !aEndPlanConfig.InnerVLAN.IsNull() &&
-					!aEndPlanConfig.InnerVLAN.Equal(aEndStateConfig.InnerVLAN) {
-					resp.Diagnostics.AddAttributeError(path.Root("a_end").AtName("inner_vlan"), vlanChangeSummary, vlanChangeDetail)
-				}
-				if !bEndPlanConfig.InnerVLAN.IsUnknown() && !bEndPlanConfig.InnerVLAN.IsNull() &&
-					!bEndPlanConfig.InnerVLAN.Equal(bEndStateConfig.InnerVLAN) {
-					resp.Diagnostics.AddAttributeError(path.Root("b_end").AtName("inner_vlan"), vlanChangeSummary, vlanChangeDetail)
-				}
-				if resp.Diagnostics.HasError() {
-					return
-				}
 			}
 			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
 			diags = append(diags, partnerConfigDiags...)

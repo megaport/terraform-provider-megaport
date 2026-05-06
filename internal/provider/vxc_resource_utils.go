@@ -782,30 +782,6 @@ func supportVLANUpdates(partnerType string) bool {
 	return true
 }
 
-// stateHasUnsupportedVLANCSPConnection reports whether any CSP connection in
-// the resource's state uses a connect_type for which the Megaport API rejects
-// VLAN updates. This is the defence-in-depth backstop for cases where the user
-// described a Transit/AWS endpoint via a partner-port lookup
-// (data.megaport_partner) rather than an explicit *_partner_config block — in
-// which case the partner-type string used by supportVLANUpdates is empty and
-// would otherwise let a VLAN mutation through.
-func stateHasUnsupportedVLANCSPConnection(ctx context.Context, csp types.List) bool {
-	if csp.IsNull() || csp.IsUnknown() {
-		return false
-	}
-	var conns []cspConnectionModel
-	if diags := csp.ElementsAs(ctx, &conns, false); diags.HasError() {
-		return false
-	}
-	for _, c := range conns {
-		switch c.ConnectType.ValueString() {
-		case "TRANSIT", "AWS", "AWSHC":
-			return true
-		}
-	}
-	return false
-}
-
 // waitForVXCUpdate polls the VXC API to verify that an update has propagated successfully.
 // It uses exponential backoff with a maximum backoff time to efficiently wait for API propagation.
 //
