@@ -282,6 +282,112 @@ func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
 	})
 }
 
+// mveTestPaloAltoAdminPasswordHash is a sha256crypt-formatted password hash used
+// for Palo Alto MVE acceptance tests. Corresponds to the example in the Megaport
+// provider docs. Generated with: mkpasswd -m sha-256 'your_password'
+const mveTestPaloAltoAdminPasswordHash = "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"
+
+// mveTestCiscoAdminPassword is the plaintext admin password used for Cisco FTDv
+// MVE acceptance tests. Meets API requirements: 9-100 chars, no " CR LF.
+const mveTestCiscoAdminPassword = "TestAdminPw1234!"
+
+// findMVECiscoTestLocation returns a staging location with confirmed capacity for
+// a Cisco Firewall (FTDv) MVE. It dynamically resolves the Cisco Firewall image ID
+// so the probe stays valid as staging images change.
+// The caller must set MEGAPORT_TEST_SSH_PUBLIC_KEY — tests skip if absent.
+func findMVECiscoTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var ciscoImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Cisco") && strings.Contains(strings.ToLower(img.Product), "firewall") && img.ReleaseImage {
+			ciscoImageID = img.ID
+			break
+		}
+	}
+	if ciscoImageID == 0 {
+		t.Skip("skipping: no released Cisco Firewall MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.CiscoConfig{
+			Vendor:        "cisco",
+			ImageID:       ciscoImageID,
+			ProductSize:   "MEDIUM",
+			MVELabel:      "MVE 4/16",
+			ManageLocally: true,
+			AdminPassword: mveTestCiscoAdminPassword,
+		},
+		diversityZone: "red",
+		vnicCount:     4,
+	})
+	return locID, ciscoImageID, locName
+}
+
+// findMVEPaloAltoTestLocation returns a staging location with confirmed capacity for
+// a Palo Alto VM-Series MVE. It dynamically resolves the image ID.
+// Requires MEGAPORT_TEST_SSH_PUBLIC_KEY (RSA 2048 OpenSSH public key); skips otherwise.
+func findMVEPaloAltoTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	sshPublicKey := os.Getenv("MEGAPORT_TEST_SSH_PUBLIC_KEY")
+	if sshPublicKey == "" {
+		t.Skip("skipping: MEGAPORT_TEST_SSH_PUBLIC_KEY not set — export an RSA 2048 public key to run Palo Alto acceptance tests")
+		return 0, 0, ""
+	}
+
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var paloAltoImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Palo Alto") && strings.Contains(strings.ToLower(img.Product), "vm-series") && img.ReleaseImage {
+			paloAltoImageID = img.ID
+			break
+		}
+	}
+	if paloAltoImageID == 0 {
+		t.Skip("skipping: no released Palo Alto VM-Series MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.PaloAltoConfig{
+			Vendor:            "palo_alto",
+			ImageID:           paloAltoImageID,
+			ProductSize:       "MEDIUM",
+			MVELabel:          "MVE 4/16",
+			AdminPasswordHash: mveTestPaloAltoAdminPasswordHash,
+			SSHPublicKey:      sshPublicKey,
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+	})
+	return locID, paloAltoImageID, locName
+}
+
 // findMVETestLocationWithOpts returns a staging location ID with confirmed MVE
 // capacity for the given probe options. Each call returns a unique location.
 func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name string) {
