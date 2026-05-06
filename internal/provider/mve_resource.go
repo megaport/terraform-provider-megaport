@@ -280,6 +280,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			MVELabel:          v.MVELabel.ValueString(),
 			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
+			AdminPassword:     v.AdminPassword.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return paloAltoConfig, apiDiags
@@ -645,7 +646,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_password": schema.StringAttribute{
-						Description: "The admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Description: "The admin password for the vendor config. Required for Cisco FTDv (Firewall) and Palo Alto MVEs.",
 						Optional:    true,
 						Sensitive:   true,
 					},
