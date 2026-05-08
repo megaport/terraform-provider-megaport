@@ -2019,9 +2019,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Only send a VLAN update when the user has actually changed ordered_vlan.
+	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
+	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
+	// allocated a non-zero VLAN — incorrectly queuing a VLAN mutation on every
+	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
 	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2036,7 +2040,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !aEndPlan.OrderedVLAN.IsNull() &&
-				!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+				!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) {
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !aEndState.VLAN.IsNull() &&
 				updateReq.AEndVLAN == nil {
@@ -2056,9 +2060,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2095,7 +2099,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !bEndPlan.OrderedVLAN.IsNull() &&
-				!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+				!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) {
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !bEndState.VLAN.IsNull() &&
 				updateReq.BEndVLAN == nil {
