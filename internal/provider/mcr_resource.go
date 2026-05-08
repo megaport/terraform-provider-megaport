@@ -615,8 +615,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "Numeric ID of the prefix filter list.",
 							Computed:    true,
 							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-								unknownWhenNoPriorState(),
+								int64planmodifier.UseNonNullStateForUnknown(),
 							},
 						},
 						"description": schema.StringAttribute{
@@ -686,7 +685,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      waitForTime,
 	}
 
-	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() {
+	if !plan.ASN.IsUnknown() {
 		buyReq.MCRAsn = int(plan.ASN.ValueInt64())
 	}
 
@@ -983,7 +982,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	var mcrAsn *int
-	if !plan.ASN.IsNull() && !plan.ASN.IsUnknown() && !plan.ASN.Equal(state.ASN) {
+	if !plan.ASN.IsUnknown() && !plan.ASN.Equal(state.ASN) {
 		asn := int(plan.ASN.ValueInt64())
 		mcrAsn = &asn
 	}
