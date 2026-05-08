@@ -877,14 +877,12 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 		for _, l := range prefixFilterLists {
-			wg.Add(1)
-			go func(list *megaport.PrefixFilterList) {
-				defer wg.Done()
+			wg.Go(func() {
 				// Get a token from the rate limiter to apply rate limiting
 
 				<-rateLimiter.rateLimitCh
 
-				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), l.Id)
 				if err != nil {
 					mux.Lock()
 					errs = append(errs, err)
@@ -894,7 +892,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 				mux.Lock()
 				detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 				mux.Unlock()
-			}(l)
+			})
 		}
 
 		wg.Wait()
@@ -1075,9 +1073,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, planModel := range planPrefixFilterLists {
-		wg.Add(1)
-		go func(planModel *mcrPrefixFilterListModel) {
-			defer wg.Done()
+		wg.Go(func() {
 			// Get a token from the rate limiter to apply rate limiting
 			<-rateLimiter.rateLimitCh
 
@@ -1107,7 +1103,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					mux.Unlock()
 				}
 			}
-		}(planModel)
+		})
 	}
 
 	wg.Wait()
@@ -1131,10 +1127,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, stateModel := range statePrefixFilterLists {
-		wg.Add(1)
-		go func(stateModel *mcrPrefixFilterListModel) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			<-deleteRateLimiter.rateLimitCh
 
 			// If the prefix filter list does not exist in the plan, delete it.
@@ -1146,7 +1139,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					mux.Unlock()
 				}
 			}
-		}(stateModel)
+		})
 	}
 	wg.Wait()
 
@@ -1186,13 +1179,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
 
 		for _, l := range prefixFilterLists {
-			wg.Add(1)
-			go func(list *megaport.PrefixFilterList) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				<-rateLimiter.rateLimitCh
 
-				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), l.Id)
 				if err != nil {
 					mux.Lock()
 					errs = append(errs, err)
@@ -1202,7 +1192,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				mux.Lock()
 				detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 				mux.Unlock()
-			}(l)
+			})
 		}
 		wg.Wait()
 		if len(errs) > 0 {
