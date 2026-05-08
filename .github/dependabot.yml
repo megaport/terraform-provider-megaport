@@ -5,6 +5,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Wait for releases to bake before opening bump PRs — mitigates the
+    # window where a freshly-pushed (potentially compromised) version is
+    # picked up automatically.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -19,3 +25,10 @@ updates:
       # Major bumps land as deliberate human decisions; minor/patch only.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    # Same rationale as gomod above — delay adoption of fresh action
+    # releases (incl. SHA-pinned bumps) so a compromised tag has time to
+    # be flagged by the wider community before we pick it up. Note: the
+    # github-actions ecosystem only supports `default-days` (semver-*-days
+    # keys are gomod/npm/etc. only); majors are already ignored above.
+    cooldown:
+      default-days: 7
