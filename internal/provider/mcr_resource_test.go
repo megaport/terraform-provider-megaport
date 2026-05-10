@@ -685,6 +685,95 @@ func TestRateLimiter_Concurrent(t *testing.T) {
 	}
 }
 
+// TestAccMegaportMCR_UpdateASN exercises ESD-1094: changing the BGP ASN on
+// an existing MCR must update the resource in place rather than forcing a
+// destroy-and-recreate. The test asserts the product_uid is preserved
+// across the ASN change and that the new ASN reads back from the API.
+func TestAccMegaportMCR_UpdateASN(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+
+	configWithASN := func(asn int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "test_location" {
+				id = %d
+			}
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				port_speed           = 1000
+				location_id          = data.megaport_location.test_location.id
+				contract_term_months = 12
+				asn                  = %d
+			}
+		`, locationID, mcrName, asn)
+	}
+
+	configNoASN := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed           = 1000
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 12
+		}
+	`, locationID, mcrName)
+
+	var originalUID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithASN(64512),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "64512"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						originalUID = rs.Primary.Attributes["product_uid"]
+						return nil
+					},
+				),
+			},
+			// Change ASN — must NOT replace.
+			{
+				Config: configWithASN(64513),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "64513"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						if rs.Primary.Attributes["product_uid"] != originalUID {
+							return fmt.Errorf("MCR was replaced (product_uid changed) when ASN was updated; want in-place update. before=%s after=%s", originalUID, rs.Primary.Attributes["product_uid"])
+						}
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after the in-place update.
+			{
+				Config:   configWithASN(64513),
+				PlanOnly: true,
+			},
+			// Omit asn from config — must NOT plan a reset to the default 133937.
+			{
+				Config:             configNoASN,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
 func TestRateLimiter_RateOverTime(t *testing.T) {
 	rl := NewRateLimiter(5, 100*time.Millisecond)
 	start := time.Now()
