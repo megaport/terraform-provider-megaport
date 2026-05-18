@@ -1631,7 +1631,7 @@ func migrateV1AWSConfig(raw json.RawMessage) types.Object {
 }
 
 // migrateV1AzureConfig migrates V1 azure_config JSON to a types.Object.
-func migrateV1AzureConfig(ctx context.Context, raw json.RawMessage) types.Object {
+func migrateV1AzureConfig(_ context.Context, raw json.RawMessage) types.Object {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1739,7 +1739,7 @@ func migrateV1VrouterConfig(ctx context.Context, raw json.RawMessage) types.Obje
 }
 
 // migrateV1VrouterInterfaces migrates a V1 vrouter interfaces JSON array to a types.List.
-func migrateV1VrouterInterfaces(ctx context.Context, raw json.RawMessage) types.List {
+func migrateV1VrouterInterfaces(_ context.Context, raw json.RawMessage) types.List {
 	nullList := types.ListNull(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs))
 
 	var rawIfaces []json.RawMessage

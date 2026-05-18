@@ -66,9 +66,9 @@ func TestLagPortUIDsList_WithUIDs(t *testing.T) {
 
 	elements := result.Elements()
 	require.Len(t, elements, 3)
-	assert.Equal(t, "uid-1", elements[0].(types.String).ValueString())
-	assert.Equal(t, "uid-2", elements[1].(types.String).ValueString())
-	assert.Equal(t, "uid-3", elements[2].(types.String).ValueString())
+	assert.Equal(t, "uid-1", asTypesString(t, elements[0]))
+	assert.Equal(t, "uid-2", asTypesString(t, elements[1]))
+	assert.Equal(t, "uid-3", asTypesString(t, elements[2]))
 }
 
 func TestLagPortUIDsList_Empty(t *testing.T) {
@@ -87,15 +87,15 @@ func TestLagPortUIDsList_Empty(t *testing.T) {
 
 func TestResolvePortModifyParams(t *testing.T) {
 	tests := []struct {
-		name                     string
-		planName, stateName      types.String
-		planVis, stateVis        types.Bool
-		planCostCentre           types.String
-		planTerm, stateTerm      types.Int64
-		wantName                 string
-		wantVisibility           bool
-		wantCostCentre           string
-		wantContractTermMonths   *int
+		name                   string
+		planName, stateName    types.String
+		planVis, stateVis      types.Bool
+		planCostCentre         types.String
+		planTerm, stateTerm    types.Int64
+		wantName               string
+		wantVisibility         bool
+		wantCostCentre         string
+		wantContractTermMonths *int
 	}{
 		{
 			name:                   "no changes — all same",

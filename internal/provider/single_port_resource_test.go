@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
@@ -56,8 +55,8 @@ func TestFromAPIPort_Full(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 2)
-	assert.Equal(t, "test", tagElements["env"].(types.String).ValueString())
-	assert.Equal(t, "platform", tagElements["team"].(types.String).ValueString())
+	assert.Equal(t, "test", asTypesString(t, tagElements["env"]))
+	assert.Equal(t, "platform", asTypesString(t, tagElements["team"]))
 }
 
 func TestFromAPIPort_MinimalFields(t *testing.T) {
