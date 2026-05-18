@@ -98,7 +98,7 @@ func (d *mveSizeDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	mveSizes, listErr := d.client.MVEService.ListAvailableMVESizes(ctx)
 	if listErr != nil {
-		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Sizes", ""), listErr)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Sizes", "list"), listErr)
 		return
 	}
 

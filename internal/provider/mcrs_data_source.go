@@ -274,7 +274,7 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			IncludeInactive: false,
 		})
 		if err != nil {
-			addAPIError(&resp.Diagnostics, readErrorSummary("MCR", ""), err)
+			addAPIError(&resp.Diagnostics, readErrorSummary("MCR", "list"), err)
 			return
 		}
 	}

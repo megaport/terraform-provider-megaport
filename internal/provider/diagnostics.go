@@ -27,6 +27,9 @@ func buildErrorDetail(err error) string {
 	}
 
 	detail := apiErr.Message
+	if detail == "" {
+		detail = "(no message)"
+	}
 	if apiErr.Data != "" {
 		detail += "\n  Detail: " + apiErr.Data
 	}

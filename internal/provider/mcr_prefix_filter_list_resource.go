@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -45,20 +43,11 @@ func (r *mcrPrefixFilterListResource) Schema(_ context.Context, _ resource.Schem
 
 // Configure adds the provider configured client to the resource.
 func (r *mcrPrefixFilterListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*megaportProviderData)
+	providerData, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
 		return
 	}
-
-	r.client = client.client
+	r.client = providerData.client
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -155,11 +144,9 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
 	if err != nil {
 		// Check if the resource was deleted
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		if IsNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error reading MCR prefix filter list",
@@ -260,10 +247,10 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 		InitialBackoff: 10 * time.Second,
 		MaxBackoff:     30 * time.Second,
 		Multiplier:     1.5,
-		MaxRetries:     12,
+		MaxAttempts:    12,
 		RetryableFunc: func(err error) bool {
 			var apiErr *megaport.ErrorResponse
-			if errors.As(err, &apiErr) {
+			if errors.As(err, &apiErr) && apiErr.Response != nil {
 				return apiErr.Response.StatusCode == http.StatusConflict
 			}
 			return false
@@ -277,7 +264,11 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 			if IsNotFoundError(deleteErr) {
 				return nil // already deleted
 			}
-			tflog.Debug(ctx, "Prefix filter list delete attempt failed, may retry",
+			msg := "Prefix filter list delete attempt failed, will not retry"
+			if cfg.RetryableFunc(deleteErr) {
+				msg = "Prefix filter list delete attempt failed, will retry"
+			}
+			tflog.Debug(ctx, msg,
 				map[string]interface{}{
 					"prefix_list_id": state.ID.ValueInt64(),
 					"mcr_id":         state.MCRID.ValueString(),
@@ -319,14 +310,12 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Verify the resource exists by attempting to read it
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
 	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
-				)
-				return
-			}
+		if IsNotFoundError(err) {
+			resp.Diagnostics.AddError(
+				"Resource not found",
+				fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
+			)
+			return
 		}
 		resp.Diagnostics.AddError(
 			"Error verifying resource during import",
@@ -346,61 +335,4 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 
 	// Save the imported state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-}
-
-// validatePrefixListEntry validates a single prefix list entry
-func (r *mcrPrefixFilterListResource) validatePrefixListEntry(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string, index int) diag.Diagnostics {
-	diags := diag.Diagnostics{}
-
-	// Validate prefix format
-	_, network, err := net.ParseCIDR(entry.Prefix.ValueString())
-	if err != nil {
-		diags.AddError(
-			fmt.Sprintf("Invalid prefix in entry %d", index),
-			fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix.ValueString(), err.Error()),
-		)
-		return diags
-	}
-
-	// Validate address family matches prefix type
-	isIPv4 := network.IP.To4() != nil
-	expectedIPv4 := addressFamily == "IPv4"
-
-	if isIPv4 != expectedIPv4 {
-		diags.AddError(
-			fmt.Sprintf("Address family mismatch in entry %d", index),
-			fmt.Sprintf("Prefix %s is %s but address family is set to %s",
-				entry.Prefix.ValueString(),
-				map[bool]string{true: "IPv4", false: "IPv6"}[isIPv4],
-				addressFamily),
-		)
-	}
-
-	// Validate ge/le ranges based on address family
-	maxLength := 32
-	if addressFamily == "IPv6" {
-		maxLength = 128
-	}
-
-	if !entry.Ge.IsNull() {
-		ge := entry.Ge.ValueInt64()
-		if ge < 0 || ge > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid ge value in entry %d", index),
-				fmt.Sprintf("ge must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	if !entry.Le.IsNull() {
-		le := entry.Le.ValueInt64()
-		if le < 0 || le > int64(maxLength) {
-			diags.AddError(
-				fmt.Sprintf("Invalid le value in entry %d", index),
-				fmt.Sprintf("le must be between 0 and %d for %s", maxLength, addressFamily),
-			)
-		}
-	}
-
-	return diags
 }

@@ -898,13 +898,13 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	})
 
 	if err != nil {
-		addAPIError(&resp.Diagnostics, updateErrorSummary("MVE", plan.UID.ValueString()), err)
+		addAPIError(&resp.Diagnostics, updateErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
 	updatedMVE, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
 	if err != nil {
-		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", plan.UID.ValueString()), err)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -916,14 +916,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), tagMap)
 		if err != nil {
-			addAPIError(&resp.Diagnostics, updateErrorSummary("MVE Tags", plan.UID.ValueString()), err)
+			addAPIError(&resp.Diagnostics, updateErrorSummary("MVE Tags", state.UID.ValueString()), err)
 			return
 		}
 	}
 
 	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
-		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", plan.UID.ValueString()), err)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", state.UID.ValueString()), err)
 		return
 	}
 
