@@ -4332,3 +4332,167 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 		},
 	})
 }
+
+// TestAccMegaportVXC_AttachedProductReplace exercises ESD-1095: when an
+// upstream Port attached to a VXC's a_end is forced to replace (here by
+// changing port_speed, which is RequiresReplace), the dependent VXC's
+// a_end.requested_product_uid becomes unknown at plan time. The VXC
+// ModifyPlan must handle that gracefully rather than failing with
+// "Value Conversion Error / Target Type: provider.vxcEndConfigurationModel".
+func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	configWithSpeed := func(aEndSpeed int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = %d
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 200
+				}
+				b_end = {
+					requested_product_uid = megaport_port.port_2.product_uid
+					ordered_vlan          = 201
+				}
+			}
+		`, locs[0], portName1, aEndSpeed, portName2, vxcName)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithSpeed(1000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+				),
+			},
+			// Bump port_1's speed — port_1 is RequiresReplace, so its product_uid
+			// is unknown in the plan. Pre-fix, the VXC ModifyPlan crashed here.
+			// PlanOnly: the goal is to verify planning succeeds without crashing;
+			// the location may not support 10 G ports so we do not apply.
+			{
+				Config:             configWithSpeed(10000),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_TransitInternetTagsUpdate is a regression test for
+// https://github.com/megaport/terraform-provider-megaport/issues/372 (ESD-1101).
+//
+// Scenario: an MCR↔Megaport-Internet (IP Transit) VXC with ordered_vlan = 0 on
+// both ends and no b_end_partner_config block. Adding resource_tags must not
+// trigger a VLAN update — the IP Transit API rejects VLAN mutations.
+//
+// Pre-fix the provider compared plan.OrderedVLAN(=0) to state.VLAN(=API-allocated),
+// which permanently disagreed and queued AEndVLAN/BEndVLAN=0 in every Update.
+// On a Transit VXC the API responded "IP Transit: vlan update not supported".
+func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	mcrLocationID, _ := findMCRTestLocation(t, 1000)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	baseConfig := func(extraVXCAttrs string) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "mcr_loc" {
+				id = %d
+			}
+
+			data "megaport_location" "transit_loc" {
+				id = %d
+			}
+
+			data "megaport_partner" "internet_port" {
+				connect_type = "TRANSIT"
+				location_id  = data.megaport_location.transit_loc.id
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.mcr_loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+
+			resource "megaport_vxc" "transit_vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 0
+				}
+
+				b_end = {
+					requested_product_uid = data.megaport_partner.internet_port.product_uid
+					ordered_vlan          = 0
+				}
+
+				%s
+			}
+		`, mcrLocationID, transitLocs[0], mcrName, vxcName, extraVXCAttrs)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1 — create the Transit VXC with no tags.
+			{
+				Config: baseConfig(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan", "0"),
+				),
+			},
+			// Step 2 — add resource_tags. Pre-fix this PUT was rejected with
+			// "IP Transit: vlan update not supported".
+			{
+				Config: baseConfig(`
+					resource_tags = {
+						owner = "esd-1101"
+					}
+				`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "resource_tags.owner", "esd-1101"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan", "0"),
+				),
+			},
+		},
+	})
+}

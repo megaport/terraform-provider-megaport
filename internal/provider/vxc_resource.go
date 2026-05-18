@@ -2019,9 +2019,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Only send a VLAN update when the user has actually changed ordered_vlan.
+	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
+	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
+	// allocated a non-zero VLAN — incorrectly queuing a VLAN mutation on every
+	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
 	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2036,7 +2040,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !aEndPlan.OrderedVLAN.IsNull() &&
-				!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+				!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) {
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !aEndState.VLAN.IsNull() &&
 				updateReq.AEndVLAN == nil {
@@ -2056,9 +2060,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2095,7 +2099,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !bEndPlan.OrderedVLAN.IsNull() &&
-				!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+				!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) {
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !bEndState.VLAN.IsNull() &&
 				updateReq.BEndVLAN == nil {
@@ -2643,126 +2647,42 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
 		if !req.Plan.Raw.IsNull() {
-			var aEndCSP, bEndCSP bool
 			aEndStateObj := state.AEndConfiguration
 			bEndStateObj := state.BEndConfiguration
-			aEndStateConfig := &vxcEndConfigurationModel{}
-			bEndStateConfig := &vxcEndConfigurationModel{}
-			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
-			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
-			aEndPlanConfig := &vxcEndConfigurationModel{}
-			bEndPlanConfig := &vxcEndConfigurationModel{}
-			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
-			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			if aEndStateConfig.OrderedVLAN.IsUnknown() {
-				aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
-			}
-			if bEndStateConfig.OrderedVLAN.IsUnknown() {
-				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
-			}
-			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.AEndPartnerConfig.IsNull() {
-				if !aEndPartnerConfigModel.Partner.IsNull() {
-					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-						aEndCSP = true
-					}
-				}
-			}
-			if state.AEndPartnerConfig.IsNull() {
-				if !plan.AEndPartnerConfig.IsNull() {
-					state.AEndPartnerConfig = plan.AEndPartnerConfig
-				} else {
-					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) && aEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
-				}
+
+			// If any of the end-config objects are wholly unknown (typically because
+			// the attached Port/MCR/MVE is being replaced and its product_uid is
+			// unknown at plan time), skip the partner-config / UID reconciliation
+			// below — decoding an unknown types.Object into a struct fails with a
+			// "Value Conversion Error" and there is nothing meaningful to do here
+			// until the upstream resource is applied.
+			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
+				resp.Diagnostics.Append(diags...)
+				return
 			}
 
-			if aEndStateConfig.RequestedProductUID.IsNull() {
-				if aEndPlanConfig.RequestedProductUID.IsNull() {
-					aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-					aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-				} else {
-					aEndStateConfig.RequestedProductUID = aEndPlanConfig.RequestedProductUID
-				}
-			} else if aEndCSP {
-				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-					tflog.Info(ctx, "Cloud provider port mapping detected for A-End",
-						map[string]any{
-							"requested_product_uid": aEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   aEndStateConfig.CurrentProductUID.ValueString(),
-						},
-					)
-				}
-				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
-			}
-
-			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.BEndPartnerConfig.IsNull() {
-				if !bEndPartnerConfigModel.Partner.IsNull() {
-					if !bEndPartnerConfigModel.Partner.IsNull() {
-						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-							bEndCSP = true
-						}
-					}
-				}
-			}
-
-			if state.BEndPartnerConfig.IsNull() {
-				if !plan.BEndPartnerConfig.IsNull() {
-					state.BEndPartnerConfig = plan.BEndPartnerConfig
-				} else {
-					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) && bEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
-				}
-			}
-
-			if bEndStateConfig.RequestedProductUID.IsNull() {
-				if bEndPlanConfig.RequestedProductUID.IsNull() {
-					bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-					bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-				} else {
-					bEndStateConfig.RequestedProductUID = bEndPlanConfig.RequestedProductUID
-				}
-			} else if bEndCSP {
-				if !bEndPlanConfig.RequestedProductUID.IsNull() && bEndPlanConfig.RequestedProductUID.ValueString() != "" && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.RequestedProductUID) {
-					tflog.Info(ctx, "Cloud provider port mapping detected for B-End",
-						map[string]any{
-							"requested_product_uid": bEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   bEndStateConfig.CurrentProductUID.ValueString(),
-						},
-					)
-				}
-				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
-			}
-
-			newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
-			newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			plan.AEndConfiguration = newPlanAEndObj
-			plan.BEndConfiguration = newPlanBEndObj
-			newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
-			newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			state.AEndConfiguration = newStateAEndObj
-			state.BEndConfiguration = newStateBEndObj
+			plan.AEndConfiguration, state.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            aEndPlanObj,
+				stateEndObj:           aEndStateObj,
+				planPartnerConfig:     plan.AEndPartnerConfig,
+				statePartnerConfig:    &state.AEndPartnerConfig,
+				requiresReplace:       &resp.RequiresReplace,
+				diags:                 &diags,
+			})
+			plan.BEndConfiguration, state.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "B-End",
+				partnerConfigPathRoot: "b_end_partner_config",
+				planEndObj:            bEndPlanObj,
+				stateEndObj:           bEndStateObj,
+				planPartnerConfig:     plan.BEndPartnerConfig,
+				statePartnerConfig:    &state.BEndPartnerConfig,
+				requiresReplace:       &resp.RequiresReplace,
+				diags:                 &diags,
+			})
 			req.Plan.Set(ctx, &plan)
 			resp.Plan.Set(ctx, &plan)
 			stateDiags := req.State.Set(ctx, &state)
@@ -2773,5 +2693,91 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+}
+
+type vxcEndReconcileInput struct {
+	endLabel              string
+	partnerConfigPathRoot string
+	planEndObj            types.Object
+	stateEndObj           types.Object
+	planPartnerConfig     types.Object
+	statePartnerConfig    *types.Object
+	requiresReplace       *path.Paths
+	diags                 *diag.Diagnostics
+}
+
+// reconcileVXCEnd performs the per-end plan/state reconciliation that
+// ModifyPlan needs to apply symmetrically to A-End and B-End: decoding the
+// end configs, fixing up an unknown ordered_vlan, deciding whether the
+// partner is a cloud-provider (CSP) partner, reconciling the partner-config
+// object, and reconciling requested_product_uid against the current product
+// UID returned by the API. Returns the re-encoded plan and state end-config
+// objects.
+func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) (newPlanObj, newStateObj types.Object) {
+	stateConfig := &vxcEndConfigurationModel{}
+	planConfig := &vxcEndConfigurationModel{}
+	*in.diags = append(*in.diags, in.stateEndObj.As(ctx, stateConfig, basetypes.ObjectAsOptions{})...)
+	*in.diags = append(*in.diags, in.planEndObj.As(ctx, planConfig, basetypes.ObjectAsOptions{})...)
+
+	if stateConfig.OrderedVLAN.IsUnknown() {
+		planConfig.OrderedVLAN = stateConfig.VLAN
+	}
+
+	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
+
+	if in.statePartnerConfig.IsNull() {
+		if !in.planPartnerConfig.IsNull() {
+			*in.statePartnerConfig = in.planPartnerConfig
+		} else {
+			*in.statePartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
+		}
+	} else if !in.planPartnerConfig.Equal(*in.statePartnerConfig) && csp {
+		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))
+	}
+
+	switch {
+	case stateConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.IsNull():
+		stateConfig.RequestedProductUID = stateConfig.CurrentProductUID
+		planConfig.RequestedProductUID = stateConfig.CurrentProductUID
+	case stateConfig.RequestedProductUID.IsNull():
+		stateConfig.RequestedProductUID = planConfig.RequestedProductUID
+	case csp:
+		if !planConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.ValueString() != "" && !planConfig.RequestedProductUID.Equal(stateConfig.RequestedProductUID) {
+			tflog.Info(ctx, fmt.Sprintf("Cloud provider port mapping detected for %s", in.endLabel),
+				map[string]any{
+					"requested_product_uid": planConfig.RequestedProductUID.ValueString(),
+					"current_product_uid":   stateConfig.CurrentProductUID.ValueString(),
+				},
+			)
+		}
+		planConfig.RequestedProductUID = stateConfig.RequestedProductUID
+	}
+
+	newPlanObj, planObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, planConfig)
+	newStateObj, stateObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, stateConfig)
+	*in.diags = append(*in.diags, planObjDiags...)
+	*in.diags = append(*in.diags, stateObjDiags...)
+	return newPlanObj, newStateObj
+}
+
+// isCSPPartnerConfig reports whether the plan partner-config object is a
+// cloud-provider partner — anything other than the internal "transit",
+// "vrouter", and "a-end" sentinel partners triggers the CSP-specific
+// product-UID rotation handling in ModifyPlan.
+func isCSPPartnerConfig(ctx context.Context, planPartnerConfig types.Object, diags *diag.Diagnostics) bool {
+	if planPartnerConfig.IsNull() || planPartnerConfig.IsUnknown() {
+		return false
+	}
+	var partnerConfigModel vxcPartnerConfigurationModel
+	*diags = append(*diags, planPartnerConfig.As(ctx, &partnerConfigModel, basetypes.ObjectAsOptions{})...)
+	if partnerConfigModel.Partner.IsNull() {
+		return false
+	}
+	switch partnerConfigModel.Partner.ValueString() {
+	case "transit", "vrouter", "a-end":
+		return false
+	default:
+		return true
 	}
 }

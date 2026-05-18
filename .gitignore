@@ -1,3 +1,4 @@
+terraform-provider-megaport
 *.dll
 *.exe
 .DS_Store
