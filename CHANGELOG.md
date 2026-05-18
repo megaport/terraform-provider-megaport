@@ -46,6 +46,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release History
 
+### [v1.8.0] — 2026-05-10
+
+- ESD-1094: bump golangci-lint to v2.11.4 for Go 1.25 support
+- ESD-1094: bump go.mod to 1.25 and use sync.WaitGroup.Go
+- ESD-1094: address review feedback on ASN/plan modifiers
+- ESD-1095: extract per-end helpers in VXC ModifyPlan
+- Revert "fix: defensively block VLAN updates on Transit/AWS VXCs"
+- fix: defensively block VLAN updates on Transit/AWS VXCs
+- fix: only send VLAN update when ordered_vlan actually changed
+- ESD-1095: fix TestAccMegaportVXC_AttachedProductReplace test step flags
+- ESD-1095: fix null partner config crash in ModifyPlan
+- ESD-1094: fix prefix_filter_lists clear to empty
+- ESD-1094: address second round of Copilot review feedback
+- ESD-1095: address Copilot review feedback
+- ESD-1094: address Copilot review feedback
+- ESD-1094: support modifying MCR ASN in place
+- ESD-1095: guard VXC ModifyPlan against unknown end-config objects
+- merge: resolve conflicts with origin/main (vxcs-data-source, mcr-ipsec, megaportgo bump)
+- test: drive mves Read through datasource.ReadRequest end-to-end
+- fix: emit RFC3339 for date fields in mves/mcrs data sources
+- fix: distinguish unfetched vs fetched-empty resource tags
+- docs: regenerate mves data source docs
+- fix: address review feedback on mves data source
+- refactor: remove megaport_vxcs data source from this PR
+- docs: add generated mves data source documentation
+- fix: address code review findings for mves data source
+- feat: add megaport_mves data source
+- test: add coverage for include_resource_tags opt-in behavior
+- fix: add DataSourceWithConfigure interface assertion
+- fix: make resource tag fetching opt-in via include_resource_tags
+- feat: add megaport_vxcs data source and bump megaportgo to v1.7.0
+
+### [v1.7.0] — 2026-04-27
+
+- ESD-884: fix GCP VXC example missing requested_product_uid, improve docs
+- cleanup: move timeout logic to megaportgo, bump megaport go module
+- feat: bump megaportgo to v1.9.1, use WaitForProvision in Create
+- test: drive vxcs Read through datasource.ReadRequest end-to-end
+- test: gate promo_code acceptance tests on MEGAPORT_TEST_PROMO_CODE
+- fix: drop last_updated field from mcr_ipsec_addon resource
+- fix: emit RFC3339 for date fields in vxcs data source
+- fix: promo_code inconsistent result after apply
+- fix: remove duplicate MockMCRService methods after rebase
+- docs: regenerate vxcs data source docs
+- fix: address review feedback on vxcs data source
+- fix: rewrite tag fetch test to exercise actual Read logic
+- fix: guard IncludeResourceTags against unknown values
+- fix: correct gofmt alignment in vxcs_data_source.go
+- fix: address review feedback on VXCs data source
+- test: add coverage for include_resource_tags opt-in behavior
+- fix: add DataSourceWithConfigure interface assertion
+- fix: make resource tag fetching opt-in via include_resource_tags
+- feat: add megaport_vxcs data source and bump megaportgo to v1.7.0
+- fix: adapt tests to PR 349 standalone pattern
+- fix: remove ImportStateVerifyIdentifierAttribute for composite import ID
+- fix: reject import IDs with multiple colons in parseImportIDStrings
+- fix: handle decommissioned MCR state and add parseImportIDStrings tests
+- fix: immediate readiness check, consistent default timeout, wait after delete
+- fix: handle HTTP 400 MCR not found and simplify import ID parsing
+- feat: mcr ipsec support
+- fix: address review feedback on dynamic test locations
+- fix: vendor_config replace on any change, TF_ACC guard, dual location claiming
+- fix: use MCR-aware location picker for TestFullEcosystem
+- fix: add CSP_CREDENTIALS_JSON secret to acceptance test CI job
+- fix: rename CI secrets to MEGAPORT_STAGING_ACCESS_KEY/SECRET_KEY
+- fix: closure captures in location pickers and remove CI staging creds
+- fix: align MCR location picker speed with test config and add TF_ACC guard
+- fix: use MVE-aware location picker for TestMVE_TransitVXC
+- fix: validate Oracle VCIDs are not already in use before claiming
+- fix: only ignore file-not-found in loadCSPCredentials
+- fix: use MVE-aware location picker for TestMVE_TransitVXCAWS
+- fix: use MCR-aware location picker for TestOracleVXCWithProductUID
+- fix: closure capture in cleanup, remove hardcoded location IDs, MVE capacity check
+- fix: MVE vendor_config casing, multi-partner locations, and test helpers
+- fix: reduce diagnostic test log verbosity
+- fix: add t.Cleanup to findVXCPortTestLocations and fix stale comments
+- fix: use MCR-aware location picker for tests that create MCRs
+- fix: use partner-aware location picker for AWS and Oracle VXC tests
+- fix: use partner-aware location picker for tests requiring AWS/TRANSIT partner ports
+- fix: address review feedback — release claims, mask keys, surface parse errors, set TF_ACC in scripts
+- fix: replace hardcoded VXC location constants with dynamic pickers
+- fix: remove CSP credentials from version control, support env var injection
+- fix: address code review feedback for test helpers and retry logic
+- fix: address Copilot review feedback
+- Update CODEOWNERS
+- feat: replace hardcoded staging location constants with dynamic pickers
+- cleanup: remove product_name, company_name, promo_code
+- cleanup: remove redundant fields
+- fix: date fallback values
+- feat: add megaport_service_key resource for creating and managing service keys
+
 ### [v1.6.0] — 2026-04-03
 
 - fix: remove unused data source filter utilities
