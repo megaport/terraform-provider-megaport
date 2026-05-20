@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -259,17 +260,45 @@ func (r *natGatewayPrefixListResource) Delete(ctx context.Context, req resource.
 
 	productUID := state.NATGatewayProductID.ValueString()
 	id := int(state.ID.ValueInt64())
-	if err := r.client.NATGatewayService.DeleteNATGatewayPrefixList(ctx, productUID, id); err != nil {
-		var apiErr *megaport.ErrorResponse
-		if errors.As(err, &apiErr) && apiErr.Response != nil && apiErr.Response.StatusCode == http.StatusNotFound {
+
+	// A VXC delete upstream in the same apply only detaches its BGP
+	// import/export whitelist/blacklist references asynchronously. Between
+	// Terraform destroying the VXC and destroying this prefix list, the server
+	// can still report it as "associated with a BGP connection" and return 409.
+	// Retry briefly so the teardown is robust; the VXC removal eventually
+	// clears the binding. Mirrors the packet-filter Delete pattern.
+	const (
+		retries = 12
+		delay   = 5 * time.Second
+	)
+	var lastErr error
+	for attempt := 0; attempt < retries; attempt++ {
+		err := r.client.NATGatewayService.DeleteNATGatewayPrefixList(ctx, productUID, id)
+		if err == nil {
 			return
 		}
-		resp.Diagnostics.AddError(
-			"Error deleting NAT Gateway prefix list",
-			fmt.Sprintf("Could not delete prefix list %d on NAT Gateway %s: %s", id, productUID, err.Error()),
-		)
-		return
+		lastErr = err
+		var apiErr *megaport.ErrorResponse
+		if !errors.As(err, &apiErr) || apiErr.Response == nil {
+			break
+		}
+		if apiErr.Response.StatusCode == http.StatusNotFound {
+			return
+		}
+		if apiErr.Response.StatusCode != http.StatusConflict {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			lastErr = ctx.Err()
+			attempt = retries
+		case <-time.After(delay):
+		}
 	}
+	resp.Diagnostics.AddError(
+		"Error deleting NAT Gateway prefix list",
+		fmt.Sprintf("Could not delete prefix list %d on NAT Gateway %s: %s", id, productUID, lastErr.Error()),
+	)
 }
 
 func (r *natGatewayPrefixListResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

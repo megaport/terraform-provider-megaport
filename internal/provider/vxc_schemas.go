@@ -183,11 +183,11 @@ var (
 							},
 						},
 						"packet_filter_in": schema.Int64Attribute{
-							Description: "ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.",
+							Description: "ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.",
 							Optional:    true,
 						},
 						"packet_filter_out": schema.Int64Attribute{
-							Description: "ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.",
+							Description: "ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.",
 							Optional:    true,
 						},
 						"ip_mtu": schema.Int64Attribute{

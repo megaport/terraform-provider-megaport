@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -134,6 +135,8 @@ func (r *natGatewayPacketFilterResource) Schema(_ context.Context, _ resource.Sc
 						"ip_protocol": schema.Int64Attribute{
 							Description: "IANA IP protocol number (e.g. 6 = TCP, 17 = UDP). Omit or set to 0 for any protocol.",
 							Optional:    true,
+							Computed:    true,
+							Default:     int64default.StaticInt64(0),
 							Validators: []validator.Int64{
 								int64validator.Between(0, 255),
 							},
@@ -360,7 +363,7 @@ func (m *natGatewayPacketFilterResourceModel) fromAPI(ctx context.Context, pf *m
 			DestinationAddress: types.StringValue(e.DestinationAddress),
 			SourcePorts:        stringOrNull(e.SourcePorts),
 			DestinationPorts:   stringOrNull(e.DestinationPorts),
-			IPProtocol:         int64OrNull(e.IPProtocol),
+			IPProtocol:         types.Int64Value(int64(e.IPProtocol)),
 		}
 		obj, d := types.ObjectValueFrom(ctx, natGatewayPacketFilterEntryAttrs, em)
 		diags.Append(d...)

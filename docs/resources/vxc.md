@@ -543,8 +543,8 @@ Optional:
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.
-- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
@@ -779,8 +779,8 @@ Optional:
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
-- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.
-- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid on a NAT Gateway A-End VXC.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
