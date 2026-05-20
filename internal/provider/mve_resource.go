@@ -280,7 +280,6 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			MVELabel:          v.MVELabel.ValueString(),
 			SSHPublicKey:      v.SSHPublicKey.ValueString(),
 			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
-			AdminPassword:     v.AdminPassword.ValueString(),
 			LicenseData:       v.LicenseData.ValueString(),
 		}
 		return paloAltoConfig, apiDiags
@@ -642,13 +641,14 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
-						Description: `The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".`,
+						Description: "The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).",
 						Optional:    true,
 					},
 					"admin_password": schema.StringAttribute{
-						Description: "The admin password for the vendor config. Required for Cisco FTDv (Firewall) and Palo Alto MVEs.",
+						Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `\"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.",
 						Optional:    true,
 						Sensitive:   true,
+						WriteOnly:   true,
 					},
 					"director_address": schema.StringAttribute{
 						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
@@ -755,6 +755,15 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	vcModel := &vendorConfigModel{}
 	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
 	resp.Diagnostics = append(resp.Diagnostics, vcDiags...)
+	// admin_password is a write-only attribute, so it is null in req.Plan.
+	// Pull it from req.Config and apply it to the vendor model before mapping
+	// to the API request.
+	var configAdminPassword types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("vendor_config").AtName("admin_password"), &configAdminPassword)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	vcModel.AdminPassword = configAdminPassword
 	vendorConfig, apiVCDiags := toAPIVendorConfig(vcModel)
 	resp.Diagnostics = append(resp.Diagnostics, apiVCDiags...)
 	if resp.Diagnostics.HasError() {

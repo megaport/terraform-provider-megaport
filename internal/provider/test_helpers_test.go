@@ -285,14 +285,50 @@ func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
 	})
 }
 
-// mveTestPaloAltoAdminPasswordHash is a sha256crypt-formatted password hash used
-// for Palo Alto MVE acceptance tests. Corresponds to the example in the Megaport
-// provider docs. Generated with: mkpasswd -m sha-256 'your_password'
-const mveTestPaloAltoAdminPasswordHash = "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"
+// mveAdminPasswordSafeAlphabet is the character set used to build random admin
+// passwords and password hashes for acceptance tests. It is the intersection of
+// what the Megaport API accepts for the Cisco FTDv `adminPassword` field
+// (anything except `"`, CR, LF) and the sha256crypt salt/encrypted alphabet
+// `[a-zA-Z0-9./]` enforced by megalith's HashAdminPasswordValidator.
+const mveAdminPasswordSafeAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./"
 
-// mveTestCiscoAdminPassword is the plaintext admin password used for Cisco FTDv
-// MVE acceptance tests. Meets API requirements: 9-100 chars, no " CR LF.
-const mveTestCiscoAdminPassword = "TestAdminPw1234!"
+// randomFromAlphabet returns a string of length n drawn uniformly from alphabet
+// using crypto/rand. It is intended for test-only credentials.
+func randomFromAlphabet(t *testing.T, n int, alphabet string) string {
+	t.Helper()
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("crypto/rand.Read: %v", err)
+	}
+	out := make([]byte, n)
+	for i, b := range buf {
+		out[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return string(out)
+}
+
+// mveTestCiscoAdminPassword returns a freshly-generated plaintext admin password
+// suitable for Cisco FTDv acceptance tests. The API requires 9–100 characters
+// and disallows `"`, CR, LF. We generate 24 characters from a safe alphabet so
+// every test run uses unique credentials on the (temporary) provisioned MVE.
+func mveTestCiscoAdminPassword(t *testing.T) string {
+	t.Helper()
+	return randomFromAlphabet(t, 24, mveAdminPasswordSafeAlphabet)
+}
+
+// mveTestPaloAltoAdminPasswordHash returns a freshly-generated sha256crypt-format
+// admin password hash suitable for Palo Alto VM-Series acceptance tests. The API
+// only checks the structural format `$5$<salt>$<encrypted>` with an 8–16 char
+// salt and 43-char encrypted segment over `[a-zA-Z0-9./]`, so we synthesize a
+// random hash that satisfies the validator without needing a real sha256crypt
+// implementation. The corresponding plaintext is never used — the MVE is
+// destroyed at the end of the test before anyone could log in.
+func mveTestPaloAltoAdminPasswordHash(t *testing.T) string {
+	t.Helper()
+	salt := randomFromAlphabet(t, 16, mveAdminPasswordSafeAlphabet)
+	encrypted := randomFromAlphabet(t, 43, mveAdminPasswordSafeAlphabet)
+	return "$5$" + salt + "$" + encrypted
+}
 
 // mveTestSSHKeyOnce caches a freshly-generated RSA 2048 OpenSSH public key for
 // the lifetime of the test binary so Palo Alto MVE tests don't need an external
@@ -363,7 +399,7 @@ func findMVECiscoTestLocation(t *testing.T) (locationID int, imageID int, locati
 			ProductSize:   "MEDIUM",
 			MVELabel:      "MVE 4/16",
 			ManageLocally: true,
-			AdminPassword: mveTestCiscoAdminPassword,
+			AdminPassword: mveTestCiscoAdminPassword(t),
 		},
 		diversityZone: "red",
 		vnicCount:     4,
@@ -409,7 +445,7 @@ func findMVEPaloAltoTestLocation(t *testing.T) (locationID int, imageID int, loc
 			ImageID:           paloAltoImageID,
 			ProductSize:       "MEDIUM",
 			MVELabel:          "MVE 4/16",
-			AdminPasswordHash: mveTestPaloAltoAdminPasswordHash,
+			AdminPasswordHash: mveTestPaloAltoAdminPasswordHash(t),
 			SSHPublicKey:      sshPublicKey,
 		},
 		diversityZone: "red",

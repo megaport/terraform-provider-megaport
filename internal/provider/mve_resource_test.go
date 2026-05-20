@@ -807,6 +807,10 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
 	costCentreNew := RandomTestName()
+	// Generate once and reuse across create + update steps so the second
+	// apply doesn't show a vendor_config diff (the value is write-only and
+	// not stored in state, but reusing it keeps the test config readable).
+	adminPassword := mveTestCiscoAdminPassword(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -843,7 +847,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 						{ description = "Management Plane" },
 						{ description = "HA Plane" },
 					]
-				}`, locationID, imageID, mveName, costCentre, mveTestCiscoAdminPassword),
+				}`, locationID, imageID, mveName, costCentre, adminPassword),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -917,7 +921,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 						{ description = "Management Plane" },
 						{ description = "HA Plane" },
 					]
-				}`, locationID, imageID, mveNameNew, costCentreNew, mveTestCiscoAdminPassword),
+				}`, locationID, imageID, mveNameNew, costCentreNew, adminPassword),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -941,6 +945,10 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
 	costCentreNew := RandomTestName()
+	// Generate once and reuse across create + update steps. admin_password_hash
+	// is stored in state (not write-only), so using different values would
+	// trigger an unintended vendor_config replace on the update step.
+	adminPasswordHash := mveTestPaloAltoAdminPasswordHash(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -975,7 +983,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 						{ description = "Management" },
 						{ description = "Data" },
 					]
-				}`, locationID, imageID, mveName, costCentre, mveTestPaloAltoAdminPasswordHash, sshPublicKey),
+				}`, locationID, imageID, mveName, costCentre, adminPasswordHash, sshPublicKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -1047,7 +1055,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 						{ description = "Management" },
 						{ description = "Data" },
 					]
-				}`, locationID, imageID, mveNameNew, costCentreNew, mveTestPaloAltoAdminPasswordHash, sshPublicKey),
+				}`, locationID, imageID, mveNameNew, costCentreNew, adminPasswordHash, sshPublicKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
