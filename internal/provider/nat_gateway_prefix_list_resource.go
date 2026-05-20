@@ -66,7 +66,7 @@ func (r *natGatewayPrefixListResource) Metadata(_ context.Context, req resource.
 
 func (r *natGatewayPrefixListResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6.",
+		Description: "NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6. The list is referenced by `description` on a VXC's `a_end_partner_config.vrouter_config.interfaces[].bgp_connections[].import_whitelist` / `import_blacklist` / `export_whitelist` / `export_blacklist` (or the symmetric B-End) when that VXC's endpoint is the NAT Gateway that owns this list — the same wiring used for MCR prefix filter lists.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Description: "Numeric ID of the prefix list, assigned by the API.",

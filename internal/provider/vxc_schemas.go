@@ -316,19 +316,19 @@ var (
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
-										Description: "The import whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.",
 										Optional:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
-										Description: "The import blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.",
 										Optional:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
-										Description: "The export whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.",
 										Optional:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
-										Description: "The export blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.",
 										Optional:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{
@@ -462,19 +462,19 @@ var (
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
-										Description: "The import whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.",
 										Optional:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
-										Description: "The import blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.",
 										Optional:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
-										Description: "The export whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.",
 										Optional:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
-										Description: "The export blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.",
 										Optional:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{

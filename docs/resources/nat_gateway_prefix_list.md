@@ -3,12 +3,12 @@
 page_title: "megaport_nat_gateway_prefix_list Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6.
+  NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6. The list is referenced by description on a VXC's a_end_partner_config.vrouter_config.interfaces[].bgp_connections[].import_whitelist / import_blacklist / export_whitelist / export_blacklist (or the symmetric B-End) when that VXC's endpoint is the NAT Gateway that owns this list — the same wiring used for MCR prefix filter lists.
 ---
 
 # megaport_nat_gateway_prefix_list (Resource)
 
-NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6.
+NAT Gateway Prefix List Resource for the Megaport Terraform Provider. Manages a prefix list (route filter) on a NAT Gateway, scoped to either IPv4 or IPv6. The list is referenced by `description` on a VXC's `a_end_partner_config.vrouter_config.interfaces[].bgp_connections[].import_whitelist` / `import_blacklist` / `export_whitelist` / `export_blacklist` (or the symmetric B-End) when that VXC's endpoint is the NAT Gateway that owns this list — the same wiring used for MCR prefix filter lists.
 
 
 

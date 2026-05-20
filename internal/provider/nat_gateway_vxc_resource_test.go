@@ -164,3 +164,153 @@ resource "megaport_vxc" "vxc" {
 		},
 	})
 }
+
+// TestAccMegaportVXC_NATGatewayPrefixListBGP exercises the NAT Gateway prefix
+// list ↔ VXC BGP wiring. NetAuto classifies MCR and NAT Gateway as the same
+// VRouter product class (confirmed with the NGW backend team), so the four
+// import/export whitelist/blacklist fields on a BGP connection accept the
+// description of any prefix filter list owned by the VXC's vrouter endpoint
+// — including NGW prefix lists, not just MCR ones. This test asserts that
+// vrouterPrefixFilterListsForEndpoint resolves NGW prefix-list descriptions
+// to their numeric IDs on the wire-level VXC order.
+//
+// Shape:
+//
+//   - NAT Gateway + same-site Port
+//   - megaport_nat_gateway_prefix_list (IPv4, two entries)
+//   - VXC with A-End on the NAT Gateway and a BGP connection that sets both
+//     import_whitelist and export_whitelist to the prefix list's description.
+//     The peer is shutdown=true because the B-End port has no live peer; we
+//     only care that the order is accepted and the description-to-ID lookup
+//     succeeds.
+func TestAccMegaportVXC_NATGatewayPrefixListBGP(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	speed, sessionCount, err := getNATGatewayTestConfig()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway VXC prefix-list test: %v", err)
+	}
+	locationID, _ := findNATGatewayAndPortTestLocation(t, speed)
+
+	natGWName := RandomTestName()
+	portName := RandomTestName()
+	plDescription := RandomTestName()
+	vxcName := RandomTestName()
+
+	natResource := "megaport_nat_gateway.nat"
+	plResource := "megaport_nat_gateway_prefix_list.pl"
+	portResource := "megaport_port.port"
+	vxcResource := "megaport_vxc.vxc"
+
+	config := providerConfig + fmt.Sprintf(`
+data "megaport_location" "loc" {
+    id = %d
+}
+
+resource "megaport_nat_gateway" "nat" {
+    product_name         = "%s"
+    location_id          = data.megaport_location.loc.id
+    speed                = %d
+    session_count        = %d
+    contract_term_months = 1
+    diversity_zone       = "red"
+    asn                  = 64512
+}
+
+resource "megaport_port" "port" {
+    product_name           = "%s"
+    location_id            = data.megaport_location.loc.id
+    port_speed             = 1000
+    contract_term_months   = 1
+    marketplace_visibility = false
+}
+
+resource "megaport_nat_gateway_prefix_list" "pl" {
+    nat_gateway_product_uid = megaport_nat_gateway.nat.product_uid
+    description             = "%s"
+    address_family          = "IPv4"
+    entries = [
+        {
+            action = "permit"
+            prefix = "10.0.0.0/8"
+            ge     = 24
+            le     = 32
+        },
+        {
+            action = "deny"
+            prefix = "192.168.0.0/16"
+        }
+    ]
+}
+
+resource "megaport_vxc" "vxc" {
+    product_name         = "%s"
+    rate_limit           = 100
+    contract_term_months = 1
+
+    a_end = {
+        requested_product_uid = megaport_nat_gateway.nat.product_uid
+        ordered_vlan          = 100
+    }
+
+    a_end_partner_config = {
+        partner = "vrouter"
+        vrouter_config = {
+            interfaces = [{
+                description  = "nat-gw-bgp-filtered"
+                ip_addresses = ["10.0.0.1/30"]
+                bgp_connections = [{
+                    peer_asn         = 64600
+                    local_ip_address = "10.0.0.1"
+                    peer_ip_address  = "10.0.0.2"
+                    shutdown         = true
+                    description      = "filtered by NGW prefix list"
+                    bfd_enabled      = false
+                    export_policy    = "permit"
+                    import_whitelist = "%s"
+                    export_whitelist = "%s"
+                }]
+            }]
+        }
+    }
+
+    b_end = {
+        requested_product_uid = megaport_port.port.product_uid
+        ordered_vlan          = 200
+    }
+
+    depends_on = [megaport_nat_gateway_prefix_list.pl]
+}
+`, locationID, natGWName, speed, sessionCount, portName, plDescription, vxcName, plDescription, plDescription)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					checkNATGatewayProvisioned(natResource),
+					resource.TestCheckResourceAttrSet(portResource, "product_uid"),
+					resource.TestCheckResourceAttrSet(plResource, "id"),
+					resource.TestCheckResourceAttrSet(vxcResource, "product_uid"),
+					resource.TestCheckResourceAttr(vxcResource, "product_name", vxcName),
+					resource.TestCheckResourceAttrPair(
+						vxcResource, "a_end.current_product_uid",
+						natResource, "product_uid",
+					),
+					resource.TestCheckResourceAttr(
+						vxcResource,
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.import_whitelist",
+						plDescription,
+					),
+					resource.TestCheckResourceAttr(
+						vxcResource,
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.export_whitelist",
+						plDescription,
+					),
+				),
+			},
+		},
+	})
+}

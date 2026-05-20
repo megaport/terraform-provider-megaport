@@ -495,11 +495,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -566,11 +566,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -731,11 +731,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -802,11 +802,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.

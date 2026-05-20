@@ -481,27 +481,51 @@ func (r *vxcResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 	resp.TypeName = req.ProviderTypeName + "_vxc"
 }
 
-// mcrPrefixFilterListsForEndpoint returns MCR prefix filter lists for the
-// given endpoint product only when that product is actually an MCR. VXC
-// endpoints can also be NAT Gateways (vrouter partner config) or other
-// product types that do not support the MCR prefix-list endpoint — calling
-// GET /v2/product/mcr2/{uid}/prefixLists for a NAT Gateway returns
-// 400 "Not supported service type" and would otherwise abort the whole
-// Create/Update/Read path.
+// vrouterPrefixFilterListsForEndpoint returns the prefix filter lists owned
+// by the given vrouter-class endpoint, normalised to []*megaport.PrefixFilterList
+// so the shared description-to-ID lookup in createVrouterPartnerConfig /
+// createAEndPartnerConfig works uniformly regardless of product type.
 //
-// The returned slice is consumed by createVrouterPartnerConfig /
-// createAEndPartnerConfig to translate MCR prefix-list *names* to numeric
-// IDs; non-MCR endpoints have no such names in scope, so returning nil is
-// semantically correct.
-func (r *vxcResource) mcrPrefixFilterListsForEndpoint(ctx context.Context, productUID string) ([]*megaport.PrefixFilterList, error) {
+// At the NetAuto layer both MCRs and NAT Gateways are classified as
+// VRouters and share the same BGP prefix-list semantics — the four
+// importWhitelist/importBlacklist/exportWhitelist/exportBlacklist fields on
+// a BGP connection accept any prefix-list ID belonging to the virtual
+// router on the VXC's endpoint. The two products expose their lists on
+// different REST endpoints (GET /v2/product/mcr2/{uid}/prefixLists vs
+// GET /v3/products/nat_gateways/{uid}/prefix_list_summaries) but the
+// resulting summary shape (id / description / addressFamily) is identical.
+//
+// Any other endpoint type (Port, MVE, etc.) has no prefix-list collection,
+// so we return nil — the lookup loops then become no-ops, which is the
+// correct behaviour for non-vrouter endpoints.
+func (r *vxcResource) vrouterPrefixFilterListsForEndpoint(ctx context.Context, productUID string) ([]*megaport.PrefixFilterList, error) {
 	productType, err := r.client.ProductService.GetProductType(ctx, productUID)
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(productType, megaport.PRODUCT_MCR) {
+	switch {
+	case strings.EqualFold(productType, megaport.PRODUCT_MCR):
+		return r.client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
+	case strings.EqualFold(productType, megaport.PRODUCT_NAT_GATEWAY):
+		summaries, err := r.client.NATGatewayService.ListNATGatewayPrefixLists(ctx, productUID)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]*megaport.PrefixFilterList, 0, len(summaries))
+		for _, s := range summaries {
+			if s == nil {
+				continue
+			}
+			out = append(out, &megaport.PrefixFilterList{
+				Id:            s.ID,
+				Description:   s.Description,
+				AddressFamily: s.AddressFamily,
+			})
+		}
+		return out, nil
+	default:
 		return nil, nil
 	}
-	return r.client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
 }
 
 // Schema defines the schema for the resource.
@@ -1468,7 +1492,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1498,7 +1522,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1793,7 +1817,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, b.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, b.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2206,7 +2230,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, aEndPlan.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndPlan.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2235,7 +2259,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2283,7 +2307,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.mcrPrefixFilterListsForEndpoint(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, bEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
