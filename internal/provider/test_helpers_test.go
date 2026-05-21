@@ -2,11 +2,13 @@ package provider
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"math/rand"
+	mrand "math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	megaport "github.com/megaport/megaportgo"
+	"golang.org/x/crypto/ssh"
 )
 
 // ── Acceptance Test Rate Limiter ──────────────────────────────────────────────
@@ -282,6 +285,175 @@ func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
 	})
 }
 
+// mveAdminPasswordSafeAlphabet is the character set used to build random admin
+// passwords and password hashes for acceptance tests. It is the intersection of
+// what the Megaport API accepts for the Cisco FTDv `adminPassword` field
+// (anything except `"`, CR, LF) and the sha256crypt salt/encrypted alphabet
+// `[a-zA-Z0-9./]` enforced by megalith's HashAdminPasswordValidator.
+const mveAdminPasswordSafeAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./"
+
+// randomFromAlphabet returns a string of length n drawn uniformly from alphabet
+// using crypto/rand. It is intended for test-only credentials.
+func randomFromAlphabet(t *testing.T, n int, alphabet string) string {
+	t.Helper()
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("crypto/rand.Read: %v", err)
+	}
+	out := make([]byte, n)
+	for i, b := range buf {
+		out[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return string(out)
+}
+
+// mveTestCiscoAdminPassword returns a freshly-generated plaintext admin password
+// suitable for Cisco FTDv acceptance tests. The API requires 9–100 characters
+// and disallows `"`, CR, LF. We generate 24 characters from a safe alphabet so
+// every test run uses unique credentials on the (temporary) provisioned MVE.
+func mveTestCiscoAdminPassword(t *testing.T) string {
+	t.Helper()
+	return randomFromAlphabet(t, 24, mveAdminPasswordSafeAlphabet)
+}
+
+// mveTestPaloAltoAdminPasswordHash returns a freshly-generated sha256crypt-format
+// admin password hash suitable for Palo Alto VM-Series acceptance tests. The API
+// only checks the structural format `$5$<salt>$<encrypted>` with an 8–16 char
+// salt and 43-char encrypted segment over `[a-zA-Z0-9./]`, so we synthesize a
+// random hash that satisfies the validator without needing a real sha256crypt
+// implementation. The corresponding plaintext is never used — the MVE is
+// destroyed at the end of the test before anyone could log in.
+func mveTestPaloAltoAdminPasswordHash(t *testing.T) string {
+	t.Helper()
+	salt := randomFromAlphabet(t, 16, mveAdminPasswordSafeAlphabet)
+	encrypted := randomFromAlphabet(t, 43, mveAdminPasswordSafeAlphabet)
+	return "$5$" + salt + "$" + encrypted
+}
+
+// mveTestSSHKeyOnce caches a freshly-generated RSA 2048 OpenSSH public key for
+// the lifetime of the test binary so Palo Alto MVE tests don't need an external
+// MEGAPORT_TEST_SSH_PUBLIC_KEY env var. The corresponding private key is
+// discarded — tests only validate the order, never log into the MVE.
+var (
+	mveTestSSHKeyOnce sync.Once
+	mveTestSSHKeyVal  string
+	mveTestSSHKeyErr  error
+)
+
+func mveTestSSHPublicKey(t *testing.T) string {
+	t.Helper()
+	mveTestSSHKeyOnce.Do(func() {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			mveTestSSHKeyErr = fmt.Errorf("generate RSA key: %w", err)
+			return
+		}
+		pub, err := ssh.NewPublicKey(&key.PublicKey)
+		if err != nil {
+			mveTestSSHKeyErr = fmt.Errorf("derive ssh public key: %w", err)
+			return
+		}
+		mveTestSSHKeyVal = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub)))
+	})
+	if mveTestSSHKeyErr != nil {
+		t.Fatalf("mveTestSSHPublicKey: %v", mveTestSSHKeyErr)
+	}
+	return mveTestSSHKeyVal
+}
+
+// findMVECiscoTestLocation returns a staging location with confirmed capacity for
+// a Cisco Firewall (FTDv) MVE. It dynamically resolves the Cisco Firewall image ID
+// so the probe stays valid as staging images change.
+// The caller must set MEGAPORT_TEST_SSH_PUBLIC_KEY — tests skip if absent.
+func findMVECiscoTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var ciscoImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Cisco") && strings.Contains(strings.ToLower(img.Product), "firewall") && img.ReleaseImage {
+			ciscoImageID = img.ID
+			break
+		}
+	}
+	if ciscoImageID == 0 {
+		t.Skip("skipping: no released Cisco Firewall MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.CiscoConfig{
+			Vendor:        "cisco",
+			ImageID:       ciscoImageID,
+			ProductSize:   "MEDIUM",
+			MVELabel:      "MVE 4/16",
+			ManageLocally: true,
+			AdminPassword: mveTestCiscoAdminPassword(t),
+		},
+		diversityZone: "red",
+		vnicCount:     4,
+	})
+	return locID, ciscoImageID, locName
+}
+
+// findMVEPaloAltoTestLocation returns a staging location with confirmed capacity for
+// a Palo Alto VM-Series MVE. It dynamically resolves the image ID and uses an
+// ephemeral RSA 2048 OpenSSH public key generated by mveTestSSHPublicKey.
+func findMVEPaloAltoTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	sshPublicKey := mveTestSSHPublicKey(t)
+
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var paloAltoImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Palo Alto") && strings.Contains(strings.ToLower(img.Product), "vm-series") && img.ReleaseImage {
+			paloAltoImageID = img.ID
+			break
+		}
+	}
+	if paloAltoImageID == 0 {
+		t.Skip("skipping: no released Palo Alto VM-Series MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.PaloAltoConfig{
+			Vendor:            "palo_alto",
+			ImageID:           paloAltoImageID,
+			ProductSize:       "MEDIUM",
+			MVELabel:          "MVE 4/16",
+			AdminPasswordHash: mveTestPaloAltoAdminPasswordHash(t),
+			SSHPublicKey:      sshPublicKey,
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+	})
+	return locID, paloAltoImageID, locName
+}
+
 // findMVETestLocationWithOpts returns a staging location ID with confirmed MVE
 // capacity for the given probe options. Each call returns a unique location.
 func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name string) {
@@ -443,6 +615,114 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 		}
 	}
 	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity", speedMbps)
+	return 0, ""
+}
+
+// findNATGatewayTestLocation returns a staging location ID that supports NAT
+// Gateway at the given speed (Mbps) in the "red" diversity zone. Calls t.Skip
+// if none found.
+//
+// Every NAT Gateway acceptance test pins diversity_zone = "red" in its HCL,
+// so this helper must verify the red zone specifically. The aggregate
+// LocationV3.SupportsNATGatewaySpeed returns true if either zone advertises
+// the speed, which can hand back a location whose red zone lacks it — the
+// networkdesign/validate endpoint then rejects the order with
+// "NAT Gateway speed N is not available in location M".
+var (
+	natGatewayClaimedMu        sync.Mutex
+	natGatewayClaimedLocations = map[int]bool{}
+)
+
+func locationRedSupportsNATGatewaySpeed(loc *megaport.LocationV3, speedMbps int) bool {
+	if loc == nil || loc.DiversityZones == nil || loc.DiversityZones.Red == nil {
+		return false
+	}
+	for _, s := range loc.DiversityZones.Red.NATGatewaySpeedMbps {
+		if s == speedMbps {
+			return true
+		}
+	}
+	return false
+}
+
+func findNATGatewayTestLocation(t *testing.T, speedMbps int) (id int, name string) { //nolint:unparam // name return is available for callers that want it
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	natGatewayClaimedMu.Lock()
+	defer natGatewayClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && locationRedSupportsNATGatewaySpeed(loc, speedMbps) && !natGatewayClaimedLocations[loc.ID] {
+			locID := loc.ID
+			natGatewayClaimedLocations[locID] = true
+			t.Cleanup(func() {
+				natGatewayClaimedMu.Lock()
+				defer natGatewayClaimedMu.Unlock()
+				delete(natGatewayClaimedLocations, locID)
+			})
+			t.Logf("findNATGatewayTestLocation: using location %d (%s) for speed %d (red zone)", locID, loc.Name, speedMbps)
+			return locID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps NAT Gateway capacity in red zone", speedMbps)
+	return 0, ""
+}
+
+// findNATGatewayAndPortTestLocation returns a single staging location ID that
+// supports both NAT Gateway at the given speed and Megaport ports at 1000 Mbps.
+// Used for tests that need to provision a NAT Gateway and a Port at the same
+// site (e.g. VXC A-End = NAT Gateway, B-End = Port).
+func findNATGatewayAndPortTestLocation(t *testing.T, natSpeedMbps int) (id int, name string) { //nolint:unparam // name return is available for callers that want it
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	natGatewayClaimedMu.Lock()
+	portClaimedMu.Lock()
+	defer natGatewayClaimedMu.Unlock()
+	defer portClaimedMu.Unlock()
+	for _, loc := range locations {
+		if !strings.EqualFold(loc.Status, "active") {
+			continue
+		}
+		if !locationRedSupportsNATGatewaySpeed(loc, natSpeedMbps) || !portLocationHasCapacity(loc, 1000) {
+			continue
+		}
+		if natGatewayClaimedLocations[loc.ID] || portClaimedLocations[loc.ID] {
+			continue
+		}
+		locID := loc.ID
+		natGatewayClaimedLocations[locID] = true
+		portClaimedLocations[locID] = true
+		t.Cleanup(func() {
+			natGatewayClaimedMu.Lock()
+			portClaimedMu.Lock()
+			defer natGatewayClaimedMu.Unlock()
+			defer portClaimedMu.Unlock()
+			delete(natGatewayClaimedLocations, locID)
+			delete(portClaimedLocations, locID)
+		})
+		t.Logf("findNATGatewayAndPortTestLocation: using location %d (%s) for NAT speed %d", locID, loc.Name, natSpeedMbps)
+		return locID, loc.Name
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps NAT Gateway + 1000 Mbps port capacity", natSpeedMbps)
 	return 0, ""
 }
 
@@ -810,7 +1090,7 @@ func pickCSPKey(t *testing.T, partner, connectType string) cspPickResult {
 	}
 
 	//nolint:gosec // weak random is fine for test key shuffling
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	shuffled := make([]string, len(keys))
 	copy(shuffled, keys)
 	r.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })

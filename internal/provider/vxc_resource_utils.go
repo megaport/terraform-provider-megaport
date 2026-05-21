@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -10,6 +12,42 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// resolvePrefixListID looks up a prefix filter list by description on the
+// supplied slice (typically returned by vrouterPrefixFilterListsForEndpoint).
+// It returns an error diagnostic if zero or more than one list matches —
+// matching by description is convenient but can otherwise silently drop a
+// whitelist/blacklist on typos or when descriptions are reused, leaving the
+// BGP session unfiltered without any signal to the user.
+func resolvePrefixListID(prefixFilterList []*megaport.PrefixFilterList, description, fieldName string) (int, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	matches := make([]*megaport.PrefixFilterList, 0, 1)
+	for _, pfl := range prefixFilterList {
+		if pfl.Description == description {
+			matches = append(matches, pfl)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0].Id, diags
+	case 0:
+		diags.AddError(
+			"Prefix filter list not found",
+			fmt.Sprintf("%s references prefix filter list %q, but no list with that description exists on the attached MCR or NAT Gateway. Prefix lists are resolved by description.", fieldName, description),
+		)
+		return 0, diags
+	default:
+		ids := make([]string, len(matches))
+		for i, m := range matches {
+			ids[i] = strconv.Itoa(m.Id)
+		}
+		diags.AddError(
+			"Ambiguous prefix filter list description",
+			fmt.Sprintf("%s references prefix filter list %q, but %d lists on the attached MCR or NAT Gateway share that description (IDs: %s). Prefix list descriptions must be unique for description-based lookup.", fieldName, description, len(matches), strings.Join(ids, ", ")),
+		)
+		return 0, diags
+	}
+}
 
 // fromAPIVXC updates the resource model from API response data.
 // The optional plan parameter allows preserving user-only fields (like requested_product_uid,
@@ -480,6 +518,18 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 		if !iface.IpMtu.IsNull() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
 		}
+		if !iface.Description.IsNull() {
+			toAppend.Description = iface.Description.ValueString()
+		}
+		if !iface.InterfaceType.IsNull() {
+			toAppend.InterfaceType = iface.InterfaceType.ValueString()
+		}
+		if !iface.PacketFilterIn.IsNull() {
+			toAppend.PacketFilterIn = megaport.PtrTo(iface.PacketFilterIn.ValueInt64())
+		}
+		if !iface.PacketFilterOut.IsNull() {
+			toAppend.PacketFilterOut = megaport.PtrTo(iface.PacketFilterOut.ValueInt64())
+		}
 		if !iface.IPAddresses.IsNull() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
@@ -540,32 +590,24 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportWhitelist.ValueString() {
-							bgpToAppend.ImportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ImportWhitelist = id
 				}
 				if !bgpConnection.ImportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportBlacklist.ValueString() {
-							bgpToAppend.ImportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ImportBlacklist = id
 				}
 				if !bgpConnection.ExportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportWhitelist.ValueString() {
-							bgpToAppend.ExportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ExportWhitelist = id
 				}
 				if !bgpConnection.ExportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportBlacklist.ValueString() {
-							bgpToAppend.ExportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ExportBlacklist = id
 				}
 				if !bgpConnection.PermitExportTo.IsNull() {
 					permitExportTo := []string{}
@@ -675,32 +717,24 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportWhitelist.ValueString() {
-							bgpToAppend.ImportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ImportWhitelist = id
 				}
 				if !bgpConnection.ImportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportBlacklist.ValueString() {
-							bgpToAppend.ImportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ImportBlacklist = id
 				}
 				if !bgpConnection.ExportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportWhitelist.ValueString() {
-							bgpToAppend.ExportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ExportWhitelist = id
 				}
 				if !bgpConnection.ExportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportBlacklist.ValueString() {
-							bgpToAppend.ExportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ExportBlacklist = id
 				}
 				if !bgpConnection.PermitExportTo.IsNull() {
 					permitExportTo := []string{}
