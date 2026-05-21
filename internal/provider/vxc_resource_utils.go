@@ -1012,10 +1012,9 @@ func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
 				"The Megaport platform rejected the local_asn update on VXC %s because the change "+
 					"would flip the BGP session from iBGP (matching local/peer ASN) to eBGP, or vice versa. "+
 					"NetAuto does not currently support that transition on an in-place VXC update. "+
-					"To change the ASN today, the VXC must be deleted and recreated, or both ends of an "+
-					"MCR-to-MCR VXC must move to a consistent ASN — which is itself blocked while VXCs "+
-					"are attached to the MCR. This is a platform-side constraint that the Terraform "+
-					"provider cannot work around. Original API error: %s",
+					"To change the ASN today, the VXC must be deleted and recreated. This is a "+
+					"platform-side constraint that the Terraform provider cannot work around. "+
+					"Original API error: %s",
 				vxcUID, msg,
 			)
 	}
