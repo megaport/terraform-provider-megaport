@@ -583,6 +583,8 @@ When Terraform deletes a Megaport resource, the provider issues an immediate can
 
 Delayed cancellation (cancel-at-end-of-term) is not supported by the provider. The previously available `cancel_at_end_of_term` provider option has been removed because the Megaport API no longer accepts delayed cancellation for Ports or LAG Ports.
 
+**Upgrade note:** If your existing Terraform configuration still sets `cancel_at_end_of_term` in the `provider "megaport"` block, Terraform will report it as an unsupported provider argument. Remove that setting before planning or applying with this version.
+
 ## Importing Existing Resources
 
 When importing existing Megaport resources into Terraform, you may notice that certain computed fields appear to change from "unknown" to their actual values on the first `terraform apply` after import. **This is expected behavior and not actual configuration drift.**

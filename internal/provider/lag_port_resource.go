@@ -649,7 +649,7 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Delete existing order. LAG ports only support immediate cancellation
 	// (CANCEL_NOW); delayed cancellation was removed in megaportgo and the
-	// API now rejects DeleteNow=false for ports.
+	// API now rejects DeleteNow=false for LAG ports.
 	err := retryTransientDelete(ctx, 3, func() error {
 		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
 			PortID:     state.UID.ValueString(),

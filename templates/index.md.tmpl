@@ -633,3 +633,5 @@ Example plan output:
 When Terraform deletes a Megaport resource, the provider issues an immediate cancellation or deletion request to the Megaport API. Resources are removed from Terraform state as soon as the API call returns successfully. For Ports and LAG Ports specifically, this is always a `CANCEL_NOW` action against the Megaport Products API.
 
 Delayed cancellation (cancel-at-end-of-term) is not supported by the provider. The previously available `cancel_at_end_of_term` provider option has been removed because the Megaport API no longer accepts delayed cancellation for Ports or LAG Ports.
+
+**Upgrade note:** If your existing Terraform configuration still sets `cancel_at_end_of_term` in the `provider "megaport"` block, Terraform will report it as an unsupported provider argument. Remove that setting before planning or applying with this version.
