@@ -43,3 +43,4 @@ website/vendor
 internal/provider/testdata/csp_credentials.json
 
 .claude
+terraform-provider-megaport
