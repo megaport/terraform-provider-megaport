@@ -993,3 +993,31 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 	}
 	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
 }
+
+// vxcLocalAsnIBGPEBGPSentinel is the substring NetAuto returns (verbatim,
+// surfaced through Megalith's NetAutoErrorDecoder) when an in-place VXC
+// update would flip a BGP session from iBGP to eBGP — i.e. the new local_asn
+// no longer matches the peer's ASN.
+const vxcLocalAsnIBGPEBGPSentinel = "localAsn may not change the neighbour relationship"
+
+// mapVXCUpdateError translates a megaportgo VXC update error into a Terraform
+// diagnostic (summary, detail). Known platform constraints get richer
+// provider-side guidance; unrecognised errors fall through to the historical
+// generic Update diagnostic so we don't hide novel failure modes from users.
+func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
+	msg := err.Error()
+	if strings.Contains(msg, vxcLocalAsnIBGPEBGPSentinel) {
+		return "Cannot change VXC BGP local_asn (iBGP/eBGP transition)",
+			fmt.Sprintf(
+				"The Megaport platform rejected the local_asn update on VXC %s because the change "+
+					"would flip the BGP session from iBGP (matching local/peer ASN) to eBGP, or vice versa. "+
+					"NetAuto does not currently support that transition on an in-place VXC update. "+
+					"To change the ASN today, the VXC must be deleted and recreated, or both ends of an "+
+					"MCR-to-MCR VXC must move to a consistent ASN — which is itself blocked while VXCs "+
+					"are attached to the MCR. This is a platform-side constraint that the Terraform "+
+					"provider cannot work around. Original API error: %s",
+				vxcUID, msg,
+			)
+	}
+	return "Error Updating VXC", fmt.Sprintf("Could not update VXC with ID %s: %s", vxcUID, msg)
+}
