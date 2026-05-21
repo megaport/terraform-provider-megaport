@@ -23,9 +23,11 @@ func TestPortDeleteAlwaysUsesCancelNow(t *testing.T) {
 
 	const portUID = "test-port-uid"
 
-	var receivedPath string
+	// Buffered channel synchronises the handler goroutine's write of the
+	// observed path with the test goroutine's read — safe under -race.
+	pathCh := make(chan string, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedPath = r.URL.Path
+		pathCh <- r.URL.Path
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"message":"ok","data":{}}`))
 	}))
@@ -46,6 +48,13 @@ func TestPortDeleteAlwaysUsesCancelNow(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("DeletePort returned error: %v", err)
+	}
+
+	var receivedPath string
+	select {
+	case receivedPath = <-pathCh:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("DeletePort handler was not invoked within timeout")
 	}
 
 	wantPath := "/v3/product/" + portUID + "/action/CANCEL_NOW"
