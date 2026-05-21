@@ -509,11 +509,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -551,10 +551,14 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
+- `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
@@ -576,11 +580,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -741,11 +745,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
@@ -783,10 +787,14 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
+- `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
@@ -808,11 +816,11 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
