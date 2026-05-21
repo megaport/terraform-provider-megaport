@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -40,11 +41,11 @@ type natGatewayPrefixListResource struct {
 }
 
 type natGatewayPrefixListResourceModel struct {
-	ID                  types.Int64  `tfsdk:"id"`
-	NATGatewayProductID types.String `tfsdk:"nat_gateway_product_uid"`
-	Description         types.String `tfsdk:"description"`
-	AddressFamily       types.String `tfsdk:"address_family"`
-	Entries             types.List   `tfsdk:"entries"`
+	ID                   types.Int64  `tfsdk:"id"`
+	NATGatewayProductUID types.String `tfsdk:"nat_gateway_product_uid"`
+	Description          types.String `tfsdk:"description"`
+	AddressFamily        types.String `tfsdk:"address_family"`
+	Entries              types.List   `tfsdk:"entries"`
 }
 
 type natGatewayPrefixListEntryModel struct {
@@ -120,15 +121,19 @@ func (r *natGatewayPrefixListResource) Schema(_ context.Context, _ resource.Sche
 							},
 						},
 						"ge": schema.Int64Attribute{
-							Description: "Minimum prefix length to be matched. 0–32 for IPv4, 0–128 for IPv6.",
+							Description: "Minimum prefix length to be matched. 0–32 for IPv4, 0–128 for IPv6. Omit or set to 0 to match the prefix's own length.",
 							Optional:    true,
+							Computed:    true,
+							Default:     int64default.StaticInt64(0),
 							Validators: []validator.Int64{
 								int64validator.Between(0, 128),
 							},
 						},
 						"le": schema.Int64Attribute{
-							Description: "Maximum prefix length to be matched. Must be greater than or equal to `ge`.",
+							Description: "Maximum prefix length to be matched. Must be greater than or equal to `ge`. Omit or set to 0 to match the prefix's own length.",
 							Optional:    true,
+							Computed:    true,
+							Default:     int64default.StaticInt64(0),
 							Validators: []validator.Int64{
 								int64validator.Between(0, 128),
 							},
@@ -168,7 +173,7 @@ func (r *natGatewayPrefixListResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	productUID := plan.NATGatewayProductID.ValueString()
+	productUID := plan.NATGatewayProductUID.ValueString()
 	created, err := r.client.NATGatewayService.CreateNATGatewayPrefixList(ctx, productUID, apiReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -192,7 +197,7 @@ func (r *natGatewayPrefixListResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 
 	pl, err := r.client.NATGatewayService.GetNATGatewayPrefixList(ctx, productUID, id)
@@ -233,7 +238,7 @@ func (r *natGatewayPrefixListResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 	updated, err := r.client.NATGatewayService.UpdateNATGatewayPrefixList(ctx, productUID, id, apiReq)
 	if err != nil {
@@ -258,7 +263,7 @@ func (r *natGatewayPrefixListResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 
 	// A VXC delete upstream in the same apply only detaches its BGP
@@ -349,8 +354,8 @@ func (m *natGatewayPrefixListResourceModel) fromAPI(ctx context.Context, pl *meg
 		em := &natGatewayPrefixListEntryModel{
 			Action: types.StringValue(e.Action),
 			Prefix: types.StringValue(e.Prefix),
-			Ge:     int64OrNull(e.Ge),
-			Le:     int64OrNull(e.Le),
+			Ge:     types.Int64Value(int64(e.Ge)),
+			Le:     types.Int64Value(int64(e.Le)),
 		}
 		obj, d := types.ObjectValueFrom(ctx, natGatewayPrefixListEntryAttrs, em)
 		diags.Append(d...)

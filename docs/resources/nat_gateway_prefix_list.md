@@ -36,5 +36,5 @@ Required:
 
 Optional:
 
-- `ge` (Number) Minimum prefix length to be matched. 0–32 for IPv4, 0–128 for IPv6.
-- `le` (Number) Maximum prefix length to be matched. Must be greater than or equal to `ge`.
+- `ge` (Number) Minimum prefix length to be matched. 0–32 for IPv4, 0–128 for IPv6. Omit or set to 0 to match the prefix's own length.
+- `le` (Number) Maximum prefix length to be matched. Must be greater than or equal to `ge`. Omit or set to 0 to match the prefix's own length.

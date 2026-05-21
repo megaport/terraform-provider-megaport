@@ -43,10 +43,10 @@ type natGatewayPacketFilterResource struct {
 
 // natGatewayPacketFilterResourceModel maps the resource schema data.
 type natGatewayPacketFilterResourceModel struct {
-	ID                  types.Int64  `tfsdk:"id"`
-	NATGatewayProductID types.String `tfsdk:"nat_gateway_product_uid"`
-	Description         types.String `tfsdk:"description"`
-	Entries             types.List   `tfsdk:"entries"`
+	ID                   types.Int64  `tfsdk:"id"`
+	NATGatewayProductUID types.String `tfsdk:"nat_gateway_product_uid"`
+	Description          types.String `tfsdk:"description"`
+	Entries              types.List   `tfsdk:"entries"`
 }
 
 // natGatewayPacketFilterEntryModel maps a single entry.
@@ -176,7 +176,7 @@ func (r *natGatewayPacketFilterResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	productUID := plan.NATGatewayProductID.ValueString()
+	productUID := plan.NATGatewayProductUID.ValueString()
 	created, err := r.client.NATGatewayService.CreateNATGatewayPacketFilter(ctx, productUID, apiReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -201,7 +201,7 @@ func (r *natGatewayPacketFilterResource) Read(ctx context.Context, req resource.
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 
 	pf, err := r.client.NATGatewayService.GetNATGatewayPacketFilter(ctx, productUID, id)
@@ -242,7 +242,7 @@ func (r *natGatewayPacketFilterResource) Update(ctx context.Context, req resourc
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 	updated, err := r.client.NATGatewayService.UpdateNATGatewayPacketFilter(ctx, productUID, id, apiReq)
 	if err != nil {
@@ -267,7 +267,7 @@ func (r *natGatewayPacketFilterResource) Delete(ctx context.Context, req resourc
 		return
 	}
 
-	productUID := state.NATGatewayProductID.ValueString()
+	productUID := state.NATGatewayProductUID.ValueString()
 	id := int(state.ID.ValueInt64())
 
 	// A VXC delete upstream in the same apply only detaches packet-filter
@@ -384,14 +384,6 @@ func stringOrNull(s string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(s)
-}
-
-// int64OrNull returns a null types.Int64 for the zero value.
-func int64OrNull(i int) types.Int64 {
-	if i == 0 {
-		return types.Int64Null()
-	}
-	return types.Int64Value(int64(i))
 }
 
 // parsePackedImportID parses a colon-separated import ID of the form
