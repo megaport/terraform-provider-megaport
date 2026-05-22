@@ -99,7 +99,7 @@ func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkIn
 // vnicCountChanged forces replacement when the number of vNICs changes between
 // state and plan. Description-only edits are sent through Update; the API does
 // not support changing the vNIC count after provisioning.
-func vnicCountChanged(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+func vnicCountChanged(_ context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
 	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
 		return
 	}
