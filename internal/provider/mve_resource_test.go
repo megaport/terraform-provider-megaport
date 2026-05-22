@@ -15,7 +15,7 @@ const (
 func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVETestLocation(t, 2)
+	locationID, _ := findMVETestLocation(t, 4)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	mveNameNew := RandomTestName()
@@ -208,7 +208,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVETestLocation(t, 2)
+	locationID, _ := findMVETestLocation(t, 4)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	costCentreName := RandomTestName()
@@ -313,7 +313,7 @@ func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
 func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVETestLocation(t, 2)
+	locationID, _ := findMVETestLocation(t, 4)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	initialPromo := testPromoCode()
@@ -386,7 +386,7 @@ func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
 func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVETestLocation(t, 2)
+	locationID, _ := findMVETestLocation(t, 4)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	resource.Test(t, resource.TestCase{
