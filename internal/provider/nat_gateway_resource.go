@@ -577,7 +577,11 @@ func (r *natGatewayResource) ImportState(ctx context.Context, req resource.Impor
 // consulting the live NAT Gateway availability matrix through the optional
 // NATGatewayMatrixValidator interface on the SDK service. Fail-open if the
 // SDK is too old to advertise the interface, the provider isn't configured
-// (e.g. terraform validate), or either value is unknown/null.
+// (e.g. terraform validate), or either value is unknown/null. Operational
+// failures from the matrix lookup (transport, auth, 5xx) are surfaced as a
+// warning rather than an error — apply will still catch invalid
+// combinations server-side, so a transient lookup failure should not block
+// terraform plan.
 func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
@@ -610,6 +614,14 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 		return
 	}
 
+	if !isNATGatewayMatrixValidationError(err) {
+		resp.Diagnostics.AddWarning(
+			"Could not validate NAT Gateway speed / session count at plan time",
+			fmt.Sprintf("The availability matrix lookup failed: %v. Invalid combinations will still be rejected at apply.", err),
+		)
+		return
+	}
+
 	attrPath := path.Root("speed")
 	switch {
 	case errors.Is(err, megaport.ErrNATGatewaySessionCountRequired),
@@ -622,4 +634,15 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 		"Invalid NAT Gateway speed / session count combination",
 		err.Error(),
 	)
+}
+
+// isNATGatewayMatrixValidationError reports whether err is one of the
+// matrix validator's known validation sentinels (as opposed to a transport
+// or API failure). Used by ModifyPlan to decide between attribute error
+// (real validation failure) and warning (lookup failure).
+func isNATGatewayMatrixValidationError(err error) bool {
+	return errors.Is(err, megaport.ErrNATGatewaySpeedRequired) ||
+		errors.Is(err, megaport.ErrNATGatewaySessionCountRequired) ||
+		errors.Is(err, megaport.ErrNATGatewaySpeedNotSupported) ||
+		errors.Is(err, megaport.ErrNATGatewaySessionCountNotSupported)
 }
