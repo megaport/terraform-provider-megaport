@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -569,4 +570,55 @@ func (r *natGatewayResource) Configure(_ context.Context, req resource.Configure
 
 func (r *natGatewayResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// ModifyPlan rejects invalid speed/session_count combinations at plan time by
+// consulting the live NAT Gateway availability matrix through the optional
+// NATGatewayMatrixValidator interface on the SDK service. Fail-open if the
+// SDK is too old to advertise the interface, the provider isn't configured
+// (e.g. terraform validate), or either value is unknown/null.
+func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan natGatewayResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Speed.IsUnknown() || plan.Speed.IsNull() {
+		return
+	}
+	if plan.SessionCount.IsUnknown() || plan.SessionCount.IsNull() {
+		return
+	}
+	if r.client == nil {
+		return
+	}
+	v, ok := r.client.NATGatewayService.(megaport.NATGatewayMatrixValidator)
+	if !ok {
+		return
+	}
+
+	speed := int(plan.Speed.ValueInt64())
+	sessionCount := int(plan.SessionCount.ValueInt64())
+
+	err := v.ValidateNATGatewaySpeedSession(ctx, speed, sessionCount)
+	if err == nil {
+		return
+	}
+
+	attrPath := path.Root("speed")
+	switch {
+	case errors.Is(err, megaport.ErrNATGatewaySessionCountRequired),
+		errors.Is(err, megaport.ErrNATGatewaySessionCountNotSupported):
+		attrPath = path.Root("session_count")
+	}
+
+	resp.Diagnostics.AddAttributeError(
+		attrPath,
+		"Invalid NAT Gateway speed / session count combination",
+		err.Error(),
+	)
 }

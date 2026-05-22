@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -224,6 +225,53 @@ resource "megaport_nat_gateway" "test" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckNoResourceAttr(resourceName, "promo_code"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed asserts that the
+// resource's ModifyPlan hook rejects a known-invalid speed during
+// terraform plan, before any provisioning occurs. 500 Mbps is not in the
+// NAT Gateway availability matrix, so the validator should surface
+// ErrNATGatewaySpeedNotSupported as an attribute diagnostic.
+func TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	// Pick any valid speed just to find a location; the actual plan config
+	// below uses an invalid 500 Mbps speed that the matrix won't accept.
+	probeSpeed, sessionCount, err := getNATGatewayTestConfig()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
+	}
+	locationID, _ := findNATGatewayTestLocation(t, probeSpeed)
+	natGWName := RandomTestName()
+
+	const invalidSpeed = 500
+	config := providerConfig + fmt.Sprintf(`
+data "megaport_location" "test_location" {
+    id = %d
+}
+
+resource "megaport_nat_gateway" "test" {
+    product_name         = "%s"
+    location_id          = data.megaport_location.test_location.id
+    speed                = %d
+    session_count        = %d
+    contract_term_months = 1
+    diversity_zone       = "red"
+    asn                  = 64512
+}
+`, locationID, natGWName, invalidSpeed, sessionCount)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?i)not supported`),
 			},
 		},
 	})
