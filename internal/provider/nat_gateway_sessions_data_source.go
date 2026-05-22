@@ -111,6 +111,14 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 		entryObjects = append(entryObjects, obj)
 	}
 
+	if len(entryObjects) == 0 {
+		resp.Diagnostics.AddError(
+			"No NAT Gateway Sessions Found",
+			"The Megaport API returned no valid NAT Gateway speed / session-count pairings. This usually indicates an API or environment issue.",
+		)
+		return
+	}
+
 	sessionsList, sessionsDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: natGatewaySessionEntryAttrs}, entryObjects)
 	resp.Diagnostics.Append(sessionsDiags...)
 	if resp.Diagnostics.HasError() {
