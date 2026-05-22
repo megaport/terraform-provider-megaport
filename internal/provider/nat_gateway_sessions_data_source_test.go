@@ -29,6 +29,16 @@ data "megaport_nat_gateway_sessions" "this" {}
 							return nil
 						},
 					),
+					resource.TestCheckResourceAttrWith(
+						"data.megaport_nat_gateway_sessions.this",
+						"sessions.0.session_count.#",
+						func(v string) error {
+							if v == "0" {
+								return fmt.Errorf("expected first session to have non-empty session_count, got 0 entries")
+							}
+							return nil
+						},
+					),
 				),
 			},
 		},
