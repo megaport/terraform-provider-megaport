@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -14,6 +15,11 @@ import (
 var (
 	_ datasource.DataSource              = &natGatewaySessionsDataSource{}
 	_ datasource.DataSourceWithConfigure = &natGatewaySessionsDataSource{}
+
+	natGatewaySessionEntryAttrs = map[string]attr.Type{
+		"speed_mbps":    types.Int64Type,
+		"session_count": types.ListType{ElemType: types.Int64Type},
+	}
 )
 
 // natGatewaySessionsDataSource is the data source implementation.
@@ -23,7 +29,7 @@ type natGatewaySessionsDataSource struct {
 
 // natGatewaySessionsDataSourceModel maps the data source schema data.
 type natGatewaySessionsDataSourceModel struct {
-	Sessions []natGatewaySessionEntryModel `tfsdk:"sessions"`
+	Sessions types.List `tfsdk:"sessions"`
 }
 
 // natGatewaySessionEntryModel maps a single speed / session-count entry.
@@ -79,9 +85,7 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 		return
 	}
 
-	state := natGatewaySessionsDataSourceModel{
-		Sessions: make([]natGatewaySessionEntryModel, 0, len(sessions)),
-	}
+	entryObjects := make([]types.Object, 0, len(sessions))
 	for _, s := range sessions {
 		if s == nil || len(s.SessionCount) == 0 {
 			continue
@@ -95,12 +99,25 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		state.Sessions = append(state.Sessions, natGatewaySessionEntryModel{
+		entry := natGatewaySessionEntryModel{
 			SpeedMbps:    types.Int64Value(int64(s.SpeedMbps)),
 			SessionCount: countList,
-		})
+		}
+		obj, objDiags := types.ObjectValueFrom(ctx, natGatewaySessionEntryAttrs, &entry)
+		resp.Diagnostics.Append(objDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		entryObjects = append(entryObjects, obj)
 	}
 
+	sessionsList, sessionsDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: natGatewaySessionEntryAttrs}, entryObjects)
+	resp.Diagnostics.Append(sessionsDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	state := natGatewaySessionsDataSourceModel{Sessions: sessionsList}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
