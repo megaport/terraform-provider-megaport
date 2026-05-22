@@ -35,6 +35,40 @@ func getNATGatewayTestConfig() (speed, sessionCount int, err error) {
 	return 0, 0, fmt.Errorf("no NAT Gateway session/speed pairs available")
 }
 
+// findInvalidNATGatewaySpeed derives a speed guaranteed not to be in the
+// live NAT Gateway availability matrix by returning max(SpeedMbps)+1. It
+// also returns a sample session count from the matrix so the HCL parses
+// — the validator rejects on speed before checking session count anyway.
+// Deriving the value dynamically keeps the test stable as the matrix
+// evolves; a hard-coded "500 Mbps is invalid" would silently break the
+// day 500 Mbps is added.
+func findInvalidNATGatewaySpeed() (invalidSpeed, sessionCount int, err error) {
+	client, err := getTestClient()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to create test client: %w", err)
+	}
+	sessions, err := client.NATGatewayService.ListNATGatewaySessions(context.Background())
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
+	}
+	maxSpeed := 0
+	for _, s := range sessions {
+		if s == nil || s.SpeedMbps <= 0 {
+			continue
+		}
+		if s.SpeedMbps > maxSpeed {
+			maxSpeed = s.SpeedMbps
+			if len(s.SessionCount) > 0 {
+				sessionCount = s.SessionCount[0]
+			}
+		}
+	}
+	if maxSpeed == 0 {
+		return 0, 0, fmt.Errorf("no positive NAT Gateway speeds advertised")
+	}
+	return maxSpeed + 1, sessionCount, nil
+}
+
 // checkNATGatewayProvisioned asserts the resource's provisioning_status is
 // one of the ready states (CONFIGURED or LIVE), confirming the validate/buy
 // flow ran and the service was actually purchased.
@@ -231,24 +265,24 @@ resource "megaport_nat_gateway" "test" {
 }
 
 // TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed asserts that the
-// resource's ModifyPlan hook rejects a known-invalid speed during
-// terraform plan, before any provisioning occurs. 500 Mbps is not in the
-// NAT Gateway availability matrix, so the validator should surface
-// ErrNATGatewaySpeedNotSupported as an attribute diagnostic.
+// resource's ModifyPlan hook rejects an invalid speed during terraform
+// plan, before any provisioning occurs. The invalid speed is derived from
+// the live availability matrix (max advertised speed + 1 Mbps) so the
+// test stays accurate as the matrix evolves.
 func TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 
-	// Pick any valid speed just to find a location; the actual plan config
-	// below uses an invalid 500 Mbps speed that the matrix won't accept.
-	probeSpeed, sessionCount, err := getNATGatewayTestConfig()
+	invalidSpeed, sessionCount, err := findInvalidNATGatewaySpeed()
 	if err != nil {
 		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
 	}
-	locationID, _ := findNATGatewayTestLocation(t, probeSpeed)
+	// Find a location that supports the highest advertised speed (one less
+	// than invalidSpeed). The location is needed for the HCL to parse; the
+	// plan-only step never reaches provisioning.
+	locationID, _ := findNATGatewayTestLocation(t, invalidSpeed-1)
 	natGWName := RandomTestName()
 
-	const invalidSpeed = 500
 	config := providerConfig + fmt.Sprintf(`
 data "megaport_location" "test_location" {
     id = %d

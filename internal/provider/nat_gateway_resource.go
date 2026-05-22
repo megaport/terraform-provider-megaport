@@ -30,6 +30,7 @@ var (
 	_ resource.Resource                = &natGatewayResource{}
 	_ resource.ResourceWithConfigure   = &natGatewayResource{}
 	_ resource.ResourceWithImportState = &natGatewayResource{}
+	_ resource.ResourceWithModifyPlan  = &natGatewayResource{}
 )
 
 // natGatewayResourceModel maps the resource schema data.
