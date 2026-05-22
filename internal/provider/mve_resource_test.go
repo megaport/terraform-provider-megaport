@@ -484,7 +484,9 @@ func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVETestLocation(t, 2)
+	// Probe with 3 vNICs — the final step replaces the MVE with three vNICs,
+	// so the location must validate for the maximum count the test exercises.
+	locationID, _ := findMVETestLocation(t, 3)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 
