@@ -83,7 +83,7 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 		Sessions: make([]natGatewaySessionEntryModel, 0, len(sessions)),
 	}
 	for _, s := range sessions {
-		if s == nil {
+		if s == nil || len(s.SessionCount) == 0 {
 			continue
 		}
 		counts := make([]types.Int64, 0, len(s.SessionCount))
