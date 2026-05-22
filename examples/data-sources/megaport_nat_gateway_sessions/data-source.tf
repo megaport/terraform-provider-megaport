@@ -7,7 +7,7 @@ output "nat_gateway_sessions" {
   description = "Map of NAT Gateway speed (Mbps) to permitted session counts"
   value = {
     for entry in data.megaport_nat_gateway_sessions.available.sessions :
-    entry.speed_mbps => entry.session_count
+    tostring(entry.speed_mbps) => entry.session_count
   }
 }
 
