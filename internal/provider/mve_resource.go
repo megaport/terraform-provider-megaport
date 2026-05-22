@@ -96,6 +96,21 @@ func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkIn
 	}
 }
 
+// vnicCountChanged forces replacement when the number of vNICs changes between
+// state and plan. Description-only edits are sent through Update; the API does
+// not support changing the vNIC count after provisioning.
+func vnicCountChanged(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if len(req.StateValue.Elements()) != len(req.PlanValue.Elements()) {
+		resp.RequiresReplace = true
+	}
+}
+
 // vendorConfigModel represents the vendor configuration for an MVE.
 type vendorConfigModel struct {
 	Vendor             types.String `tfsdk:"vendor"`
@@ -562,7 +577,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vnics": schema.ListNestedAttribute{
-				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others.",
+				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. vNIC descriptions can be updated in place; adding or removing vNICs forces the MVE to be replaced because the API does not allow changing the vNIC count after provisioning.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
@@ -582,7 +597,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
-					listplanmodifier.RequiresReplace(),
+					listplanmodifier.RequiresReplaceIf(
+						vnicCountChanged,
+						"Adding or removing vNICs requires replacing the MVE.",
+						"Adding or removing vNICs requires replacing the MVE.",
+					),
 				},
 			},
 			"resource_tags": schema.MapAttribute{
@@ -923,14 +942,33 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		contractTermMonths = &months
 	}
 
-	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
+	modifyReq := &megaport.ModifyMVERequest{
 		MVEID:              state.UID.ValueString(),
 		Name:               name,
 		CostCentre:         costCentre,
 		ContractTermMonths: contractTermMonths,
 		WaitForUpdate:      true,
 		WaitForTime:        waitForTime,
-	})
+	}
+
+	// Forward vNIC description changes. The schema's RequiresReplaceIf
+	// guarantees plan and state have the same vNIC count by the time Update
+	// runs, so any inequality here is a description edit.
+	if !plan.NetworkInterfaces.Equal(state.NetworkInterfaces) {
+		planVnics := []*mveNetworkInterfaceModel{}
+		vnicDiags := plan.NetworkInterfaces.ElementsAs(ctx, &planVnics, false)
+		resp.Diagnostics.Append(vnicDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		vnicUpdates := make([]megaport.MVEVnicUpdate, len(planVnics))
+		for i, v := range planVnics {
+			vnicUpdates[i] = megaport.MVEVnicUpdate{Description: v.Description.ValueString()}
+		}
+		modifyReq.Vnics = vnicUpdates
+	}
+
+	_, err := r.client.MVEService.ModifyMVE(ctx, modifyReq)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
