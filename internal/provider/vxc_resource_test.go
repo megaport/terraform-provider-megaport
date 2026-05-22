@@ -2105,7 +2105,8 @@ func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 2)
+	// MVE config below uses 3 vNICs — probe must match.
+	mveLocID, _ := findMVETestLocation(t, 3)
 	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
 	locs := []int{mveLocID, transitLocs[0]}
 	portName := RandomTestName()
@@ -2219,7 +2220,8 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// loc1 hosts the MVE (needs MVE capacity); loc2 needs both AWS and TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 2)
+	// MVE config below uses 3 vNICs — probe must match.
+	mveLocID, _ := findMVETestLocation(t, 3)
 	partnerLocs := findVXCPortTestLocationsWithPartners(t, 1, "AWS", "TRANSIT")
 	locs := []int{mveLocID, partnerLocs[0]}
 	portName := RandomTestName()
@@ -4222,7 +4224,8 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortTestLocations(t, 1)
-	mveLocationID, _ := findMVETestLocation(t, 2)
+	// MVE config below uses 3 vNICs — probe must match.
+	mveLocationID, _ := findMVETestLocation(t, 3)
 	portName := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
