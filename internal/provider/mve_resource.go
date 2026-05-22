@@ -951,10 +951,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		WaitForTime:        waitForTime,
 	}
 
-	// Forward vNIC description changes. The schema's RequiresReplaceIf
-	// guarantees plan and state have the same vNIC count by the time Update
-	// runs, so any inequality here is a description edit.
-	if !plan.NetworkInterfaces.Equal(state.NetworkInterfaces) {
+	// Forward vNIC description changes. vnics is Optional+Computed, so the
+	// planned value can be null or unknown — treat those as "no vNIC update".
+	// Element-count changes are handled by the schema's RequiresReplaceIf, so
+	// a mismatch here would mean Update was reached in an unexpected state;
+	// skip rather than push a count-changing payload to the API.
+	if !plan.NetworkInterfaces.IsNull() && !plan.NetworkInterfaces.IsUnknown() &&
+		!plan.NetworkInterfaces.Equal(state.NetworkInterfaces) &&
+		len(plan.NetworkInterfaces.Elements()) == len(state.NetworkInterfaces.Elements()) {
 		planVnics := []*mveNetworkInterfaceModel{}
 		vnicDiags := plan.NetworkInterfaces.ElementsAs(ctx, &planVnics, false)
 		resp.Diagnostics.Append(vnicDiags...)

@@ -477,6 +477,125 @@ func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 	})
 }
 
+// TestAccMegaportMVEAruba_VnicDescriptionUpdate exercises ESD-1201:
+// editing only vnics[*].description must update the MVE in place
+// (product_uid preserved), while changing the vNIC count still forces
+// replacement (product_uid changes).
+func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+
+	configWithVnics := func(vnics string) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "test_location" {
+				id = %d
+			}
+			data "megaport_mve_images" "aruba" {
+				vendor_filter = "Aruba"
+				id_filter = %d
+			}
+			resource "megaport_mve" "mve" {
+				product_name = "%s"
+				location_id = data.megaport_location.test_location.id
+				contract_term_months = 12
+				diversity_zone = "red"
+				vendor_config = {
+					vendor = "aruba"
+					product_size = "SMALL"
+					mve_label = "MVE 2/8"
+					image_id = data.megaport_mve_images.aruba.mve_images.0.id
+					account_name = "%s"
+					account_key = "%s"
+					system_tag = "Preconfiguration-aruba-test-1"
+				}
+				vnics = %s
+			}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey, vnics)
+	}
+
+	twoVnics := `[
+		{ description = "Data Plane" },
+		{ description = "Control Plane" }
+	]`
+	twoVnicsRenamed := `[
+		{ description = "Data Plane Renamed" },
+		{ description = "Control Plane Renamed" }
+	]`
+	threeVnics := `[
+		{ description = "Data Plane Renamed" },
+		{ description = "Control Plane Renamed" },
+		{ description = "Management Plane" }
+	]`
+
+	var originalUID, postRenameUID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithVnics(twoVnics),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.0.description", "Data Plane"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.1.description", "Control Plane"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					waitForProvisioningStatus("megaport_mve.mve"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
+						if !ok {
+							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						originalUID = rs.Primary.Attributes["product_uid"]
+						return nil
+					},
+				),
+			},
+			// Rename both vNIC descriptions — must NOT replace.
+			{
+				Config: configWithVnics(twoVnicsRenamed),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.0.description", "Data Plane Renamed"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.1.description", "Control Plane Renamed"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
+						if !ok {
+							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						postRenameUID = rs.Primary.Attributes["product_uid"]
+						if postRenameUID != originalUID {
+							return fmt.Errorf("MVE was replaced (product_uid changed) when only vNIC descriptions changed; want in-place update. before=%s after=%s", originalUID, postRenameUID)
+						}
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after the in-place update.
+			{
+				Config:   configWithVnics(twoVnicsRenamed),
+				PlanOnly: true,
+			},
+			// Add a vNIC — must force replacement (product_uid changes).
+			{
+				Config: configWithVnics(threeVnics),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.#", "3"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
+						if !ok {
+							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						if rs.Primary.Attributes["product_uid"] == postRenameUID {
+							return fmt.Errorf("MVE was updated in place when vNIC count changed; want replacement. product_uid unchanged=%s", postRenameUID)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
 func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
