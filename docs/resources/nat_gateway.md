@@ -15,12 +15,11 @@ NAT Gateway Resource for the Megaport Terraform Provider. This can be used to cr
 ```terraform
 resource "megaport_nat_gateway" "example" {
   product_name         = "Megaport NAT Gateway Example"
-  location_id          = 6
+  location_id          = 5
   speed                = 1000
-  session_count        = 32768
+  session_count        = 250000
   contract_term_months = 1
   diversity_zone       = "red"
-  asn                  = 64512
 
   resource_tags = {
     environment = "production"
