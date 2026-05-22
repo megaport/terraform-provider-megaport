@@ -578,10 +578,11 @@ func (r *natGatewayResource) ImportState(ctx context.Context, req resource.Impor
 // NATGatewayMatrixValidator interface on the SDK service. Fail-open if the
 // SDK is too old to advertise the interface, the provider isn't configured
 // (e.g. terraform validate), or either value is unknown/null. Validation
-// only runs on create or when speed/session_count are actually changing; a
-// no-op plan against an already-provisioned NAT gateway must not start
-// failing just because the matrix has dropped a previously valid pair.
-// Operational failures from the matrix lookup (transport, auth, 5xx) are
+// runs on create, on any plan that changes speed or session_count, and on
+// replacements (a change to a RequiresReplace attribute is a fresh
+// provision); pure in-place no-ops with both values unchanged are skipped
+// so a shifting matrix can't fail plan against an already-provisioned NAT
+// gateway. Operational failures from the matrix lookup (transport, auth, 5xx) are
 // surfaced as a warning rather than an error so a transient lookup failure
 // doesn't block terraform plan.
 func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -607,7 +608,14 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		if plan.Speed.Equal(state.Speed) && plan.SessionCount.Equal(state.SessionCount) {
+		// A change to any RequiresReplace attribute means the resource will
+		// be destroyed and recreated — effectively a new provision — so the
+		// new instance must still go through matrix validation even if
+		// speed/session_count match prior state. Keep this list in sync
+		// with the RequiresReplace plan modifiers in Schema.
+		requiresReplace := !plan.LocationID.Equal(state.LocationID) ||
+			!plan.PromoCode.Equal(state.PromoCode)
+		if !requiresReplace && plan.Speed.Equal(state.Speed) && plan.SessionCount.Equal(state.SessionCount) {
 			return
 		}
 	}
