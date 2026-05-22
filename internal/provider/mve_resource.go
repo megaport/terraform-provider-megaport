@@ -577,7 +577,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vnics": schema.ListNestedAttribute{
-				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each supplied vNIC must include a description. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. vNIC descriptions can be updated in place; adding or removing vNICs forces the MVE to be replaced because the API does not allow changing the vNIC count after provisioning.",
+				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each supplied vNIC must include a description. The maximum number of vNICs allowed is 5. If the list is omitted or set to null, it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. vNIC descriptions can be updated in place; adding or removing vNICs forces the MVE to be replaced because the API does not allow changing the vNIC count after provisioning.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
