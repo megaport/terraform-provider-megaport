@@ -28,8 +28,8 @@ type natGatewaySessionsDataSourceModel struct {
 
 // natGatewaySessionEntryModel maps a single speed / session-count entry.
 type natGatewaySessionEntryModel struct {
-	SpeedMbps    types.Int64   `tfsdk:"speed_mbps"`
-	SessionCount []types.Int64 `tfsdk:"session_count"`
+	SpeedMbps    types.Int64 `tfsdk:"speed_mbps"`
+	SessionCount types.List  `tfsdk:"session_count"`
 }
 
 // NewNATGatewaySessionsDataSource is a helper function to simplify the provider implementation.
@@ -86,13 +86,18 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 		if s == nil || len(s.SessionCount) == 0 {
 			continue
 		}
-		counts := make([]types.Int64, 0, len(s.SessionCount))
+		counts := make([]int64, 0, len(s.SessionCount))
 		for _, c := range s.SessionCount {
-			counts = append(counts, types.Int64Value(int64(c)))
+			counts = append(counts, int64(c))
+		}
+		countList, listDiags := types.ListValueFrom(ctx, types.Int64Type, counts)
+		resp.Diagnostics.Append(listDiags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
 		state.Sessions = append(state.Sessions, natGatewaySessionEntryModel{
 			SpeedMbps:    types.Int64Value(int64(s.SpeedMbps)),
-			SessionCount: counts,
+			SessionCount: countList,
 		})
 	}
 
