@@ -288,6 +288,28 @@ func TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
 	}
+
+	// Preflight the validator the provider's ModifyPlan will use, so we
+	// only assert on the validation outcome when the matrix lookup is
+	// actually working. The provider downgrades operational lookup
+	// failures (transport, auth, 5xx) to a warning, which would leave the
+	// PlanOnly step with no error to match. Skip in that case instead of
+	// flaking.
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
+	}
+	v, ok := client.NATGatewayService.(megaport.NATGatewayMatrixValidator)
+	if !ok {
+		t.Skip("Skipping NAT Gateway plan-time validation test: SDK does not advertise NATGatewayMatrixValidator")
+	}
+	preflightErr := v.ValidateNATGatewaySpeedSession(context.Background(), invalidSpeed, sessionCount)
+	switch {
+	case preflightErr == nil:
+		t.Skipf("Skipping NAT Gateway plan-time validation test: derived invalid speed %d Mbps was accepted by the validator (matrix may have changed)", invalidSpeed)
+	case !isNATGatewayMatrixValidationError(preflightErr):
+		t.Skipf("Skipping NAT Gateway plan-time validation test: matrix lookup failed operationally: %v", preflightErr)
+	}
 	// Find a location that supports the highest advertised speed (one less
 	// than invalidSpeed). The location is needed for the HCL to parse; the
 	// plan-only step never reaches provisioning.

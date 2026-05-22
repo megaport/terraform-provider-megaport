@@ -577,11 +577,13 @@ func (r *natGatewayResource) ImportState(ctx context.Context, req resource.Impor
 // consulting the live NAT Gateway availability matrix through the optional
 // NATGatewayMatrixValidator interface on the SDK service. Fail-open if the
 // SDK is too old to advertise the interface, the provider isn't configured
-// (e.g. terraform validate), or either value is unknown/null. Operational
-// failures from the matrix lookup (transport, auth, 5xx) are surfaced as a
-// warning rather than an error — apply will still catch invalid
-// combinations server-side, so a transient lookup failure should not block
-// terraform plan.
+// (e.g. terraform validate), or either value is unknown/null. Validation
+// only runs on create or when speed/session_count are actually changing; a
+// no-op plan against an already-provisioned NAT gateway must not start
+// failing just because the matrix has dropped a previously valid pair.
+// Operational failures from the matrix lookup (transport, auth, 5xx) are
+// surfaced as a warning rather than an error so a transient lookup failure
+// doesn't block terraform plan.
 func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
@@ -598,6 +600,18 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 	if plan.SessionCount.IsUnknown() || plan.SessionCount.IsNull() {
 		return
 	}
+
+	if !req.State.Raw.IsNull() {
+		var state natGatewayResourceModel
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if plan.Speed.Equal(state.Speed) && plan.SessionCount.Equal(state.SessionCount) {
+			return
+		}
+	}
+
 	if r.client == nil {
 		return
 	}
@@ -617,7 +631,7 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 	if !isNATGatewayMatrixValidationError(err) {
 		resp.Diagnostics.AddWarning(
 			"Could not validate NAT Gateway speed / session count at plan time",
-			fmt.Sprintf("The availability matrix lookup failed: %v. Invalid combinations will still be rejected at apply.", err),
+			fmt.Sprintf("Plan-time validation was skipped because the availability matrix lookup failed: %v. Apply will still reject invalid combinations server-side, and may surface the same lookup error if it persists.", err),
 		)
 		return
 	}
