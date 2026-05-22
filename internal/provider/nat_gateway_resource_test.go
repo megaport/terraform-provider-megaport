@@ -37,9 +37,12 @@ func getNATGatewayTestConfig() (speed, sessionCount int, err error) {
 
 // findInvalidNATGatewaySpeed derives a speed guaranteed not to be in the
 // live NAT Gateway availability matrix by returning max(SpeedMbps)+1. It
-// also returns a sample session count from the matrix so the HCL parses
-// — the validator rejects on speed before checking session count anyway.
-// Deriving the value dynamically keeps the test stable as the matrix
+// also returns any positive session count from the matrix so the HCL
+// parses and the validator's session-count pre-check passes (the test
+// targets the speed sentinel, not the session-count sentinel). The two
+// selections are independent: if the highest-speed entry has no
+// SessionCount values, we still pick a session count from another entry.
+// Deriving both values dynamically keeps the test stable as the matrix
 // evolves; a hard-coded "500 Mbps is invalid" would silently break the
 // day 500 Mbps is added.
 func findInvalidNATGatewaySpeed() (invalidSpeed, sessionCount int, err error) {
@@ -53,18 +56,26 @@ func findInvalidNATGatewaySpeed() (invalidSpeed, sessionCount int, err error) {
 	}
 	maxSpeed := 0
 	for _, s := range sessions {
-		if s == nil || s.SpeedMbps <= 0 {
+		if s == nil {
 			continue
 		}
 		if s.SpeedMbps > maxSpeed {
 			maxSpeed = s.SpeedMbps
-			if len(s.SessionCount) > 0 {
-				sessionCount = s.SessionCount[0]
+		}
+		if sessionCount == 0 {
+			for _, c := range s.SessionCount {
+				if c > 0 {
+					sessionCount = c
+					break
+				}
 			}
 		}
 	}
-	if maxSpeed == 0 {
+	if maxSpeed <= 0 {
 		return 0, 0, fmt.Errorf("no positive NAT Gateway speeds advertised")
+	}
+	if sessionCount <= 0 {
+		return 0, 0, fmt.Errorf("no positive session count advertised in NAT Gateway matrix")
 	}
 	return maxSpeed + 1, sessionCount, nil
 }
@@ -305,7 +316,7 @@ resource "megaport_nat_gateway" "test" {
 			{
 				Config:      config,
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`(?i)not supported`),
+				ExpectError: regexp.MustCompile(`Invalid NAT Gateway speed / session count combination`),
 			},
 		},
 	})
