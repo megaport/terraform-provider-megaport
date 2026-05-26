@@ -56,8 +56,23 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
+
+  # Optional. Minutes to wait for resources to finish provisioning before
+  # timing out. Defaults to 10. See "Provisioning Wait Time" below.
+  # wait_time = 30
 }
 ```
+
+### Provider Argument Reference
+
+| Argument | Required | Default | Description |
+|---|---|---|---|
+| `environment` | No | `staging` | Megaport API environment: `production`, `staging`, or `development`. Can also be set with `MEGAPORT_ENVIRONMENT`. |
+| `access_key` | Yes | — | API access key. Can also be set with `MEGAPORT_ACCESS_KEY`. |
+| `secret_key` | Yes | — | API secret key. Can also be set with `MEGAPORT_SECRET_KEY`. |
+| `accept_purchase_terms` | Yes | `false` | Acceptance of the Megaport API terms. Can also be set with `MEGAPORT_ACCEPT_PURCHASE_TERMS`. |
+| `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
+| `cancel_at_end_of_term` | No | `false` | Cancel resources at the end of their billing term instead of immediately. See [End-of-Term Cancellation](#end-of-term-cancellation). |
 
 ## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
 
@@ -627,6 +642,58 @@ Example plan output:
 3. Review the plan to ensure it matches your expectations
 4. Run `terraform apply` to update the state
 5. Run `terraform plan` again - should show no changes
+
+## Provisioning Wait Time
+
+Most Megaport resources are provisioned asynchronously. After Terraform places an order, the service is deployed across the Megaport network before it becomes live. During `terraform apply`, the provider polls the Megaport API until the resource reaches its ready state before reporting the create or update as complete.
+
+The `wait_time` provider option controls how long, in minutes, the provider waits for a resource to finish provisioning. The default is `10` minutes and the minimum is `1`.
+
+```terraform
+provider "megaport" {
+  environment           = "production"
+  access_key            = "your-access-key"
+  secret_key            = "your-secret-key"
+  accept_purchase_terms = true
+  wait_time             = 30 # Wait up to 30 minutes for resources to provision
+}
+```
+
+`wait_time` is set once on the provider and applies to every resource it manages; it cannot currently be set per resource.
+
+### When to increase `wait_time`
+
+Ten minutes is enough for most resources, but some take longer and benefit from a higher value:
+
+- **Megaport Virtual Edges (MVEs)** — vendor appliances can take several minutes to boot and become reachable.
+- **VXCs to cloud providers** — provisioning on the cloud side (AWS, Azure, Google, Oracle, and others) can add delay outside Megaport's control.
+- **Large applies** — ordering many resources at once.
+
+If applies regularly time out while resources are still provisioning, raise `wait_time`.
+
+### What happens when the wait time is exceeded
+
+If a resource does not reach its ready state within `wait_time`, the apply fails with a timeout error such as:
+
+```
+Error: time expired waiting for Port [...] to provision
+```
+
+**The order has already been placed**, so the resource usually keeps provisioning in the Megaport portal and becomes live shortly after. However, because the apply failed before Terraform could record the resource, **it is not saved to Terraform state**. Running `terraform apply` again will try to create a *new* resource rather than adopt the one that is still provisioning.
+
+To recover, do one of the following before re-applying:
+
+1. **Import the resource** that was created, using its UID from the Megaport portal:
+
+   ```bash
+   terraform import megaport_port.example <product-uid>
+   ```
+
+2. **Cancel the resource** in the Megaport portal, then re-run `terraform apply`.
+
+Setting `wait_time` high enough for your slowest-provisioning resources avoids this situation entirely.
+
+> **Note:** Internet Exchange (IX) resources use a fixed 10-minute provisioning wait and are not affected by `wait_time`.
 
 ## End-of-Term Cancellation
 
