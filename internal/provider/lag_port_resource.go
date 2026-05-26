@@ -146,8 +146,7 @@ func NewLagPortResource() resource.Resource {
 
 // lagPortResource is the resource implementation.
 type lagPortResource struct {
-	client            *megaport.Client
-	cancelAtEndOfTerm bool
+	client *megaport.Client
 }
 
 // Metadata returns the resource type name.
@@ -648,11 +647,13 @@ func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	// Delete existing order
+	// Delete existing order. LAG ports only support immediate cancellation
+	// (CANCEL_NOW); delayed cancellation was removed in megaportgo and the
+	// API now rejects DeleteNow=false for LAG ports.
 	err := retryTransientDelete(ctx, 3, func() error {
 		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
 			PortID:     state.UID.ValueString(),
-			DeleteNow:  !r.cancelAtEndOfTerm,
+			DeleteNow:  true,
 			SafeDelete: true,
 		})
 		return deleteErr
@@ -682,11 +683,7 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 
-	client := data.client
-
-	r.client = client
-	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
-
+	r.client = data.client
 }
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

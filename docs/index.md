@@ -72,7 +72,6 @@ provider "megaport" {
 | `secret_key` | Yes | — | API secret key. Can also be set with `MEGAPORT_SECRET_KEY`. |
 | `accept_purchase_terms` | Yes | `false` | Acceptance of the Megaport API terms. Can also be set with `MEGAPORT_ACCEPT_PURCHASE_TERMS`. |
 | `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
-| `cancel_at_end_of_term` | No | `false` | Cancel resources at the end of their billing term instead of immediately. See [End-of-Term Cancellation](#end-of-term-cancellation). |
 
 ## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
 
@@ -695,26 +694,12 @@ Setting `wait_time` high enough for your slowest-provisioning resources avoids t
 
 > **Note:** Internet Exchange (IX) resources use a fixed 10-minute provisioning wait and are not affected by `wait_time`.
 
-## End-of-Term Cancellation
+## Resource Cancellation
 
-By default, when Terraform deletes resources, they are immediately cancelled in the Megaport portal. However, you may prefer to have resources marked for cancellation at the end of their current billing term instead of immediate cancellation.
+When Terraform deletes a Megaport resource, the provider issues an immediate cancellation or deletion request to the Megaport API. Resources are removed from Terraform state as soon as the API call returns successfully. For Ports and LAG Ports specifically, this is always a `CANCEL_NOW` action against the Megaport Products API.
 
-The provider supports this with the `cancel_at_end_of_term` configuration option:
+Delayed cancellation (cancel-at-end-of-term) is not supported by the provider. The previously available `cancel_at_end_of_term` provider option has been removed because the Megaport API no longer accepts delayed cancellation for Ports or LAG Ports.
 
-```terraform
-provider "megaport" {
-  environment           = "production"
-  access_key            = "your-access-key"
-  secret_key            = "your-secret-key"
-  accept_purchase_terms = true
-  cancel_at_end_of_term = true  # Mark resources for end-of-term cancellation
-}
-```
+**Billing impact:** Cancelling a Megaport resource before the end of its committed minimum term may incur early termination charges. Review your contract terms before destroying resources, especially in production.
 
-**Important notes:**
-
-- This feature is currently only supported for Single Ports and LAG Ports
-- For other resource types, the option will be ignored and immediate cancellation will occur
-- When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
-- Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
-- If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
+**Upgrade note:** If your existing Terraform configuration still sets `cancel_at_end_of_term` in the `provider "megaport"` block, Terraform will report it as an unsupported provider argument. Remove that setting before planning or applying with this version.
