@@ -157,8 +157,7 @@ func NewPortResource() resource.Resource {
 
 // portResource is the resource implementation.
 type portResource struct {
-	client            *megaport.Client
-	cancelAtEndOfTerm bool
+	client *megaport.Client
 }
 
 // Metadata returns the resource type name.
@@ -619,11 +618,13 @@ func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	// Delete existing order
+	// Delete existing order. Ports only support immediate cancellation
+	// (CANCEL_NOW); delayed cancellation was removed in megaportgo and the
+	// API now rejects DeleteNow=false for ports.
 	err := retryTransientDelete(ctx, 3, func() error {
 		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
 			PortID:     state.UID.ValueString(),
-			DeleteNow:  !r.cancelAtEndOfTerm,
+			DeleteNow:  true,
 			SafeDelete: true,
 		})
 		return deleteErr
@@ -653,10 +654,7 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	client := data.client
-
-	r.client = client
-	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
+	r.client = data.client
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
