@@ -7,17 +7,12 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-type MCRPrefixFilterListProviderTestSuite ProviderTestSuite
-
-func TestMCRPrefixFilterListProviderTestSuite(t *testing.T) {
+func TestAccMegaportMCRPrefixFilterList_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRPrefixFilterListProviderTestSuite))
-}
-
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -29,7 +24,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 	mcrNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create MCR and prefix filter lists
@@ -38,7 +33,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				data "megaport_location" "test_location" {
 					id = %d
 				}
-				
+
 				resource "megaport_mcr" "mcr" {
 					product_name         = "%s"
 					port_speed          = 1000
@@ -51,12 +46,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2" = "value2"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -98,7 +87,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				`, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// MCR checks
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -108,7 +97,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
 
 					// Prefix filter list 1 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "description", prefixFilterName),
@@ -123,7 +111,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.ge", "25"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_1", "entries.1.le", "27"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_1", "last_updated"),
 
 					// Prefix filter list 2 checks
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "description", prefixFilterName2),
@@ -138,7 +125,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.prefix_list_2", "entries.1.le", "25"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "id"),
-					resource.TestCheckResourceAttrSet("megaport_mcr_prefix_filter_list.prefix_list_2", "last_updated"),
 				),
 			},
 			// Test ImportState for prefix filter list 1
@@ -163,7 +149,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Update Test 1: Modify existing prefix filter lists and add a new one
 			{
@@ -184,12 +170,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_1" {
@@ -251,7 +231,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+				`, locationID, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// MCR checks
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
@@ -299,12 +279,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						"key2updated" = "value2updated"
 					}
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "prefix_list_single" {
@@ -320,7 +294,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
+				`, locationID, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew),
@@ -336,12 +310,15 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 	})
 }
 
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_IPv6() {
+func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -357,12 +334,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "ipv6_list" {
@@ -384,7 +355,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_list", "description", prefixFilterName),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_list", "address_family", "IPv6"),
@@ -408,13 +379,16 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // This specifically tests the normalization fix for when the Megaport API returns le=32 (IPv4)
 // or le=128 (IPv6) instead of the exact match value configured by the user.
 // See PR #308 for details on the bug fix.
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ExactMatch() {
+func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterNameIPv4 := RandomTestName()
 	prefixFilterNameIPv6 := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create prefix filter lists with exact match entries
@@ -431,12 +405,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -486,7 +454,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				`, locationID, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// IPv4 Exact Match Checks - verify ge=le is preserved
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv4_exact", "description", prefixFilterNameIPv4),
@@ -544,12 +512,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				# IPv4 Exact Match Test - ge=le should not cause drift
@@ -599,7 +561,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
+				`, locationID, mcrName, costCentreName, prefixFilterNameIPv4, prefixFilterNameIPv6),
 				// PlanOnly checks that no changes are needed - validates idempotency
 				PlanOnly: true,
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -641,7 +603,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				// for exact match entries. During normal operation, we normalize this back to
 				// the user's configured value (ge=le). But during import, we can't know the
 				// user's intention, so we return raw API values.
-				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+				ImportStateVerifyIgnore: []string{"entries.0.le", "entries.1.le", "entries.2.le"},
 			},
 		},
 	})
@@ -650,12 +612,15 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // TestAccMegaportMCRPrefixFilterList_CIDRValidation tests that prefixes with host bits set
 // are rejected with a descriptive error, and that canonical prefixes work correctly.
 // This is the end-to-end test for the fix in issue #317.
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_CIDRValidation() {
+func TestAccMegaportMCRPrefixFilterList_CIDRValidation(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Non-canonical CIDR prefix should be rejected with a helpful error
@@ -672,11 +637,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "cidr_test" {
@@ -692,7 +652,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				ExpectError: regexp.MustCompile(`(?s)host bits set.*Use the network address.*192\.168\.1\.0/24`),
 			},
 		},
@@ -701,12 +661,15 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 
 // TestAccMegaportMCRPrefixFilterList_MixedExactAndRange tests a combination of exact match
 // and range-based prefix filter entries to ensure both are handled correctly.
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_MixedExactAndRange() {
+func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -722,12 +685,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					contract_term_months = 12
 					cost_centre         = "%s"
 
-					# Explicitly set empty prefix filter lists since we're using standalone resources
-					prefix_filter_lists = []
-
-					lifecycle {
-						ignore_changes = [prefix_filter_lists]
-					}
 				}
 
 				resource "megaport_mcr_prefix_filter_list" "mixed" {
@@ -765,7 +722,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 						}
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName),
+				`, locationID, mcrName, costCentreName, prefixFilterName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "description", prefixFilterName),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.#", "4"),
@@ -801,7 +758,10 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // 2. VXC has BGP connections that reference prefix filter lists via import_whitelist
 // 3. After importing the prefix filter list, the VXC should NOT detect changes
 // 4. The MCR should NOT attempt to delete the standalone-managed prefix filter lists
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift() {
+func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -822,12 +782,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl" {
@@ -896,10 +850,10 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 
 				depends_on = [megaport_mcr_prefix_filter_list.pfl]
 			}
-		`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
+		`, locationID, mcrName, costCentreName, prefixFilterListName, portName, vxcName, prefixFilterListName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create MCR + standalone prefix filter list + VXC with BGP referencing it
@@ -933,7 +887,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Apply the same config after import - reconcile any import differences
 			{
@@ -958,7 +912,10 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 // TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift tests that importing multiple
 // standalone prefix filter lists does not trigger updates on VXCs that reference them.
 // This mirrors the GoTo customer pattern of importing multiple prefix filter lists at once.
-func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift() {
+func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -981,12 +938,6 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 				asn                  = 64555
 				cost_centre          = "%s"
 
-				# Using standalone prefix filter list resources
-				prefix_filter_lists = []
-
-				lifecycle {
-					ignore_changes = [prefix_filter_lists]
-				}
 			}
 
 			resource "megaport_mcr_prefix_filter_list" "pfl_whitelist" {
@@ -1082,13 +1033,13 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					megaport_mcr_prefix_filter_list.pfl_export,
 				]
 			}
-		`, MCRTestLocationIDNum, mcrName, costCentreName,
+		`, locationID, mcrName, costCentreName,
 			pflName1, pflName2, pflName3,
 			portName, vxcName,
 			pflName1, pflName3)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create everything
@@ -1122,7 +1073,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 3: Import prefix filter list 2 (blacklist)
 			{
@@ -1143,7 +1094,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 4: Import prefix filter list 3 (export)
 			{
@@ -1164,7 +1115,7 @@ func (suite *MCRPrefixFilterListProviderTestSuite) TestAccMegaportMCRPrefixFilte
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, pflID), nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{},
 			},
 			// Step 5: Apply same config to reconcile any import state differences
 			{

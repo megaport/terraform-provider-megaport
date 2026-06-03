@@ -879,10 +879,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	// If Imported, VendorConfig will be Null. Set VendorConfig in state to existing one in plan.
-	if state.VendorConfig.IsNull() {
-		state.VendorConfig = plan.VendorConfig
-	}
+	// Preserve the plan's VendorConfig in state. This handles two cases:
+	// 1. After Import, VendorConfig in state is null — adopt the plan value.
+	// 2. Case-only changes (e.g., "aruba" → "aRuBa") — adopt the plan's casing
+	//    so Terraform doesn't see an inconsistent result after apply.
+	state.VendorConfig = plan.VendorConfig
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -980,9 +981,12 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Call the API to delete the resource
 	productUID := state.UID.ValueString()
-	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID:      productUID,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
+			MVEID:      productUID,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1065,7 +1069,40 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			}
 			state.VendorConfig = plan.VendorConfig
 		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
-			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			// During destroy, the plan's VendorConfig is null — nothing to compare.
+			if plan.VendorConfig.IsNull() || plan.VendorConfig.IsUnknown() {
+				// No replacement decision needed during destroy.
+			} else {
+				// vendor_config cannot be changed after creation — require replace on
+				// any change. However, the API normalizes vendor/size to uppercase
+				// (e.g., "aruba" → "ARUBA"), so Equal() can return false on casing
+				// differences alone. Compare vendor and size case-insensitively to
+				// avoid unnecessary destroy+recreate on case-only changes.
+				var planVC vendorConfigModel
+				planVCDiags := plan.VendorConfig.As(ctx, &planVC, basetypes.ObjectAsOptions{})
+				resp.Diagnostics.Append(planVCDiags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !strings.EqualFold(state.Vendor.ValueString(), planVC.Vendor.ValueString()) ||
+					!strings.EqualFold(state.Size.ValueString(), planVC.ProductSize.ValueString()) {
+					// Vendor or size changed (case-insensitive) — must replace.
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+				} else {
+					// Vendor/size match case-insensitively. Normalize them in the
+					// plan to match state casing, then check remaining fields.
+					planVC.Vendor = types.StringValue(state.Vendor.ValueString())
+					planVC.ProductSize = types.StringValue(state.Size.ValueString())
+					normalized, normDiags := types.ObjectValueFrom(ctx, plan.VendorConfig.AttributeTypes(ctx), &planVC)
+					resp.Diagnostics.Append(normDiags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					if !normalized.Equal(state.VendorConfig) {
+						resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+					}
+				}
+			}
 		}
 		diags := req.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)

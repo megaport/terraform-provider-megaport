@@ -3,12 +3,12 @@
 page_title: "megaport_port Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization’s Port is the physical point of connection between your organization’s network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.
+  Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization's Port is the physical point of connection between your organization's network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.
 ---
 
 # megaport_port (Resource)
 
-Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization’s Port is the physical point of connection between your organization’s network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.
+Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization's Port is the physical point of connection between your organization's network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.
 
 ## Example Usage
 
@@ -30,38 +30,22 @@ resource "megaport_port" "port" {
 
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
-- `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.
-- `port_speed` (Number) The speed of the port in Mbps. Can be 1000(1g), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available.
-- `product_name` (String) The name of the product. Specify a name for the Port that is easily identifiable, particularly if you plan on having more than one Port.
+- `marketplace_visibility` (Boolean) Whether the port is visible in the Megaport Marketplace. When false, the port is private to your organisation. When true, it is publicly searchable and available for inbound connection requests.
+- `port_speed` (Number) The speed of the port in Mbps. Can be 1000 (1G), 10000 (10G), 100000 (100G), or 400000 (400G) where available.
+- `product_name` (String) The name of the port. Specify a name that is easily identifiable, particularly if you plan on having more than one port.
 
 ### Optional
 
-- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the Port is not automatically updated with the Port service level reference number.
+- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `diversity_zone` (String) The diversity zone of the product.
-- `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
+- `promo_code` (String) An optional promotional code for the service order. The code is not validated — if it doesn't exist or doesn't apply, the request will still succeed.
 - `resource_tags` (Map of String) The resource tags associated with the product.
 
 ### Read-Only
 
-- `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) The unique identifier of the company.
-- `contract_end_date` (String) The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `contract_start_date` (String) The date the contract starts. This value is managed by the Megaport API and may be updated when the port is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `create_date` (String) The date the port was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `created_by` (String) The user who created the product.
-- `last_updated` (String) The last time the resource was updated.
-- `live_date` (String) The date the port went live. This value is set by the Megaport API when the port becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `locked` (Boolean) Whether the product is locked.
-- `market` (String) The market the product is in.
-- `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
-- `terminate_date` (String) The date the port will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `usage_algorithm` (String) The usage algorithm for the product.
-- `virtual` (Boolean) Whether the product is virtual.
-- `vxc_auto_approval` (Boolean) Whether VXC is auto-approved on this product.
-- `vxc_permitted` (Boolean) Whether VXC is permitted on this product.
 
 <a id="nestedatt--resources"></a>
 ### Nested Schema for `resources`

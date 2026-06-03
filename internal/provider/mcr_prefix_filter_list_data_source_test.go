@@ -5,23 +5,18 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/stretchr/testify/suite"
 )
 
-type MCRPrefixFilterListDataSourceProviderTestSuite ProviderTestSuite
-
-func TestMCRPrefixFilterListDataSourceProviderTestSuite(t *testing.T) {
+func TestAccMegaportMCRPrefixFilterListDataSource_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRPrefixFilterListDataSourceProviderTestSuite))
-}
-
-func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRPrefixFilterListDataSource_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
 	costCentreName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -29,14 +24,14 @@ func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRP
 				data "megaport_location" "test_location" {
 					id = %d
 				}
-				
+
 				resource "megaport_mcr" "mcr" {
 					product_name         = "%s"
 					port_speed          = 1000
 					location_id         = data.megaport_location.test_location.id
 					contract_term_months = 12
 					cost_centre         = "%s"
-					
+
 					# Explicitly set empty prefix filter lists to avoid conflicts
 					prefix_filter_lists = []
 
@@ -86,7 +81,7 @@ func (suite *MCRPrefixFilterListDataSourceProviderTestSuite) TestAccMegaportMCRP
 						megaport_mcr_prefix_filter_list.prefix_list_2
 					]
 				}
-				`, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				`, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Data source checks
 					resource.TestCheckResourceAttr("data.megaport_mcr_prefix_filter_lists.all_lists", "prefix_filter_lists.#", "2"),

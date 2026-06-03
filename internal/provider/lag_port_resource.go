@@ -2,23 +2,17 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
@@ -29,35 +23,19 @@ var (
 	_ resource.Resource                = &lagPortResource{}
 	_ resource.ResourceWithConfigure   = &lagPortResource{}
 	_ resource.ResourceWithImportState = &lagPortResource{}
+	_ resource.ResourceWithMoveState   = &lagPortResource{}
 )
 
 // lagPortResourceModel maps the resource schema data.
 type lagPortResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                   types.String `tfsdk:"product_uid"`
-	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
-	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
-	CreateDate            types.String `tfsdk:"create_date"`
-	CreatedBy             types.String `tfsdk:"created_by"`
 	PortSpeed             types.Int64  `tfsdk:"port_speed"`
-	TerminateDate         types.String `tfsdk:"terminate_date"`
-	LiveDate              types.String `tfsdk:"live_date"`
-	Market                types.String `tfsdk:"market"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
-	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
-	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
-	ContractStartDate     types.String `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
-	Virtual               types.Bool   `tfsdk:"virtual"`
-	Locked                types.Bool   `tfsdk:"locked"`
-	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 
@@ -70,55 +48,16 @@ type lagPortResourceModel struct {
 
 func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags map[string]string) diag.Diagnostics {
 	diags := diag.Diagnostics{}
-
 	orm.UID = types.StringValue(p.UID)
-	orm.ID = types.Int64Value(int64(p.ID))
-	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
-	orm.Locked = types.BoolValue(p.Locked)
-	orm.Market = types.StringValue(p.Market)
 	orm.MarketplaceVisibility = types.BoolValue(p.MarketplaceVisibility)
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
-	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
-	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
-	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
-	orm.Virtual = types.BoolValue(p.Virtual)
 	orm.LagCount = types.Int64Value(int64(p.LagCount))
-
-	if p.CreateDate != nil {
-		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-	if p.LiveDate != nil {
-		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
-	if p.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
-	if p.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
-
-	if p.TerminateDate != nil {
-		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
-	} else {
-		orm.TerminateDate = types.StringNull()
-	}
 
 	resourcesModel := &portResourcesModel{}
 	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
@@ -139,7 +78,7 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	return diags
 }
 
-// NewPortResource is a helper function to simplify the provider implementation.
+// NewLagPortResource is a helper function to simplify the provider implementation.
 func NewLagPortResource() resource.Resource {
 	return &lagPortResource{}
 }
@@ -157,221 +96,50 @@ func (r *lagPortResource) Metadata(_ context.Context, req resource.MetadataReque
 
 // Schema defines the schema for the resource.
 func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	attrs := commonPortSchemaAttrs()
+	attrs["product_name"] = schema.StringAttribute{
+		Description: "The name of the LAG port.",
+		Required:    true,
+	}
+	attrs["port_speed"] = schema.Int64Attribute{
+		Description: "The speed of the port in Mbps. Can be 10000 (10G), 100000 (100G), or 400000 (400G) where available.",
+		Required:    true,
+		PlanModifiers: []planmodifier.Int64{
+			int64planmodifier.RequiresReplace(),
+		},
+		Validators: []validator.Int64{
+			int64validator.OneOf(10000, 100000, 400000),
+		},
+	}
+	attrs["marketplace_visibility"] = schema.BoolAttribute{
+		Description: "Whether the port is visible in the Megaport Marketplace. When false, the port is private to your organisation. When true, it is publicly searchable and available for inbound connection requests.",
+		Required:    true,
+	}
+	attrs["lag_count"] = schema.Int64Attribute{
+		Description: "The number of LAG ports. Valid values are between 1 and 8.",
+		Required:    true,
+		Validators: []validator.Int64{
+			int64validator.Between(1, 8),
+		},
+	}
+	attrs["lag_port_uids"] = schema.ListAttribute{
+		ElementType: types.StringType,
+		Description: "The unique identifiers of the individual LAG member ports.",
+		Computed:    true,
+		PlanModifiers: []planmodifier.List{
+			listplanmodifier.UseStateForUnknown(),
+		},
+	}
 	resp.Schema = schema.Schema{
 		Description: "Link Aggregation Group (LAG) Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A LAG bundles physical ports to create a single data path, where the traffic load is distributed among the ports to increase overall connection reliability.",
-		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
-			"product_uid": schema.StringAttribute{
-				Description: "The unique identifier for the resource.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
-			"product_name": schema.StringAttribute{
-				Description: "The name of the product.",
-				Required:    true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
-			},
-			"create_date": schema.StringAttribute{
-				Description: "The date the product was created.",
-				Computed:    true,
-			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"port_speed": schema.Int64Attribute{
-				Description: "The speed of the port in Mbps. Can be 10000 (10 G), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available..",
-				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
-				Validators: []validator.Int64{
-					int64validator.OneOf(10000, 100000, 400000),
-				},
-			},
-			"terminate_date": schema.StringAttribute{
-				Description: "The date the product will be terminated.",
-				Computed:    true,
-			},
-			"live_date": schema.StringAttribute{
-				Description: "The date the product went live.",
-				Computed:    true,
-			},
-			"market": schema.StringAttribute{
-				Description: "The market the product is in.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"location_id": schema.Int64Attribute{
-				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
-				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
-			},
-			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
-				Required:    true,
-				Validators: []validator.Int64{
-					int64validator.OneOf(1, 12, 24, 36, 48, 60),
-				},
-			},
-			"promo_code": schema.StringAttribute{
-				Description: "Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm for the product.",
-				Computed:    true,
-			},
-			"company_uid": schema.StringAttribute{
-				Description: "The unique identifier of the company.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.",
-				Computed:    true,
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract started.",
-				Computed:    true,
-			},
-			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends.",
-				Computed:    true,
-			},
-			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the product is visible in the marketplace.",
-				Required:    true,
-			},
-			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto-approved on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual. Always false for LAG orders.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the product.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"lag_count": schema.Int64Attribute{
-				Description: "The number of LAG ports. Valid values are between 1 and 8.",
-				Required:    true,
-				Validators: []validator.Int64{
-					int64validator.Between(1, 8),
-				},
-			},
-			"lag_port_uids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "The unique identifiers of the LAG ports.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"resources": schema.SingleNestedAttribute{
-				Description: "Resources attached to port.",
-				Computed:    true,
-				Attributes: map[string]schema.Attribute{
-					"interface": schema.SingleNestedAttribute{
-						Description: "Port interface details.",
-						Optional:    true,
-						Computed:    true,
-						Attributes: map[string]schema.Attribute{
-							"demarcation": schema.StringAttribute{
-								Description: "The demarcation of the interface.",
-								Computed:    true,
-							},
-							"up": schema.Int64Attribute{
-								Description: "The up status of the interface.",
-								Computed:    true,
-							},
-						},
-					},
-				},
-			},
-			"resource_tags": schema.MapAttribute{
-				Description: "The resource tags associated with the product.",
-				Optional:    true,
-				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
-				},
-			},
-		},
+		Attributes:  attrs,
 	}
 }
 
 // Create a new resource.
 func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Retrieve values from plan
 	var plan lagPortResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -399,11 +167,10 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		buyPortReq.ResourceTags = tagMap
 	}
 
-	err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq)
-	if err != nil {
+	if err := r.client.PortService.ValidatePortOrder(ctx, buyPortReq); err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create port",
-			"Validation error while attempting to create port with name "+plan.Name.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not validate port %q: %s", plan.Name.ValueString(), err),
 		)
 		return
 	}
@@ -411,8 +178,8 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Creating Port",
-			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
+			"Error creating port",
+			fmt.Sprintf("Could not create port %q: %s", plan.Name.ValueString(), err),
 		)
 		return
 	}
@@ -420,308 +187,267 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	if len(createdPort.TechnicalServiceUIDs) < 1 {
 		resp.Diagnostics.AddError(
 			"Unexpected number of ports created",
-			fmt.Sprintf("Expected greater than one port, got: %d. The IDs were: %v Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs), createdPort.TechnicalServiceUIDs),
+			fmt.Sprintf("Expected at least one port, got %d. Please report this issue to Megaport.", len(createdPort.TechnicalServiceUIDs)),
 		)
 		return
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
 
-	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created port",
-			"Could not read newly created port with ID "+createdID+": "+err.Error(),
+			"Error reading created port",
+			fmt.Sprintf("Could not read created port %s: %s", createdID, err),
 		)
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, createdID)
+	tags, err := r.fetchResourceTags(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created port tags",
-			"Could not read newly created port tags with ID "+createdID+": "+err.Error(),
+			"Error reading created port tags",
+			fmt.Sprintf("Could not read tags for created port %s: %s", createdID, err),
 		)
 		return
 	}
 
-	// update the plan with the port info
-	apiDiags := plan.fromAPIPort(ctx, port, tags)
-	resp.Diagnostics.Append(apiDiags...)
-	lagPortUids := []types.String{}
-	for _, uid := range createdPort.TechnicalServiceUIDs {
-		lagPortUids = append(lagPortUids, types.StringValue(uid))
-	}
-	lagPortUidList, listDiags := types.ListValueFrom(ctx, types.StringType, lagPortUids)
-	resp.Diagnostics.Append(listDiags...)
-	plan.LagPortUIDs = lagPortUidList
-	plan.UID = types.StringValue(createdID)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(plan.fromAPIPort(ctx, port, tags)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	lagPortUIDs, lagDiags := lagPortUIDsList(createdPort.TechnicalServiceUIDs)
+	resp.Diagnostics.Append(lagDiags...)
+	plan.LagPortUIDs = lagPortUIDs
+	plan.UID = types.StringValue(createdID)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 // Read resource information.
 func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	// Get current state
 	var state lagPortResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Get refreshed port value from API
 	port, err := r.client.PortService.GetPort(ctx, state.UID.ValueString())
 	if err != nil {
-		// Port has been deleted or is not found
-		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
-			if mpErr.Response.StatusCode == http.StatusNotFound ||
-				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
-				resp.State.RemoveResource(ctx)
-				return
-			}
+		if isPortNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
 		}
-
 		resp.Diagnostics.AddError(
-			"Error Reading port",
-			"Could not read port with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Error reading port",
+			fmt.Sprintf("Could not read port %s: %s", state.UID.ValueString(), err),
 		)
 		return
 	}
 
-	// If the port has been deleted
 	if port.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	tags, err := r.client.PortService.ListPortResourceTags(ctx, state.UID.ValueString())
+	tags, err := r.fetchResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
-			"Could not read port tags with ID "+state.UID.ValueString()+": "+err.Error(),
+			fmt.Sprintf("Could not read tags for port %s: %s", state.UID.ValueString(), err),
 		)
 		return
 	}
 
-	// Populate the state with the port details
-	apiDiags := state.fromAPIPort(ctx, port, tags)
-	resp.Diagnostics.Append(apiDiags...)
-
-	// Populate the LAG port UIDs
-	if len(port.LagPortUIDs) > 0 {
-		lagPortUIDsList := []attr.Value{}
-		for _, uid := range port.LagPortUIDs {
-			lagPortUIDsList = append(lagPortUIDsList, types.StringValue(uid))
-		}
-
-		lagPortUIDs, diags := types.ListValue(types.StringType, lagPortUIDsList)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		state.LagPortUIDs = lagPortUIDs
-	} else {
-		state.LagPortUIDs = types.ListNull(types.StringType)
-	}
-
-	// Set refreshed state
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	lagPortUIDs, lagDiags := lagPortUIDsList(port.LagPortUIDs)
+	resp.Diagnostics.Append(lagDiags...)
+	state.LagPortUIDs = lagPortUIDs
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state lagPortResourceModel
-
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Check on changes
-	var name, costCentre string
-	var marketplaceVisibility bool
-	var contractTermMonths *int
-	if !plan.Name.Equal(state.Name) {
-		name = plan.Name.ValueString()
-	} else {
-		name = state.Name.ValueString()
-	}
-	// Always use the planned cost centre value, even if it's empty/null
-	costCentre = plan.CostCentre.ValueString()
-	if !plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
-		marketplaceVisibility = plan.MarketplaceVisibility.ValueBool()
-	} else {
-		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
-	}
-
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		months := int(plan.ContractTermMonths.ValueInt64())
-		contractTermMonths = &months
-	}
+	params := resolvePortModifyParams(
+		plan.Name, state.Name,
+		plan.MarketplaceVisibility, state.MarketplaceVisibility,
+		plan.CostCentre,
+		plan.ContractTermMonths, state.ContractTermMonths,
+	)
 
 	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
 		PortID:                plan.UID.ValueString(),
-		Name:                  name,
-		MarketplaceVisibility: &marketplaceVisibility,
-		CostCentre:            costCentre,
-		ContractTermMonths:    contractTermMonths,
+		Name:                  params.name,
+		MarketplaceVisibility: &params.marketplaceVisibility,
+		CostCentre:            params.costCentre,
+		ContractTermMonths:    params.contractTermMonths,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
-
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error modifying port",
-			"Could not modify port with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Error updating port",
+			fmt.Sprintf("Could not update port %s: %s", plan.UID.ValueString(), err),
 		)
 		return
 	}
 
-	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
-	if portErr != nil {
+	port, err := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading port",
-			"Could not read port with ID "+plan.UID.ValueString()+": "+portErr.Error(),
+			"Error reading port",
+			fmt.Sprintf("Could not read port %s: %s", plan.UID.ValueString(), err),
 		)
 		return
 	}
 
-	if !plan.ResourceTags.Equal(state.ResourceTags) {
-		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
-		resp.Diagnostics.Append(tagDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		err = r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating port tags",
-				"Could not update port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
-			)
-			return
-		}
-	}
-
-	tags, tagErr := r.client.PortService.ListPortResourceTags(ctx, plan.UID.ValueString())
-	if tagErr != nil {
-		resp.Diagnostics.AddError(
-			"Error reading port tags",
-			"Could not read port tags with ID "+plan.UID.ValueString()+": "+tagErr.Error(),
-		)
-		return
-	}
-
-	// Update the state
-	state.fromAPIPort(ctx, port, tags)
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Set state to fully populated data
-	diags := resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(syncPortResourceTags(ctx, plan.ResourceTags, state.ResourceTags, plan.UID.ValueString(), r.client)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	tags, err := r.fetchResourceTags(ctx, plan.UID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading port tags",
+			fmt.Sprintf("Could not read tags for port %s: %s", plan.UID.ValueString(), err),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	lagPortUIDs, lagDiags := lagPortUIDsList(port.LagPortUIDs)
+	resp.Diagnostics.Append(lagDiags...)
+	state.LagPortUIDs = lagPortUIDs
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *lagPortResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Retrieve values from state
 	var state lagPortResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Delete existing order
-	_, err := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
-		PortID:     state.UID.ValueString(),
-		DeleteNow:  !r.cancelAtEndOfTerm,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{
+			PortID:     state.UID.ValueString(),
+			DeleteNow:  !r.cancelAtEndOfTerm,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting port",
-			"Could not delete port, unexpected error: "+err.Error(),
+			"Error deleting port",
+			fmt.Sprintf("Could not delete port %s: %s", state.UID.ValueString(), err),
 		)
-		return
 	}
 }
 
 // Configure adds the provider configured client to the resource.
 func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 	r.cancelAtEndOfTerm = data.cancelAtEndOfTerm
+}
 
+func (r *lagPortResource) fetchResourceTags(ctx context.Context, uid string) (map[string]string, error) {
+	return r.client.PortService.ListPortResourceTags(ctx, uid)
 }
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// MoveState implements resource.ResourceWithMoveState to support automatic
+// V1-to-V2 state migration when users move from megaport/megaport (v1) to v2.
+func (r *lagPortResource) MoveState(ctx context.Context) []resource.StateMover {
+	return []resource.StateMover{
+		{
+			StateMover: moveStateLagPort,
+		},
+	}
+}
+
+// moveStateLagPort migrates a V1 megaport_lag_port state to V2 by extracting
+// only the fields that exist in the V2 schema and dropping all removed fields.
+func moveStateLagPort(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
+	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_lag_port" {
+		return
+	}
+
+	if req.SourceRawState == nil {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state is nil")
+		return
+	}
+	rawJSON := req.SourceRawState.JSON
+	if len(rawJSON) == 0 {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state JSON is empty")
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rawJSON, &raw); err != nil {
+		resp.Diagnostics.AddError("Unable to unmarshal V1 state", err.Error())
+		return
+	}
+
+	model, diags := lagPortModelFromV1RawState(ctx, raw)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.TargetState.Set(ctx, model)...)
 }
 
 func (r *lagPortResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	var plan, state lagPortResourceModel
 
-	// Get plan and state
 	if !req.Plan.Raw.IsNull() {
-		planDiags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(planDiags...)
+		resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
 
 	if !req.State.Raw.IsNull() {
-		stateDiags := req.State.Get(ctx, &state)
-		resp.Diagnostics.Append(stateDiags...)
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
 
-	// Only check if we have both state and plan
+	// If lag_count changes and we have confirmed state, require replacement.
 	if !state.UID.IsNull() && !plan.LagCount.IsNull() {
-		plannedLagCount := int(plan.LagCount.ValueInt64())
-
-		// We have LagPortUIDs from the API - compare actual count
 		if !state.LagPortUIDs.IsNull() {
-			actualLagCount := len(state.LagPortUIDs.Elements())
-
-			// If counts don't match, we need replacement
-			if actualLagCount != plannedLagCount {
+			if len(state.LagPortUIDs.Elements()) != int(plan.LagCount.ValueInt64()) {
 				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("lag_count"))
 			}
+		} else if !plan.LagCount.Equal(state.LagCount) {
+			// LagPortUIDs not yet populated but lag_count changed — require replacement
+			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("lag_count"))
 		}
 	}
 }

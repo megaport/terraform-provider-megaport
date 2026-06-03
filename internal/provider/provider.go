@@ -80,6 +80,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"access_key": schema.StringAttribute{
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The API access key. Can also be set using the environment variable MEGAPORT_ACCESS_KEY",
 			},
 			"secret_key": schema.StringAttribute{
@@ -202,7 +203,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
 	ctx = tflog.SetField(ctx, "wait_time", waitTime)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key", "access_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
 
@@ -329,6 +330,7 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 		NewMVEResource,
 		NewVXCResource,
 		NewIXResource,
+		NewServiceKeyResource,
 	}
 }
 
@@ -336,4 +338,22 @@ func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, dia
 	tags := map[string]string{}
 	diags := in.ElementsAs(ctx, &tags, false)
 	return tags, diags
+}
+
+// configureMegaportResource extracts the Megaport client and provider config from the
+// provider data passed to a resource's Configure method. Returns false if the provider
+// data is nil or wrong type (diagnostics already populated in that case).
+func configureMegaportResource(req resource.ConfigureRequest, resp *resource.ConfigureResponse) (*megaportProviderData, bool) {
+	if req.ProviderData == nil {
+		return nil, false
+	}
+	providerData, ok := req.ProviderData.(*megaportProviderData)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Provider Data Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return nil, false
+	}
+	return providerData, true
 }
