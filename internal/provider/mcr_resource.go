@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -20,6 +18,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
+	"net/http"
+	"strings"
 )
 
 var (
@@ -66,11 +66,7 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 	orm.MarketplaceVisibility = types.BoolValue(m.MarketplaceVisibility)
 	orm.CompanyUID = types.StringValue(m.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(m.ContractTermMonths))
-	if m.DiversityZone != "" {
-		orm.DiversityZone = types.StringValue(m.DiversityZone)
-	} else {
-		orm.DiversityZone = types.StringNull()
-	}
+	orm.DiversityZone = types.StringValue(m.DiversityZone)
 
 	if m.AttributeTags != nil {
 		attributeTags := make(map[string]attr.Value)
@@ -80,8 +76,6 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 		attributeTagsValue, tagDiags := types.MapValue(types.StringType, attributeTags)
 		apiDiags = append(apiDiags, tagDiags...)
 		orm.AttributeTags = attributeTagsValue
-	} else {
-		orm.AttributeTags = types.MapNull(types.StringType)
 	}
 
 	if len(tags) > 0 {
@@ -162,9 +156,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
 				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},
@@ -203,9 +194,6 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				ElementType: types.StringType,
 				Description: "Attribute tags of the product.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"resource_tags": schema.MapAttribute{
 				Description: "The resource tags associated with the product.",
@@ -440,8 +428,6 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Copy plan-only fields not returned by the API before overwriting with API response.
-	state.PromoCode = plan.PromoCode
 	apiDiags := state.fromAPIMCR(ctx, mcr, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
@@ -507,13 +493,6 @@ func (r *mcrResource) MoveState(ctx context.Context) []resource.StateMover {
 					return
 				}
 
-				if req.SourceRawState == nil {
-					resp.Diagnostics.AddError(
-						"Missing source state",
-						"Cannot migrate MCR state: source raw state is nil.",
-					)
-					return
-				}
 				var rawState map[string]json.RawMessage
 				if err := json.Unmarshal(req.SourceRawState.JSON, &rawState); err != nil {
 					resp.Diagnostics.AddError(

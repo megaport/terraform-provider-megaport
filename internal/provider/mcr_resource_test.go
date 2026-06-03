@@ -58,15 +58,23 @@ func TestFromAPIMCR_Full(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 2)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
+	attrAccount, ok := attrTags["account"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "prod", attrAccount.ValueString())
+	attrTeam, ok := attrTags["team"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "network", attrTeam.ValueString())
 
 	// Verify resource tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "test", resTags["env"].(types.String).ValueString())
-	assert.Equal(t, "ci", resTags["owner"].(types.String).ValueString())
+	resEnv, ok := resTags["env"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "test", resEnv.ValueString())
+	resOwner, ok := resTags["owner"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "ci", resOwner.ValueString())
 }
 
 func TestFromAPIMCR_MinimalFields(t *testing.T) {
@@ -184,9 +192,15 @@ func TestFromAPIMCR_AttributeTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull(), "attribute tags should not be null")
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
-	assert.Equal(t, "premium", attrTags["tier"].(types.String).ValueString())
+	attrAccount, ok := attrTags["account"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "prod", attrAccount.ValueString())
+	attrRegion, ok := attrTags["region"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "us-west", attrRegion.ValueString())
+	attrTier, ok := attrTags["tier"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "premium", attrTier.ValueString())
 }
 
 func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {
@@ -205,14 +219,24 @@ func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {
 	assert.True(t, model.AttributeTags.IsNull(), "attribute tags should be null when API returns nil")
 }
 
+// --- Acceptance tests ---
+
 func TestAccMegaportMCR_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
+	prefixFilterName := RandomTestName()
+	prefixFilterName2 := RandomTestName()
+	prefixFilterNameNew := RandomTestName()
+	prefixFilterNameNew2 := RandomTestName()
+	prefixFilterNameNew3 := RandomTestName()
+	prefixFilterNameNew4 := RandomTestName()
 	costCentreName := RandomTestName()
 	mcrNameNew := RandomTestName()
+	mcrNameNew2 := RandomTestName()
 	costCentreNameNew := RandomTestName()
+	costCentreNameNew2 := RandomTestName()
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -232,8 +256,46 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						"key1" = "value1"
 						"key2" = "value2"
 					}
+
+					prefix_filter_lists = [
+					{
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 25
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 25
+							le      = 27
+						  }
+						]
+					  },
+					  {
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 26
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 25
+						  }
+						]
+					  }]
 				  }
-				  `, locationID, mcrName, costCentreName),
+				  `, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -243,8 +305,33 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.description", prefixFilterName2),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.le", "27"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.ge", "26"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.le", "25"),
 				),
 			},
 			// ImportState testing
@@ -265,9 +352,9 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
-			// Update Test
+			// Update Test 1
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -283,8 +370,143 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 						"key1updated" = "value1updated"
 						"key2updated" = "value2updated"
 					}
+
+					prefix_filter_lists = [
+					{
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 24
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 25
+							le      = 29
+						  }
+						]
+					  },
+					  {
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 25
+							le      = 32
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 24
+							le      = 26
+						  }
+						]
+					  },
+					  {
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 24
+							le      = 24
+						  },
+						  {
+							action  = "deny"
+							prefix  = "10.0.2.0/24"
+							ge      = 27
+							le      = 32
+						  }
+						]
+					  }]
 				  }
-				  `, locationID, mcrNameNew, costCentreNameNew),
+				  `, locationID, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "3"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterNameNew),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.description", prefixFilterNameNew2),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.description", prefixFilterNameNew3),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.1.le", "29"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.ge", "25"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.0.le", "32"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.1.entries.1.le", "26"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.0.le", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.action", "deny"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.prefix", "10.0.2.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.ge", "27"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.2.entries.1.le", "32"),
+				),
+			},
+			// Update Test 2
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				  resource "megaport_mcr" "mcr" {
+					product_name             = "%s"
+					port_speed               = 1000
+					location_id              = data.megaport_location.test_location.id
+					contract_term_months     = 12
+					cost_centre              = "%s"
+
+					resource_tags = {
+						"key1updated" = "value1updated"
+						"key2updated" = "value2updated"
+					}
+
+					prefix_filter_lists = [{
+						description     = "%s"
+						address_family  = "IPv4"
+						entries = [
+						  {
+							action  = "permit"
+							prefix  = "10.0.1.0/24"
+							ge      = 28
+							le      = 32
+						  }
+						]
+					  }]
+				  }
+				  `, locationID, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -293,8 +515,50 @@ func TestAccMegaportMCR_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterNameNew4),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.action", "permit"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.prefix", "10.0.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "28"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "32"),
+				),
+			},
+			// Update Test 3
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				  resource "megaport_mcr" "mcr" {
+					product_name             = "%s"
+					port_speed               = 1000
+					location_id              = data.megaport_location.test_location.id
+					contract_term_months     = 12
+					cost_centre              = "%s"
+
+					prefix_filter_lists = []
+				  }
+				  `, locationID, mcrNameNew2, costCentreNameNew2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew2),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreNameNew2),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "0"),
 				),
 			},
 		},
@@ -371,9 +635,6 @@ func TestAccMegaportMCR_ContractTermUpdate(t *testing.T) {
 				),
 			},
 			{
-				// contract_term_months has RequiresReplace -- changing it
-				// destroys and recreates the MCR. Verify the new resource
-				// has the updated value.
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
 					id = %d
@@ -431,6 +692,10 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "65000"),
@@ -454,7 +719,7 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "provisioning_status"},
 			},
 			// Update Test 1
 			{
@@ -482,6 +747,10 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_uid"),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "65000"),

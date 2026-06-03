@@ -817,13 +817,10 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 				rate_limit           = 500
 				contract_term_months = 1
 
-				a_end = {
-					requested_product_uid = megaport_mcr.mcr.product_uid
-					ordered_vlan          = 0
-				}
+				a_end_config = {
+					product_uid = megaport_mcr.mcr.product_uid
+					vlan        = 0
 
-				a_end_partner_config = {
-					partner = "vrouter"
 					vrouter_config = {
 						interfaces = [{
 							ip_addresses = ["10.0.0.1/30"]
@@ -844,8 +841,8 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 					}
 				}
 
-				b_end = {
-					requested_product_uid = megaport_port.port.product_uid
+				b_end_config = {
+					product_uid = megaport_port.port.product_uid
 				}
 
 				depends_on = [megaport_mcr_prefix_filter_list.pfl]
@@ -865,7 +862,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "entries.#", "2"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
 			// Step 2: Import the prefix filter list
@@ -896,7 +893,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportNoVXCDrift(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "description", prefixFilterListName),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl", "entries.#", "2"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
 			// Step 4: Plan-only to verify NO drift on VXC or MCR after prefix filter list import
@@ -995,13 +992,10 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 				rate_limit           = 500
 				contract_term_months = 1
 
-				a_end = {
-					requested_product_uid = megaport_mcr.mcr.product_uid
-					ordered_vlan          = 0
-				}
+				a_end_config = {
+					product_uid = megaport_mcr.mcr.product_uid
+					vlan        = 0
 
-				a_end_partner_config = {
-					partner = "vrouter"
 					vrouter_config = {
 						interfaces = [{
 							ip_addresses = ["10.0.0.1/30"]
@@ -1023,8 +1017,8 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					}
 				}
 
-				b_end = {
-					requested_product_uid = megaport_port.port.product_uid
+				b_end_config = {
+					product_uid = megaport_port.port.product_uid
 				}
 
 				depends_on = [
@@ -1051,7 +1045,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_blacklist", "description", pflName2),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_export", "description", pflName3),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
 			// Step 2: Import prefix filter list 1 (whitelist)
@@ -1125,7 +1119,7 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_blacklist", "description", pflName2),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.pfl_export", "description", pflName3),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
-					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
 			// Step 6: Plan-only to verify NO drift - VXC and MCR must not show changes
