@@ -634,7 +634,7 @@ func mergeVrouterPartnerConfigFromAPI(
 		configModel.VrouterPartnerConfig = vrouterObj
 	} else {
 		aEndModel := vxcPartnerConfigAEndModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs), ifaceValues)
+		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), ifaceValues)
 		diags.Append(ifaceDiags...)
 		aEndModel.Interfaces = ifaceList
 
@@ -856,7 +856,7 @@ func reconstructVrouterPartnerConfig(
 	} else {
 		// "a-end" (deprecated)
 		aEndModel := vxcPartnerConfigAEndModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs), interfaceModels)
+		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), interfaceModels)
 		diags.Append(ifaceDiags...)
 		aEndModel.Interfaces = ifaceList
 
@@ -1327,7 +1327,6 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
 					bgpToAppend.PermitExportTo = permitExportTo
-					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() && !bgpConnection.DenyExportTo.IsUnknown() {
 					denyExportTo := []string{}
@@ -1453,7 +1452,6 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() && !bgpConnection.DenyExportTo.IsUnknown() {

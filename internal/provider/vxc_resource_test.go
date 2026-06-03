@@ -4510,7 +4510,10 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 // TestAccMegaportVXC_BGPDriftDetection tests that BGP session parameters configured
 // via Terraform are correctly read back from the API, enabling drift detection when
 // BGP settings are changed outside of Terraform (e.g., via the Megaport Portal).
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_BGPDriftDetection() {
+func TestAccMegaportVXC_BGPDriftDetection(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -4571,10 +4574,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_BGPDriftDetecti
 					ordered_vlan          = 200
 				}
 			}
-		`, VXCLocationID1, mcrName, portName, vxcName)
+		`, locs[0], mcrName, portName, vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with MCR and BGP configuration
@@ -4642,9 +4645,6 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_BGPDriftDetecti
 				Config:   vxcConfig(),
 				PlanOnly: true,
 			},
-		},
-	})
-}
 		},
 	})
 }
