@@ -99,6 +99,10 @@ func (m *MockMCRService) RestoreMCR(ctx context.Context, mcrId string) (*megapor
 	return nil, nil
 }
 
+func (m *MockMCRService) WaitForMCRReady(ctx context.Context, mcrID string, timeout time.Duration) error {
+	return nil
+}
+
 func (m *MockMCRService) UpdateMCRResourceTags(ctx context.Context, mcrID string, tags map[string]string) error {
 	return nil
 }
