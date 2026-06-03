@@ -1920,9 +1920,9 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 }
 
-// waitForVXCProvision polls the VXC until it reaches a ready state or
-// the timeout elapses. Transient read errors are retried rather than
-// aborting the wait, since the order has already been placed.
+// waitForVXCProvision polls the VXC until it reaches a ready state, hits a
+// terminal state, or the timeout elapses. Transient read errors are retried
+// rather than aborting the wait, since the order has already been placed.
 func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
 	timeout := time.NewTimer(timeoutAfter)
 	defer timeout.Stop()
@@ -1930,23 +1930,25 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 	defer ticker.Stop()
 
 	for {
+		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		switch {
+		case err != nil:
+			tflog.Warn(ctx, "error polling VXC provisioning status, will retry", map[string]interface{}{
+				"vxc_uid": uid,
+				"error":   err.Error(),
+			})
+		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
+			return nil
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED:
+			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		}
+
 		select {
 		case <-timeout.C:
 			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			vxc, err := r.client.VXCService.GetVXC(ctx, uid)
-			if err != nil {
-				tflog.Warn(ctx, "error polling VXC provisioning status, will retry", map[string]interface{}{
-					"vxc_uid": uid,
-					"error":   err.Error(),
-				})
-				continue
-			}
-			if slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus) {
-				return nil
-			}
 		}
 	}
 }

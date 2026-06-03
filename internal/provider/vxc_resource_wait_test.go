@@ -42,6 +42,16 @@ func TestWaitForVXCProvision_RetriesTransientErrors(t *testing.T) {
 	assert.GreaterOrEqual(t, calls.Load(), int32(3))
 }
 
+func TestWaitForVXCProvision_TerminalState(t *testing.T) {
+	r := waitTestResource(&MockVXCService{
+		GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_CANCELLED},
+	})
+
+	err := r.waitForVXCProvision(context.Background(), "test-uid", time.Second, time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "terminal state")
+}
+
 func TestWaitForVXCProvision_TimesOut(t *testing.T) {
 	r := waitTestResource(&MockVXCService{
 		GetVXCResult: &megaport.VXC{ProvisioningStatus: "DEPLOYABLE"},
