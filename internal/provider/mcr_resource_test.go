@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
@@ -58,15 +57,15 @@ func TestFromAPIMCR_Full(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 2)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
+	assert.Equal(t, "prod", stringAttrValue(t, attrTags["account"]))
+	assert.Equal(t, "network", stringAttrValue(t, attrTags["team"]))
 
 	// Verify resource tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "test", resTags["env"].(types.String).ValueString())
-	assert.Equal(t, "ci", resTags["owner"].(types.String).ValueString())
+	assert.Equal(t, "test", stringAttrValue(t, resTags["env"]))
+	assert.Equal(t, "ci", stringAttrValue(t, resTags["owner"]))
 }
 
 func TestFromAPIMCR_MinimalFields(t *testing.T) {
@@ -184,9 +183,9 @@ func TestFromAPIMCR_AttributeTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull(), "attribute tags should not be null")
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
-	assert.Equal(t, "premium", attrTags["tier"].(types.String).ValueString())
+	assert.Equal(t, "prod", stringAttrValue(t, attrTags["account"]))
+	assert.Equal(t, "us-west", stringAttrValue(t, attrTags["region"]))
+	assert.Equal(t, "premium", stringAttrValue(t, attrTags["tier"]))
 }
 
 func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {

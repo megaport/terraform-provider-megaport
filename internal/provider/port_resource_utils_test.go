@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -66,9 +67,9 @@ func TestLagPortUIDsList_WithUIDs(t *testing.T) {
 
 	elements := result.Elements()
 	require.Len(t, elements, 3)
-	assert.Equal(t, "uid-1", elements[0].(types.String).ValueString())
-	assert.Equal(t, "uid-2", elements[1].(types.String).ValueString())
-	assert.Equal(t, "uid-3", elements[2].(types.String).ValueString())
+	assert.Equal(t, "uid-1", stringAttrValue(t, elements[0]))
+	assert.Equal(t, "uid-2", stringAttrValue(t, elements[1]))
+	assert.Equal(t, "uid-3", stringAttrValue(t, elements[2]))
 }
 
 func TestLagPortUIDsList_Empty(t *testing.T) {
@@ -87,15 +88,15 @@ func TestLagPortUIDsList_Empty(t *testing.T) {
 
 func TestResolvePortModifyParams(t *testing.T) {
 	tests := []struct {
-		name                     string
-		planName, stateName      types.String
-		planVis, stateVis        types.Bool
-		planCostCentre           types.String
-		planTerm, stateTerm      types.Int64
-		wantName                 string
-		wantVisibility           bool
-		wantCostCentre           string
-		wantContractTermMonths   *int
+		name                   string
+		planName, stateName    types.String
+		planVis, stateVis      types.Bool
+		planCostCentre         types.String
+		planTerm, stateTerm    types.Int64
+		wantName               string
+		wantVisibility         bool
+		wantCostCentre         string
+		wantContractTermMonths *int
 	}{
 		{
 			name:                   "no changes — all same",
@@ -205,3 +206,11 @@ func TestResolvePortModifyParams(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+// stringAttrValue asserts that v is a types.String and returns its value.
+func stringAttrValue(t *testing.T, v attr.Value) string {
+	t.Helper()
+	s, ok := v.(types.String)
+	require.True(t, ok, "expected types.String, got %T", v)
+	return s.ValueString()
+}

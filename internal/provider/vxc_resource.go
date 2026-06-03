@@ -1442,14 +1442,14 @@ func (r *vxcResource) moveStateV1ToV2(ctx context.Context, req resource.MoveStat
 	state.ResourceTags = unmarshalMap("resource_tags")
 
 	// Convert V1 end configs to V2 end configs.
-	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(ctx, raw["a_end"])
-	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(ctx, raw["b_end"])
+	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(raw["a_end"])
+	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(raw["b_end"])
 
 	resp.Diagnostics.Append(resp.TargetState.Set(ctx, &state)...)
 }
 
 // migrateV1EndConfigToV2AEnd converts a V1 a_end JSON object to the V2 a_end_config object type.
-func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+func migrateV1EndConfigToV2AEnd(rawEnd json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcAEndConfigAttrs)
 	}
@@ -1484,7 +1484,7 @@ func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage) typ
 }
 
 // migrateV1EndConfigToV2BEnd converts a V1 b_end JSON object to the V2 b_end_config object type.
-func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage) types.Object {
+func migrateV1EndConfigToV2BEnd(rawEnd json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcBEndConfigAttrs)
 	}
