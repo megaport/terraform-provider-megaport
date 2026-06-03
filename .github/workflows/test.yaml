@@ -58,10 +58,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      # Terraform 1.11+ is required for write-only attribute documentation rendering.
+      # Write-only argument annotations in generated docs require Terraform 1.11+.
       - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
         with:
-          terraform_version: '1.11.4'
+          terraform_version: '1.14.*'
           terraform_wrapper: false
       - run: go generate ./...
       - name: git diff
