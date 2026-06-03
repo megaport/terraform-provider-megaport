@@ -28,7 +28,6 @@ import (
 )
 
 // Update Timeout for VXC Update Verification - will be configurable in future release.
-const updateTimeout = 120 * time.Second
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -324,7 +323,8 @@ func NewVXCResource() resource.Resource {
 
 // vxcResource is the resource implementation.
 type vxcResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -579,7 +579,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ServiceKey: plan.ServiceKey.ValueString(),
 
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	var serviceKeyBEndUID string
@@ -1097,7 +1097,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
-		WaitForTime:   waitForTime,
+		WaitForTime:   r.waitForTime,
 	}
 
 	if !plan.Name.Equal(state.Name) {
@@ -1202,7 +1202,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 
 		// Add retry logic to wait for API propagation
-		waitErr = r.waitForVXCUpdate(ctx, state.UID.ValueString(), updateReq, updateTimeout)
+		waitErr = r.waitForVXCUpdate(ctx, state.UID.ValueString(), updateReq, r.waitForTime)
 		if waitErr != nil {
 			resp.Diagnostics.AddWarning(
 				"VXC Update Propagation Delay",
@@ -1231,7 +1231,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Get refreshed vxc value from API, waiting for vnic_index to propagate
-	vxc, err := r.waitForVnicIndex(ctx, state.UID.ValueString(), expectedAEndVnic, expectedBEndVnic, updateTimeout)
+	vxc, err := r.waitForVnicIndex(ctx, state.UID.ValueString(), expectedAEndVnic, expectedBEndVnic, r.waitForTime)
 	if err != nil {
 		if vxc == nil {
 			resp.Diagnostics.AddError(
@@ -1344,9 +1344,8 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	client := data.client
-
-	r.client = client
+	r.client = data.client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

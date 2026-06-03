@@ -66,9 +66,9 @@ func TestLagPortUIDsList_WithUIDs(t *testing.T) {
 
 	elements := result.Elements()
 	require.Len(t, elements, 3)
-	assert.Equal(t, types.StringValue("uid-1"), elements[0])
-	assert.Equal(t, types.StringValue("uid-2"), elements[1])
-	assert.Equal(t, types.StringValue("uid-3"), elements[2])
+	assert.Equal(t, "uid-1", asTypesString(t, elements[0]))
+	assert.Equal(t, "uid-2", asTypesString(t, elements[1]))
+	assert.Equal(t, "uid-3", asTypesString(t, elements[2]))
 }
 
 func TestLagPortUIDsList_Empty(t *testing.T) {

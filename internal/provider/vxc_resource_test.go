@@ -936,8 +936,12 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
                       ordered_vlan = 0
                     }
 
-                    b_end_config = {
-                        product_uid = "%s"
+                    b_end = {
+                      requested_product_uid = "%s"
+                    }
+
+                    b_end_partner_config = {
+                        partner = "azure"
                         azure_config = {
 							port_choice = "primary"
                             service_key = "%s"
@@ -1300,9 +1304,12 @@ func TestGCPVXCWithProductUID(t *testing.T) {
 					  ordered_vlan = 182
 					}
 
-					b_end_config = {
-					  product_uid = "%s"
+					b_end = {
+					  requested_product_uid = "%s"
+					}
 
+					b_end_partner_config = {
+					  partner = "google"
 					  google_config = {
 						pairing_key = "%s"
 					  }
@@ -1734,8 +1741,12 @@ func TestFullEcosystem(t *testing.T) {
 					  ordered_vlan = 0
 					}
 
-					b_end_config = {
-					  product_uid = "%s"
+					b_end = {
+					  requested_product_uid = "%s"
+					}
+
+					b_end_partner_config = {
+					  partner = "azure"
 					  azure_config = {
 						service_key = "%s"
 					  port_choice = "primary"
@@ -1872,7 +1883,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "rate_limit", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "contract_term_months", "1"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_config.oracle_config.virtual_circuit_id", oracleVCID),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracleVCID),
 				),
 			},
 			// ImportState testing
