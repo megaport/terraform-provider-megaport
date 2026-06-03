@@ -94,31 +94,31 @@ func fullV1State() map[string]interface{} {
 			"env": "staging",
 		},
 		// Fields removed in V2
-		"last_updated":           "2024-01-01T00:00:00Z",
-		"id":                     "mcr-uid-abc123",
-		"product_type":           "MCR2",
-		"provisioning_status":    "LIVE",
-		"create_date":            "2024-01-01T00:00:00Z",
-		"created_by":             "user@example.com",
-		"terminate_date":         nil,
-		"live_date":              "2024-01-01T00:00:00Z",
-		"market":                 "US",
-		"usage_algorithm":        "POST_PAID_FIXED",
-		"vxc_permitted":          true,
-		"vxc_auto_approval":      false,
-		"secondary_name":         "",
-		"lag_primary":            false,
-		"lag_id":                 float64(0),
-		"aggregation_id":         float64(0),
-		"company_name":           "Test Company",
-		"contract_start_date":    "2024-01-01T00:00:00Z",
-		"contract_end_date":      "2025-01-01T00:00:00Z",
-		"virtual":                false,
-		"buyout_port":            false,
-		"locked":                 false,
-		"admin_locked":           false,
-		"cancelable":             true,
-		"prefix_filter_lists":    nil,
+		"last_updated":        "2024-01-01T00:00:00Z",
+		"id":                  "mcr-uid-abc123",
+		"product_type":        "MCR2",
+		"provisioning_status": "LIVE",
+		"create_date":         "2024-01-01T00:00:00Z",
+		"created_by":          "user@example.com",
+		"terminate_date":      nil,
+		"live_date":           "2024-01-01T00:00:00Z",
+		"market":              "US",
+		"usage_algorithm":     "POST_PAID_FIXED",
+		"vxc_permitted":       true,
+		"vxc_auto_approval":   false,
+		"secondary_name":      "",
+		"lag_primary":         false,
+		"lag_id":              float64(0),
+		"aggregation_id":      float64(0),
+		"company_name":        "Test Company",
+		"contract_start_date": "2024-01-01T00:00:00Z",
+		"contract_end_date":   "2025-01-01T00:00:00Z",
+		"virtual":             false,
+		"buyout_port":         false,
+		"locked":              false,
+		"admin_locked":        false,
+		"cancelable":          true,
+		"prefix_filter_lists": nil,
 	}
 }
 
@@ -147,11 +147,11 @@ func TestMoveState_MCR_V1ToV2(t *testing.T) {
 	// Verify tags
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), attrTags["account"])
 
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
-	assert.Equal(t, "staging", resTags["env"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("staging"), resTags["env"])
 }
 
 func TestMoveState_MCR_V1ToV2_NilOptionals(t *testing.T) {
@@ -224,16 +224,16 @@ func TestMoveState_MCR_V1ToV2_WithTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
-	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), attrTags["account"])
+	assert.Equal(t, types.StringValue("network"), attrTags["team"])
+	assert.Equal(t, types.StringValue("us-west"), attrTags["region"])
 
 	// Verify resource_tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "production", resTags["env"].(types.String).ValueString())
-	assert.Equal(t, "platform-team", resTags["owner"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("production"), resTags["env"])
+	assert.Equal(t, types.StringValue("platform-team"), resTags["owner"])
 }
 
 func TestMoveState_MCR_WrongProvider(t *testing.T) {

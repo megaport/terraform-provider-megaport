@@ -58,7 +58,7 @@ func TestFromAPILagPort_Full(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 1)
-	assert.Equal(t, "prod", tagElements["env"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), tagElements["env"])
 }
 
 func TestFromAPILagPort_MinimalFields(t *testing.T) {
