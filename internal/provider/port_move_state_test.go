@@ -178,8 +178,12 @@ func TestMoveState_Port_V1ToV2(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 2)
-	assert.Equal(t, "staging", tagElements["env"].(types.String).ValueString())
-	assert.Equal(t, "infra", tagElements["team"].(types.String).ValueString())
+	tagEnv, ok := tagElements["env"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "staging", tagEnv.ValueString())
+	tagTeam, ok := tagElements["team"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "infra", tagTeam.ValueString())
 }
 
 func TestMoveState_Port_V1ToV2_NilOptionals(t *testing.T) {
@@ -267,8 +271,12 @@ func TestMoveState_LagPort_V1ToV2(t *testing.T) {
 	assert.False(t, model.LagPortUIDs.IsNull())
 	uidElements := model.LagPortUIDs.Elements()
 	require.Len(t, uidElements, 4)
-	assert.Equal(t, "lag-1", uidElements[0].(types.String).ValueString())
-	assert.Equal(t, "lag-4", uidElements[3].(types.String).ValueString())
+	uid0, ok := uidElements[0].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "lag-1", uid0.ValueString())
+	uid3, ok := uidElements[3].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "lag-4", uid3.ValueString())
 
 	// Verify resources nested object.
 	assert.False(t, model.Resources.IsNull())
@@ -277,7 +285,9 @@ func TestMoveState_LagPort_V1ToV2(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 1)
-	assert.Equal(t, "prod", tagElements["env"].(types.String).ValueString())
+	tagEnv, ok := tagElements["env"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "prod", tagEnv.ValueString())
 }
 
 func TestMoveState_Port_WrongProvider(t *testing.T) {
