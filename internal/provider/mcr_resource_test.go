@@ -58,15 +58,23 @@ func TestFromAPIMCR_Full(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 2)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
+	accountTag, ok := attrTags["account"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "prod", accountTag.ValueString())
+	teamTag, ok := attrTags["team"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "network", teamTag.ValueString())
 
 	// Verify resource tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "test", resTags["env"].(types.String).ValueString())
-	assert.Equal(t, "ci", resTags["owner"].(types.String).ValueString())
+	envTag, ok := resTags["env"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "test", envTag.ValueString())
+	ownerTag, ok := resTags["owner"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "ci", ownerTag.ValueString())
 }
 
 func TestFromAPIMCR_MinimalFields(t *testing.T) {
@@ -184,9 +192,15 @@ func TestFromAPIMCR_AttributeTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull(), "attribute tags should not be null")
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
-	assert.Equal(t, "premium", attrTags["tier"].(types.String).ValueString())
+	accountTag, ok := attrTags["account"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "prod", accountTag.ValueString())
+	regionTag, ok := attrTags["region"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "us-west", regionTag.ValueString())
+	tierTag, ok := attrTags["tier"].(types.String)
+	require.True(t, ok)
+	assert.Equal(t, "premium", tierTag.ValueString())
 }
 
 func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {
