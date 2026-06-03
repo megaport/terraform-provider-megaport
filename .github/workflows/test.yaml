@@ -32,9 +32,9 @@ jobs:
       - run: go mod download
       - run: go build -v .
       - name: Run linters
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9  # v8.0.0
         with:
-          version: 'v2.3.1' # Use golangci-lint v2 to match config version
+          version: 'v2.11.4' # golangci-lint v2 to match config; v2.9.0+ required for Go 1.25
           args: --timeout=10m
           skip-cache: true # Disable golangci-lint-action's cache
         # Add retry logic
@@ -43,9 +43,9 @@ jobs:
       # Retry once if it fails
       - name: Run linters (retry)
         if: steps.lint.outcome == 'failure'
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9  # v8.0.0
         with:
-          version: 'v2.3.1' # Use golangci-lint v2 to match config version
+          version: 'v2.11.4' # golangci-lint v2 to match config; v2.9.0+ required for Go 1.25
           args: --timeout=10m
           skip-cache: true # Also disable cache in the retry step
 
@@ -58,10 +58,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      # Write-only argument annotations in generated docs require Terraform 1.11+.
-      - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
+      # Terraform 1.11+ is required for write-only attribute documentation rendering.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: '1.14.*'
+          terraform_version: '1.11.4'
           terraform_wrapper: false
       - run: go generate ./...
       - name: git diff
