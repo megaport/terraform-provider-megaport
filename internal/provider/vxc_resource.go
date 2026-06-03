@@ -1460,15 +1460,15 @@ func (r *vxcResource) moveStateV1ToV2(ctx context.Context, req resource.MoveStat
 	// Convert V1 end configs to V2 end configs.
 	// V1 stored partner configurations as separate top-level fields
 	// (a_end_partner_config, b_end_partner_config); V2 inlines them into the end config object.
-	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(ctx, raw["a_end"], raw["a_end_partner_config"])
-	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(ctx, raw["b_end"], raw["b_end_partner_config"])
+	state.AEndConfiguration = migrateV1EndConfigToV2AEnd(raw["a_end"], raw["a_end_partner_config"])
+	state.BEndConfiguration = migrateV1EndConfigToV2BEnd(raw["b_end"], raw["b_end_partner_config"])
 
 	resp.Diagnostics.Append(resp.TargetState.Set(ctx, &state)...)
 }
 
 // migrateV1EndConfigToV2AEnd converts a V1 a_end JSON object to the V2 a_end_config object type.
 // rawPartnerConfig is the V1 a_end_partner_config top-level field (may be nil/null).
-func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
+func migrateV1EndConfigToV2AEnd(rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcAEndConfigAttrs)
 	}
@@ -1499,10 +1499,10 @@ func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage, raw
 			}
 			switch partner {
 			case "vrouter":
-				vrouterConfig = migrateV1VrouterConfig(ctx, pc["vrouter_config"])
+				vrouterConfig = migrateV1VrouterConfig(pc["vrouter_config"])
 			case "a-end":
 				// V1 used "partner_a_end_config" key for the a-end deprecated partner type.
-				vrouterConfig = migrateV1VrouterConfig(ctx, pc["partner_a_end_config"])
+				vrouterConfig = migrateV1VrouterConfig(pc["partner_a_end_config"])
 			}
 		}
 	}
@@ -1522,7 +1522,7 @@ func migrateV1EndConfigToV2AEnd(ctx context.Context, rawEnd json.RawMessage, raw
 
 // migrateV1EndConfigToV2BEnd converts a V1 b_end JSON object and V1 b_end_partner_config to the V2 b_end_config object type.
 // rawPartnerConfig is the V1 b_end_partner_config top-level field (may be nil/null).
-func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
+func migrateV1EndConfigToV2BEnd(rawEnd json.RawMessage, rawPartnerConfig json.RawMessage) types.Object {
 	if rawEnd == nil {
 		return types.ObjectNull(vxcBEndConfigAttrs)
 	}
@@ -1565,7 +1565,7 @@ func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage, raw
 				}
 			case "azure":
 				if subRaw, ok := pc["azure_config"]; ok && !isJSONNull(subRaw) {
-					azureConfig = migrateV1AzureConfig(ctx, subRaw)
+					azureConfig = migrateV1AzureConfig(subRaw)
 				}
 			case "google":
 				if subRaw, ok := pc["google_config"]; ok && !isJSONNull(subRaw) {
@@ -1583,7 +1583,7 @@ func migrateV1EndConfigToV2BEnd(ctx context.Context, rawEnd json.RawMessage, raw
 				transit = types.BoolValue(true)
 			case "vrouter":
 				if subRaw, ok := pc["vrouter_config"]; ok && !isJSONNull(subRaw) {
-					vrouterConfig = migrateV1VrouterConfig(ctx, subRaw)
+					vrouterConfig = migrateV1VrouterConfig(subRaw)
 				}
 			}
 		}
@@ -1631,7 +1631,7 @@ func migrateV1AWSConfig(raw json.RawMessage) types.Object {
 }
 
 // migrateV1AzureConfig migrates V1 azure_config JSON to a types.Object.
-func migrateV1AzureConfig(_ context.Context, raw json.RawMessage) types.Object {
+func migrateV1AzureConfig(raw json.RawMessage) types.Object {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return types.ObjectNull(vxcPartnerConfigAzureAttrs)
@@ -1717,7 +1717,7 @@ func migrateV1IBMConfig(raw json.RawMessage) types.Object {
 }
 
 // migrateV1VrouterConfig migrates V1 vrouter_config JSON to a types.Object.
-func migrateV1VrouterConfig(ctx context.Context, raw json.RawMessage) types.Object {
+func migrateV1VrouterConfig(raw json.RawMessage) types.Object {
 	if len(raw) == 0 || isJSONNull(raw) {
 		return types.ObjectNull(vxcPartnerConfigVrouterAttrs)
 	}
@@ -1728,7 +1728,7 @@ func migrateV1VrouterConfig(ctx context.Context, raw json.RawMessage) types.Obje
 
 	ifacesList := types.ListNull(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs))
 	if ifacesRaw, ok := fields["interfaces"]; ok && !isJSONNull(ifacesRaw) {
-		ifacesList = migrateV1VrouterInterfaces(ctx, ifacesRaw)
+		ifacesList = migrateV1VrouterInterfaces(ifacesRaw)
 	}
 
 	vals := map[string]attr.Value{
@@ -1739,7 +1739,7 @@ func migrateV1VrouterConfig(ctx context.Context, raw json.RawMessage) types.Obje
 }
 
 // migrateV1VrouterInterfaces migrates a V1 vrouter interfaces JSON array to a types.List.
-func migrateV1VrouterInterfaces(_ context.Context, raw json.RawMessage) types.List {
+func migrateV1VrouterInterfaces(raw json.RawMessage) types.List {
 	nullList := types.ListNull(types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs))
 
 	var rawIfaces []json.RawMessage
