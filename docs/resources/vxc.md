@@ -361,7 +361,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The password of the BGP connection.
+- `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -414,7 +414,7 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The authentication key of the partner configuration.
+- `auth_key` (String) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -425,7 +425,7 @@ Optional:
 
 Required:
 
-- `service_key` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The service key of the partner configuration. Required for Azure partner configurations.
+- `service_key` (String) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:
 
@@ -528,7 +528,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The password of the BGP connection.
+- `password` (String) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.

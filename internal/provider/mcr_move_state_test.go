@@ -146,11 +146,11 @@ func TestMoveState_MCR_V1ToV2(t *testing.T) {
 	// Verify tags
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
-	assert.Equal(t, "prod", stringAttrValue(t, attrTags["account"]))
+	assert.Equal(t, "prod", asTypesString(t, attrTags["account"]))
 
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
-	assert.Equal(t, "staging", stringAttrValue(t, resTags["env"]))
+	assert.Equal(t, "staging", asTypesString(t, resTags["env"]))
 }
 
 func TestMoveState_MCR_V1ToV2_NilOptionals(t *testing.T) {
@@ -223,16 +223,16 @@ func TestMoveState_MCR_V1ToV2_WithTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", stringAttrValue(t, attrTags["account"]))
-	assert.Equal(t, "network", stringAttrValue(t, attrTags["team"]))
-	assert.Equal(t, "us-west", stringAttrValue(t, attrTags["region"]))
+	assert.Equal(t, "prod", asTypesString(t, attrTags["account"]))
+	assert.Equal(t, "network", asTypesString(t, attrTags["team"]))
+	assert.Equal(t, "us-west", asTypesString(t, attrTags["region"]))
 
 	// Verify resource_tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "production", stringAttrValue(t, resTags["env"]))
-	assert.Equal(t, "platform-team", stringAttrValue(t, resTags["owner"]))
+	assert.Equal(t, "production", asTypesString(t, resTags["env"]))
+	assert.Equal(t, "platform-team", asTypesString(t, resTags["owner"]))
 }
 
 func TestMoveState_MCR_WrongProvider(t *testing.T) {

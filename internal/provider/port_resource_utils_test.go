@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -67,9 +66,9 @@ func TestLagPortUIDsList_WithUIDs(t *testing.T) {
 
 	elements := result.Elements()
 	require.Len(t, elements, 3)
-	assert.Equal(t, "uid-1", stringAttrValue(t, elements[0]))
-	assert.Equal(t, "uid-2", stringAttrValue(t, elements[1]))
-	assert.Equal(t, "uid-3", stringAttrValue(t, elements[2]))
+	assert.Equal(t, "uid-1", asTypesString(t, elements[0]))
+	assert.Equal(t, "uid-2", asTypesString(t, elements[1]))
+	assert.Equal(t, "uid-3", asTypesString(t, elements[2]))
 }
 
 func TestLagPortUIDsList_Empty(t *testing.T) {
@@ -206,11 +205,3 @@ func TestResolvePortModifyParams(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
-
-// stringAttrValue asserts that v is a types.String and returns its value.
-func stringAttrValue(t *testing.T, v attr.Value) string {
-	t.Helper()
-	s, ok := v.(types.String)
-	require.True(t, ok, "expected types.String, got %T", v)
-	return s.ValueString()
-}

@@ -735,7 +735,7 @@ func TestAccMegaportVXC_BasicUntagVLAN(t *testing.T) {
 func TestAccMegaportVXC_UpdateVLAN(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findPortTestLocation(t, 1000)
+	locs := findVXCPortTestLocations(t, 1)
 	portNameA := RandomTestName()
 	portNameB := RandomTestName()
 	vxcName := RandomTestName()
@@ -775,7 +775,7 @@ func TestAccMegaportVXC_UpdateVLAN(t *testing.T) {
 					vlan        = 200
 				}
 			}
-			`, locationID, portNameA, portNameB, vxcName, aVLAN)
+			`, locs[0], portNameA, portNameB, vxcName, aVLAN)
 	}
 
 	resource.Test(t, resource.TestCase{
