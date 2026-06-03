@@ -27,12 +27,11 @@ var waitForTime time.Duration
 
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
-	Environment       types.String `tfsdk:"environment"`
-	AccessKey         types.String `tfsdk:"access_key"`
-	SecretKey         types.String `tfsdk:"secret_key"`
-	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
-	WaitTime          types.Int64  `tfsdk:"wait_time"`
-	CancelAtEndOfTerm types.Bool   `tfsdk:"cancel_at_end_of_term"`
+	Environment   types.String `tfsdk:"environment"`
+	AccessKey     types.String `tfsdk:"access_key"`
+	SecretKey     types.String `tfsdk:"secret_key"`
+	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
+	WaitTime      types.Int64  `tfsdk:"wait_time"`
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -58,8 +57,7 @@ type megaportProvider struct {
 }
 
 type megaportProviderData struct {
-	client            *megaport.Client
-	cancelAtEndOfTerm bool
+	client *megaport.Client
 }
 
 // Metadata returns the provider type name.
@@ -97,10 +95,6 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
-			},
-			"cancel_at_end_of_term": schema.BoolAttribute{
-				Optional:    true,
-				Description: "When true, resources will be marked for cancellation at the end of their billing term rather than immediately. Default is false (immediate cancellation). Please note that this is only applicable to resources that support cancellation at the end of the term, which is currently only the case for Single Ports and LAG Ports. For other resources, this attribute will be ignored.",
 			},
 		},
 	}
@@ -190,11 +184,6 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 
 	if !config.WaitTime.IsNull() {
 		waitTime = int(config.WaitTime.ValueInt64())
-	}
-
-	cancelAtEndOfTerm := false
-	if !config.CancelAtEndOfTerm.IsNull() {
-		cancelAtEndOfTerm = config.CancelAtEndOfTerm.ValueBool()
 	}
 
 	ctx = tflog.SetField(ctx, "environment", environment)
@@ -297,8 +286,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Make the Megaport client available during DataSource and Resource
 	// type Configure methods.
 	providerData := &megaportProviderData{
-		client:            megaportClient,
-		cancelAtEndOfTerm: cancelAtEndOfTerm,
+		client: megaportClient,
 	}
 
 	resp.DataSourceData = providerData
