@@ -46,6 +46,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release History
 
+### [v1.9.1] — 2026-05-21
+
+- ESD-1192: address review feedback on NAT Gateway example values
+- ESD-1192: make NAT Gateway examples self-contained and follow convention
+- ESD-1192: add Import and Example Usage to NAT Gateway docs
+- ci: group gomod Dependabot updates into a single PR
+- fix: keep go.mod indirect marker for x/crypto
+- chore(deps): bump framework to v1.19.0 and sdk to v2.40.1
+- chore(deps): bump terraform-plugin-sdk/v2 and terraform-plugin-testing to match plugin-go v0.31
+- chore(deps): bump terraform-plugin-framework to v1.19.0
+- chore(deps): bump github.com/hashicorp/terraform-plugin-testing
+- chore(deps): bump github.com/hashicorp/terraform-plugin-go
+- chore(deps): bump github.com/hashicorp/terraform-plugin-framework
+
+### [v1.9.0] — 2026-05-20
+
+- test: use add_on_uid as import identifier for MCR IPsec addon
+- fix: address PR review nits on NAT Gateway resources
+- ci: bump generate-step Terraform to 1.11.4 for write-only attribute support
+- fix: address PR review feedback on Cisco/Palo Alto admin password
+- fix: address PR review feedback on NAT Gateway resources
+- feat: resolve NAT Gateway prefix lists for VXC BGP whitelists
+- chore(deps): bump github.com/megaport/megaportgo from 1.10.2 to 1.10.3
+- chore(deps): bump github.com/hashicorp/terraform-plugin-docs
+- chore(deps): bump hashicorp/setup-terraform in the github-actions group
+- ci: add Dependabot cooldown for new releases
+- test: generate ephemeral SSH key for Palo Alto MVE acceptance test
+- test: add acceptance tests for Cisco FTDv and Palo Alto VM-Series MVEs
+- feat: wire admin_password through to Palo Alto MVE vendor config
+- ESD-1080: Add admin_password attribute for Cisco FTDv MVE vendor config
+- ci: harden GitHub Actions workflows
+- fix: NAT Gateway VXC integration and acceptance-test robustness
+- test: add NAT Gateway packet filter, prefix list, and VXC acceptance tests
+- feat: extend VXC vrouter partner config for NAT Gateway A-End interfaces
+- feat: add megaport_nat_gateway_packet_filter and megaport_nat_gateway_prefix_list resources
+- fix: force promo code on nat gateway to require replacement if changed
+- fix: promo code cleanup
+- fix: drop last_updated field from nat_gateway resource
+- test: pick NAT Gateway test location by NAT Gateway speed
+- refactor: route NAT Gateway delete through NATGatewayService
+- feat: expose session_count on NAT Gateway resource
+- feat: purchase NAT Gateway through to provisioning on create
+- fix: remove blocking provisioning wait for NAT Gateway create
+- fix: adapt tests to PR 349 standalone pattern
+- fix: send empty tag slice when resource_tags removed from config
+- fix: improve NAT Gateway provisioning wait loop and error propagation
+- docs: regenerate nat_gateway docs after schema change
+- fix: address Copilot review feedback on NAT Gateway resource
+- fix: restore locked, admin_locked, and service_level_reference to nat_gateway resource
+- fix: address PR review feedback on nat_gateway resource
+- feat: add megaport_nat_gateway resource
+
 ### [v1.8.0] — 2026-05-10
 
 - ESD-1094: bump golangci-lint to v2.11.4 for Go 1.25 support
