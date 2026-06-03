@@ -56,8 +56,8 @@ func TestFromAPIPort_Full(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 2)
-	assert.Equal(t, "test", tagElements["env"].(types.String).ValueString())
-	assert.Equal(t, "platform", tagElements["team"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("test"), tagElements["env"])
+	assert.Equal(t, types.StringValue("platform"), tagElements["team"])
 }
 
 func TestFromAPIPort_MinimalFields(t *testing.T) {
@@ -163,6 +163,10 @@ func TestAccMegaportSinglePort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
 				),
@@ -185,7 +189,7 @@ func TestAccMegaportSinglePort_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"resources"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 			{
 				Config: providerConfig + fmt.Sprintf(`
@@ -215,6 +219,10 @@ func TestAccMegaportSinglePort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key1-updated", "value1-updated"),
 					resource.TestCheckResourceAttr("megaport_port.port", "resource_tags.key2-updated", "value2-updated"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_port.port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_port.port", "company_uid"),
 				),

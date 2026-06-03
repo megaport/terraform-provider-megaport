@@ -58,7 +58,7 @@ func TestFromAPILagPort_Full(t *testing.T) {
 	assert.False(t, model.ResourceTags.IsNull())
 	tagElements := model.ResourceTags.Elements()
 	require.Len(t, tagElements, 1)
-	assert.Equal(t, "prod", tagElements["env"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), tagElements["env"])
 }
 
 func TestFromAPILagPort_MinimalFields(t *testing.T) {
@@ -132,6 +132,10 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
 				),
@@ -154,7 +158,7 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"lag_count", "lag_port_uids", "resources"},
+				ImportStateVerifyIgnore: []string{"last_updated", "lag_count", "lag_port_uids", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 			// Update Testing
 			{
@@ -185,6 +189,10 @@ func TestAccMegaportLAGPort_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "created_by"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "company_uid"),
 				),

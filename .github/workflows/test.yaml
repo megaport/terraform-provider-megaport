@@ -34,7 +34,7 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@v8
         with:
-          version: 'v2.3.1' # Use golangci-lint v2 to match config version
+          version: 'v2.11.4' # golangci-lint v2 to match config; v2.9.0+ required for Go 1.25
           args: --timeout=10m
           skip-cache: true # Disable golangci-lint-action's cache
         # Add retry logic
@@ -45,7 +45,7 @@ jobs:
         if: steps.lint.outcome == 'failure'
         uses: golangci/golangci-lint-action@v8
         with:
-          version: 'v2.3.1' # Use golangci-lint v2 to match config version
+          version: 'v2.11.4' # golangci-lint v2 to match config; v2.9.0+ required for Go 1.25
           args: --timeout=10m
           skip-cache: true # Also disable cache in the retry step
 
@@ -58,11 +58,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      # Temporarily download Terraform 1.8 prerelease for function documentation support.
-      # When Terraform 1.8.0 final is released, this can be removed.
+      # Terraform 1.11+ is required for write-only attribute documentation rendering.
       - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
         with:
-          terraform_version: '1.8.0-alpha20240216'
+          terraform_version: '1.11.4'
           terraform_wrapper: false
       - run: go generate ./...
       - name: git diff

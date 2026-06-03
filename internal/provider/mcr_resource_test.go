@@ -58,15 +58,15 @@ func TestFromAPIMCR_Full(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull())
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 2)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "network", attrTags["team"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), attrTags["account"])
+	assert.Equal(t, types.StringValue("network"), attrTags["team"])
 
 	// Verify resource tags
 	assert.False(t, model.ResourceTags.IsNull())
 	resTags := model.ResourceTags.Elements()
 	assert.Len(t, resTags, 2)
-	assert.Equal(t, "test", resTags["env"].(types.String).ValueString())
-	assert.Equal(t, "ci", resTags["owner"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("test"), resTags["env"])
+	assert.Equal(t, types.StringValue("ci"), resTags["owner"])
 }
 
 func TestFromAPIMCR_MinimalFields(t *testing.T) {
@@ -184,9 +184,9 @@ func TestFromAPIMCR_AttributeTags(t *testing.T) {
 	assert.False(t, model.AttributeTags.IsNull(), "attribute tags should not be null")
 	attrTags := model.AttributeTags.Elements()
 	assert.Len(t, attrTags, 3)
-	assert.Equal(t, "prod", attrTags["account"].(types.String).ValueString())
-	assert.Equal(t, "us-west", attrTags["region"].(types.String).ValueString())
-	assert.Equal(t, "premium", attrTags["tier"].(types.String).ValueString())
+	assert.Equal(t, types.StringValue("prod"), attrTags["account"])
+	assert.Equal(t, types.StringValue("us-west"), attrTags["region"])
+	assert.Equal(t, types.StringValue("premium"), attrTags["tier"])
 }
 
 func TestFromAPIMCR_EmptyAttributeTags(t *testing.T) {
@@ -745,4 +745,3 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 		},
 	})
 }
-
