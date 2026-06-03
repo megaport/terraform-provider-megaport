@@ -1924,13 +1924,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 // terminal state, or the timeout elapses. Transient read errors are retried
 // rather than aborting the wait, since the order has already been placed.
 func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
-	timeout := time.NewTimer(timeoutAfter)
-	defer timeout.Stop()
+	// The polls share this deadline so a stalled HTTP request can't hang
+	// the wait past the overall timeout.
+	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
+	defer cancel()
+
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
-		vxc, err := r.client.VXCService.GetVXC(ctx, uid)
+		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
 		switch {
 		case err != nil:
 			tflog.Warn(ctx, "error polling VXC provisioning status, will retry", map[string]interface{}{
@@ -1944,10 +1947,11 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 		}
 
 		select {
-		case <-timeout.C:
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
-		case <-ctx.Done():
-			return ctx.Err()
 		case <-ticker.C:
 		}
 	}
