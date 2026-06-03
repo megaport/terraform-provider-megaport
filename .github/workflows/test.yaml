@@ -58,11 +58,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      # Temporarily download Terraform 1.8 prerelease for function documentation support.
-      # When Terraform 1.8.0 final is released, this can be removed.
+      # Write-only argument annotations in generated docs require Terraform 1.11+.
       - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
         with:
-          terraform_version: '1.8.0-alpha20240216'
+          terraform_version: '1.14.*'
           terraform_wrapper: false
       - run: go generate ./...
       - name: git diff
