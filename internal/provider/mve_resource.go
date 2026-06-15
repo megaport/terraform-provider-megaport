@@ -641,6 +641,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"account_key": schema.StringAttribute{
 						Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
@@ -657,10 +658,12 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"license_data": schema.StringAttribute{
 						Description: "The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
 						Description: "The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"admin_password": schema.StringAttribute{
@@ -683,10 +686,12 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"local_auth": schema.StringAttribute{
 						Description: "The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"remote_auth": schema.StringAttribute{
 						Description: "The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"serial_number": schema.StringAttribute{
@@ -703,6 +708,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vco_activation_code": schema.StringAttribute{
 						Description: "The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"fmc_ip_address": schema.StringAttribute{
@@ -711,6 +717,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"fmc_registration_key": schema.StringAttribute{
 						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"fmc_nat_id": schema.StringAttribute{
@@ -719,14 +726,17 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"token": schema.StringAttribute{
 						Description: "The token for the vendor config. Required for Meraki MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"ion_key": schema.StringAttribute{
 						Description: "The vION key for the vendor config. Required for Prisma MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"secret_key": schema.StringAttribute{
 						Description: "The secret key for the vendor config. Required for Prisma MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 				},
