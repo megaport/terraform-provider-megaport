@@ -223,29 +223,29 @@ Required:
 
 Optional:
 
-- `account_key` (String) The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.
+- `account_key` (String, Sensitive) The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.
 - `account_name` (String) The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.
 - `admin_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.
-- `admin_password_hash` (String) The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).
+- `admin_password_hash` (String, Sensitive) The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).
 - `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.
 - `cloud_init` (String) The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.
 - `controller_address` (String) The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.
 - `director_address` (String) The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.
 - `fmc_ip_address` (String) The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `fmc_nat_id` (String) The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.
-- `fmc_registration_key` (String) The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.
-- `ion_key` (String) The vION key for the vendor config. Required for Prisma MVE.
-- `license_data` (String) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
-- `local_auth` (String) The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.
+- `fmc_registration_key` (String, Sensitive) The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.
+- `ion_key` (String, Sensitive) The vION key for the vendor config. Required for Prisma MVE.
+- `license_data` (String, Sensitive) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
+- `local_auth` (String, Sensitive) The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.
 - `manage_locally` (Boolean) Whether to manage the MVE locally. Required for Cisco MVE.
 - `mve_label` (String) The MVE label for the vendor config.
-- `remote_auth` (String) The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.
-- `secret_key` (String) The secret key for the vendor config. Required for Prisma MVE.
+- `remote_auth` (String, Sensitive) The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.
+- `secret_key` (String, Sensitive) The secret key for the vendor config. Required for Prisma MVE.
 - `serial_number` (String) The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.
 - `ssh_public_key` (String) The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'
 - `system_tag` (String) The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.
-- `token` (String) The token for the vendor config. Required for Meraki MVE.
-- `vco_activation_code` (String) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
+- `token` (String, Sensitive) The token for the vendor config. Required for Meraki MVE.
+- `vco_activation_code` (String, Sensitive) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
 - `vco_address` (String) The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.
 
 

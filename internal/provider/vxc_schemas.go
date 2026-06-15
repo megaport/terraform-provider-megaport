@@ -41,6 +41,7 @@ var (
 			},
 			"auth_key": schema.StringAttribute{
 				Description: "The authentication key of the partner configuration.",
+				Sensitive:   true,
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
@@ -104,6 +105,7 @@ var (
 						},
 						"shared_key": schema.StringAttribute{
 							Description: "The shared key of the peer.",
+							Sensitive:   true,
 							Optional:    true,
 						},
 						"vlan": schema.Int64Attribute{
@@ -279,6 +281,7 @@ var (
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
+										Sensitive:   true,
 										Optional:    true,
 									},
 									"shutdown": schema.BoolAttribute{

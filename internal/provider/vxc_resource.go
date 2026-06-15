@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -1208,8 +1209,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		CostCentre: plan.CostCentre.ValueString(),
 		ServiceKey: plan.ServiceKey.ValueString(),
 
-		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		// Don't wait inside BuyVXC — on wait failure it discards the UID,
+		// orphaning the ordered VXC. We persist the UID to state first,
+		// then wait ourselves (see waitForVXCProvision below).
+		WaitForProvision: false,
 	}
 
 	var serviceKeyBEndUID string
@@ -1866,12 +1869,27 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdVXC.TechnicalServiceUID
 
+	// Persist the UID immediately so any failure below leaves a tracked
+	// (tainted) resource instead of an orphan that later applies try to recreate.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
+		resp.Diagnostics.AddError(
+			"VXC ordered but not ready",
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+		)
+		return
+	}
+
 	// get the created VXC
 	vxc, err := r.client.VXCService.GetVXC(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading newly created VXC",
-			"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was created but could not be read back: "+err.Error()+". Its UID has been saved to state.",
 		)
 		return
 	}
@@ -1880,7 +1898,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for newly created VXC",
-			"Could not read tags for newly created VXC with ID "+createdID+": "+err.Error(),
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was created but its tags could not be read: "+err.Error()+". Its UID has been saved to state.",
 		)
 		return
 	}
@@ -1899,6 +1917,43 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+}
+
+// waitForVXCProvision polls the VXC until it reaches a ready state, hits a
+// terminal state, or the timeout elapses. Transient read errors are retried
+// rather than aborting the wait, since the order has already been placed.
+func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
+	// The polls share this deadline so a stalled HTTP request can't hang
+	// the wait past the overall timeout.
+	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
+		switch {
+		case err != nil:
+			tflog.Warn(ctx, "error polling VXC provisioning status, will retry", map[string]interface{}{
+				"vxc_uid": uid,
+				"error":   err.Error(),
+			})
+		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
+			return nil
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED:
+			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		}
+
+		select {
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
+		case <-ticker.C:
+		}
 	}
 }
 
