@@ -21,6 +21,7 @@ type MockVXCService struct {
 	ListVXCsErr               error
 	GetVXCResult              *megaport.VXC
 	GetVXCErr                 error
+	GetVXCFunc                func(ctx context.Context, id string) (*megaport.VXC, error)
 	ListVXCResourceTagsFunc   func(ctx context.Context, vxcID string) (map[string]string, error)
 	ListVXCResourceTagsErr    error
 	ListVXCResourceTagsResult map[string]string
@@ -38,6 +39,9 @@ func (m *MockVXCService) ListVXCs(ctx context.Context, req *megaport.ListVXCsReq
 }
 
 func (m *MockVXCService) GetVXC(ctx context.Context, id string) (*megaport.VXC, error) {
+	if m.GetVXCFunc != nil {
+		return m.GetVXCFunc(ctx, id)
+	}
 	if m.GetVXCErr != nil {
 		return nil, m.GetVXCErr
 	}

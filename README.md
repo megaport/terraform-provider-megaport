@@ -500,6 +500,27 @@ If you need to find the location ID for a specific site code, you can:
 
 ---
 
+## 🚨 BREAKING CHANGE: `cancel_at_end_of_term` Removed
+
+### ⚠️ Action required if you set `cancel_at_end_of_term`
+
+**If your `provider "megaport"` block sets `cancel_at_end_of_term`, you must remove it or your `terraform plan`/`apply` will fail with an "Unsupported argument" error.**
+
+The Megaport API no longer accepts delayed (end-of-term) cancellation, so the provider now always issues an immediate `CANCEL_NOW` when destroying resources. The `cancel_at_end_of_term` provider option has been removed.
+
+#### ❌ What No Longer Works
+```terraform
+provider "megaport" {
+  # ...
+  cancel_at_end_of_term = true  # ❌ removed - Terraform will reject this argument
+}
+```
+
+#### ✅ What To Do
+Delete the `cancel_at_end_of_term` line from your provider block. Resource deletion is always immediate - see [Resource Cancellation](#resource-cancellation) for details and billing implications.
+
+---
+
 ## Datacenter Location Data Source
 
 Locations for Megaport Data Centers can be retrieved using the Locations Data Source in the Megaport Terraform Provider.
