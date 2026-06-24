@@ -122,11 +122,27 @@ jobs:
           mkdir -p /tmp/opentofu-test
           cd /tmp/opentofu-test
 
-          # Create proper directory structure for the provider
-          # Note: We need to match the source exactly as it appears in the configuration
-          mkdir -p .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
-          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v1.0.0 .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/
-          chmod +x .terraform/plugins/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/terraform-provider-megaport_v1.0.0
+          # Stage the locally built provider into a filesystem mirror and point
+          # OpenTofu at it via a CLI config. The direct{exclude} block stops
+          # `tofu init` from querying registry.terraform.io for our provider, so
+          # the test never depends on the public registry being reachable.
+          MIRROR=/tmp/tf-mirror
+          mkdir -p "$MIRROR/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/"
+          cp $GITHUB_WORKSPACE/terraform-provider-megaport_v1.0.0 "$MIRROR/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/"
+          chmod +x "$MIRROR/registry.terraform.io/megaport/megaport/1.0.0/linux_amd64/terraform-provider-megaport_v1.0.0"
+
+          cat > /tmp/tofu.tfrc << EOF
+          provider_installation {
+            filesystem_mirror {
+              path    = "$MIRROR"
+              include = ["registry.terraform.io/megaport/megaport"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/megaport/megaport"]
+            }
+          }
+          EOF
+          export TF_CLI_CONFIG_FILE=/tmp/tofu.tfrc
 
           # Create test config with fully qualified source
           cat > main.tf << 'EOL'
@@ -147,8 +163,7 @@ jobs:
           }
           EOL
 
-          # Run OpenTofu commands
-          # Let OpenTofu discover the plugin in the .terraform directory
+          # Run OpenTofu commands against the filesystem mirror (no registry calls)
           tofu init
           tofu providers
 
