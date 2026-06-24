@@ -614,7 +614,6 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
 					bgpToAppend.PermitExportTo = permitExportTo
-					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() {
 					denyExportTo := []string{}
@@ -623,6 +622,31 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					bgpToAppend.DenyExportTo = denyExportTo
 				}
 				toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
+			}
+		}
+		if !iface.IpSecTunnelOptions.IsNull() {
+			tunnels := []*ipSecTunnelOptionsModel{}
+			tunnelDiags := iface.IpSecTunnelOptions.ElementsAs(ctx, &tunnels, false)
+			diags.Append(tunnelDiags...)
+			for _, t := range tunnels {
+				tunnelToAppend := megaport.IPsecTunnelConfig{
+					SourceIpAddress:      t.SourceIPAddress.ValueString(),
+					DestinationIpAddress: t.DestinationIPAddress.ValueString(),
+					PreSharedKey:         t.PreSharedKey.ValueString(),
+					LocalId:              t.LocalID.ValueString(),
+					RemoteId:             t.RemoteID.ValueString(),
+				}
+				// Pointer fields: only set when configured so nil keeps the API default.
+				if !t.Passive.IsNull() {
+					tunnelToAppend.Passive = megaport.PtrTo(t.Passive.ValueBool())
+				}
+				if !t.Phase1Lifetime.IsNull() {
+					tunnelToAppend.Phase1Lifetime = megaport.PtrTo(int(t.Phase1Lifetime.ValueInt64()))
+				}
+				if !t.Phase2Lifetime.IsNull() {
+					tunnelToAppend.Phase2Lifetime = megaport.PtrTo(int(t.Phase2Lifetime.ValueInt64()))
+				}
+				toAppend.IpSecTunnelOptions = append(toAppend.IpSecTunnelOptions, tunnelToAppend)
 			}
 		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
@@ -740,7 +764,6 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() {
