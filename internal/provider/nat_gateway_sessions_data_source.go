@@ -87,6 +87,8 @@ func (d *natGatewaySessionsDataSource) Read(ctx context.Context, _ datasource.Re
 
 	entryObjects := make([]types.Object, 0, len(sessions))
 	for _, s := range sessions {
+		// A speed advertising no session counts is not orderable, so it is
+		// intentionally omitted from the matrix returned to HCL.
 		if s == nil || len(s.SessionCount) == 0 {
 			continue
 		}
