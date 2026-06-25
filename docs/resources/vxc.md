@@ -556,7 +556,7 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
-- `ip_sec_tunnel_options` (Attributes List) One or more IPsec tunnels to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. These values are write-only: the API does not return the pre-shared key or lifetimes on read, so the provider preserves the configured values and they never show drift. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. These values are write-only: the API does not return the pre-shared key or lifetimes on read, so the provider preserves the configured values and they never show drift. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
@@ -615,7 +615,7 @@ Required:
 
 - `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
 - `pre_shared_key` (String, Sensitive) Pre-shared key used to authenticate the IPsec tunnel. Write-only: not returned by the API on read.
-- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
 
 Optional:
 
@@ -811,7 +811,7 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
-- `ip_sec_tunnel_options` (Attributes List) One or more IPsec tunnels to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. These values are write-only: the API does not return the pre-shared key or lifetimes on read, so the provider preserves the configured values and they never show drift. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. These values are write-only: the API does not return the pre-shared key or lifetimes on read, so the provider preserves the configured values and they never show drift. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
@@ -870,7 +870,7 @@ Required:
 
 - `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
 - `pre_shared_key` (String, Sensitive) Pre-shared key used to authenticate the IPsec tunnel. Write-only: not returned by the API on read.
-- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
 
 Optional:
 

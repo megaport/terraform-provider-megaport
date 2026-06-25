@@ -17,7 +17,7 @@ const (
 
 // ipSecPhaseLifetimeValidator enforces the API rule that an IPsec tunnel's
 // phase 2 lifetime must be shorter than its phase 1 lifetime. It runs at plan
-// time on each ip_sec_tunnel_options object so users get a clear error instead
+// time on the ip_sec_tunnel_options object so users get a clear error instead
 // of an order rejection. A null lifetime takes the API default, so the defaults
 // are folded in before comparing (this catches a high phase2 paired with an
 // omitted phase1). The absolute range checks live on the individual attributes;

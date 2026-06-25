@@ -198,7 +198,7 @@ var (
 		"bfd":                   types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
 		"vlan":                  types.Int64Type,
 		"bgp_connections":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
-		"ip_sec_tunnel_options": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs)),
+		"ip_sec_tunnel_options": types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs),
 		"description":           types.StringType,
 		"interface_type":        types.StringType,
 		"packet_filter_in":      types.Int64Type,
@@ -435,7 +435,7 @@ type vxcPartnerConfigInterfaceModel struct {
 	NatIPAddresses     types.List   `tfsdk:"nat_ip_addresses"`
 	Bfd                types.Object `tfsdk:"bfd"`
 	BgpConnections     types.List   `tfsdk:"bgp_connections"`
-	IpSecTunnelOptions types.List   `tfsdk:"ip_sec_tunnel_options"`
+	IpSecTunnelOptions types.Object `tfsdk:"ip_sec_tunnel_options"`
 	VLAN               types.Int64  `tfsdk:"vlan"`
 	Description        types.String `tfsdk:"description"`
 	InterfaceType      types.String `tfsdk:"interface_type"`

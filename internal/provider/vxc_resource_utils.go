@@ -624,30 +624,28 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 				toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
 			}
 		}
-		if !iface.IpSecTunnelOptions.IsNull() {
-			tunnels := []*ipSecTunnelOptionsModel{}
-			tunnelDiags := iface.IpSecTunnelOptions.ElementsAs(ctx, &tunnels, false)
+		if !iface.IpSecTunnelOptions.IsNull() && !iface.IpSecTunnelOptions.IsUnknown() {
+			var t ipSecTunnelOptionsModel
+			tunnelDiags := iface.IpSecTunnelOptions.As(ctx, &t, basetypes.ObjectAsOptions{})
 			diags.Append(tunnelDiags...)
-			for _, t := range tunnels {
-				tunnelToAppend := megaport.IPsecTunnelConfig{
-					SourceIpAddress:      t.SourceIPAddress.ValueString(),
-					DestinationIpAddress: t.DestinationIPAddress.ValueString(),
-					PreSharedKey:         t.PreSharedKey.ValueString(),
-					LocalId:              t.LocalID.ValueString(),
-					RemoteId:             t.RemoteID.ValueString(),
-				}
-				// Pointer fields: only set when configured so nil keeps the API default.
-				if !t.Passive.IsNull() {
-					tunnelToAppend.Passive = megaport.PtrTo(t.Passive.ValueBool())
-				}
-				if !t.Phase1Lifetime.IsNull() {
-					tunnelToAppend.Phase1Lifetime = megaport.PtrTo(int(t.Phase1Lifetime.ValueInt64()))
-				}
-				if !t.Phase2Lifetime.IsNull() {
-					tunnelToAppend.Phase2Lifetime = megaport.PtrTo(int(t.Phase2Lifetime.ValueInt64()))
-				}
-				toAppend.IpSecTunnelOptions = append(toAppend.IpSecTunnelOptions, tunnelToAppend)
+			tunnel := megaport.IPsecTunnelConfig{
+				SourceIpAddress:      t.SourceIPAddress.ValueString(),
+				DestinationIpAddress: t.DestinationIPAddress.ValueString(),
+				PreSharedKey:         t.PreSharedKey.ValueString(),
+				LocalId:              t.LocalID.ValueString(),
+				RemoteId:             t.RemoteID.ValueString(),
 			}
+			// Pointer fields: only set when configured so nil keeps the API default.
+			if !t.Passive.IsNull() {
+				tunnel.Passive = megaport.PtrTo(t.Passive.ValueBool())
+			}
+			if !t.Phase1Lifetime.IsNull() {
+				tunnel.Phase1Lifetime = megaport.PtrTo(int(t.Phase1Lifetime.ValueInt64()))
+			}
+			if !t.Phase2Lifetime.IsNull() {
+				tunnel.Phase2Lifetime = megaport.PtrTo(int(t.Phase2Lifetime.ValueInt64()))
+			}
+			toAppend.IpSecTunnelOptions = &tunnel
 		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}

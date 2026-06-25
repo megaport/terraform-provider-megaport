@@ -12,63 +12,72 @@ import (
 )
 
 // TestCreateVrouterPartnerConfig_IPsecTunnelOptions verifies the model -> SDK
-// mapping for ip_sec_tunnel_options, including the multi-tunnel case and the
-// "nil keeps the API default" behavior for the optional pointer fields.
+// mapping for ip_sec_tunnel_options. There is one tunnel per ipSecTunnel
+// interface, so the multi-tunnel case is two interfaces. It also covers the
+// "nil keeps the API default" behavior for the optional pointer fields and that
+// a nil tunnel is omitted entirely (never an empty object).
 func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	ctx := context.Background()
 
-	tunnels := []ipSecTunnelOptionsModel{
-		{
-			// Fully populated tunnel.
-			SourceIPAddress:      types.StringValue("169.254.1.1"),
-			DestinationIPAddress: types.StringValue("203.0.113.1"),
-			PreSharedKey:         types.StringValue("secret-one"),
-			Passive:              types.BoolValue(false),
-			LocalID:              types.StringValue("local-1"),
-			RemoteID:             types.StringValue("remote-1"),
-			Phase1Lifetime:       types.Int64Value(7200),
-			Phase2Lifetime:       types.Int64Value(3600),
-		},
-		{
-			// Minimal tunnel: only the required fields; optionals left null so
-			// the API applies its defaults.
-			SourceIPAddress:      types.StringValue("169.254.2.1"),
-			DestinationIPAddress: types.StringValue("203.0.113.2"),
-			PreSharedKey:         types.StringValue("secret-two"),
-			Passive:              types.BoolNull(),
-			LocalID:              types.StringNull(),
-			RemoteID:             types.StringNull(),
-			Phase1Lifetime:       types.Int64Null(),
-			Phase2Lifetime:       types.Int64Null(),
-		},
+	fullTunnel := ipSecTunnelOptionsModel{
+		SourceIPAddress:      types.StringValue("169.254.1.1"),
+		DestinationIPAddress: types.StringValue("203.0.113.1"),
+		PreSharedKey:         types.StringValue("secret-one"),
+		Passive:              types.BoolValue(false),
+		LocalID:              types.StringValue("local-1"),
+		RemoteID:             types.StringValue("remote-1"),
+		Phase1Lifetime:       types.Int64Value(7200),
+		Phase2Lifetime:       types.Int64Value(3600),
+	}
+	// Minimal tunnel: only the required fields; optionals left null so the API
+	// applies its defaults.
+	minimalTunnel := ipSecTunnelOptionsModel{
+		SourceIPAddress:      types.StringValue("169.254.2.1"),
+		DestinationIPAddress: types.StringValue("203.0.113.2"),
+		PreSharedKey:         types.StringValue("secret-two"),
+		Passive:              types.BoolNull(),
+		LocalID:              types.StringNull(),
+		RemoteID:             types.StringNull(),
+		Phase1Lifetime:       types.Int64Null(),
+		Phase2Lifetime:       types.Int64Null(),
 	}
 
-	tunnelList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs), tunnels)
-	require.False(t, diags.HasError(), "building tunnel list: %v", diags)
+	fullObj, diags := types.ObjectValueFrom(ctx, ipSecTunnelOptionsAttrs, fullTunnel)
+	require.False(t, diags.HasError(), "building full tunnel object: %v", diags)
+	minimalObj, diags := types.ObjectValueFrom(ctx, ipSecTunnelOptionsAttrs, minimalTunnel)
+	require.False(t, diags.HasError(), "building minimal tunnel object: %v", diags)
 
-	iface := vxcPartnerConfigInterfaceModel{
-		InterfaceType:      types.StringValue("ipSecTunnel"),
-		IPAddresses:        types.ListNull(types.StringType),
-		IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		NatIPAddresses:     types.ListNull(types.StringType),
-		Bfd:                types.ObjectNull(bfdConfigAttrs),
-		BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
-		IpSecTunnelOptions: tunnelList,
+	newIface := func(tunnel types.Object) vxcPartnerConfigInterfaceModel {
+		return vxcPartnerConfigInterfaceModel{
+			InterfaceType:      types.StringValue("ipSecTunnel"),
+			IPAddresses:        types.ListNull(types.StringType),
+			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+			NatIPAddresses:     types.ListNull(types.StringType),
+			Bfd:                types.ObjectNull(bfdConfigAttrs),
+			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+			IpSecTunnelOptions: tunnel,
+		}
 	}
-	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{iface})
+
+	// A third interface with no tunnel confirms nil is omitted, not serialized.
+	noTunnelIface := newIface(types.ObjectNull(ipSecTunnelOptionsAttrs))
+
+	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{
+		newIface(fullObj),
+		newIface(minimalObj),
+		noTunnelIface,
+	})
 	require.False(t, diags.HasError(), "building interface list: %v", diags)
 
 	model := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
 
 	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil)
 	require.False(t, diags.HasError(), "createVrouterPartnerConfig: %v", diags)
-	require.Len(t, vrouterConfig.Interfaces, 1)
-
-	got := vrouterConfig.Interfaces[0].IpSecTunnelOptions
-	require.Len(t, got, 2, "expected both tunnels mapped")
+	require.Len(t, vrouterConfig.Interfaces, 3)
 
 	// Fully populated tunnel.
-	full := got[0]
+	full := vrouterConfig.Interfaces[0].IpSecTunnelOptions
+	require.NotNil(t, full)
 	assert.Equal(t, "169.254.1.1", full.SourceIpAddress)
 	assert.Equal(t, "203.0.113.1", full.DestinationIpAddress)
 	assert.Equal(t, "secret-one", full.PreSharedKey)
@@ -82,7 +91,8 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	assert.Equal(t, 3600, *full.Phase2Lifetime)
 
 	// Minimal tunnel: optional pointers stay nil so the API default applies.
-	minimal := got[1]
+	minimal := vrouterConfig.Interfaces[1].IpSecTunnelOptions
+	require.NotNil(t, minimal)
 	assert.Equal(t, "169.254.2.1", minimal.SourceIpAddress)
 	assert.Equal(t, "203.0.113.2", minimal.DestinationIpAddress)
 	assert.Equal(t, "secret-two", minimal.PreSharedKey)
@@ -91,6 +101,9 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	assert.Nil(t, minimal.Passive)
 	assert.Nil(t, minimal.Phase1Lifetime)
 	assert.Nil(t, minimal.Phase2Lifetime)
+
+	// No tunnel: pointer stays nil so the field is omitted from the payload.
+	assert.Nil(t, vrouterConfig.Interfaces[2].IpSecTunnelOptions)
 }
 
 // TestIPSecPhaseLifetimeValidator covers the cross-field rule that phase2 must

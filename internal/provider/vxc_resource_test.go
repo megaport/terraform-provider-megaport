@@ -4498,7 +4498,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 }
 
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
-// whose A-End vrouter interface declares an ip_sec_tunnel_options block, then
+// whose A-End vrouter config declares two interfaces: a subInterface carrying
+// the tunnel source IP, and an ipSecTunnel interface with a single
+// ip_sec_tunnel_options object (one tunnel per ipSecTunnel interface). It then
 // relies on the framework's post-apply plan to confirm the write-only tunnel
 // fields (PSK, lifetimes) produce no drift. The peer addresses are illustrative
 // (RFC 5737 / link-local); a live run against a real peer may need real values.
@@ -4549,16 +4551,22 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 			a_end_partner_config = {
 				partner = "vrouter"
 				vrouter_config = {
-					interfaces = [{
-						interface_type = "ipSecTunnel"
-						ip_sec_tunnel_options = [{
-							source_ip_address      = "169.254.100.1"
-							destination_ip_address = "203.0.113.10"
-							pre_shared_key         = "tf-acc-test-psk"
-							phase1_lifetime        = 28800
-							phase2_lifetime        = 3600
-						}]
-					}]
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["169.254.100.1/30"]
+						},
+						{
+							interface_type = "ipSecTunnel"
+							ip_sec_tunnel_options = {
+								source_ip_address      = "169.254.100.1"
+								destination_ip_address = "203.0.113.10"
+								pre_shared_key         = "tf-acc-test-psk"
+								phase1_lifetime        = 28800
+								phase2_lifetime        = 3600
+							}
+						},
+					]
 				}
 			}
 
@@ -4579,11 +4587,12 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_mcr_ipsec_addon.addon", "add_on_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.ipsec_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.interface_type", "ipSecTunnel"),
-					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_sec_tunnel_options.0.source_ip_address", "169.254.100.1"),
-					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_sec_tunnel_options.0.destination_ip_address", "203.0.113.10"),
-					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_sec_tunnel_options.0.phase1_lifetime", "28800"),
-					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_sec_tunnel_options.0.phase2_lifetime", "3600"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.interface_type", "subInterface"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.interface_type", "ipSecTunnel"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.source_ip_address", "169.254.100.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.destination_ip_address", "203.0.113.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase1_lifetime", "28800"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase2_lifetime", "3600"),
 				),
 			},
 		},
