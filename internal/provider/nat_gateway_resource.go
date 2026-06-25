@@ -639,6 +639,17 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 		return
 	}
 
+	if len(matrix) == 0 {
+		// Fail open: an empty-but-successful matrix would otherwise make
+		// natGatewaySpeedSessionSupported reject every plan. Treat it like a
+		// lookup failure; apply still validates server-side.
+		resp.Diagnostics.AddWarning(
+			"Could not validate NAT Gateway speed / session count at plan time",
+			"The NAT Gateway availability matrix was empty. Apply will still reject invalid combinations server-side.",
+		)
+		return
+	}
+
 	if attrPath, msg, ok := natGatewaySpeedSessionSupported(matrix, speed, sessionCount); !ok {
 		resp.Diagnostics.AddAttributeError(attrPath, "Invalid NAT Gateway speed / session count combination", msg)
 	}
