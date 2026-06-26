@@ -2797,13 +2797,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				requiresReplace:       &resp.RequiresReplace,
 				diags:                 &diags,
 			})
-			resp.Plan.Set(ctx, &plan)
+			resp.Diagnostics.Append(diags...)
+			if !resp.Diagnostics.HasError() {
+				resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+			}
 		}
-	}
-
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
 	}
 }
 
@@ -2848,6 +2846,8 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) (newPlanObj, 
 	}
 
 	switch {
+	case planConfig.RequestedProductUID.IsUnknown():
+		// Leave unknown as-is; framework will resolve it once the upstream resource is applied.
 	case stateConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.IsNull():
 		stateConfig.RequestedProductUID = stateConfig.CurrentProductUID
 		planConfig.RequestedProductUID = stateConfig.CurrentProductUID
