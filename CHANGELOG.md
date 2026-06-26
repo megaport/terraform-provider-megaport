@@ -46,6 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release History
 
+### [v1.10.1] — 2026-06-11
+
+- ESD-1368 Mark all sensitive fields as such.
+- docs: flag cancel_at_end_of_term removal as a breaking change in README
+
+### [v1.10.0] — 2026-06-04
+
+- Bound provisioning polls with a deadline context
+- Poll immediately and short-circuit on terminal VXC states
+- ESD-1314: persist VXC UID to state before provisioning wait
+- docs: scope billing warning to production environments
+- docs: warn about early termination billing impact on resource delete
+- docs: address copilot review feedback round 2
+- fix: address copilot review feedback
+- fix: prevent delayed cancellation for ports
+
 ### [v1.9.1] — 2026-05-21
 
 - ESD-1192: address review feedback on NAT Gateway example values
