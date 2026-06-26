@@ -57,6 +57,10 @@ func (m *MockIXService) DeleteIX(ctx context.Context, id string, req *megaport.D
 	return nil
 }
 
+func (m *MockIXService) ListIXPs(ctx context.Context, req *megaport.ListIXPsRequest) ([]*megaport.IXP, error) {
+	return nil, nil
+}
+
 // ixsReadRequest builds a datasource.ReadRequest and ReadResponse for the ixs
 // data source schema. When productUID is non-nil the config sets product_uid to
 // that value; otherwise the attribute is null (triggering a list-all call).
