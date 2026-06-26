@@ -534,8 +534,12 @@ func mergeVrouterPartnerConfigFromAPI(
 				existingBgp.BfdEnabled = types.BoolValue(apiBgp.BfdEnabled)
 
 				// Update optional fields only if user configured them (non-null in state)
-				if !existingBgp.LocalAsn.IsNull() && apiBgp.LocalAsn != nil {
-					existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
+				if !existingBgp.LocalAsn.IsNull() {
+					if apiBgp.LocalAsn != nil {
+						existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
+					} else {
+						existingBgp.LocalAsn = types.Int64Null()
+					}
 				}
 				if !existingBgp.PeerType.IsNull() {
 					existingBgp.PeerType = types.StringValue(apiBgp.PeerType)
@@ -557,46 +561,34 @@ func mergeVrouterPartnerConfigFromAPI(
 				}
 				// Password: always preserve from state (API doesn't return it)
 
-				// Update list fields only if user configured them
+				// Update list fields only if user configured them.
+				// Always write the API value (including empty) so that external
+				// removal of all entries is detected as drift.
 				if !existingBgp.PermitExportTo.IsNull() {
-					if len(apiBgp.PermitExportTo) > 0 {
-						permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
-						diags.Append(permitDiags...)
-						existingBgp.PermitExportTo = permitList
-					}
+					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
+					diags.Append(permitDiags...)
+					existingBgp.PermitExportTo = permitList
 				}
 				if !existingBgp.DenyExportTo.IsNull() {
-					if len(apiBgp.DenyExportTo) > 0 {
-						denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
-						diags.Append(denyDiags...)
-						existingBgp.DenyExportTo = denyList
-					}
+					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
+					diags.Append(denyDiags...)
+					existingBgp.DenyExportTo = denyList
 				}
 
-				// Update prefix filter lists only if user configured them
+				// Update prefix filter lists only if user configured them.
+				// If the API returns ID=0 (unset) or an unknown ID, prefixFilterIDToName
+				// returns null — preserve that so Terraform surfaces the drift.
 				if !existingBgp.ImportWhitelist.IsNull() {
 					existingBgp.ImportWhitelist = prefixFilterIDToName(apiBgp.ImportWhitelist, pflMap)
-					if existingBgp.ImportWhitelist.IsNull() {
-						existingBgp.ImportWhitelist = types.StringValue("")
-					}
 				}
 				if !existingBgp.ImportBlacklist.IsNull() {
 					existingBgp.ImportBlacklist = prefixFilterIDToName(apiBgp.ImportBlacklist, pflMap)
-					if existingBgp.ImportBlacklist.IsNull() {
-						existingBgp.ImportBlacklist = types.StringValue("")
-					}
 				}
 				if !existingBgp.ExportWhitelist.IsNull() {
 					existingBgp.ExportWhitelist = prefixFilterIDToName(apiBgp.ExportWhitelist, pflMap)
-					if existingBgp.ExportWhitelist.IsNull() {
-						existingBgp.ExportWhitelist = types.StringValue("")
-					}
 				}
 				if !existingBgp.ExportBlacklist.IsNull() {
 					existingBgp.ExportBlacklist = prefixFilterIDToName(apiBgp.ExportBlacklist, pflMap)
-					if existingBgp.ExportBlacklist.IsNull() {
-						existingBgp.ExportBlacklist = types.StringValue("")
-					}
 				}
 			}
 
@@ -634,7 +626,17 @@ func mergeVrouterPartnerConfigFromAPI(
 		configModel.VrouterPartnerConfig = vrouterObj
 	} else {
 		aEndModel := vxcPartnerConfigAEndModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), ifaceValues)
+		narrow := make([]vxcAEndInterfaceSerializeModel, len(ifaceValues))
+		for i, v := range ifaceValues {
+			narrow[i] = vxcAEndInterfaceSerializeModel{
+				IPAddresses:    v.IPAddresses,
+				IPRoutes:       v.IPRoutes,
+				NatIPAddresses: v.NatIPAddresses,
+				Bfd:            v.Bfd,
+				BgpConnections: v.BgpConnections,
+			}
+		}
+		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), narrow)
 		diags.Append(ifaceDiags...)
 		aEndModel.Interfaces = ifaceList
 
@@ -856,7 +858,17 @@ func reconstructVrouterPartnerConfig(
 	} else {
 		// "a-end" (deprecated)
 		aEndModel := vxcPartnerConfigAEndModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), interfaceModels)
+		narrowModels := make([]vxcAEndInterfaceSerializeModel, len(interfaceModels))
+		for i, v := range interfaceModels {
+			narrowModels[i] = vxcAEndInterfaceSerializeModel{
+				IPAddresses:    v.IPAddresses,
+				IPRoutes:       v.IPRoutes,
+				NatIPAddresses: v.NatIPAddresses,
+				Bfd:            v.Bfd,
+				BgpConnections: v.BgpConnections,
+			}
+		}
+		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), narrowModels)
 		diags.Append(ifaceDiags...)
 		aEndModel.Interfaces = ifaceList
 

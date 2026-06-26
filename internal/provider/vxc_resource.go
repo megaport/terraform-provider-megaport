@@ -150,12 +150,11 @@ var (
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
-	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
-	// shape; on decode into the model, unmatched attrs remain null, and on
-	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
-	// this map to match the struct breaks encoding with a Value Conversion
-	// Error because the framework requires attr.Type ↔ schema equality.
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly.
+	// The a-end schema exposes only these 5 of the 11 interface attributes.
+	// When serializing back to attr objects, use vxcAEndInterfaceSerializeModel
+	// (not vxcPartnerConfigInterfaceModel) — the framework's FromStruct checks
+	// for strict field-set equality and returns "Value Conversion Error" on mismatch.
 	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
@@ -413,6 +412,18 @@ type vxcPartnerConfigIbmModel struct {
 	Name              types.String `tfsdk:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".
 	CustomerIPAddress types.String `tfsdk:"customer_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
 	ProviderIPAddress types.String `tfsdk:"provider_ip_address"` // IPv4 network address including subnet mask.
+}
+
+// vxcAEndInterfaceSerializeModel is used only when serializing a-end (deprecated) interface
+// objects back to attr values. The a-end schema has 5 attributes; the full
+// vxcPartnerConfigInterfaceModel has 11. The framework requires strict field-set equality
+// between a Go struct and its target ObjectType when encoding via types.ListValueFrom.
+type vxcAEndInterfaceSerializeModel struct {
+	IPAddresses    types.List   `tfsdk:"ip_addresses"`
+	IPRoutes       types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd            types.Object `tfsdk:"bfd"`
+	BgpConnections types.List   `tfsdk:"bgp_connections"`
 }
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
