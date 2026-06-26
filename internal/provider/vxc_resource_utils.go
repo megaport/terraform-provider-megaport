@@ -348,12 +348,14 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 		}
 	}
 
-	// Handle A-End partner config
+	// Handle A-End partner config. Only "vrouter" is merged from API data;
+	// the deprecated "a-end" type has a narrower schema that doesn't map
+	// cleanly to the shared interface model, so we preserve state as-is.
 	if !orm.AEndPartnerConfig.IsNull() {
 		partnerType := getPartnerType(ctx, orm.AEndPartnerConfig)
-		if (partnerType == "vrouter" || partnerType == "a-end") && len(vrouterCSPConns) > 0 {
+		if partnerType == "vrouter" && len(vrouterCSPConns) > 0 {
 			mcrUID := v.AEndConfiguration.UID
-			merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[0], orm.AEndPartnerConfig, mcrUID, client, partnerType)
+			merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[0], orm.AEndPartnerConfig, mcrUID, client)
 			diags.Append(mergeDiags...)
 			if !merged.IsNull() {
 				orm.AEndPartnerConfig = merged
@@ -361,17 +363,19 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 		}
 	}
 
-	// Handle B-End partner config
+	// Handle B-End partner config. Same restriction: vrouter only.
+	// The b_end_partner_config schema validator already excludes "a-end",
+	// so the partnerType == "a-end" case cannot arise here in practice.
 	if !orm.BEndPartnerConfig.IsNull() {
 		partnerType := getPartnerType(ctx, orm.BEndPartnerConfig)
-		if partnerType == "vrouter" || partnerType == "a-end" {
+		if partnerType == "vrouter" {
 			vrIdx := 0
 			if len(vrouterCSPConns) > 1 {
 				vrIdx = len(vrouterCSPConns) - 1
 			}
 			if len(vrouterCSPConns) > vrIdx {
 				mcrUID := v.BEndConfiguration.UID
-				merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[vrIdx], orm.BEndPartnerConfig, mcrUID, client, partnerType)
+				merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[vrIdx], orm.BEndPartnerConfig, mcrUID, client)
 				diags.Append(mergeDiags...)
 				if !merged.IsNull() {
 					orm.BEndPartnerConfig = merged
@@ -393,18 +397,19 @@ func getPartnerType(ctx context.Context, partnerConfig basetypes.ObjectValue) st
 	return partnerConfigModel.Partner.ValueString()
 }
 
-// mergeVrouterPartnerConfigFromAPI updates the existing partner config state with
+// mergeVrouterPartnerConfigFromAPI updates the existing vrouter partner config state with
 // values from the API's CSP VirtualRouter data. Only fields that the user originally
 // configured (non-null in existing state) are updated from the API. Fields the user
 // didn't set remain null, preventing spurious drift on auto-computed values.
 // Passwords are always preserved from state since the API doesn't return them.
+// Only the "vrouter" partner type is supported; the deprecated "a-end" type is
+// excluded because its narrower schema does not map to the shared interface model.
 func mergeVrouterPartnerConfigFromAPI(
 	ctx context.Context,
 	vrConn megaport.CSPConnectionVirtualRouter,
 	existingPartnerConfig basetypes.ObjectValue,
 	mcrUID string,
 	client *megaport.Client,
-	partnerType string,
 ) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
@@ -421,7 +426,7 @@ func mergeVrouterPartnerConfigFromAPI(
 	}
 
 	var interfacesList types.List
-	if partnerType == "vrouter" && !configModel.VrouterPartnerConfig.IsNull() {
+	if !configModel.VrouterPartnerConfig.IsNull() {
 		vrouterModel := &vxcPartnerConfigVrouterModel{}
 		vrDiags := configModel.VrouterPartnerConfig.As(ctx, vrouterModel, basetypes.ObjectAsOptions{})
 		if vrDiags.HasError() {
@@ -429,14 +434,6 @@ func mergeVrouterPartnerConfigFromAPI(
 			return existingPartnerConfig, diags
 		}
 		interfacesList = vrouterModel.Interfaces
-	} else if partnerType == "a-end" && !configModel.PartnerAEndConfig.IsNull() {
-		aEndModel := &vxcPartnerConfigAEndModel{}
-		aeDiags := configModel.PartnerAEndConfig.As(ctx, aEndModel, basetypes.ObjectAsOptions{})
-		if aeDiags.HasError() {
-			diags.Append(aeDiags...)
-			return existingPartnerConfig, diags
-		}
-		interfacesList = aEndModel.Interfaces
 	} else {
 		return existingPartnerConfig, diags
 	}
@@ -563,14 +560,23 @@ func mergeVrouterPartnerConfigFromAPI(
 
 				// Update list fields only if user configured them.
 				// Always write the API value (including empty) so that external
-				// removal of all entries is detected as drift.
+				// removal of all entries is detected as drift. Coerce nil to an
+				// empty slice first — types.ListValueFrom errors on a nil slice.
 				if !existingBgp.PermitExportTo.IsNull() {
-					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
+					permitTo := apiBgp.PermitExportTo
+					if permitTo == nil {
+						permitTo = []string{}
+					}
+					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, permitTo)
 					diags.Append(permitDiags...)
 					existingBgp.PermitExportTo = permitList
 				}
 				if !existingBgp.DenyExportTo.IsNull() {
-					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
+					denyTo := apiBgp.DenyExportTo
+					if denyTo == nil {
+						denyTo = []string{}
+					}
+					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, denyTo)
 					diags.Append(denyDiags...)
 					existingBgp.DenyExportTo = denyList
 				}
@@ -594,9 +600,6 @@ func mergeVrouterPartnerConfigFromAPI(
 
 			// Re-serialize the updated BGP connections back into the interface
 			bgpAttrTypes := bgpVrouterConnectionConfig
-			if partnerType == "a-end" {
-				bgpAttrTypes = bgpConnectionConfig
-			}
 			// Convert []*model to []model for serialization
 			bgpValues := make([]bgpConnectionConfigModel, len(existingBgps))
 			for i, b := range existingBgps {
@@ -608,43 +611,21 @@ func mergeVrouterPartnerConfigFromAPI(
 		}
 	}
 
-	// Re-serialize the updated interfaces back into the partner config
+	// Re-serialize the updated interfaces back into the vrouter partner config
 	ifaceValues := make([]vxcPartnerConfigInterfaceModel, len(existingIfaces))
 	for i, iface := range existingIfaces {
 		ifaceValues[i] = *iface
 	}
 
-	if partnerType == "vrouter" {
-		vrouterModel := vxcPartnerConfigVrouterModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), ifaceValues)
-		diags.Append(ifaceDiags...)
-		vrouterModel.Interfaces = ifaceList
+	vrouterModel := vxcPartnerConfigVrouterModel{}
+	ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), ifaceValues)
+	diags.Append(ifaceDiags...)
+	vrouterModel.Interfaces = ifaceList
 
-		vrouterObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterModel)
-		diags.Append(vrouterDiags...)
+	vrouterObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterModel)
+	diags.Append(vrouterDiags...)
 
-		configModel.VrouterPartnerConfig = vrouterObj
-	} else {
-		aEndModel := vxcPartnerConfigAEndModel{}
-		narrow := make([]vxcAEndInterfaceSerializeModel, len(ifaceValues))
-		for i, v := range ifaceValues {
-			narrow[i] = vxcAEndInterfaceSerializeModel{
-				IPAddresses:    v.IPAddresses,
-				IPRoutes:       v.IPRoutes,
-				NatIPAddresses: v.NatIPAddresses,
-				Bfd:            v.Bfd,
-				BgpConnections: v.BgpConnections,
-			}
-		}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), narrow)
-		diags.Append(ifaceDiags...)
-		aEndModel.Interfaces = ifaceList
-
-		aEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndModel)
-		diags.Append(aEndDiags...)
-
-		configModel.PartnerAEndConfig = aEndObj
-	}
+	configModel.VrouterPartnerConfig = vrouterObj
 
 	resultObj, resultDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, configModel)
 	diags.Append(resultDiags...)
