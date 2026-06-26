@@ -4588,6 +4588,10 @@ func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
 			if resp.Diagnostics.HasError() {
 				t.Errorf("expected no errors, got: %v", resp.Diagnostics.Errors())
 			}
+			// Verify the plan was not modified on the early-return path.
+			if !resp.Plan.Raw.Equal(planVal) {
+				t.Error("expected plan to be unchanged when end configs are unknown or null")
+			}
 		})
 	}
 }

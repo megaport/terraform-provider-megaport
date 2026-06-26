@@ -2767,13 +2767,13 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
 
-			// If any of the end-config objects are wholly unknown (typically because
-			// the attached Port/MCR/MVE is being replaced and its product_uid is
-			// unknown at plan time), skip the partner-config / UID reconciliation
-			// below — decoding an unknown types.Object into a struct fails with a
-			// "Value Conversion Error" and there is nothing meaningful to do here
-			// until the upstream resource is applied.
-			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
+			// If any of the end-config objects are wholly unknown or null, skip
+			// the partner-config / UID reconciliation below. Unknown objects arise
+			// from conditional expressions referencing resources not yet applied;
+			// null objects would produce a confusing "Value Conversion Error" from
+			// the framework rather than a useful diagnostic.
+			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() ||
+				aEndStateObj.IsNull() || bEndStateObj.IsNull() || aEndPlanObj.IsNull() || bEndPlanObj.IsNull() {
 				return
 			}
 
