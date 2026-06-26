@@ -4549,24 +4549,26 @@ func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
 	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
 
 	tests := []struct {
-		name       string
-		unknownEnd string
+		name        string
+		unknownEnds []string
 	}{
-		{"unknown_a_end", "a_end"},
-		{"unknown_b_end", "b_end"},
+		{"unknown_a_end", []string{"a_end"}},
+		{"unknown_b_end", []string{"b_end"}},
+		{"unknown_both_ends", []string{"a_end", "b_end"}},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Build plan: set the target end to unknown, other end to valid.
+			// Build plan: start with valid ends, then override the target end(s) with unknown.
 			planAttrs := nullValueMap(schemaObjType)
 			planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
 			planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
 			planAttrs["a_end"] = validEndVal
 			planAttrs["b_end"] = validEndVal
 
-			// Override the target end with an unknown value.
-			planAttrs[tc.unknownEnd] = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+			for _, end := range tc.unknownEnds {
+				planAttrs[end] = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+			}
 
 			planVal := tftypes.NewValue(schemaObjType, planAttrs)
 

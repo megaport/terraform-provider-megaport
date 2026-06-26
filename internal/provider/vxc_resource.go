@@ -2774,7 +2774,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			// "Value Conversion Error" and there is nothing meaningful to do here
 			// until the upstream resource is applied.
 			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
-				resp.Diagnostics.Append(diags...)
 				return
 			}
 
@@ -2798,10 +2797,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				requiresReplace:       &resp.RequiresReplace,
 				diags:                 &diags,
 			})
-			req.Plan.Set(ctx, &plan)
 			resp.Plan.Set(ctx, &plan)
-			stateDiags := req.State.Set(ctx, &state)
-			diags = append(diags, stateDiags...)
 		}
 	}
 

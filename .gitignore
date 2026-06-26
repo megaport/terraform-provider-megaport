@@ -1,7 +1,6 @@
 terraform-provider-megaport
 *.dll
 *.exe
-terraform-provider-megaport
 .DS_Store
 example.tf
 terraform.tfplan
@@ -44,4 +43,3 @@ website/vendor
 internal/provider/testdata/csp_credentials.json
 
 .claude
-terraform-provider-megaport
