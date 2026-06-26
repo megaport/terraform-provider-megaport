@@ -323,15 +323,12 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel, client *megaport.Client) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
-	// During Create/Update, preserve partner configs from the plan.
-	// The API may not have fully populated CSP connection data yet.
+	// During Create/Update, preserve partner configs from the plan unconditionally
+	// (including null) so that removing a partner config in HCL is reflected in state.
+	// The API may not have fully populated CSP connection data immediately after the op.
 	if plan != nil {
-		if !plan.AEndPartnerConfig.IsNull() {
-			orm.AEndPartnerConfig = plan.AEndPartnerConfig
-		}
-		if !plan.BEndPartnerConfig.IsNull() {
-			orm.BEndPartnerConfig = plan.BEndPartnerConfig
-		}
+		orm.AEndPartnerConfig = plan.AEndPartnerConfig
+		orm.BEndPartnerConfig = plan.BEndPartnerConfig
 		return diags
 	}
 
@@ -363,9 +360,9 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 		}
 	}
 
-	// Handle B-End partner config. Same restriction: vrouter only.
-	// The b_end_partner_config schema validator already excludes "a-end",
-	// so the partnerType == "a-end" case cannot arise here in practice.
+	// Handle B-End partner config. Only "vrouter" is merged; all other partner types
+	// (AWS, Azure, Google, Oracle, IBM, transit, and the deprecated "a-end") are
+	// preserved from state unchanged.
 	if !orm.BEndPartnerConfig.IsNull() {
 		partnerType := getPartnerType(ctx, orm.BEndPartnerConfig)
 		if partnerType == "vrouter" {
@@ -457,6 +454,10 @@ func mergeVrouterPartnerConfigFromAPI(
 		if err != nil {
 			tflog.Warn(ctx, "Failed to list MCR prefix filter lists, falling back to state",
 				map[string]interface{}{"mcr_uid": mcrUID, "error": err.Error()})
+			diags.AddWarning(
+				"Could not refresh BGP prefix filter list names",
+				fmt.Sprintf("ListMCRPrefixFilterLists for %s failed: %s. Prefix filter list names in state may be stale.", mcrUID, err.Error()),
+			)
 			return existingPartnerConfig, diags
 		}
 	}
