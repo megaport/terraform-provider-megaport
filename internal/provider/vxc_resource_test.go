@@ -4593,6 +4593,8 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.destination_ip_address", "203.0.113.10"),
 					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase1_lifetime", "28800"),
 					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase2_lifetime", "3600"),
+					// pre_shared_key is write-only: it must never be persisted to state.
+					resource.TestCheckNoResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.pre_shared_key"),
 				),
 			},
 		},

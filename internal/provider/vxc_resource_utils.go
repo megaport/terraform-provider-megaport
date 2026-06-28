@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
@@ -507,13 +509,49 @@ func createIBMPartnerConfig(ctx context.Context, ibmConfig vxcPartnerConfigIbmMo
 	return diags, ibmPartnerConfig, partnerConfigObj
 }
 
-func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
+// ipSecPreSharedKeysFromConfig reads the write-only pre_shared_key for each
+// vrouter interface from the configuration, keyed by interface index. The PSK is
+// a write-only argument, so it is null in the plan and must be sourced from
+// config when ordering the tunnel. pathRoot is the partner-config attribute name
+// ("a_end_partner_config" or "b_end_partner_config").
+func ipSecPreSharedKeysFromConfig(ctx context.Context, config tfsdk.Config, pathRoot string, ifaceCount int) (map[int]string, diag.Diagnostics) {
+	diags := diag.Diagnostics{}
+	psks := map[int]string{}
+	for i := 0; i < ifaceCount; i++ {
+		tunnelPath := path.Root(pathRoot).
+			AtName("vrouter_config").
+			AtName("interfaces").
+			AtListIndex(i).
+			AtName("ip_sec_tunnel_options")
+		// Read the tunnel object first so we never descend into a null object on
+		// interfaces that have no tunnel.
+		var tunnel types.Object
+		diags.Append(config.GetAttribute(ctx, tunnelPath, &tunnel)...)
+		if diags.HasError() {
+			return psks, diags
+		}
+		if tunnel.IsNull() || tunnel.IsUnknown() {
+			continue
+		}
+		var psk types.String
+		diags.Append(config.GetAttribute(ctx, tunnelPath.AtName("pre_shared_key"), &psk)...)
+		if diags.HasError() {
+			return psks, diags
+		}
+		if !psk.IsNull() && !psk.IsUnknown() {
+			psks[i] = psk.ValueString()
+		}
+	}
+	return psks, diags
+}
+
+func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList, preSharedKeys map[int]string) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	vrouterPartnerConfig := &megaport.VXCOrderVrouterPartnerConfig{}
 	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
 	ifaceDiags := vrouterConfig.Interfaces.ElementsAs(ctx, &ifaceModels, false)
 	diags.Append(ifaceDiags...)
-	for _, iface := range ifaceModels {
+	for i, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
 		if !iface.IpMtu.IsNull() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
@@ -628,10 +666,12 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 			var t ipSecTunnelOptionsModel
 			tunnelDiags := iface.IpSecTunnelOptions.As(ctx, &t, basetypes.ObjectAsOptions{})
 			diags.Append(tunnelDiags...)
+			// pre_shared_key is write-only, so it is null in t (sourced from the
+			// plan). Pull it from the configuration, keyed by interface index.
 			tunnel := megaport.IPsecTunnelConfig{
 				SourceIpAddress:      t.SourceIPAddress.ValueString(),
 				DestinationIpAddress: t.DestinationIPAddress.ValueString(),
-				PreSharedKey:         t.PreSharedKey.ValueString(),
+				PreSharedKey:         preSharedKeys[i],
 				LocalId:              t.LocalID.ValueString(),
 				RemoteId:             t.RemoteID.ValueString(),
 			}

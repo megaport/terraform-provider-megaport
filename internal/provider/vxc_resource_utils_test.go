@@ -19,10 +19,12 @@ import (
 func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	ctx := context.Background()
 
+	// pre_shared_key is write-only, so it is null in the plan-derived model and
+	// supplied separately via the preSharedKeys map (keyed by interface index).
 	fullTunnel := ipSecTunnelOptionsModel{
 		SourceIPAddress:      types.StringValue("169.254.1.1"),
 		DestinationIPAddress: types.StringValue("203.0.113.1"),
-		PreSharedKey:         types.StringValue("secret-one"),
+		PreSharedKey:         types.StringNull(),
 		Passive:              types.BoolValue(false),
 		LocalID:              types.StringValue("local-1"),
 		RemoteID:             types.StringValue("remote-1"),
@@ -34,7 +36,7 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	minimalTunnel := ipSecTunnelOptionsModel{
 		SourceIPAddress:      types.StringValue("169.254.2.1"),
 		DestinationIPAddress: types.StringValue("203.0.113.2"),
-		PreSharedKey:         types.StringValue("secret-two"),
+		PreSharedKey:         types.StringNull(),
 		Passive:              types.BoolNull(),
 		LocalID:              types.StringNull(),
 		RemoteID:             types.StringNull(),
@@ -71,7 +73,8 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 
 	model := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
 
-	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil)
+	preSharedKeys := map[int]string{0: "secret-one", 1: "secret-two"}
+	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil, preSharedKeys)
 	require.False(t, diags.HasError(), "createVrouterPartnerConfig: %v", diags)
 	require.Len(t, vrouterConfig.Interfaces, 3)
 

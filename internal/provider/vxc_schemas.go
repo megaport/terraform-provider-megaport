@@ -252,7 +252,7 @@ var (
 							Optional:    true,
 						},
 						"ip_sec_tunnel_options": schema.SingleNestedAttribute{
-							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. These values are write-only: the API does not return the pre-shared key or lifetimes on read, so the provider preserves the configured values and they never show drift.",
+							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift.",
 							Optional:    true,
 							Validators: []validator.Object{
 								ipSecPhaseLifetimeValidator{},
@@ -267,9 +267,10 @@ var (
 									Required:    true,
 								},
 								"pre_shared_key": schema.StringAttribute{
-									Description: "Pre-shared key used to authenticate the IPsec tunnel. Write-only: not returned by the API on read.",
+									Description: "Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.",
 									Required:    true,
 									Sensitive:   true,
+									WriteOnly:   true,
 								},
 								"passive": schema.BoolAttribute{
 									Description: "Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.",

@@ -443,9 +443,10 @@ type vxcPartnerConfigInterfaceModel struct {
 	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
 }
 
-// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The PSK
-// and lifetimes are write-only (the API never returns them), so these values
-// are preserved from plan/state rather than read back.
+// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
+// never returns the PSK or lifetimes. PreSharedKey is a write-only argument, so
+// it is null in plan/state and sourced from the configuration when ordering;
+// the lifetimes are preserved from plan/state rather than read back.
 type ipSecTunnelOptionsModel struct {
 	SourceIPAddress      types.String `tfsdk:"source_ip_address"`
 	DestinationIPAddress types.String `tfsdk:"destination_ip_address"`
@@ -1531,7 +1532,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -1856,7 +1862,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(partnerConfigBEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2353,7 +2364,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				)
 				return
 			}
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2402,7 +2418,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(vrouterModel.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
