@@ -4833,6 +4833,91 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 	}
 }
 
+// TestReconcileVXCEnd_RequiresReplace covers the partner-config replace branch:
+// a changed CSP partner-config forces replacement, while an unchanged CSP
+// config, a non-CSP change, or a null state config must not.
+func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partnerWith := func(t *testing.T, name string) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+	end := func(t *testing.T) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: types.StringValue("port-x"),
+			CurrentProductUID:   types.StringValue("port-x"),
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name         string
+		planPartner  func(t *testing.T) types.Object
+		nullState    bool // state partner config is null
+		statePartner string
+		wantReplace  bool
+	}{
+		{name: "csp_changed_forces_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "azure", wantReplace: true},
+		{name: "csp_unchanged_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "aws", wantReplace: false},
+		{name: "non_csp_change_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "transit") }, statePartner: "aws", wantReplace: false},
+		{name: "null_state_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, nullState: true, wantReplace: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if !tc.nullState {
+				statePartner = partnerWith(t, tc.statePartner)
+			}
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            end(t),
+				stateEndObj:           end(t),
+				planPartnerConfig:     tc.planPartner(t),
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			if tc.wantReplace {
+				if len(rr) != 1 || rr[0].String() != path.Root("a_end_partner_config").String() {
+					t.Errorf("expected requiresReplace [a_end_partner_config], got %v", rr)
+				}
+			} else if len(rr) != 0 {
+				t.Errorf("expected no requiresReplace, got %v", rr)
+			}
+		})
+	}
+}
+
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
 // whose A-End vrouter config declares two interfaces: a subInterface carrying
 // the tunnel source IP, and an ipSecTunnel interface with a single
