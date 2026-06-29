@@ -561,25 +561,18 @@ func mergeVrouterPartnerConfigFromAPI(
 				}
 				// Password: always preserve from state (API doesn't return it)
 
-				// Update list fields only if user configured them.
-				// Always write the API value (including empty) so that external
-				// removal of all entries is detected as drift. Coerce nil to an
-				// empty slice first — types.ListValueFrom errors on a nil slice.
-				if !existingBgp.PermitExportTo.IsNull() {
-					permitTo := apiBgp.PermitExportTo
-					if permitTo == nil {
-						permitTo = []string{}
-					}
-					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, permitTo)
+				// permit_export_to / deny_export_to are not echoed back by the
+				// CSP-connection read endpoint, so an empty API value means
+				// "unknown", not "removed". Only overwrite state when the user
+				// configured the field AND the API actually returns a value;
+				// otherwise preserve state to avoid false drift on every refresh.
+				if !existingBgp.PermitExportTo.IsNull() && len(apiBgp.PermitExportTo) > 0 {
+					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
 					diags.Append(permitDiags...)
 					existingBgp.PermitExportTo = permitList
 				}
-				if !existingBgp.DenyExportTo.IsNull() {
-					denyTo := apiBgp.DenyExportTo
-					if denyTo == nil {
-						denyTo = []string{}
-					}
-					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, denyTo)
+				if !existingBgp.DenyExportTo.IsNull() && len(apiBgp.DenyExportTo) > 0 {
+					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
 					diags.Append(denyDiags...)
 					existingBgp.DenyExportTo = denyList
 				}
