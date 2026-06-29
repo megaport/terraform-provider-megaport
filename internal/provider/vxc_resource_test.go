@@ -4425,7 +4425,7 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 
 	// MCR and the TRANSIT partner port must share a region, so claim one
 	// location that satisfies both and use it for both ends.
-	mcrLocationID, _ := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	mcrLocationID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4514,7 +4514,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	defer acquireAccTestSlot(t)()
 	// MCR and the TRANSIT partner port must share a region, so claim one
 	// location that satisfies both and use it for both ends.
-	mcrLocID, _ := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	mcrLocID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 

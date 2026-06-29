@@ -625,23 +625,23 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 // ("LongHaul Transit VXC must be in the same region"). Picking the MCR and
 // partner locations independently can straddle regions under parallel load.
 // Claims the location in the MCR pool.
-func findMCRWithPartnerTestLocation(t *testing.T, mcrSpeedMbps int, connectType string) (id int, name string) {
+func findMCRWithPartnerTestLocation(t *testing.T, mcrSpeedMbps int, connectType string) (id int) {
 	t.Helper()
 	ctx := context.Background()
 	client, err := getTestClient()
 	if err != nil {
 		t.Skipf("skipping: could not get test client: %v", err)
-		return 0, ""
+		return 0
 	}
 	locations, err := client.LocationService.ListLocationsV3(ctx)
 	if err != nil {
 		t.Skipf("skipping: could not list locations: %v", err)
-		return 0, ""
+		return 0
 	}
 	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
 	if err != nil {
 		t.Skipf("skipping: could not list partner ports: %v", err)
-		return 0, ""
+		return 0
 	}
 	partnerLocs := map[int]bool{}
 	for _, pp := range partnerPorts {
@@ -661,11 +661,11 @@ func findMCRWithPartnerTestLocation(t *testing.T, mcrSpeedMbps int, connectType 
 				delete(mcrClaimedLocations, locID)
 			})
 			t.Logf("findMCRWithPartnerTestLocation(%s): using location %d (%s)", connectType, locID, loc.Name)
-			return locID, loc.Name
+			return locID
 		}
 	}
 	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity and %s partner ports", mcrSpeedMbps, connectType)
-	return 0, ""
+	return 0
 }
 
 // findNATGatewayTestLocation returns a staging location ID that supports NAT
