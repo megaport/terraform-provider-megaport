@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -347,17 +346,27 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 		}
 	}
 
+	// Match each end's vrouter partner config to a specific CSP connection by
+	// BGP IP overlap rather than position. With a single MCR end (the common
+	// case) there is one connection and this just picks it; for MCR-to-MCR it
+	// avoids attaching the wrong MCR's data to an end if the API reorders them.
+	used := make([]bool, len(vrouterCSPConns))
+
 	// Handle A-End partner config. Only "vrouter" is merged from API data;
 	// the deprecated "a-end" type has a narrower schema that doesn't map
 	// cleanly to the shared interface model, so we preserve state as-is.
 	if !orm.AEndPartnerConfig.IsNull() {
 		partnerType := getPartnerType(ctx, orm.AEndPartnerConfig)
 		if partnerType == "vrouter" && len(vrouterCSPConns) > 0 {
-			mcrUID := v.AEndConfiguration.UID
-			merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[0], orm.AEndPartnerConfig, mcrUID, client)
-			diags.Append(mergeDiags...)
-			if !merged.IsNull() {
-				orm.AEndPartnerConfig = merged
+			idx := matchVrouterCSPConn(vrouterCSPConns, used, vrouterStateBGPIPs(ctx, orm.AEndPartnerConfig))
+			if idx >= 0 {
+				used[idx] = true
+				mcrUID := v.AEndConfiguration.UID
+				merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[idx], orm.AEndPartnerConfig, mcrUID, client)
+				diags.Append(mergeDiags...)
+				if !merged.IsNull() {
+					orm.AEndPartnerConfig = merged
+				}
 			}
 		}
 	}
@@ -367,14 +376,12 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 	// preserved from state unchanged.
 	if !orm.BEndPartnerConfig.IsNull() {
 		partnerType := getPartnerType(ctx, orm.BEndPartnerConfig)
-		if partnerType == "vrouter" {
-			vrIdx := 0
-			if len(vrouterCSPConns) > 1 {
-				vrIdx = len(vrouterCSPConns) - 1
-			}
-			if len(vrouterCSPConns) > vrIdx {
+		if partnerType == "vrouter" && len(vrouterCSPConns) > 0 {
+			idx := matchVrouterCSPConn(vrouterCSPConns, used, vrouterStateBGPIPs(ctx, orm.BEndPartnerConfig))
+			if idx >= 0 {
+				used[idx] = true
 				mcrUID := v.BEndConfiguration.UID
-				merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[vrIdx], orm.BEndPartnerConfig, mcrUID, client)
+				merged, mergeDiags := mergeVrouterPartnerConfigFromAPI(ctx, vrouterCSPConns[idx], orm.BEndPartnerConfig, mcrUID, client)
 				diags.Append(mergeDiags...)
 				if !merged.IsNull() {
 					orm.BEndPartnerConfig = merged
@@ -384,6 +391,87 @@ func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *meg
 	}
 
 	return diags
+}
+
+// vrouterStateBGPIPs collects the local and peer BGP IP addresses configured
+// across a vrouter partner config's interfaces. These act as a stable content
+// key for matching a state config to its API CSP connection. Parse diagnostics
+// are intentionally ignored: this is a best-effort match key, and an empty map
+// just falls back to positional matching.
+func vrouterStateBGPIPs(ctx context.Context, partnerConfig basetypes.ObjectValue) map[string]bool {
+	ips := map[string]bool{}
+	configModel := &vxcPartnerConfigurationModel{}
+	if partnerConfig.As(ctx, configModel, basetypes.ObjectAsOptions{}).HasError() {
+		return ips
+	}
+	if configModel.VrouterPartnerConfig.IsNull() {
+		return ips
+	}
+	vrouterModel := &vxcPartnerConfigVrouterModel{}
+	if configModel.VrouterPartnerConfig.As(ctx, vrouterModel, basetypes.ObjectAsOptions{}).HasError() {
+		return ips
+	}
+	if vrouterModel.Interfaces.IsNull() || vrouterModel.Interfaces.IsUnknown() {
+		return ips
+	}
+	ifaces := []*vxcPartnerConfigInterfaceModel{}
+	if vrouterModel.Interfaces.ElementsAs(ctx, &ifaces, false).HasError() {
+		return ips
+	}
+	for _, iface := range ifaces {
+		if iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+			continue
+		}
+		bgps := []*bgpConnectionConfigModel{}
+		if iface.BgpConnections.ElementsAs(ctx, &bgps, false).HasError() {
+			continue
+		}
+		for _, b := range bgps {
+			if v := b.LocalIPAddress.ValueString(); v != "" {
+				ips[v] = true
+			}
+			if v := b.PeerIPAddress.ValueString(); v != "" {
+				ips[v] = true
+			}
+		}
+	}
+	return ips
+}
+
+// matchVrouterCSPConn returns the index of the unused CSP connection whose BGP
+// IPs best overlap stateIPs. With no overlap (or nothing to match on) it falls
+// back to the first unused connection, preserving the prior positional
+// behavior; it returns -1 only when every connection is already used.
+func matchVrouterCSPConn(conns []megaport.CSPConnectionVirtualRouter, used []bool, stateIPs map[string]bool) int {
+	bestIdx, bestScore := -1, 0
+	for i := range conns {
+		if used[i] {
+			continue
+		}
+		score := 0
+		for _, iface := range conns[i].Interfaces {
+			for _, bgp := range iface.BGPConnections {
+				if bgp.LocalIpAddress != "" && stateIPs[bgp.LocalIpAddress] {
+					score++
+				}
+				if bgp.PeerIpAddress != "" && stateIPs[bgp.PeerIpAddress] {
+					score++
+				}
+			}
+		}
+		if score > bestScore {
+			bestScore, bestIdx = score, i
+		}
+	}
+	if bestIdx != -1 {
+		return bestIdx
+	}
+	for i := range conns {
+		if !used[i] {
+			return i
+		}
+	}
+	return -1
 }
 
 // getPartnerType extracts the "partner" field from a partner config object.
@@ -480,13 +568,29 @@ func mergeVrouterPartnerConfigFromAPI(
 			existing.IPAddresses = ipList
 		}
 
-		// Update IP routes if user configured them
+		// Update IP routes if user configured them. description is omitempty in the
+		// SDK, so the read API may echo it as "" even when the user set one; preserve
+		// the state description (keyed by prefix) in that case to avoid false drift.
 		if !existing.IPRoutes.IsNull() && len(apiIface.IPRoutes) > 0 {
+			existingDescByPrefix := map[string]basetypes.StringValue{}
+			var existingRoutes []ipRouteModel
+			if !existing.IPRoutes.IsUnknown() {
+				diags.Append(existing.IPRoutes.ElementsAs(ctx, &existingRoutes, false)...)
+				for _, er := range existingRoutes {
+					existingDescByPrefix[er.Prefix.ValueString()] = er.Description
+				}
+			}
 			routeModels := make([]ipRouteModel, 0, len(apiIface.IPRoutes))
 			for _, r := range apiIface.IPRoutes {
+				desc := types.StringValue(r.Description)
+				if r.Description == "" {
+					if existingDesc, ok := existingDescByPrefix[r.Prefix]; ok {
+						desc = existingDesc
+					}
+				}
 				routeModels = append(routeModels, ipRouteModel{
 					Prefix:      types.StringValue(r.Prefix),
-					Description: types.StringValue(r.Description),
+					Description: desc,
 					NextHop:     types.StringValue(r.NextHop),
 				})
 			}
@@ -516,24 +620,61 @@ func mergeVrouterPartnerConfigFromAPI(
 			}
 		}
 
-		// Merge BGP connections
+		// Merge BGP connections. Match each state connection to its API
+		// counterpart by peer IP address (a stable per-session key), falling
+		// back to positional order for any that don't match. Matching by
+		// position alone would attach API values to the wrong peer if the API
+		// returns connections in a different order than state.
 		if !existing.BgpConnections.IsNull() && len(apiIface.BGPConnections) > 0 {
 			existingBgps := []*bgpConnectionConfigModel{}
 			bgpDiags := existing.BgpConnections.ElementsAs(ctx, &existingBgps, false)
 			diags.Append(bgpDiags...)
 
-			for bgpIdx := 0; bgpIdx < len(existingBgps) && bgpIdx < len(apiIface.BGPConnections); bgpIdx++ {
-				existingBgp := existingBgps[bgpIdx]
-				apiBgp := apiIface.BGPConnections[bgpIdx]
+			apiIdxByPeerIP := make(map[string]int, len(apiIface.BGPConnections))
+			for i := range apiIface.BGPConnections {
+				if ip := apiIface.BGPConnections[i].PeerIpAddress; ip != "" {
+					if _, dup := apiIdxByPeerIP[ip]; !dup {
+						apiIdxByPeerIP[ip] = i
+					}
+				}
+			}
+			apiUsed := make([]bool, len(apiIface.BGPConnections))
 
-				// Always update these core fields (user must have set them to create the BGP session)
-				existingBgp.PeerAsn = types.Int64Value(int64(apiBgp.PeerAsn))
-				existingBgp.LocalIPAddress = types.StringValue(apiBgp.LocalIpAddress)
-				existingBgp.PeerIPAddress = types.StringValue(apiBgp.PeerIpAddress)
-				existingBgp.Shutdown = types.BoolValue(apiBgp.Shutdown)
-				existingBgp.BfdEnabled = types.BoolValue(apiBgp.BfdEnabled)
+			for bgpIdx, existingBgp := range existingBgps {
+				apiIdx := -1
+				if ip := existingBgp.PeerIPAddress.ValueString(); ip != "" {
+					if idx, ok := apiIdxByPeerIP[ip]; ok && !apiUsed[idx] {
+						apiIdx = idx
+					}
+				}
+				if apiIdx == -1 && bgpIdx < len(apiIface.BGPConnections) && !apiUsed[bgpIdx] {
+					apiIdx = bgpIdx
+				}
+				if apiIdx == -1 {
+					continue // no API counterpart; preserve state
+				}
+				apiUsed[apiIdx] = true
+				apiBgp := apiIface.BGPConnections[apiIdx]
 
-				// Update optional fields only if user configured them (non-null in state)
+				// Update fields only if the user configured them (non-null in
+				// state). shutdown and bfd_enabled are Optional-only with no
+				// default, so writing the API's concrete bool into a null state
+				// value would manufacture perpetual drift.
+				if !existingBgp.PeerAsn.IsNull() {
+					existingBgp.PeerAsn = types.Int64Value(int64(apiBgp.PeerAsn))
+				}
+				if !existingBgp.LocalIPAddress.IsNull() {
+					existingBgp.LocalIPAddress = types.StringValue(apiBgp.LocalIpAddress)
+				}
+				if !existingBgp.PeerIPAddress.IsNull() {
+					existingBgp.PeerIPAddress = types.StringValue(apiBgp.PeerIpAddress)
+				}
+				if !existingBgp.Shutdown.IsNull() {
+					existingBgp.Shutdown = types.BoolValue(apiBgp.Shutdown)
+				}
+				if !existingBgp.BfdEnabled.IsNull() {
+					existingBgp.BfdEnabled = types.BoolValue(apiBgp.BfdEnabled)
+				}
 				if !existingBgp.LocalAsn.IsNull() {
 					if apiBgp.LocalAsn != nil {
 						existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
@@ -541,22 +682,28 @@ func mergeVrouterPartnerConfigFromAPI(
 						existingBgp.LocalAsn = types.Int64Null()
 					}
 				}
-				if !existingBgp.PeerType.IsNull() {
+				// peer_type, description, med_in, med_out, export_policy and
+				// as_path_prepend_count are omitempty in the SDK, so a zero/empty
+				// value from the read endpoint is indistinguishable from "not
+				// echoed". Only overwrite when the user configured the field AND
+				// the API returns a non-empty value, otherwise preserve state to
+				// avoid false drift to zero on every refresh.
+				if !existingBgp.PeerType.IsNull() && apiBgp.PeerType != "" {
 					existingBgp.PeerType = types.StringValue(apiBgp.PeerType)
 				}
-				if !existingBgp.Description.IsNull() {
+				if !existingBgp.Description.IsNull() && apiBgp.Description != "" {
 					existingBgp.Description = types.StringValue(apiBgp.Description)
 				}
-				if !existingBgp.MedIn.IsNull() {
+				if !existingBgp.MedIn.IsNull() && apiBgp.MedIn > 0 {
 					existingBgp.MedIn = types.Int64Value(int64(apiBgp.MedIn))
 				}
-				if !existingBgp.MedOut.IsNull() {
+				if !existingBgp.MedOut.IsNull() && apiBgp.MedOut > 0 {
 					existingBgp.MedOut = types.Int64Value(int64(apiBgp.MedOut))
 				}
-				if !existingBgp.ExportPolicy.IsNull() {
+				if !existingBgp.ExportPolicy.IsNull() && apiBgp.ExportPolicy != "" {
 					existingBgp.ExportPolicy = types.StringValue(apiBgp.ExportPolicy)
 				}
-				if !existingBgp.AsPathPrependCount.IsNull() {
+				if !existingBgp.AsPathPrependCount.IsNull() && apiBgp.AsPathPrependCount > 0 {
 					existingBgp.AsPathPrependCount = types.Int64Value(int64(apiBgp.AsPathPrependCount))
 				}
 				// Password: always preserve from state (API doesn't return it)
@@ -577,20 +724,21 @@ func mergeVrouterPartnerConfigFromAPI(
 					existingBgp.DenyExportTo = denyList
 				}
 
-				// Update prefix filter lists only if user configured them.
-				// If the API returns ID=0 (unset) or an unknown ID, prefixFilterIDToName
-				// returns null — preserve that so Terraform surfaces the drift.
+				// Update prefix filter lists only if the user configured them.
+				// prefixFilterIDToName preserves the existing value when the API
+				// returns a non-zero ID it can't resolve, so a lookup gap doesn't
+				// manufacture drift against a filter that may still be attached.
 				if !existingBgp.ImportWhitelist.IsNull() {
-					existingBgp.ImportWhitelist = prefixFilterIDToName(apiBgp.ImportWhitelist, pflMap)
+					existingBgp.ImportWhitelist = prefixFilterIDToName(apiBgp.ImportWhitelist, pflMap, existingBgp.ImportWhitelist)
 				}
 				if !existingBgp.ImportBlacklist.IsNull() {
-					existingBgp.ImportBlacklist = prefixFilterIDToName(apiBgp.ImportBlacklist, pflMap)
+					existingBgp.ImportBlacklist = prefixFilterIDToName(apiBgp.ImportBlacklist, pflMap, existingBgp.ImportBlacklist)
 				}
 				if !existingBgp.ExportWhitelist.IsNull() {
-					existingBgp.ExportWhitelist = prefixFilterIDToName(apiBgp.ExportWhitelist, pflMap)
+					existingBgp.ExportWhitelist = prefixFilterIDToName(apiBgp.ExportWhitelist, pflMap, existingBgp.ExportWhitelist)
 				}
 				if !existingBgp.ExportBlacklist.IsNull() {
-					existingBgp.ExportBlacklist = prefixFilterIDToName(apiBgp.ExportBlacklist, pflMap)
+					existingBgp.ExportBlacklist = prefixFilterIDToName(apiBgp.ExportBlacklist, pflMap, existingBgp.ExportBlacklist)
 				}
 			}
 
@@ -628,397 +776,19 @@ func mergeVrouterPartnerConfigFromAPI(
 	return resultObj, diags
 }
 
-// reconstructVrouterPartnerConfig builds a full partner config object from CSP VirtualRouter
-// API data, preserving passwords from existing state and resolving prefix filter list IDs to names.
-// This is used in unit tests; the main Read path uses mergeVrouterPartnerConfigFromAPI instead.
-//
-//nolint:unparam
-func reconstructVrouterPartnerConfig(
-	ctx context.Context,
-	vrConn megaport.CSPConnectionVirtualRouter,
-	existingPartnerConfig basetypes.ObjectValue,
-	mcrUID string,
-	client *megaport.Client,
-	partnerType string, // "vrouter" or "a-end"
-) (basetypes.ObjectValue, diag.Diagnostics) {
-	diags := diag.Diagnostics{}
-
-	if len(vrConn.Interfaces) == 0 {
-		// No interface data from API, return null to fall back to state preservation
-		return types.ObjectNull(vxcPartnerConfigAttrs), diags
-	}
-
-	// Look up prefix filter lists for ID→name mapping
-	var prefixFilterLists []*megaport.PrefixFilterList
-	if client != nil && mcrUID != "" {
-		var err error
-		prefixFilterLists, err = client.MCRService.ListMCRPrefixFilterLists(ctx, mcrUID)
-		if err != nil {
-			tflog.Warn(ctx, "Failed to list MCR prefix filter lists for BGP drift detection, falling back to state",
-				map[string]interface{}{"mcr_uid": mcrUID, "error": err.Error()})
-			return types.ObjectNull(vxcPartnerConfigAttrs), diags
-		}
-	}
-
-	// Build a map of prefix filter list ID → description (name)
-	pflMap := make(map[int]string)
-	for _, pfl := range prefixFilterLists {
-		pflMap[pfl.Id] = pfl.Description
-	}
-
-	// Extract existing BGP passwords from state for preservation
-	existingPasswords := extractExistingBGPPasswords(ctx, existingPartnerConfig, partnerType)
-
-	// Build interface models from API data
-	interfaceModels := make([]vxcPartnerConfigInterfaceModel, 0, len(vrConn.Interfaces))
-	for ifaceIdx, apiIface := range vrConn.Interfaces {
-		ifaceModel := vxcPartnerConfigInterfaceModel{}
-
-		// IP Addresses
-		if len(apiIface.IPAddresses) > 0 {
-			ipList, ipDiags := types.ListValueFrom(ctx, types.StringType, apiIface.IPAddresses)
-			diags.Append(ipDiags...)
-			ifaceModel.IPAddresses = ipList
-		} else {
-			ifaceModel.IPAddresses = types.ListNull(types.StringType)
-		}
-
-		// IP Routes
-		if len(apiIface.IPRoutes) > 0 {
-			routeModels := make([]ipRouteModel, 0, len(apiIface.IPRoutes))
-			for _, r := range apiIface.IPRoutes {
-				routeModels = append(routeModels, ipRouteModel{
-					Prefix:      types.StringValue(r.Prefix),
-					Description: types.StringValue(r.Description),
-					NextHop:     types.StringValue(r.NextHop),
-				})
-			}
-			routeList, routeDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), routeModels)
-			diags.Append(routeDiags...)
-			ifaceModel.IPRoutes = routeList
-		} else {
-			ifaceModel.IPRoutes = types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs))
-		}
-
-		// NAT IP Addresses
-		if len(apiIface.NatIPAddresses) > 0 {
-			natList, natDiags := types.ListValueFrom(ctx, types.StringType, apiIface.NatIPAddresses)
-			diags.Append(natDiags...)
-			ifaceModel.NatIPAddresses = natList
-		} else {
-			ifaceModel.NatIPAddresses = types.ListNull(types.StringType)
-		}
-
-		// BFD
-		if apiIface.BFD.TxInterval > 0 || apiIface.BFD.RxInterval > 0 || apiIface.BFD.Multiplier > 0 {
-			bfdModel := bfdConfigModel{
-				TxInterval: types.Int64Value(int64(apiIface.BFD.TxInterval)),
-				RxInterval: types.Int64Value(int64(apiIface.BFD.RxInterval)),
-				Multiplier: types.Int64Value(int64(apiIface.BFD.Multiplier)),
-			}
-			bfdObj, bfdDiags := types.ObjectValueFrom(ctx, bfdConfigAttrs, bfdModel)
-			diags.Append(bfdDiags...)
-			ifaceModel.Bfd = bfdObj
-		} else {
-			ifaceModel.Bfd = types.ObjectNull(bfdConfigAttrs)
-		}
-
-		// VLAN - use 0 as null (not set)
-		ifaceModel.VLAN = types.Int64Null()
-
-		// IP MTU - default is 1500, always set from API if available
-		ifaceModel.IpMtu = types.Int64Null()
-
-		// ip_sec_tunnel_options is write-only (PSK etc.), so it is never read back from the API.
-		ifaceModel.IpSecTunnelOptions = types.ObjectNull(ipSecTunnelOptionsAttrs)
-
-		// BGP Connections
-		bgpAttrTypes := bgpVrouterConnectionConfig
-		if partnerType == "a-end" {
-			bgpAttrTypes = bgpConnectionConfig
-		}
-
-		if len(apiIface.BGPConnections) > 0 {
-			bgpModels := make([]bgpConnectionConfigModel, 0, len(apiIface.BGPConnections))
-			for bgpIdx, apiBgp := range apiIface.BGPConnections {
-				bgpModel := bgpConnectionConfigModel{
-					PeerAsn:            types.Int64Value(int64(apiBgp.PeerAsn)),
-					LocalIPAddress:     types.StringValue(apiBgp.LocalIpAddress),
-					PeerIPAddress:      types.StringValue(apiBgp.PeerIpAddress),
-					Shutdown:           types.BoolValue(apiBgp.Shutdown),
-					Description:        types.StringValue(apiBgp.Description),
-					MedIn:              types.Int64Value(int64(apiBgp.MedIn)),
-					MedOut:             types.Int64Value(int64(apiBgp.MedOut)),
-					BfdEnabled:         types.BoolValue(apiBgp.BfdEnabled),
-					ExportPolicy:       types.StringValue(apiBgp.ExportPolicy),
-					AsPathPrependCount: types.Int64Value(int64(apiBgp.AsPathPrependCount)),
-				}
-
-				// PeerType (only for vrouter, not deprecated a-end)
-				if partnerType == "vrouter" {
-					bgpModel.PeerType = types.StringValue(apiBgp.PeerType)
-				}
-
-				// LocalAsn - handle nil pointer
-				if apiBgp.LocalAsn != nil {
-					bgpModel.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
-				} else {
-					bgpModel.LocalAsn = types.Int64Null()
-				}
-
-				// Password - preserve from existing state (API doesn't return it)
-				key := fmt.Sprintf("%d:%d", ifaceIdx, bgpIdx)
-				if pw, ok := existingPasswords[key]; ok {
-					bgpModel.Password = pw
-				} else {
-					bgpModel.Password = types.StringNull()
-				}
-
-				// Prefix filter lists - reverse lookup ID → name
-				bgpModel.ImportWhitelist = prefixFilterIDToName(apiBgp.ImportWhitelist, pflMap)
-				bgpModel.ImportBlacklist = prefixFilterIDToName(apiBgp.ImportBlacklist, pflMap)
-				bgpModel.ExportWhitelist = prefixFilterIDToName(apiBgp.ExportWhitelist, pflMap)
-				bgpModel.ExportBlacklist = prefixFilterIDToName(apiBgp.ExportBlacklist, pflMap)
-
-				// PermitExportTo
-				if len(apiBgp.PermitExportTo) > 0 {
-					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
-					diags.Append(permitDiags...)
-					bgpModel.PermitExportTo = permitList
-				} else {
-					bgpModel.PermitExportTo = types.ListNull(types.StringType)
-				}
-
-				// DenyExportTo
-				if len(apiBgp.DenyExportTo) > 0 {
-					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
-					diags.Append(denyDiags...)
-					bgpModel.DenyExportTo = denyList
-				} else {
-					bgpModel.DenyExportTo = types.ListNull(types.StringType)
-				}
-
-				bgpModels = append(bgpModels, bgpModel)
-			}
-			bgpList, bgpDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpAttrTypes), bgpModels)
-			diags.Append(bgpDiags...)
-			ifaceModel.BgpConnections = bgpList
-		} else {
-			ifaceModel.BgpConnections = types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpAttrTypes))
-		}
-
-		interfaceModels = append(interfaceModels, ifaceModel)
-	}
-
-	// Build the partner config object based on partner type
-	var partnerConfigObj basetypes.ObjectValue
-
-	if partnerType == "vrouter" {
-		vrouterModel := vxcPartnerConfigVrouterModel{}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), interfaceModels)
-		diags.Append(ifaceDiags...)
-		vrouterModel.Interfaces = ifaceList
-
-		vrouterObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterModel)
-		diags.Append(vrouterDiags...)
-
-		partnerConfigModel := &vxcPartnerConfigurationModel{
-			Partner:              types.StringValue("vrouter"),
-			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
-			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
-			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
-			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
-			IBMPartnerConfig:     types.ObjectNull(vxcPartnerConfigIbmAttrs),
-			VrouterPartnerConfig: vrouterObj,
-			PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
-		}
-		obj, objDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-		diags.Append(objDiags...)
-		partnerConfigObj = obj
-	} else {
-		// "a-end" (deprecated)
-		aEndModel := vxcPartnerConfigAEndModel{}
-		narrowModels := make([]vxcAEndInterfaceSerializeModel, len(interfaceModels))
-		for i, v := range interfaceModels {
-			narrowModels[i] = vxcAEndInterfaceSerializeModel{
-				IPAddresses:    v.IPAddresses,
-				IPRoutes:       v.IPRoutes,
-				NatIPAddresses: v.NatIPAddresses,
-				Bfd:            v.Bfd,
-				BgpConnections: v.BgpConnections,
-			}
-		}
-		ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), narrowModels)
-		diags.Append(ifaceDiags...)
-		aEndModel.Interfaces = ifaceList
-
-		aEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAEndAttrs, aEndModel)
-		diags.Append(aEndDiags...)
-
-		partnerConfigModel := &vxcPartnerConfigurationModel{
-			Partner:              types.StringValue("a-end"),
-			AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
-			AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
-			GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
-			OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
-			IBMPartnerConfig:     types.ObjectNull(vxcPartnerConfigIbmAttrs),
-			VrouterPartnerConfig: types.ObjectNull(vxcPartnerConfigVrouterAttrs),
-			PartnerAEndConfig:    aEndObj,
-		}
-		obj, objDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-		diags.Append(objDiags...)
-		partnerConfigObj = obj
-	}
-
-	return partnerConfigObj, diags
-}
-
-// extractExistingBGPPasswords extracts BGP passwords from existing partner config state.
-// Returns a map of "ifaceIdx:bgpIdx" → password value.
-func extractExistingBGPPasswords(ctx context.Context, partnerConfig basetypes.ObjectValue, partnerType string) map[string]basetypes.StringValue {
-	passwords := make(map[string]basetypes.StringValue)
-	if partnerConfig.IsNull() || partnerConfig.IsUnknown() {
-		return passwords
-	}
-
-	configModel := &vxcPartnerConfigurationModel{}
-	diags := partnerConfig.As(ctx, configModel, basetypes.ObjectAsOptions{})
-	if diags.HasError() {
-		return passwords
-	}
-
-	var interfacesList types.List
-	if partnerType == "vrouter" && !configModel.VrouterPartnerConfig.IsNull() {
-		vrouterModel := &vxcPartnerConfigVrouterModel{}
-		vrDiags := configModel.VrouterPartnerConfig.As(ctx, vrouterModel, basetypes.ObjectAsOptions{})
-		if vrDiags.HasError() {
-			return passwords
-		}
-		interfacesList = vrouterModel.Interfaces
-	} else if partnerType == "a-end" && !configModel.PartnerAEndConfig.IsNull() {
-		aEndModel := &vxcPartnerConfigAEndModel{}
-		aeDiags := configModel.PartnerAEndConfig.As(ctx, aEndModel, basetypes.ObjectAsOptions{})
-		if aeDiags.HasError() {
-			return passwords
-		}
-		interfacesList = aEndModel.Interfaces
-	} else {
-		return passwords
-	}
-
-	if interfacesList.IsNull() || interfacesList.IsUnknown() {
-		return passwords
-	}
-
-	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
-	ifDiags := interfacesList.ElementsAs(ctx, &ifaceModels, false)
-	if ifDiags.HasError() {
-		return passwords
-	}
-
-	for ifaceIdx, iface := range ifaceModels {
-		if iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
-			continue
-		}
-		bgpModels := []*bgpConnectionConfigModel{}
-		bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpModels, false)
-		if bgpDiags.HasError() {
-			continue
-		}
-		for bgpIdx, bgp := range bgpModels {
-			key := fmt.Sprintf("%d:%d", ifaceIdx, bgpIdx)
-			passwords[key] = bgp.Password
-		}
-	}
-
-	return passwords
-}
-
 // prefixFilterIDToName converts a prefix filter list ID to its name (description).
-// Returns null if the ID is 0 (unset).
-func prefixFilterIDToName(id int, pflMap map[int]string) basetypes.StringValue {
+// Returns null when the ID is 0 (the filter was removed). When the ID is non-zero
+// but absent from pflMap (the lookup didn't resolve it), the existing state value
+// is returned so a transient lookup gap doesn't manufacture drift against a filter
+// that may still be attached.
+func prefixFilterIDToName(id int, pflMap map[int]string, existing basetypes.StringValue) basetypes.StringValue {
 	if id == 0 {
 		return types.StringNull()
 	}
 	if name, ok := pflMap[id]; ok {
 		return types.StringValue(name)
 	}
-	return types.StringNull()
-}
-
-// resolveUnknownsInObject recursively walks a types.Object and replaces any
-// unknown values with null. This is needed when preserving plan values during
-// Create, since Terraform marks unset Optional+Computed fields as unknown
-// during planning, but requires all values to be known after apply.
-func resolveUnknownsInObject(obj basetypes.ObjectValue) basetypes.ObjectValue {
-	if obj.IsNull() || obj.IsUnknown() {
-		return types.ObjectNull(obj.AttributeTypes(context.Background()))
-	}
-
-	attrs := obj.Attributes()
-	resolved := make(map[string]attr.Value, len(attrs))
-
-	for k, v := range attrs {
-		resolved[k] = resolveUnknownValue(v)
-	}
-
-	newObj, _ := types.ObjectValue(obj.AttributeTypes(context.Background()), resolved)
-	return newObj
-}
-
-// resolveUnknownValue recursively resolves unknown values to null.
-func resolveUnknownValue(val attr.Value) attr.Value {
-	if val.IsUnknown() {
-		return makeNull(val)
-	}
-	if val.IsNull() {
-		return val
-	}
-
-	switch v := val.(type) {
-	case basetypes.ObjectValue:
-		return resolveUnknownsInObject(v)
-	case basetypes.ListValue:
-		return resolveUnknownsInList(v)
-	default:
-		return val
-	}
-}
-
-// resolveUnknownsInList recursively resolves unknowns within a list value.
-func resolveUnknownsInList(list basetypes.ListValue) basetypes.ListValue {
-	if list.IsNull() || list.IsUnknown() {
-		return types.ListNull(list.ElementType(context.Background()))
-	}
-
-	elems := list.Elements()
-	resolved := make([]attr.Value, len(elems))
-	for i, e := range elems {
-		resolved[i] = resolveUnknownValue(e)
-	}
-
-	newList, _ := types.ListValue(list.ElementType(context.Background()), resolved)
-	return newList
-}
-
-// makeNull creates a null value of the same type as the input.
-func makeNull(val attr.Value) attr.Value {
-	switch v := val.(type) {
-	case basetypes.StringValue:
-		return types.StringNull()
-	case basetypes.Int64Value:
-		return types.Int64Null()
-	case basetypes.BoolValue:
-		return types.BoolNull()
-	case basetypes.ObjectValue:
-		return types.ObjectNull(v.AttributeTypes(context.Background()))
-	case basetypes.ListValue:
-		return types.ListNull(v.ElementType(context.Background()))
-	case basetypes.MapValue:
-		return types.MapNull(v.ElementType(context.Background()))
-	default:
-		return val
-	}
+	return existing
 }
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.
