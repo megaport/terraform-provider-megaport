@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ var (
 	_ resource.Resource                = &natGatewayResource{}
 	_ resource.ResourceWithConfigure   = &natGatewayResource{}
 	_ resource.ResourceWithImportState = &natGatewayResource{}
+	_ resource.ResourceWithModifyPlan  = &natGatewayResource{}
 )
 
 // natGatewayResourceModel maps the resource schema data.
@@ -569,4 +571,111 @@ func (r *natGatewayResource) Configure(_ context.Context, req resource.Configure
 
 func (r *natGatewayResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
+}
+
+// ModifyPlan rejects invalid speed/session_count combinations at plan time by
+// fetching the live NAT Gateway availability matrix from the SDK and comparing
+// locally. Fail-open if the provider isn't configured (e.g. terraform
+// validate) or either value is unknown/null. Validation runs on create, on any
+// plan that changes speed or session_count, and on replacements (a change to a
+// RequiresReplace attribute is a fresh provision); pure in-place no-ops with
+// both values unchanged are skipped so a shifting matrix can't fail plan
+// against an already-provisioned NAT gateway. A matrix lookup failure
+// (transport, auth, 5xx) is surfaced as a warning rather than an error so a
+// transient failure doesn't block terraform plan.
+//
+// The matrix is fetched once per resource instance per plan. If large configs
+// ever cause throttling, add a plan-scoped cache here in the provider.
+func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan natGatewayResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Speed.IsUnknown() || plan.Speed.IsNull() {
+		return
+	}
+	if plan.SessionCount.IsUnknown() || plan.SessionCount.IsNull() {
+		return
+	}
+
+	if !req.State.Raw.IsNull() {
+		var state natGatewayResourceModel
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		// A change to any RequiresReplace attribute means the resource will
+		// be destroyed and recreated — effectively a new provision — so the
+		// new instance must still go through matrix validation even if
+		// speed/session_count match prior state. Keep this list in sync
+		// with the RequiresReplace plan modifiers in Schema.
+		requiresReplace := !plan.LocationID.Equal(state.LocationID) ||
+			!plan.PromoCode.Equal(state.PromoCode)
+		if !requiresReplace && plan.Speed.Equal(state.Speed) && plan.SessionCount.Equal(state.SessionCount) {
+			return
+		}
+	}
+
+	if r.client == nil {
+		return
+	}
+
+	speed := int(plan.Speed.ValueInt64())
+	sessionCount := int(plan.SessionCount.ValueInt64())
+
+	matrix, err := r.client.NATGatewayService.ListNATGatewaySessions(ctx)
+	if err != nil {
+		// Fail open: a transient matrix lookup failure must not block plan.
+		// Apply still rejects invalid combinations server-side.
+		resp.Diagnostics.AddWarning(
+			"Could not validate NAT Gateway speed / session count at plan time",
+			fmt.Sprintf("The availability matrix lookup failed: %v. Apply will still reject invalid combinations server-side, and may surface the same lookup error if it persists.", err),
+		)
+		return
+	}
+
+	if len(matrix) == 0 {
+		// Fail open: an empty-but-successful matrix would otherwise make
+		// natGatewaySpeedSessionSupported reject every plan. Treat it like a
+		// lookup failure; apply still validates server-side.
+		resp.Diagnostics.AddWarning(
+			"Could not validate NAT Gateway speed / session count at plan time",
+			"The NAT Gateway availability matrix was empty. Apply will still reject invalid combinations server-side.",
+		)
+		return
+	}
+
+	if attrPath, msg, ok := natGatewaySpeedSessionSupported(matrix, speed, sessionCount); !ok {
+		resp.Diagnostics.AddAttributeError(attrPath, "Invalid NAT Gateway speed / session count combination", msg)
+	}
+}
+
+// natGatewaySpeedSessionSupported reports whether the speed/sessionCount pair
+// appears in the live availability matrix. When unsupported it returns the
+// offending attribute path and a human-readable message for the diagnostic.
+func natGatewaySpeedSessionSupported(matrix []*megaport.NATGatewaySession, speed, sessionCount int) (path.Path, string, bool) {
+	supportedSpeeds := make([]int, 0, len(matrix))
+	for _, entry := range matrix {
+		if entry == nil {
+			continue
+		}
+		supportedSpeeds = append(supportedSpeeds, entry.SpeedMbps)
+		if entry.SpeedMbps != speed {
+			continue
+		}
+		if slices.Contains(entry.SessionCount, sessionCount) {
+			return path.Empty(), "", true
+		}
+		return path.Root("session_count"),
+			fmt.Sprintf("Session count %d is not supported for %d Mbps. Supported session counts: %v.", sessionCount, speed, entry.SessionCount),
+			false
+	}
+	return path.Root("speed"),
+		fmt.Sprintf("Speed %d Mbps is not supported. Supported speeds: %v.", speed, supportedSpeeds),
+		false
 }
