@@ -618,6 +618,56 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	return 0, ""
 }
 
+// findMCRWithPartnerTestLocation returns a single ACTIVE staging location that
+// supports an MCR at mcrSpeedMbps AND hosts a VXC-permitted partner port of
+// connectType. Provisioning both VXC ends at one location keeps them in the
+// same region, which the API enforces for partner types like TRANSIT
+// ("LongHaul Transit VXC must be in the same region"). Picking the MCR and
+// partner locations independently can straddle regions under parallel load.
+// Claims the location in the MCR pool.
+func findMCRWithPartnerTestLocation(t *testing.T, mcrSpeedMbps int, connectType string) (id int, name string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, ""
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0, ""
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return 0, ""
+	}
+	partnerLocs := map[int]bool{}
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) && pp.VXCPermitted {
+			partnerLocs[pp.LocationId] = true
+		}
+	}
+	mcrClaimedMu.Lock()
+	defer mcrClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, mcrSpeedMbps) && partnerLocs[loc.ID] && !mcrClaimedLocations[loc.ID] {
+			locID := loc.ID
+			mcrClaimedLocations[locID] = true
+			t.Cleanup(func() {
+				mcrClaimedMu.Lock()
+				defer mcrClaimedMu.Unlock()
+				delete(mcrClaimedLocations, locID)
+			})
+			t.Logf("findMCRWithPartnerTestLocation(%s): using location %d (%s)", connectType, locID, loc.Name)
+			return locID, loc.Name
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity and %s partner ports", mcrSpeedMbps, connectType)
+	return 0, ""
+}
+
 // findNATGatewayTestLocation returns a staging location ID that supports NAT
 // Gateway at the given speed (Mbps) in the "red" diversity zone. Calls t.Skip
 // if none found.

@@ -4423,8 +4423,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 
-	mcrLocationID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocationID, _ := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4468,7 +4469,7 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 
 				%s
 			}
-		`, mcrLocationID, transitLocs[0], mcrName, vxcName, extraVXCAttrs)
+		`, mcrLocationID, mcrLocationID, mcrName, vxcName, extraVXCAttrs)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -4511,8 +4512,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	mcrLocID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocID, _ := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4580,7 +4582,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 			depends_on = [megaport_mcr_ipsec_addon.addon]
 		}
-	`, mcrLocID, transitLocs[0], mcrName, vxcName)
+	`, mcrLocID, mcrLocID, mcrName, vxcName)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
