@@ -4649,6 +4649,129 @@ func TestAccMegaportVXC_BGPDriftDetection(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_IPRoutesDriftDetection verifies that vrouter ip_routes are
+// read back from the API on refresh without manufacturing drift. It covers the
+// list-ordering and CIDR-normalization caveats (multiple routes), plus the
+// per-prefix description preservation (one route has no description, which the
+// API echoes as empty).
+func TestAccMegaportVXC_IPRoutesDriftDetection(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	vxcConfig := func() string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+			resource "megaport_port" "port" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 100
+				}
+
+				a_end_partner_config = {
+					partner = "vrouter"
+					vrouter_config = {
+						interfaces = [{
+							ip_addresses = ["10.0.0.1/30"]
+							ip_routes = [
+								{
+									prefix      = "192.168.1.0/24"
+									next_hop    = "10.0.0.2"
+									description = "route one"
+								},
+								{
+									prefix   = "192.168.2.0/24"
+									next_hop = "10.0.0.2"
+								},
+							]
+						}]
+					}
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, locs[0], mcrName, portName, vxcName)
+	}
+
+	routePath := "a_end_partner_config.vrouter_config.interfaces.0.ip_routes"
+	checkRoutes := resource.ComposeAggregateTestCheckFunc(
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".#", "2"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".0.prefix", "192.168.1.0/24"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".0.next_hop", "10.0.0.2"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".0.description", "route one"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".1.prefix", "192.168.2.0/24"),
+		resource.TestCheckResourceAttr("megaport_vxc.vxc", routePath+".1.next_hop", "10.0.0.2"),
+		// Route 1 has no description; the API echoes it empty and the merge must
+		// preserve the configured null rather than write "".
+		resource.TestCheckNoResourceAttr("megaport_vxc.vxc", routePath+".1.description"),
+	)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create the VXC with ip_routes.
+			{
+				Config: vxcConfig(),
+				Check:  checkRoutes,
+			},
+			// Step 2: Import the VXC.
+			{
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if v, ok := m.Resources["megaport_vxc.vxc"]; ok {
+							rawState = v.Primary.Attributes
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+			},
+			// Step 3: Re-apply the same config and confirm routes read back.
+			{
+				Config: vxcConfig(),
+				Check:  checkRoutes,
+			},
+			// Step 4: Plan-only to verify NO drift (catches route reordering or
+			// CIDR normalization by the API).
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
 // whose A-End vrouter config declares two interfaces: a subInterface carrying
 // the tunnel source IP, and an ipSecTunnel interface with a single
