@@ -4595,3 +4595,107 @@ func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
 		})
 	}
 }
+
+// TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
+// whose A-End vrouter config declares two interfaces: a subInterface carrying
+// the tunnel source IP, and an ipSecTunnel interface with a single
+// ip_sec_tunnel_options object (one tunnel per ipSecTunnel interface). It then
+// relies on the framework's post-apply plan to confirm the write-only tunnel
+// fields (PSK, lifetimes) produce no drift. The peer addresses are illustrative
+// (RFC 5737 / link-local); a live run against a real peer may need real values.
+func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	mcrLocID, _ := findMCRTestLocation(t, 1000)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "mcr_loc" {
+			id = %d
+		}
+
+		data "megaport_location" "transit_loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.mcr_loc.id
+			contract_term_months = 1
+			port_speed           = 1000
+			asn                  = 64555
+		}
+
+		resource "megaport_mcr_ipsec_addon" "addon" {
+			mcr_id       = megaport_mcr.mcr.product_uid
+			tunnel_count = 10
+		}
+
+		data "megaport_partner" "internet_port" {
+			connect_type = "TRANSIT"
+			location_id  = data.megaport_location.transit_loc.id
+		}
+
+		resource "megaport_vxc" "ipsec_vxc" {
+			product_name         = "%s"
+			rate_limit           = 100
+			contract_term_months = 1
+
+			a_end = {
+				requested_product_uid = megaport_mcr.mcr.product_uid
+			}
+
+			a_end_partner_config = {
+				partner = "vrouter"
+				vrouter_config = {
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["169.254.100.1/30"]
+						},
+						{
+							interface_type = "ipSecTunnel"
+							ip_sec_tunnel_options = {
+								source_ip_address      = "169.254.100.1"
+								destination_ip_address = "203.0.113.10"
+								pre_shared_key         = "tf-acc-test-psk"
+								phase1_lifetime        = 28800
+								phase2_lifetime        = 3600
+							}
+						},
+					]
+				}
+			}
+
+			b_end = {
+				requested_product_uid = data.megaport_partner.internet_port.product_uid
+			}
+
+			depends_on = [megaport_mcr_ipsec_addon.addon]
+		}
+	`, mcrLocID, transitLocs[0], mcrName, vxcName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr_ipsec_addon.addon", "add_on_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.ipsec_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.interface_type", "subInterface"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.interface_type", "ipSecTunnel"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.source_ip_address", "169.254.100.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.destination_ip_address", "203.0.113.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase1_lifetime", "28800"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase2_lifetime", "3600"),
+					// pre_shared_key is write-only: it must never be persisted to state.
+					resource.TestCheckNoResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.pre_shared_key"),
+				),
+			},
+		},
+	})
+}
