@@ -736,6 +736,9 @@ func reconstructVrouterPartnerConfig(
 		// IP MTU - default is 1500, always set from API if available
 		ifaceModel.IpMtu = types.Int64Null()
 
+		// ip_sec_tunnel_options is write-only (PSK etc.), so it is never read back from the API.
+		ifaceModel.IpSecTunnelOptions = types.ObjectNull(ipSecTunnelOptionsAttrs)
+
 		// BGP Connections
 		bgpAttrTypes := bgpVrouterConnectionConfig
 		if partnerType == "a-end" {

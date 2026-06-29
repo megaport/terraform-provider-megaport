@@ -160,13 +160,14 @@ func buildVrouterPartnerConfigObject(t *testing.T, ctx context.Context, bgpModel
 	}
 
 	ifaceModel := vxcPartnerConfigInterfaceModel{
-		IPAddresses:    types.ListNull(types.StringType),
-		IPRoutes:       types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		NatIPAddresses: types.ListNull(types.StringType),
-		Bfd:            types.ObjectNull(bfdConfigAttrs),
-		BgpConnections: bgpList,
-		VLAN:           types.Int64Null(),
-		IpMtu:          types.Int64Null(),
+		IPAddresses:        types.ListNull(types.StringType),
+		IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		NatIPAddresses:     types.ListNull(types.StringType),
+		Bfd:                types.ObjectNull(bfdConfigAttrs),
+		BgpConnections:     bgpList,
+		VLAN:               types.Int64Null(),
+		IpMtu:              types.Int64Null(),
+		IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
 	}
 
 	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{ifaceModel})
