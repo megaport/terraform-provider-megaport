@@ -307,6 +307,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewMVEsDataSource,
 		NewVXCsDataSource,
 		NewIXsDataSource,
+		NewNATGatewaySessionsDataSource,
 	}
 }
 
