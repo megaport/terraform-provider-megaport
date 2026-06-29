@@ -3525,10 +3525,12 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                     a_end = {
                       requested_product_uid = megaport_mve.mve_3.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                     b_end = {
                       requested_product_uid = megaport_mve.mve_4.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                 }
                 `,
@@ -3549,6 +3551,8 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.vnic_index", "1"),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.inner_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.inner_vlan", "-1"),
 
 					// Verify VXC is now connected to the new MVEs
 					resource.TestCheckResourceAttrPair(
