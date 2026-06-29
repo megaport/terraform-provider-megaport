@@ -162,7 +162,8 @@ func TestFromAPIMVEImage(t *testing.T) {
 		// Verify available sizes
 		assert.False(t, model.AvailableSizes.IsNull())
 		sizes := make([]string, 0)
-		model.AvailableSizes.ElementsAs(context.Background(), &sizes, false)
+		diags := model.AvailableSizes.ElementsAs(context.Background(), &sizes, false)
+		assert.Empty(t, diags)
 		assert.Equal(t, []string{"MVE 2/8", "MVE 4/16", "MVE 8/32"}, sizes)
 	})
 
@@ -248,6 +249,21 @@ func TestMVEImageFiltersWithAvailableSizes(t *testing.T) {
 		},
 	}
 
+	// modelSizes converts a filtered SDK image through fromAPIMVEImage and
+	// returns the resulting available_sizes as a []string, so the test
+	// exercises the conversion the data source actually performs, not just
+	// the filter's slice passthrough.
+	modelSizes := func(t *testing.T, image *megaport.MVEImage) []string {
+		t.Helper()
+		model := &mveImageDetailsModel{}
+		model.fromAPIMVEImage(image)
+		assert.False(t, model.AvailableSizes.IsNull())
+		sizes := make([]string, 0)
+		diags := model.AvailableSizes.ElementsAs(context.Background(), &sizes, false)
+		assert.Empty(t, diags)
+		return sizes
+	}
+
 	t.Run("filter by vendor preserves available sizes", func(t *testing.T) {
 		filters := []func(*megaport.MVEImage) bool{
 			filterMVEImageByVendor("Fortinet"),
@@ -255,7 +271,7 @@ func TestMVEImageFiltersWithAvailableSizes(t *testing.T) {
 		filtered := runImageFiltersAndSort(images, filters)
 		assert.Len(t, filtered, 1)
 		assert.Equal(t, "Fortinet", filtered[0].Vendor)
-		assert.Equal(t, []string{"MVE 2/8", "MVE 4/16"}, filtered[0].AvailableSizes)
+		assert.Equal(t, []string{"MVE 2/8", "MVE 4/16"}, modelSizes(t, filtered[0]))
 	})
 
 	t.Run("filter by product code preserves available sizes", func(t *testing.T) {
@@ -265,7 +281,7 @@ func TestMVEImageFiltersWithAvailableSizes(t *testing.T) {
 		filtered := runImageFiltersAndSort(images, filters)
 		assert.Len(t, filtered, 1)
 		assert.Equal(t, "Cisco", filtered[0].Vendor)
-		assert.Equal(t, []string{"MVE 2/8", "MVE 4/16", "MVE 8/32", "MVE 12/48"}, filtered[0].AvailableSizes)
+		assert.Equal(t, []string{"MVE 2/8", "MVE 4/16", "MVE 8/32", "MVE 12/48"}, modelSizes(t, filtered[0]))
 	})
 }
 

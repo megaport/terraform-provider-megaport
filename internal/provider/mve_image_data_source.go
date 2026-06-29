@@ -209,10 +209,16 @@ func (d *mveImageDataSource) Read(ctx context.Context, req datasource.ReadReques
 		imageDetailsModel.fromAPIMVEImage(image)
 		imageDetailsObject, diags := types.ObjectValueFrom(ctx, mveImageDetailsAttrs, &imageDetailsModel)
 		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		imageObjects = append(imageObjects, imageDetailsObject)
 	}
 	imageList, imageListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mveImageDetailsAttrs), imageObjects)
 	resp.Diagnostics.Append(imageListDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.MVEImages = imageList
 
 	// Set state
@@ -257,13 +263,12 @@ func (orm *mveImageDetailsModel) fromAPIMVEImage(image *megaport.MVEImage) {
 	orm.ReleaseImage = types.BoolValue(image.ReleaseImage)
 	orm.ProductCode = types.StringValue(image.ProductCode)
 
-	// Convert AvailableSizes from []string to types.List
 	if len(image.AvailableSizes) > 0 {
 		sizeValues := make([]attr.Value, len(image.AvailableSizes))
 		for i, size := range image.AvailableSizes {
 			sizeValues[i] = types.StringValue(size)
 		}
-		orm.AvailableSizes, _ = types.ListValue(types.StringType, sizeValues)
+		orm.AvailableSizes = types.ListValueMust(types.StringType, sizeValues)
 	} else {
 		orm.AvailableSizes = types.ListNull(types.StringType)
 	}
