@@ -191,17 +191,29 @@ var (
 	}
 
 	vxcVrouterInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":            types.Int64Type,
-		"ip_addresses":      types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":         types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses":  types.ListType{}.WithElementType(types.StringType),
-		"bfd":               types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"vlan":              types.Int64Type,
-		"bgp_connections":   types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
-		"description":       types.StringType,
-		"interface_type":    types.StringType,
-		"packet_filter_in":  types.Int64Type,
-		"packet_filter_out": types.Int64Type,
+		"ip_mtu":                types.Int64Type,
+		"ip_addresses":          types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":             types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses":      types.ListType{}.WithElementType(types.StringType),
+		"bfd":                   types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":                  types.Int64Type,
+		"bgp_connections":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"ip_sec_tunnel_options": types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs),
+		"description":           types.StringType,
+		"interface_type":        types.StringType,
+		"packet_filter_in":      types.Int64Type,
+		"packet_filter_out":     types.Int64Type,
+	}
+
+	ipSecTunnelOptionsAttrs = map[string]attr.Type{
+		"source_ip_address":      types.StringType,
+		"destination_ip_address": types.StringType,
+		"pre_shared_key":         types.StringType,
+		"passive":                types.BoolType,
+		"local_id":               types.StringType,
+		"remote_id":              types.StringType,
+		"phase1_lifetime":        types.Int64Type,
+		"phase2_lifetime":        types.Int64Type,
 	}
 
 	ipRouteAttrs = map[string]attr.Type{
@@ -417,17 +429,33 @@ type vxcPartnerConfigIbmModel struct {
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
 type vxcPartnerConfigInterfaceModel struct {
-	IpMtu           types.Int64  `tfsdk:"ip_mtu"`
-	IPAddresses     types.List   `tfsdk:"ip_addresses"`
-	IPRoutes        types.List   `tfsdk:"ip_routes"`
-	NatIPAddresses  types.List   `tfsdk:"nat_ip_addresses"`
-	Bfd             types.Object `tfsdk:"bfd"`
-	BgpConnections  types.List   `tfsdk:"bgp_connections"`
-	VLAN            types.Int64  `tfsdk:"vlan"`
-	Description     types.String `tfsdk:"description"`
-	InterfaceType   types.String `tfsdk:"interface_type"`
-	PacketFilterIn  types.Int64  `tfsdk:"packet_filter_in"`
-	PacketFilterOut types.Int64  `tfsdk:"packet_filter_out"`
+	IpMtu              types.Int64  `tfsdk:"ip_mtu"`
+	IPAddresses        types.List   `tfsdk:"ip_addresses"`
+	IPRoutes           types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses     types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd                types.Object `tfsdk:"bfd"`
+	BgpConnections     types.List   `tfsdk:"bgp_connections"`
+	IpSecTunnelOptions types.Object `tfsdk:"ip_sec_tunnel_options"`
+	VLAN               types.Int64  `tfsdk:"vlan"`
+	Description        types.String `tfsdk:"description"`
+	InterfaceType      types.String `tfsdk:"interface_type"`
+	PacketFilterIn     types.Int64  `tfsdk:"packet_filter_in"`
+	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
+}
+
+// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
+// never returns the PSK or lifetimes. PreSharedKey is a write-only argument, so
+// it is null in plan/state and sourced from the configuration when ordering;
+// the lifetimes are preserved from plan/state rather than read back.
+type ipSecTunnelOptionsModel struct {
+	SourceIPAddress      types.String `tfsdk:"source_ip_address"`
+	DestinationIPAddress types.String `tfsdk:"destination_ip_address"`
+	PreSharedKey         types.String `tfsdk:"pre_shared_key"`
+	Passive              types.Bool   `tfsdk:"passive"`
+	LocalID              types.String `tfsdk:"local_id"`
+	RemoteID             types.String `tfsdk:"remote_id"`
+	Phase1Lifetime       types.Int64  `tfsdk:"phase1_lifetime"`
+	Phase2Lifetime       types.Int64  `tfsdk:"phase2_lifetime"`
 }
 
 // ipRouteModel maps the IP route schema data.
@@ -1504,7 +1532,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -1829,7 +1862,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(partnerConfigBEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2326,7 +2364,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				)
 				return
 			}
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2375,7 +2418,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(vrouterModel.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return

@@ -1,12 +1,42 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
 )
+
+func TestIsIPsecTunnelsConfiguredError(t *testing.T) {
+	t.Parallel()
+	apiErr := func(status int, msg string) error {
+		return &megaport.ErrorResponse{Response: &http.Response{StatusCode: status}, Message: msg}
+	}
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"400 configured tunnels", apiErr(http.StatusBadRequest, "Invalid ipsec_tunnels. Requested limit is less than number of configured tunnels."), true},
+		{"400 configured tunnels wrapped", fmt.Errorf("delete failed: %w", apiErr(http.StatusBadRequest, "number of configured tunnels")), true},
+		{"400 unrelated message", apiErr(http.StatusBadRequest, "Could not find a service with UID"), false},
+		{"404 configured tunnels", apiErr(http.StatusNotFound, "configured tunnels"), false},
+		{"plain error", errors.New("configured tunnels"), false},
+		{"nil response", &megaport.ErrorResponse{Message: "configured tunnels"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isIPsecTunnelsConfiguredError(tc.err); got != tc.want {
+				t.Errorf("isIPsecTunnelsConfiguredError() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestAccMegaportMCRIpsecAddon_Basic(t *testing.T) {
 	t.Parallel()

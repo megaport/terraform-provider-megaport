@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -32,6 +33,51 @@ func getNATGatewayTestConfig() (speed, sessionCount int, err error) {
 		return s.SpeedMbps, s.SessionCount[0], nil
 	}
 	return 0, 0, fmt.Errorf("no NAT Gateway session/speed pairs available")
+}
+
+// findInvalidNATGatewaySpeed derives a speed guaranteed not to be in the
+// live NAT Gateway availability matrix by returning max(SpeedMbps)+1. It
+// also returns any positive session count from the matrix so the HCL
+// parses and the validator's session-count pre-check passes (the test
+// targets the speed sentinel, not the session-count sentinel). The two
+// selections are independent: if the highest-speed entry has no
+// SessionCount values, we still pick a session count from another entry.
+// Deriving both values dynamically keeps the test stable as the matrix
+// evolves; a hard-coded "500 Mbps is invalid" would silently break the
+// day 500 Mbps is added.
+func findInvalidNATGatewaySpeed() (invalidSpeed, sessionCount int, err error) {
+	client, err := getTestClient()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to create test client: %w", err)
+	}
+	sessions, err := client.NATGatewayService.ListNATGatewaySessions(context.Background())
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to list NAT Gateway sessions: %w", err)
+	}
+	maxSpeed := 0
+	for _, s := range sessions {
+		if s == nil {
+			continue
+		}
+		if s.SpeedMbps > maxSpeed {
+			maxSpeed = s.SpeedMbps
+		}
+		if sessionCount == 0 {
+			for _, c := range s.SessionCount {
+				if c > 0 {
+					sessionCount = c
+					break
+				}
+			}
+		}
+	}
+	if maxSpeed <= 0 {
+		return 0, 0, fmt.Errorf("no positive NAT Gateway speeds advertised")
+	}
+	if sessionCount <= 0 {
+		return 0, 0, fmt.Errorf("no positive session count advertised in NAT Gateway matrix")
+	}
+	return maxSpeed + 1, sessionCount, nil
 }
 
 // checkNATGatewayProvisioned asserts the resource's provisioning_status is
@@ -224,6 +270,70 @@ resource "megaport_nat_gateway" "test" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckNoResourceAttr(resourceName, "promo_code"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed asserts that the
+// resource's ModifyPlan hook rejects an invalid speed during terraform
+// plan, before any provisioning occurs. The invalid speed is derived from
+// the live availability matrix (max advertised speed + 1 Mbps) so the
+// test stays accurate as the matrix evolves.
+func TestAccMegaportNATGateway_PlanTimeRejectsInvalidSpeed(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	invalidSpeed, sessionCount, err := findInvalidNATGatewaySpeed()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
+	}
+
+	// Preflight the same matrix lookup the provider's ModifyPlan will use, so
+	// we only assert on the validation outcome when the lookup is actually
+	// working. The provider downgrades operational lookup failures (transport,
+	// auth, 5xx) to a warning, which would leave the PlanOnly step with no
+	// error to match. Skip in that case instead of flaking.
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: %v", err)
+	}
+	matrix, err := client.NATGatewayService.ListNATGatewaySessions(context.Background())
+	if err != nil {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: matrix lookup failed operationally: %v", err)
+	}
+	if _, _, ok := natGatewaySpeedSessionSupported(matrix, invalidSpeed, sessionCount); ok {
+		t.Skipf("Skipping NAT Gateway plan-time validation test: derived invalid speed %d Mbps is supported by the matrix (matrix may have changed)", invalidSpeed)
+	}
+	// Find a location that supports the highest advertised speed (one less
+	// than invalidSpeed). The location is needed for the HCL to parse; the
+	// plan-only step never reaches provisioning.
+	locationID, _ := findNATGatewayTestLocation(t, invalidSpeed-1)
+	natGWName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+data "megaport_location" "test_location" {
+    id = %d
+}
+
+resource "megaport_nat_gateway" "test" {
+    product_name         = "%s"
+    location_id          = data.megaport_location.test_location.id
+    speed                = %d
+    session_count        = %d
+    contract_term_months = 1
+    diversity_zone       = "red"
+    asn                  = 64512
+}
+`, locationID, natGWName, invalidSpeed, sessionCount)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid NAT Gateway speed / session count combination`),
 			},
 		},
 	})
