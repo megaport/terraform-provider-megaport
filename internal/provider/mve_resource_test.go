@@ -564,6 +564,9 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 						if !ok {
 							return fmt.Errorf("megaport_mve.mve not found in state")
 						}
+						if originalUID == "" {
+							return fmt.Errorf("originalUID was not captured in step 1")
+						}
 						postRenameUID = rs.Primary.Attributes["product_uid"]
 						if postRenameUID != originalUID {
 							return fmt.Errorf("MVE was replaced (product_uid changed) when only vNIC descriptions changed; want in-place update. before=%s after=%s", originalUID, postRenameUID)
@@ -586,6 +589,9 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
 						if !ok {
 							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						if postRenameUID == "" {
+							return fmt.Errorf("postRenameUID was not captured in step 2")
 						}
 						if rs.Primary.Attributes["product_uid"] == postRenameUID {
 							return fmt.Errorf("MVE was updated in place when vNIC count changed; want replacement. product_uid unchanged=%s", postRenameUID)

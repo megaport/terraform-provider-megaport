@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -585,6 +586,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						"description": schema.StringAttribute{
 							Description: "The description of the network interface.",
 							Required:    true,
+							Validators: []validator.String{
+								// The API rejects empty descriptions; fail at plan time
+								// instead of mid-apply.
+								stringvalidator.LengthAtLeast(1),
+							},
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the network interface.",
@@ -1028,6 +1034,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	apiDiags := state.fromAPIMVE(ctx, updatedMVE, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
+
+	// Adopt the planned vnics rather than the immediate post-modify read: the
+	// read model can briefly lag a description PUT, which would otherwise
+	// surface as "inconsistent result after apply". Descriptions are
+	// user-authoritative and VLANs are immutable and index-stable.
+	if !plan.NetworkInterfaces.IsNull() && !plan.NetworkInterfaces.IsUnknown() {
+		state.NetworkInterfaces = plan.NetworkInterfaces
+	}
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
