@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -15,15 +16,21 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// MockIXService is a mock of the IX service for testing
+// MockIXService is a mock of the IX service for testing. The GotListIXsReq and
+// GotGetIXID fields record the arguments of the last call so tests can assert
+// the data source passes the right request through.
 type MockIXService struct {
 	ListIXsResult []*megaport.IX
 	ListIXsErr    error
 	GetIXResult   *megaport.IX
 	GetIXErr      error
+
+	GotListIXsReq *megaport.ListIXsRequest
+	GotGetIXID    string
 }
 
 func (m *MockIXService) ListIXs(ctx context.Context, req *megaport.ListIXsRequest) ([]*megaport.IX, error) {
+	m.GotListIXsReq = req
 	if m.ListIXsErr != nil {
 		return nil, m.ListIXsErr
 	}
@@ -34,6 +41,7 @@ func (m *MockIXService) ListIXs(ctx context.Context, req *megaport.ListIXsReques
 }
 
 func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, error) {
+	m.GotGetIXID = id
 	if m.GetIXErr != nil {
 		return nil, m.GetIXErr
 	}
@@ -119,6 +127,10 @@ func TestReadIXs_ListAll(t *testing.T) {
 
 	assert.True(t, state.ProductUID.IsNull())
 
+	// The list path must request only active IXs.
+	require.NotNil(t, mockIXService.GotListIXsReq)
+	assert.False(t, mockIXService.GotListIXsReq.IncludeInactive)
+
 	var details []ixDetailModel
 	diags = state.IXs.ElementsAs(ctx, &details, false)
 	require.False(t, diags.HasError())
@@ -148,6 +160,8 @@ func TestReadIXs_GetByUID(t *testing.T) {
 	require.False(t, diags.HasError())
 
 	assert.Equal(t, "ix-1", state.ProductUID.ValueString())
+	// The single-IX path must look up the requested UID.
+	assert.Equal(t, uid, mockIXService.GotGetIXID)
 
 	var details []ixDetailModel
 	diags = state.IXs.ElementsAs(ctx, &details, false)
@@ -156,6 +170,79 @@ func TestReadIXs_GetByUID(t *testing.T) {
 	require.Len(t, details, 1)
 	assert.Equal(t, "ix-1", details[0].UID.ValueString())
 	assert.Equal(t, "IX One", details[0].Name.ValueString())
+}
+
+func TestReadIXs_ListAll_SortedByUID(t *testing.T) {
+	ctx := context.Background()
+	// Feed the IXs out of UID order; the data source must return them sorted so
+	// the list element order is stable across reads.
+	mockIXService := &MockIXService{
+		ListIXsResult: []*megaport.IX{
+			{ProductUID: "ix-3", ProductName: "IX Three"},
+			{ProductUID: "ix-1", ProductName: "IX One"},
+			{ProductUID: "ix-2", ProductName: "IX Two"},
+		},
+	}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
+
+	req, resp := ixsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state ixsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+
+	var details []ixDetailModel
+	require.False(t, state.IXs.ElementsAs(ctx, &details, false).HasError())
+
+	require.Len(t, details, 3)
+	assert.Equal(t, "ix-1", details[0].UID.ValueString())
+	assert.Equal(t, "ix-2", details[1].UID.ValueString())
+	assert.Equal(t, "ix-3", details[2].UID.ValueString())
+}
+
+func TestReadIXs_ListAll_Empty(t *testing.T) {
+	ctx := context.Background()
+	mockIXService := &MockIXService{
+		ListIXsResult: []*megaport.IX{},
+	}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
+
+	req, resp := ixsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state ixsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	// An empty result must be a known, non-null, zero-length list (not null).
+	assert.False(t, state.IXs.IsNull())
+	assert.False(t, state.IXs.IsUnknown())
+
+	var details []ixDetailModel
+	diags = state.IXs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+	assert.Len(t, details, 0)
+}
+
+func TestReadIXs_GetByUIDNilResult(t *testing.T) {
+	ctx := context.Background()
+	// Both GetIXErr and GetIXResult nil exercises the defensive nil-guard branch
+	// in Read. The real SDK can't return (nil, nil) from GetIX, so this is not the
+	// production not-found path (that surfaces as an error: TestReadIXs_GetByUIDError).
+	mockIXService := &MockIXService{}
+	ds := &ixsDataSource{client: &megaport.Client{IXService: mockIXService}}
+
+	uid := "ix-nil-result"
+	req, resp := ixsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "IX not found:")
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), uid)
 }
 
 func TestReadIXs_ListError(t *testing.T) {
@@ -222,6 +309,22 @@ func TestFromAPIIXDetail(t *testing.T) {
 		assert.Equal(t, int64(64512), detail.ASN.ValueInt64())
 		assert.Equal(t, "Los Angeles IX", detail.NetworkServiceType.ValueString())
 		assert.False(t, detail.AttributeTags.IsNull())
+	})
+
+	t.Run("Non-nil time fields format as RFC3339", func(t *testing.T) {
+		created := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+		deployed := time.Date(2024, 6, 7, 8, 9, 10, 0, time.UTC)
+		ix := &megaport.IX{
+			ProductUID: "ix-times",
+			CreateDate: &megaport.Time{Time: created},
+			DeployDate: &megaport.Time{Time: deployed},
+		}
+
+		detail, diags := fromAPIIXDetail(ix)
+		assert.False(t, diags.HasError())
+
+		assert.Equal(t, "2024-01-02T03:04:05Z", detail.CreateDate.ValueString())
+		assert.Equal(t, "2024-06-07T08:09:10Z", detail.DeployDate.ValueString())
 	})
 
 	t.Run("Nil time fields produce null values", func(t *testing.T) {

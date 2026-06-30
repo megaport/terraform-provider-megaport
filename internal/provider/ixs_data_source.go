@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -193,6 +194,8 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 			)
 			return
 		}
+		// GetIX returns a non-nil IX on success; guard the nil case so a future
+		// SDK change can't slip a nil pointer into fromAPIIXDetail and panic.
 		if ix == nil {
 			resp.Diagnostics.AddError(
 				"Error reading IX",
@@ -215,6 +218,13 @@ func (d *ixsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 			return
 		}
 	}
+
+	// ListIXs builds its result from a Go map, whose iteration order is
+	// randomized, so sort by product UID for a stable list order and avoid
+	// spurious plan diffs between reads.
+	sort.Slice(ixs, func(i, j int) bool {
+		return ixs[i].ProductUID < ixs[j].ProductUID
+	})
 
 	// Build detail objects
 	ixObjects := make([]types.Object, 0, len(ixs))
