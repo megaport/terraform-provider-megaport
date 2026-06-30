@@ -4435,13 +4435,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 				id = %d
 			}
 
-			data "megaport_location" "transit_loc" {
-				id = %d
-			}
-
 			data "megaport_partner" "internet_port" {
 				connect_type = "TRANSIT"
-				location_id  = data.megaport_location.transit_loc.id
+				location_id  = data.megaport_location.mcr_loc.id
 			}
 
 			resource "megaport_mcr" "mcr" {
@@ -4469,7 +4465,7 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 
 				%s
 			}
-		`, mcrLocationID, mcrLocationID, mcrName, vxcName, extraVXCAttrs)
+		`, mcrLocationID, mcrName, vxcName, extraVXCAttrs)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -4523,10 +4519,6 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 			id = %d
 		}
 
-		data "megaport_location" "transit_loc" {
-			id = %d
-		}
-
 		resource "megaport_mcr" "mcr" {
 			product_name         = "%s"
 			location_id          = data.megaport_location.mcr_loc.id
@@ -4542,7 +4534,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 		data "megaport_partner" "internet_port" {
 			connect_type = "TRANSIT"
-			location_id  = data.megaport_location.transit_loc.id
+			location_id  = data.megaport_location.mcr_loc.id
 		}
 
 		resource "megaport_vxc" "ipsec_vxc" {
@@ -4582,7 +4574,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 			depends_on = [megaport_mcr_ipsec_addon.addon]
 		}
-	`, mcrLocID, mcrLocID, mcrName, vxcName)
+	`, mcrLocID, mcrName, vxcName)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
