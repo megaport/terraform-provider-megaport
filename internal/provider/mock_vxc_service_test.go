@@ -39,10 +39,10 @@ func (m *MockVXCService) ListVXCs(_ context.Context, _ *megaport.ListVXCsRequest
 	return []*megaport.VXC{}, nil
 }
 
-func (m *MockVXCService) ListVXCResourceTags(_ context.Context, vxcID string) (map[string]string, error) {
+func (m *MockVXCService) ListVXCResourceTags(ctx context.Context, vxcID string) (map[string]string, error) {
 	m.CapturedResourceTagVXCUID = vxcID
 	if m.ListVXCResourceTagsFunc != nil {
-		return m.ListVXCResourceTagsFunc(context.Background(), vxcID)
+		return m.ListVXCResourceTagsFunc(ctx, vxcID)
 	}
 	if m.ListVXCResourceTagsErr != nil {
 		return nil, m.ListVXCResourceTagsErr
@@ -50,7 +50,10 @@ func (m *MockVXCService) ListVXCResourceTags(_ context.Context, vxcID string) (m
 	if m.ListVXCResourceTagsResult != nil {
 		return m.ListVXCResourceTagsResult, nil
 	}
-	return nil, nil
+	return map[string]string{
+		"environment": "test",
+		"owner":       "automation",
+	}, nil
 }
 
 func (m *MockVXCService) BuyVXC(_ context.Context, _ *megaport.BuyVXCRequest) (*megaport.BuyVXCResponse, error) {

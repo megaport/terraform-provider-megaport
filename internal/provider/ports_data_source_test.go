@@ -25,6 +25,7 @@ type MockPortService struct {
 	ListPortResourceTagsErr    error
 	ListPortResourceTagsResult map[string]string
 	CapturedResourceTagPortUID string
+	CapturedGetPortUID         string
 }
 
 func (m *MockPortService) ListPorts(ctx context.Context) ([]*megaport.Port, error) {
@@ -38,6 +39,7 @@ func (m *MockPortService) ListPorts(ctx context.Context) ([]*megaport.Port, erro
 }
 
 func (m *MockPortService) GetPort(ctx context.Context, portId string) (*megaport.Port, error) {
+	m.CapturedGetPortUID = portId
 	if m.GetPortErr != nil {
 		return nil, m.GetPortErr
 	}
@@ -184,6 +186,7 @@ func TestReadPorts_GetByUID(t *testing.T) {
 	ds.Read(ctx, req, resp)
 
 	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	assert.Equal(t, "port-1", mockPortService.CapturedGetPortUID, "GetPort must be called with the requested UID")
 
 	var state portsModel
 	diags := resp.State.Get(ctx, &state)
@@ -261,13 +264,17 @@ func TestReadPorts_ListSkipsInactive(t *testing.T) {
 	var details []portDetailModel
 	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
 
+	// Results are sorted by UID: "port-config" < "port-live".
 	require.Len(t, details, 2)
-	assert.Equal(t, "port-live", details[0].UID.ValueString())
-	assert.Equal(t, "port-config", details[1].UID.ValueString())
+	assert.Equal(t, "port-config", details[0].UID.ValueString())
+	assert.Equal(t, "port-live", details[1].UID.ValueString())
 }
 
-func TestReadPorts_GetByUIDRejectsInactive(t *testing.T) {
+func TestReadPorts_GetByUIDReturnsInactive(t *testing.T) {
 	ctx := context.Background()
+	// A direct UID lookup returns the port regardless of status, matching the
+	// megaport_vxcs/megaport_mcrs data sources. Only the list path filters
+	// out decommissioned/cancelled ports.
 	for _, status := range []string{megaport.STATUS_DECOMMISSIONED, megaport.STATUS_CANCELLED} {
 		t.Run(status, func(t *testing.T) {
 			mockPortService := &MockPortService{
@@ -279,8 +286,15 @@ func TestReadPorts_GetByUIDRejectsInactive(t *testing.T) {
 			req, resp := portsReadRequest(t, ds, &uid, nil)
 			ds.Read(ctx, req, resp)
 
-			require.True(t, resp.Diagnostics.HasError())
-			assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "not found")
+			require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+			var state portsModel
+			require.False(t, resp.State.Get(ctx, &state).HasError())
+			var details []portDetailModel
+			require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+			require.Len(t, details, 1)
+			assert.Equal(t, "port-inactive", details[0].UID.ValueString())
+			assert.Equal(t, status, details[0].ProvisioningStatus.ValueString())
 		})
 	}
 }
@@ -334,6 +348,100 @@ func TestReadPorts_TagsFetchedWhenOptedIn(t *testing.T) {
 	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
 	require.Len(t, details, 1)
 	assert.False(t, details[0].ResourceTags.IsNull())
+	assert.Equal(t, "port-1", mockPortService.CapturedResourceTagPortUID)
+}
+
+func TestReadPorts_ListSortsByUID(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		ListPortsResult: []*megaport.Port{
+			{UID: "port-c", Name: "C"},
+			{UID: "port-a", Name: "A"},
+			{UID: "port-b", Name: "B"},
+		},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+
+	require.Len(t, details, 3)
+	assert.Equal(t, "port-a", details[0].UID.ValueString())
+	assert.Equal(t, "port-b", details[1].UID.ValueString())
+	assert.Equal(t, "port-c", details[2].UID.ValueString())
+}
+
+func TestReadPorts_ListAllEmpty(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{ListPortsResult: []*megaport.Port{}}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	// An empty result must be an empty list, not null, so consumers can
+	// for_each/count over it without error.
+	assert.False(t, state.Ports.IsNull())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	assert.Empty(t, details)
+}
+
+func TestReadPorts_TagFetchErrorProducesWarningNotError(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		ListPortsResult:         []*megaport.Port{{UID: "port-1", Name: "Port One"}},
+		ListPortResourceTagsErr: errors.New("rate limited"),
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	yes := true
+	req, resp := portsReadRequest(t, ds, nil, &yes)
+	ds.Read(ctx, req, resp)
+
+	// A failed tag fetch degrades to a warning, never an error, so the read
+	// still succeeds.
+	require.False(t, resp.Diagnostics.HasError(), "tag fetch failure must not fail the read")
+	assert.NotEmpty(t, resp.Diagnostics.Warnings(), "expected a warning for the failed tag fetch")
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.True(t, details[0].ResourceTags.IsNull(), "tags should be null when the fetch failed")
+}
+
+func TestReadPorts_GetByUIDWithTags(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		GetPortResult:              &megaport.Port{UID: "port-1", Name: "Port One"},
+		ListPortResourceTagsResult: map[string]string{"env": "prod"},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	uid := "port-1"
+	yes := true
+	req, resp := portsReadRequest(t, ds, &uid, &yes)
+	ds.Read(ctx, req, resp)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.Equal(t, "port-1", details[0].UID.ValueString())
+	assert.False(t, details[0].ResourceTags.IsNull(), "tags should be populated for single-UID lookup with include_resource_tags=true")
 	assert.Equal(t, "port-1", mockPortService.CapturedResourceTagPortUID)
 }
 

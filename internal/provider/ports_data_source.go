@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -261,7 +262,9 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	var ports []*megaport.Port
 
 	if !data.ProductUID.IsNull() && !data.ProductUID.IsUnknown() {
-		// Look up a specific port by UID
+		// Look up a specific port by UID. A direct lookup returns the port
+		// regardless of status, matching the megaport_vxcs/megaport_mcrs data
+		// sources; only the list path filters inactive ports.
 		port, err := d.client.PortService.GetPort(ctx, data.ProductUID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -270,7 +273,7 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			)
 			return
 		}
-		if port == nil || isPortInactive(port) {
+		if port == nil {
 			resp.Diagnostics.AddError(
 				"Error reading port",
 				"Port not found: "+data.ProductUID.ValueString(),
@@ -279,7 +282,7 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 		ports = []*megaport.Port{port}
 	} else {
-		// List all ports — megaportgo's ListPorts does not filter by status,
+		// List all ports. megaportgo's ListPorts does not filter by status,
 		// so exclude decommissioned/cancelled ports here to match the
 		// "active ports" contract advertised by the schema.
 		all, err := d.client.PortService.ListPorts(ctx)
@@ -298,6 +301,13 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			ports = append(ports, p)
 		}
 	}
+
+	// Sort by UID for a stable, deterministic list order. The API does not
+	// guarantee order, so without this a reshuffled response would surface as
+	// a spurious diff for consumers that index into the list.
+	sort.Slice(ports, func(i, j int) bool {
+		return ports[i].UID < ports[j].UID
+	})
 
 	// Determine whether to fetch resource tags (opt-in to avoid N+1 API calls)
 	fetchTags := !data.IncludeResourceTags.IsNull() && !data.IncludeResourceTags.IsUnknown() && data.IncludeResourceTags.ValueBool()
@@ -376,7 +386,7 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailMode
 		DiversityZone:         types.StringValue(p.DiversityZone),
 	}
 
-	// Time fields — emit RFC3339 so values are consumable by Terraform's
+	// Time fields: emit RFC3339 so values are consumable by Terraform's
 	// formatdate() function; nil dates map to null rather than an empty string.
 	if p.CreateDate != nil {
 		detail.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC3339))
