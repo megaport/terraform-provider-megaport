@@ -2107,8 +2107,6 @@ func TestMVE_TransitVXC(t *testing.T) {
 	// The MVE and the TRANSIT partner port must share a region, so claim one
 	// location that satisfies both and use it for both VXC ends.
 	mveLocID := findMVEWithPartnerTestLocation(t, "TRANSIT")
-	portName := RandomTestName()
-	costCentreName := RandomTestName()
 	mveName := RandomTestName()
 	transitVXCName := RandomTestName()
 
@@ -2119,15 +2117,6 @@ func TestMVE_TransitVXC(t *testing.T) {
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
 					id = %d
-				  }
-
-				  resource "megaport_port" "port" {
-					product_name           = "%s"
-					port_speed             = 1000
-					location_id            = data.megaport_location.loc1.id
-					contract_term_months   = 12
-					marketplace_visibility = true
-					cost_centre            = "%s"
 				  }
 
 				  data "megaport_partner" "internet_port" {
@@ -2181,7 +2170,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  partner = "transit"
 					}
 				  }
-                  `, mveLocID, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
+                  `, mveLocID, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
