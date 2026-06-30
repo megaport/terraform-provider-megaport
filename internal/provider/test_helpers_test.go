@@ -113,6 +113,8 @@ type mveProbeOpts struct {
 	vendorConfig  megaport.VendorConfig
 	diversityZone string
 	vnicCount     int
+	// locationFilter, if set, restricts candidates to locations it returns true for.
+	locationFilter func(*megaport.LocationV3) bool
 }
 
 // findMVETestLocation returns a staging location with confirmed Aruba SMALL MVE
@@ -133,6 +135,54 @@ func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
 		diversityZone: "red",
 		vnicCount:     2,
 	})
+}
+
+// findMVEWithPartnerTestLocation returns a single ACTIVE staging location that
+// has confirmed Aruba SMALL MVE capacity AND hosts a VXC-permitted partner port
+// of connectType. Provisioning the MVE and the partner-facing VXC end at one
+// location keeps them in the same region, which the API enforces for partner
+// types like TRANSIT. Picking the MVE and partner locations independently can
+// straddle regions under parallel load. Claims the location in the MVE pool.
+func findMVEWithPartnerTestLocation(t *testing.T, connectType string) (id int) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return 0
+	}
+	partnerLocs := map[int]bool{}
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) && pp.VXCPermitted {
+			partnerLocs[pp.LocationId] = true
+		}
+	}
+	if len(partnerLocs) == 0 {
+		t.Skipf("skipping: no VXC-permitted %s partner ports found", connectType)
+		return 0
+	}
+	id, _ = findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.ArubaConfig{
+			Vendor:      "aruba",
+			ImageID:     MVEArubaImageIDMVE,
+			ProductSize: "SMALL",
+			MVELabel:    "MVE 2/8",
+			AccountName: "probe",
+			AccountKey:  "probe",
+			SystemTag:   "Preconfiguration-aruba-test-1",
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+		locationFilter: func(loc *megaport.LocationV3) bool {
+			return partnerLocs[loc.ID]
+		},
+	})
+	return id
 }
 
 // findMVETestLocationHighCapacity returns a staging location with enough capacity
@@ -477,6 +527,9 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 
 	probe := func(loc *megaport.LocationV3) bool {
 		if !strings.EqualFold(loc.Status, "active") || !loc.HasMVESupport() {
+			return false
+		}
+		if opts.locationFilter != nil && !opts.locationFilter(loc) {
 			return false
 		}
 		vnics := make([]megaport.MVENetworkInterface, opts.vnicCount)

@@ -2104,10 +2104,9 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 0)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
-	locs := []int{mveLocID, transitLocs[0]}
+	// The MVE and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both VXC ends.
+	mveLocID := findMVEWithPartnerTestLocation(t, "TRANSIT")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
@@ -2122,10 +2121,6 @@ func TestMVE_TransitVXC(t *testing.T) {
 					id = %d
 				  }
 
-				  data "megaport_location" "loc2" {
-					id = %d
-				  }
-
 				  resource "megaport_port" "port" {
 					product_name           = "%s"
 					port_speed             = 1000
@@ -2137,7 +2132,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					location_id   = data.megaport_location.loc2.id
+					location_id   = data.megaport_location.loc1.id
 				  }
 
 				  resource "megaport_mve" "mve" {
@@ -2186,7 +2181,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  partner = "transit"
 					}
 				  }
-                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
+                  `, mveLocID, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
