@@ -2815,18 +2815,17 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
 
-			// If any of the end-config objects are wholly unknown (typically because
-			// the attached Port/MCR/MVE is being replaced and its product_uid is
-			// unknown at plan time), skip the partner-config / UID reconciliation
-			// below — decoding an unknown types.Object into a struct fails with a
-			// "Value Conversion Error" and there is nothing meaningful to do here
-			// until the upstream resource is applied.
-			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() {
-				resp.Diagnostics.Append(diags...)
+			// Skip the partner-config / UID reconciliation below if any end-config
+			// object is wholly unknown or null. Unknown objects arise from
+			// conditional expressions referencing resources not yet applied; both
+			// unknown and null objects would fail to decode into a struct and
+			// produce a confusing "Value Conversion Error" rather than a useful
+			// diagnostic. (a_end/b_end are Required, so null is defensive.)
+			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
 				return
 			}
 
-			plan.AEndConfiguration, state.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
 				endLabel:              "A-End",
 				partnerConfigPathRoot: "a_end_partner_config",
 				planEndObj:            aEndPlanObj,
@@ -2836,7 +2835,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				requiresReplace:       &resp.RequiresReplace,
 				diags:                 &diags,
 			})
-			plan.BEndConfiguration, state.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+			plan.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
 				endLabel:              "B-End",
 				partnerConfigPathRoot: "b_end_partner_config",
 				planEndObj:            bEndPlanObj,
@@ -2846,16 +2845,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				requiresReplace:       &resp.RequiresReplace,
 				diags:                 &diags,
 			})
-			req.Plan.Set(ctx, &plan)
-			resp.Plan.Set(ctx, &plan)
-			stateDiags := req.State.Set(ctx, &state)
-			diags = append(diags, stateDiags...)
+			resp.Diagnostics.Append(diags...)
+			if !resp.Diagnostics.HasError() {
+				resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+			}
 		}
-	}
-
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
 	}
 }
 
@@ -2870,14 +2864,25 @@ type vxcEndReconcileInput struct {
 	diags                 *diag.Diagnostics
 }
 
-// reconcileVXCEnd performs the per-end plan/state reconciliation that
-// ModifyPlan needs to apply symmetrically to A-End and B-End: decoding the
-// end configs, fixing up an unknown ordered_vlan, deciding whether the
-// partner is a cloud-provider (CSP) partner, reconciling the partner-config
-// object, and reconciling requested_product_uid against the current product
-// UID returned by the API. Returns the re-encoded plan and state end-config
-// objects.
-func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) (newPlanObj, newStateObj types.Object) {
+// anyVXCEndObjectUnknownOrNull reports whether any of the given end-config
+// objects is wholly unknown or null.
+func anyVXCEndObjectUnknownOrNull(ends ...types.Object) bool {
+	for _, end := range ends {
+		if end.IsUnknown() || end.IsNull() {
+			return true
+		}
+	}
+	return false
+}
+
+// reconcileVXCEnd performs the per-end plan reconciliation that ModifyPlan
+// applies symmetrically to A-End and B-End: decoding the end configs, fixing
+// up an unknown ordered_vlan, flagging a replace when a cloud-provider (CSP)
+// partner-config changes, and reconciling requested_product_uid against the
+// current product UID returned by the API. Returns the re-encoded plan
+// end-config object. ModifyPlan cannot mutate state, so nothing here writes
+// back to state.
+func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object {
 	stateConfig := &vxcEndConfigurationModel{}
 	planConfig := &vxcEndConfigurationModel{}
 	*in.diags = append(*in.diags, in.stateEndObj.As(ctx, stateConfig, basetypes.ObjectAsOptions{})...)
@@ -2889,22 +2894,21 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) (newPlanObj, 
 
 	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
 
-	if in.statePartnerConfig.IsNull() {
-		if !in.planPartnerConfig.IsNull() {
-			*in.statePartnerConfig = in.planPartnerConfig
-		} else {
-			*in.statePartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-		}
-	} else if !in.planPartnerConfig.Equal(*in.statePartnerConfig) && csp {
+	// A changed CSP partner-config forces replacement.
+	if !in.statePartnerConfig.IsNull() && csp && !in.planPartnerConfig.Equal(*in.statePartnerConfig) {
 		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))
 	}
 
 	switch {
+	case planConfig.RequestedProductUID.IsUnknown():
+		// Leave unknown as-is: a conditional expression referencing a not-yet-applied
+		// resource resolves once that resource exists. Without this case the CSP branch
+		// below would clobber the unknown with the current state value.
 	case stateConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.IsNull():
-		stateConfig.RequestedProductUID = stateConfig.CurrentProductUID
 		planConfig.RequestedProductUID = stateConfig.CurrentProductUID
 	case stateConfig.RequestedProductUID.IsNull():
-		stateConfig.RequestedProductUID = planConfig.RequestedProductUID
+		// Plan carries an explicit UID and state has none yet; keep the plan value
+		// (and skip the CSP branch, which would otherwise overwrite it with null).
 	case csp:
 		if !planConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.ValueString() != "" && !planConfig.RequestedProductUID.Equal(stateConfig.RequestedProductUID) {
 			tflog.Info(ctx, fmt.Sprintf("Cloud provider port mapping detected for %s", in.endLabel),
@@ -2918,10 +2922,8 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) (newPlanObj, 
 	}
 
 	newPlanObj, planObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, planConfig)
-	newStateObj, stateObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, stateConfig)
 	*in.diags = append(*in.diags, planObjDiags...)
-	*in.diags = append(*in.diags, stateObjDiags...)
-	return newPlanObj, newStateObj
+	return newPlanObj
 }
 
 // isCSPPartnerConfig reports whether the plan partner-config object is a
