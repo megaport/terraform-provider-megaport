@@ -125,7 +125,7 @@ func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
 	return findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
-			ImageID:     MVEArubaImageIDMVE,
+			ImageID:     MVEArubaImageID,
 			ProductSize: "SMALL",
 			MVELabel:    "MVE 2/8",
 			AccountName: "probe",
@@ -169,7 +169,7 @@ func findMVEWithPartnerTestLocation(t *testing.T, connectType string) (id int) {
 	id, _ = findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
-			ImageID:     MVEArubaImageIDMVE,
+			ImageID:     MVEArubaImageID,
 			ProductSize: "SMALL",
 			MVELabel:    "MVE 2/8",
 			AccountName: "probe",
@@ -219,7 +219,7 @@ func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name stri
 				Term:       1,
 				VendorConfig: &megaport.ArubaConfig{
 					Vendor:      "aruba",
-					ImageID:     MVEArubaImageIDMVE,
+					ImageID:     MVEArubaImageID,
 					ProductSize: "SMALL",
 					MVELabel:    "MVE 2/8",
 					AccountName: fmt.Sprintf("probe-%d", i),
@@ -304,7 +304,7 @@ func findMVETestLocationBlueZone(t *testing.T) (id int, name string) {
 	return findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
-			ImageID:     MVEArubaImageIDMVE,
+			ImageID:     MVEArubaImageID,
 			ProductSize: "SMALL",
 			MVELabel:    "MVE 2/8",
 			AccountName: "probe",
