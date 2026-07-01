@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -20,13 +22,13 @@ import (
 func TestMapVXCUpdateError(t *testing.T) {
 	const vxcUID = "36cfd12e-ba4a-465e-8c05-c0803ee8bc22"
 
-	// Mirrors the format the megaportgo SDK returns for a 400 from
-	// PUT /v3/product/vxc/{uid}, as reported in github issue #383.
-	ibgpEbgpAPIErr := errors.New(
-		`PUT https://api-staging.megaport.com/v3/product/vxc/36cfd12e-ba4a-465e-8c05-c0803ee8bc22: ` +
-			`400 (trace_id "7a7670f5b04e2af7d0837fc4d7f27309") ` +
-			`VRouter: localAsn may not change the neighbour relationship from IBGP to EBGP, ` +
-			`Validation of csp_request failed`,
+	// The verbatim 400 NetAuto returns (surfaced through Megalith) when the
+	// local_asn change would flip iBGP <-> eBGP, as reported in github issue #383.
+	ibgpEbgpAPIErr := newMegaportAPIError(
+		"/v3/product/vxc/"+vxcUID, http.StatusBadRequest,
+		"7a7670f5b04e2af7d0837fc4d7f27309",
+		"VRouter: localAsn may not change the neighbour relationship from IBGP to EBGP, "+
+			"Validation of csp_request failed",
 	)
 
 	t.Run("iBGP-to-eBGP transition 400 is wrapped with provider guidance", func(t *testing.T) {
@@ -46,11 +48,34 @@ func TestMapVXCUpdateError(t *testing.T) {
 		if !strings.Contains(detail, "localAsn may not change the neighbour relationship") {
 			t.Errorf("detail should retain the original API error message, got %q", detail)
 		}
+		if !strings.Contains(detail, "7a7670f5b04e2af7d0837fc4d7f27309") {
+			t.Errorf("detail should retain the trace_id, got %q", detail)
+		}
 	})
 
-	t.Run("unrelated error falls through to generic Update diagnostic", func(t *testing.T) {
-		genericErr := errors.New("some other API failure")
-		summary, detail := mapVXCUpdateError(genericErr, vxcUID)
+	t.Run("wrapped API error is still unwrapped and matched", func(t *testing.T) {
+		// A caller that wraps the SDK error (fmt.Errorf("...: %w", apiErr))
+		// must still get the rich diagnostic; this is why the matcher uses
+		// errors.As rather than a plain type assertion.
+		wrapped := fmt.Errorf("update VXC %s: %w", vxcUID, ibgpEbgpAPIErr)
+		summary, detail := mapVXCUpdateError(wrapped, vxcUID)
+
+		if !strings.Contains(strings.ToLower(summary), "bgp") {
+			t.Errorf("summary should mention BGP for a wrapped API error, got %q", summary)
+		}
+		if !strings.Contains(detail, "localAsn may not change the neighbour relationship") {
+			t.Errorf("detail should retain the original API error message, got %q", detail)
+		}
+		if !strings.Contains(detail, "7a7670f5b04e2af7d0837fc4d7f27309") {
+			t.Errorf("detail should retain the trace_id, got %q", detail)
+		}
+	})
+
+	t.Run("non-API error (e.g. WaitForUpdate timeout) falls through to generic", func(t *testing.T) {
+		// UpdateVXC runs with WaitForUpdate=true; poll timeouts are plain
+		// errors, not *megaport.ErrorResponse, so they must not match.
+		timeoutErr := errors.New("time expired waiting for VXC " + vxcUID + " to update")
+		summary, detail := mapVXCUpdateError(timeoutErr, vxcUID)
 
 		if summary != "Error Updating VXC" {
 			t.Errorf("expected generic summary, got %q", summary)
@@ -58,8 +83,22 @@ func TestMapVXCUpdateError(t *testing.T) {
 		if !strings.Contains(detail, vxcUID) {
 			t.Errorf("detail should include the VXC UID, got %q", detail)
 		}
-		if !strings.Contains(detail, "some other API failure") {
+		if !strings.Contains(detail, "time expired waiting for VXC") {
 			t.Errorf("detail should include the underlying error, got %q", detail)
+		}
+	})
+
+	t.Run("sentinel message on a non-400 status falls through to generic", func(t *testing.T) {
+		// The rich diagnostic is gated on HTTP 400; a 500 carrying the same
+		// text is some other failure and must not be misreported.
+		wrongStatus := newMegaportAPIError(
+			"/v3/product/vxc/"+vxcUID, http.StatusInternalServerError,
+			"9a8b7c6d", "VRouter: localAsn may not change the neighbour relationship from IBGP to EBGP",
+		)
+		summary, _ := mapVXCUpdateError(wrongStatus, vxcUID)
+
+		if summary != "Error Updating VXC" {
+			t.Errorf("expected generic summary for a non-400 status, got %q", summary)
 		}
 	})
 }

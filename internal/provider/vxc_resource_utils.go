@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -1056,18 +1058,33 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 }
 
 // vxcLocalAsnIBGPEBGPSentinel is the substring NetAuto returns (verbatim,
-// surfaced through Megalith's NetAutoErrorDecoder) when an in-place VXC
-// update would flip a BGP session from iBGP to eBGP — i.e. the new local_asn
-// no longer matches the peer's ASN.
+// surfaced through Megalith's NetAutoErrorDecoder) in the .Message of a 400
+// when an in-place VXC update would flip a BGP session from iBGP to eBGP: the
+// new local_asn no longer matches the peer's ASN.
 const vxcLocalAsnIBGPEBGPSentinel = "localAsn may not change the neighbour relationship"
 
-// mapVXCUpdateError translates a megaportgo VXC update error into a Terraform
-// diagnostic (summary, detail). Known platform constraints get richer
-// provider-side guidance; unrecognised errors fall through to the historical
-// generic Update diagnostic so we don't hide novel failure modes from users.
+// isVXCLocalAsnIBGPEBGPError reports whether err is the platform's HTTP 400
+// rejecting an in-place local_asn change that would flip a BGP session between
+// iBGP and eBGP. Anything that is not a 400 *megaport.ErrorResponse (e.g. a
+// WaitForUpdate poll timeout) returns false and falls through to the generic
+// diagnostic.
+func isVXCLocalAsnIBGPEBGPError(err error) bool {
+	var apiErr *megaport.ErrorResponse
+	if !errors.As(err, &apiErr) || apiErr.Response == nil {
+		return false
+	}
+	return apiErr.Response.StatusCode == http.StatusBadRequest &&
+		strings.Contains(apiErr.Message, vxcLocalAsnIBGPEBGPSentinel)
+}
+
+// mapVXCUpdateError turns an error from VXCService.UpdateVXC into a Terraform
+// diagnostic (summary, detail). The known iBGP/eBGP local_asn constraint gets
+// richer provider-side guidance; everything else (including WaitForUpdate poll
+// timeouts) falls through to the historical generic Update diagnostic so we
+// don't hide novel failure modes from users. err must be non-nil; callers
+// invoke this only on the error path.
 func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
-	msg := err.Error()
-	if strings.Contains(msg, vxcLocalAsnIBGPEBGPSentinel) {
+	if isVXCLocalAsnIBGPEBGPError(err) {
 		return "Cannot change VXC BGP local_asn (iBGP/eBGP transition)",
 			fmt.Sprintf(
 				"The Megaport platform rejected the local_asn update on VXC %s because the change "+
@@ -1076,8 +1093,8 @@ func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
 					"To change the ASN today, the VXC must be deleted and recreated. This is a "+
 					"platform-side constraint that the Terraform provider cannot work around. "+
 					"Original API error: %s",
-				vxcUID, msg,
+				vxcUID, err.Error(),
 			)
 	}
-	return "Error Updating VXC", fmt.Sprintf("Could not update VXC with ID %s: %s", vxcUID, msg)
+	return "Error Updating VXC", fmt.Sprintf("Could not update VXC with ID %s: %s", vxcUID, err.Error())
 }
