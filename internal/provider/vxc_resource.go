@@ -2456,10 +2456,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if isChanged {
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Updating VXC",
-				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
-			)
+			summary, detail := mapVXCUpdateError(err, state.UID.ValueString())
+			resp.Diagnostics.AddError(summary, detail)
 			return
 		}
 
