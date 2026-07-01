@@ -2821,8 +2821,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			// unknown and null objects would fail to decode into a struct and
 			// produce a confusing "Value Conversion Error" rather than a useful
 			// diagnostic. (a_end/b_end are Required, so null is defensive.)
-			if aEndStateObj.IsUnknown() || bEndStateObj.IsUnknown() || aEndPlanObj.IsUnknown() || bEndPlanObj.IsUnknown() ||
-				aEndStateObj.IsNull() || bEndStateObj.IsNull() || aEndPlanObj.IsNull() || bEndPlanObj.IsNull() {
+			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
 				return
 			}
 
@@ -2863,6 +2862,17 @@ type vxcEndReconcileInput struct {
 	statePartnerConfig    *types.Object
 	requiresReplace       *path.Paths
 	diags                 *diag.Diagnostics
+}
+
+// anyVXCEndObjectUnknownOrNull reports whether any of the given end-config
+// objects is wholly unknown or null.
+func anyVXCEndObjectUnknownOrNull(ends ...types.Object) bool {
+	for _, end := range ends {
+		if end.IsUnknown() || end.IsNull() {
+			return true
+		}
+	}
+	return false
 }
 
 // reconcileVXCEnd performs the per-end plan reconciliation that ModifyPlan
