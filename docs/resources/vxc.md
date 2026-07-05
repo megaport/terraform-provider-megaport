@@ -324,7 +324,7 @@ resource "megaport_vxc" "service_key_vxc" {
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
+- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pre-deployment state; the apply completes with a warning and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
