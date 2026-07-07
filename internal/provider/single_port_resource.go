@@ -108,7 +108,7 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 		orm.CreateDate = types.StringNull()
 	}
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
-	orm.DiversityZone = types.StringValue(p.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone)
 	if p.LiveDate != nil {
 		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
 	} else {

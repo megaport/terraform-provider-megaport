@@ -182,7 +182,7 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 	orm.Locked = types.BoolValue(m.Locked)
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
-	orm.DiversityZone = types.StringValue(m.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, m.DiversityZone)
 
 	if m.CreateDate != nil {
 		orm.CreateDate = types.StringValue(m.CreateDate.String())

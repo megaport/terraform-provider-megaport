@@ -333,3 +333,15 @@ func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, dia
 	diags := in.ElementsAs(ctx, &tags, false)
 	return tags, diags
 }
+
+// diversityZoneFromAPI reconciles a diversity_zone read from the API with the
+// value already in state. Diversity zone is fixed at order time, so an empty
+// value from Read is a backend data gap, not a real change; overwriting a known
+// zone with it would let the RequiresReplace modifier destroy a live resource.
+// Preserve the known value on an empty read; otherwise take the API value.
+func diversityZoneFromAPI(current types.String, apiVal string) types.String {
+	if apiVal == "" && !current.IsNull() && !current.IsUnknown() {
+		return current
+	}
+	return types.StringValue(apiVal)
+}
