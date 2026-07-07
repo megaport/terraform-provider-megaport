@@ -77,7 +77,6 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))

@@ -14,9 +14,10 @@ import (
 
 // diversity_zone is fixed at order time. An empty value from Read is a backend
 // data gap, not a real change; with RequiresReplace on the attribute, writing
-// it back would plan a destroy-and-recreate of a live resource. These tests pin
-// the preserve-on-empty behavior and confirm a genuine config change still
-// replaces, across every resource that carries a diversity_zone.
+// it back would plan a destroy-and-recreate of a live resource. This pins the
+// preserve-on-empty behavior of the shared helper; TestDiversityZoneRequiresReplace
+// below confirms a genuine config change still replaces, for every resource that
+// carries a diversity_zone.
 func TestDiversityZoneFromAPI(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -89,21 +90,28 @@ func requiresReplaceOnChange(t *testing.T, r resource.Resource, stateVal, planVa
 
 	// Non-null Raw values mark this as an update (not create/destroy), which is
 	// the only case where RequiresReplace fires.
-	req := planmodifier.StringRequest{
-		State:       tfsdk.State{Raw: tftypes.NewValue(tftypes.String, "state")},
-		Plan:        tfsdk.Plan{Raw: tftypes.NewValue(tftypes.String, "plan")},
-		StateValue:  stateVal,
-		PlanValue:   planVal,
-		ConfigValue: planVal,
-	}
+	stateRaw := tfsdk.State{Raw: tftypes.NewValue(tftypes.String, "state")}
+	planRaw := tfsdk.Plan{Raw: tftypes.NewValue(tftypes.String, "plan")}
 
 	requiresReplace := false
+	// Modifiers run in schema order, and the framework threads each one's
+	// PlanValue output into the next one's PlanValue input; replicate that here
+	// rather than re-feeding every modifier the original, unmodified plan value.
+	currentPlanVal := planVal
 	for _, m := range attr.PlanModifiers {
-		resp := &planmodifier.StringResponse{PlanValue: planVal}
+		req := planmodifier.StringRequest{
+			State:       stateRaw,
+			Plan:        planRaw,
+			StateValue:  stateVal,
+			PlanValue:   currentPlanVal,
+			ConfigValue: planVal,
+		}
+		resp := &planmodifier.StringResponse{PlanValue: currentPlanVal}
 		m.PlanModifyString(ctx, req, resp)
 		if resp.Diagnostics.HasError() {
 			t.Fatalf("plan modifier returned diagnostics: %v", resp.Diagnostics)
 		}
+		currentPlanVal = resp.PlanValue
 		if resp.RequiresReplace {
 			requiresReplace = true
 		}
