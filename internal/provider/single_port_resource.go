@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -519,48 +518,6 @@ func (r *portResource) ImportState(ctx context.Context, req resource.ImportState
 	if resp.Diagnostics.HasError() {
 		return
 	}
-}
-
-// MoveState implements resource.ResourceWithMoveState to support automatic
-// V1-to-V2 state migration when users move from megaport/megaport (v1) to v2.
-func (r *portResource) MoveState(ctx context.Context) []resource.StateMover {
-	return []resource.StateMover{
-		{
-			StateMover: moveStatePort,
-		},
-	}
-}
-
-// moveStatePort migrates a V1 megaport_port state to V2 by extracting only the
-// fields that exist in the V2 schema and dropping all removed fields.
-func moveStatePort(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
-	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_port" {
-		return
-	}
-
-	if req.SourceRawState == nil {
-		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state is nil")
-		return
-	}
-	rawJSON := req.SourceRawState.JSON
-	if len(rawJSON) == 0 {
-		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state JSON is empty")
-		return
-	}
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(rawJSON, &raw); err != nil {
-		resp.Diagnostics.AddError("Unable to unmarshal V1 state", err.Error())
-		return
-	}
-
-	model, diags := portModelFromV1RawState(ctx, raw)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(resp.TargetState.Set(ctx, model)...)
 }
 
 func fromAPIPortInterface(ctx context.Context, p *megaport.PortInterface) (types.Object, diag.Diagnostics) {
