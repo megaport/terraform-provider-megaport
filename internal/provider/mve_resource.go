@@ -340,7 +340,8 @@ func NewMVEResource() resource.Resource {
 
 // mveResource is the resource implementation.
 type mveResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -745,7 +746,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		DiversityZone: plan.DiversityZone.ValueString(),
 
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	if !plan.ResourceTags.IsNull() {
@@ -939,7 +940,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		CostCentre:         costCentre,
 		ContractTermMonths: contractTermMonths,
 		WaitForUpdate:      true,
-		WaitForTime:        waitForTime,
+		WaitForTime:        r.waitForTime,
 	})
 
 	if err != nil {
@@ -1047,6 +1048,7 @@ func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

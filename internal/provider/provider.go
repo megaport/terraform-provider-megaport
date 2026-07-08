@@ -22,9 +22,6 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// Set by Provider Config, is 10 minutes by default.
-var waitForTime time.Duration
-
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
 	Environment   types.String `tfsdk:"environment"`
@@ -57,7 +54,8 @@ type megaportProvider struct {
 }
 
 type megaportProviderData struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the provider type name.
@@ -252,7 +250,6 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Build a useragent string with some useful information about the client
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
-	waitForTime = (time.Duration(waitTime) * time.Minute)
 	megaportClient, err := megaport.New(nil,
 		megaport.WithEnvironment(megaportGoEnv),
 		megaport.WithCredentials(accessKey, secretKey),
@@ -286,7 +283,8 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Make the Megaport client available during DataSource and Resource
 	// type Configure methods.
 	providerData := &megaportProviderData{
-		client: megaportClient,
+		client:      megaportClient,
+		waitForTime: time.Duration(waitTime) * time.Minute,
 	}
 
 	resp.DataSourceData = providerData

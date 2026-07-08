@@ -502,7 +502,8 @@ func NewVXCResource() resource.Resource {
 
 // vxcResource is the resource implementation.
 type vxcResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -1914,7 +1915,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
+	if err := r.waitForVXCProvision(ctx, createdID, r.waitForTime, 30*time.Second); err != nil {
 		resp.Diagnostics.AddError(
 			"VXC ordered but not ready",
 			"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
@@ -2157,7 +2158,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	updateReq := &megaport.UpdateVXCRequest{
 		WaitForUpdate: true,
-		WaitForTime:   waitForTime,
+		WaitForTime:   r.waitForTime,
 	}
 
 	if !plan.Name.Equal(state.Name) {
@@ -2611,6 +2612,7 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -354,7 +354,8 @@ func (r *mcrResource) validatePrefixFilterListUsage(ctx context.Context, mcrUID 
 
 // mcrResource is the resource implementation.
 type mcrResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -682,7 +683,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		CostCentre:       plan.CostCentre.ValueString(),
 		PromoCode:        plan.PromoCode.ValueString(),
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	if !plan.ASN.IsUnknown() {
@@ -993,7 +994,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		CostCentre:            costCentre,
 		MCRAsn:                mcrAsn,
 		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	})
 
 	if err != nil {
@@ -1300,6 +1301,7 @@ func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *mcrResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

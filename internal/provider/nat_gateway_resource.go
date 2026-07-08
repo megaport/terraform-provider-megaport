@@ -118,7 +118,8 @@ func NewNATGatewayResource() resource.Resource {
 
 // natGatewayResource is the resource implementation.
 type natGatewayResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -369,7 +370,7 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 func (r *natGatewayResource) waitForNATGatewayProvisioned(ctx context.Context, productUID string) (*megaport.NATGateway, error) {
 	const pollInterval = 10 * time.Second
 
-	pollCtx, cancel := context.WithTimeout(ctx, waitForTime)
+	pollCtx, cancel := context.WithTimeout(ctx, r.waitForTime)
 	defer cancel()
 
 	ticker := time.NewTicker(pollInterval)
@@ -393,7 +394,7 @@ func (r *natGatewayResource) waitForNATGatewayProvisioned(ctx context.Context, p
 
 		select {
 		case <-pollCtx.Done():
-			return nil, fmt.Errorf("NAT Gateway %s did not reach CONFIGURED/LIVE within %s (last status %q)", productUID, waitForTime, lastStatus)
+			return nil, fmt.Errorf("NAT Gateway %s did not reach CONFIGURED/LIVE within %s (last status %q)", productUID, r.waitForTime, lastStatus)
 		case <-ticker.C:
 		}
 	}
@@ -567,6 +568,7 @@ func (r *natGatewayResource) Configure(_ context.Context, req resource.Configure
 	}
 
 	r.client = data.client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *natGatewayResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
