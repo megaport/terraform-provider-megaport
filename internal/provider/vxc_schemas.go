@@ -251,6 +251,55 @@ var (
 							Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
 							Optional:    true,
 						},
+						"ip_sec_tunnel_options": schema.SingleNestedAttribute{
+							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift.",
+							Optional:    true,
+							Validators: []validator.Object{
+								ipSecPhaseLifetimeValidator{},
+							},
+							Attributes: map[string]schema.Attribute{
+								"source_ip_address": schema.StringAttribute{
+									Description: "Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.",
+									Required:    true,
+								},
+								"destination_ip_address": schema.StringAttribute{
+									Description: "Remote peer IPv4 address the tunnel connects to.",
+									Required:    true,
+								},
+								"pre_shared_key": schema.StringAttribute{
+									Description: "Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.",
+									Required:    true,
+									Sensitive:   true,
+									WriteOnly:   true,
+								},
+								"passive": schema.BoolAttribute{
+									Description: "Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.",
+									Optional:    true,
+								},
+								"local_id": schema.StringAttribute{
+									Description: "IKE local identifier override, typically used when the Megaport endpoint is behind NAT.",
+									Optional:    true,
+								},
+								"remote_id": schema.StringAttribute{
+									Description: "IKE remote identifier override, typically used when the peer is behind NAT.",
+									Optional:    true,
+								},
+								"phase1_lifetime": schema.Int64Attribute{
+									Description: "IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.",
+									Optional:    true,
+									Validators: []validator.Int64{
+										int64validator.Between(3600, 604800),
+									},
+								},
+								"phase2_lifetime": schema.Int64Attribute{
+									Description: "IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.",
+									Optional:    true,
+									Validators: []validator.Int64{
+										int64validator.Between(600, 86400),
+									},
+								},
+							},
+						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
@@ -428,6 +477,7 @@ var (
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
+										Sensitive:   true,
 										Optional:    true,
 									},
 									"shutdown": schema.BoolAttribute{

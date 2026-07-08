@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -278,8 +280,11 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 		"add_on_uid": addOnUID,
 	})
 
-	// Setting tunnel count to 0 disables/removes the add-on
-	err := r.client.MCRService.UpdateMCRIPsecAddOn(ctx, mcrID, addOnUID, 0)
+	// Setting tunnel count to 0 disables/removes the add-on. The API rejects
+	// this while tunnels are still configured on the MCR. On destroy the VXC
+	// carrying a tunnel is deleted first, but its deprovisioning is async, so
+	// the add-on delete can race ahead of it; retry until the tunnels clear.
+	err := r.deleteAddOnAwaitingTunnels(ctx, mcrID, addOnUID)
 	if err != nil {
 		if megaport.IsServiceNotFoundError(err) {
 			// MCR or add-on already deleted
@@ -303,6 +308,41 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 			fmt.Sprintf("IPSec add-on %s was disabled for MCR %s, but the MCR did not return to a ready state: %s", addOnUID, mcrID, err.Error()),
 		)
 	}
+}
+
+// deleteAddOnAwaitingTunnels disables the add-on (tunnel count 0), retrying
+// while the API still reports tunnels configured on the MCR. It gives up after
+// waitForTime and returns the last error for the caller to surface.
+func (r *mcrIpsecAddonResource) deleteAddOnAwaitingTunnels(ctx context.Context, mcrID, addOnUID string) error {
+	deadline := time.Now().Add(waitForTime)
+	for {
+		err := r.client.MCRService.UpdateMCRIPsecAddOn(ctx, mcrID, addOnUID, 0)
+		if err == nil || !isIPsecTunnelsConfiguredError(err) || !time.Now().Before(deadline) {
+			return err
+		}
+		tflog.Debug(ctx, "IPSec add-on still has tunnels configured, waiting for VXC deprovisioning before retry", map[string]interface{}{
+			"mcr_id":     mcrID,
+			"add_on_uid": addOnUID,
+		})
+		select {
+		case <-time.After(15 * time.Second):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// isIPsecTunnelsConfiguredError reports whether err is the API refusing to lower
+// an IPsec add-on's tunnel limit below the number of tunnels still configured on
+// the MCR (HTTP 400). This is transient during destroy: it clears once the VXC
+// carrying the tunnel finishes deprovisioning.
+func isIPsecTunnelsConfiguredError(err error) bool {
+	var apiErr *megaport.ErrorResponse
+	if !errors.As(err, &apiErr) || apiErr.Response == nil {
+		return false
+	}
+	return apiErr.Response.StatusCode == http.StatusBadRequest &&
+		strings.Contains(apiErr.Message, "configured tunnels")
 }
 
 // ImportState imports the resource state.
