@@ -1,75 +1,30 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
-
-type VXCBasicProviderTestSuite ProviderTestSuite
-type VXCCSPProviderTestSuite ProviderTestSuite
-type VXCMVEProviderTestSuite ProviderTestSuite
-type VXCInnerVLANProviderTestSuite ProviderTestSuite
-type VXCMixedProviderTestSuite ProviderTestSuite
-type VXCImportDriftProviderTestSuite ProviderTestSuite
 
 const (
-	VXCLocationOne   = "NextDC M1"
-	VXCLocationTwo   = "Global Switch Sydney West"
-	VXCLocationThree = "5G Networks MDC"
-
-	VXCLocationID1 = 4  // "NextDC M1"
-	VXCLocationID2 = 3  // "Global Switch Sydney West"
-	VXCLocationID3 = 23 // "5GN Melbourne Data Centre (MDC)"
-
-	AzureServiceKey           = "197d927b-90bc-4b1b-bffd-fca17a7ec735"
-	GooglePairingKeyCSPs      = "36ac9f72-c8e5-473f-a4b7-537a2502e446/australia-southeast1/1"
-	GooglePairingKeyGCPTest   = "e7097903-6b0a-4ee5-8261-8cb2f9dfb90d/asia-southeast1/1"
-	GooglePairingKeyEcosystem = "c0c9b06c-b4e2-4c71-a3ad-86e1cd671928/asia-northeast1/1"
-	OracleVirtualCircuitID    = "ocid1.virtualcircuit.oc1.phx.aaaaaaaapsokflwszxk3c2vhsyj5pkas3gmh3zngyxx7zj6yxj2stgeofk5q" // Example Oracle Virtual Circuit ID that passes API Validation of /^ocid1\.virtualcircuit\.oc[0-9]+.(.+)\.a{8}[a-z2-7]{52}$/
-	AzurePartnerPortUID       = "13f28165-de96-484e-8f99-babb24650e6a"                                                      // This is the specific product UID tied to the secondary port choice for the Azure Service key above.
-
-	MVEArubaImageID              = 152
-	VXCMVETestLocationIDNum      = 116 // Atlanta "Equinix Atlanta AT1" (atl-tx1) - 12 test_demo_cores
-	VXCMixedMVETestLocationIDNum = 321 // Denver "Iron Mountain DEN-1" (den-irm) - 8 test_demo_cores
+	MVEArubaImageID = 152
 )
 
-func TestVXCBasicProviderTestSuite(t *testing.T) {
+func TestAccMegaportVXC_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(VXCBasicProviderTestSuite))
-}
-
-func TestVXCCSPProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCCSPProviderTestSuite))
-}
-
-func TestVXCMVEProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMVEProviderTestSuite))
-}
-
-func TestVXCInnerVLANProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	// This suite is used to test the VXC resource with inner VLANs in various use cases with the Megaport API
-	suite.Run(t, new(VXCInnerVLANProviderTestSuite))
-}
-
-func TestVXCMixedProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCMixedProviderTestSuite))
-}
-
-func TestVXCImportDriftProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(VXCImportDriftProviderTestSuite))
-}
-
-func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	portName3 := RandomTestName()
@@ -79,7 +34,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	costCentreName := RandomTestName()
 	costCentreNew := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -138,7 +93,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 301
                     }
                   }
-                  `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcName, costCentreName),
+                  `, locs[0], portName1, portName2, portName3, portName4, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -254,7 +209,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 301
 			        }
 			      }
-			      `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcName, costCentreName),
+			      `, locs[0], portName1, portName2, portName3, portName4, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -349,7 +304,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 						inner_vlan = 401
 			        }
 			      }
-			      `, VXCLocationID1, portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
+			      `, locs[0], portName1, portName2, portName3, portName4, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -390,12 +345,15 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_Basic() {
 	})
 }
 
-func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_CostCentreRemoval() {
+func TestAccMegaportVXC_CostCentreRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
 	costCentreName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -435,7 +393,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_CostCentreRemoval() {
 						ordered_vlan = 101
 						inner_vlan = 301
 					}
-				}`, VXCLocationID1, portName1, portName2, vxcName, costCentreName),
+				}`, locs[0], portName1, portName2, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", costCentreName),
 				),
@@ -477,7 +435,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_CostCentreRemoval() {
 						ordered_vlan = 101
 						inner_vlan = 301
 					}
-				}`, VXCLocationID1, portName1, portName2, vxcName),
+				}`, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", ""),
 				),
@@ -486,11 +444,89 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_CostCentreRemoval() {
 	})
 }
 
-func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_ContractTermUpdate() {
+// TestAccMegaportVXC_PromoCode exercises promo_code on megaport_vxc against
+// the v1.8.0 ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportVXC_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	initialPromo := testPromoCode()
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+		resource "megaport_port" "port_1" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_port" "port_2" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_vxc" "vxc" {
+			product_name         = "%s"
+			rate_limit           = 200
+			contract_term_months = 1
+			%s
+			a_end = {
+				requested_product_uid = megaport_port.port_1.product_uid
+				ordered_vlan          = 100
+				inner_vlan            = 300
+			}
+			b_end = {
+				requested_product_uid = megaport_port.port_2.product_uid
+				ordered_vlan          = 101
+				inner_vlan            = 301
+			}
+		}`, locs[0], portName1, portName2, vxcName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccMegaportVXC_ContractTermUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -524,7 +560,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_ContractTermUpdate() 
 						requested_product_uid = megaport_port.port_2.product_uid
 						ordered_vlan = 101
 					}
-				}`, VXCLocationID1, portName1, portName2, vxcName),
+				}`, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "1"),
 					waitForProvisioningStatus("megaport_vxc.vxc"),
@@ -561,7 +597,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_ContractTermUpdate() 
 						requested_product_uid = megaport_port.port_2.product_uid
 						ordered_vlan = 101
 					}
-				}`, VXCLocationID1, portName1, portName2, vxcName),
+				}`, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "contract_term_months", "12"),
 				),
@@ -570,7 +606,10 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_ContractTermUpdate() 
 	})
 }
 
-func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
+func TestAccMegaportVXC_BasicUntagVLAN(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
@@ -578,7 +617,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 	costCentreName := RandomTestName()
 	costCentreNew := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -616,7 +655,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 						ordered_vlan = 101
                     }
                   }
-                  `, VXCLocationID1, portName1, portName2, vxcName, costCentreName),
+                  `, locs[0], portName1, portName2, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -692,7 +731,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
                         requested_product_uid = megaport_port.port_2.product_uid
                     }
                   }
-                  `, VXCLocationID1, portName1, portName2, vxcName, costCentreName),
+                  `, locs[0], portName1, portName2, vxcName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -751,7 +790,7 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 						ordered_vlan = -1
 			        }
 			      }
-			      `, VXCLocationID1, portName1, portName2, vxcNameNew, costCentreNew),
+			      `, locs[0], portName1, portName2, vxcNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port_1", "product_name", portName1),
 					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
@@ -778,12 +817,14 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 	})
 }
 
-// func (suite *VXCCSPProviderTestSuite) TestUpdateVLAN() {
+// func TestUpdateVLAN(t *testing.T) {
+// 	t.Parallel()
+// 	defer acquireAccTestSlot(t)()
 // 	portName := RandomTestName()
 // 	costCentreName := RandomTestName()
 // 	awsVXCName := RandomTestName()
 
-// 	resource.Test(suite.T(), resource.TestCase{
+// 	resource.Test(t, resource.TestCase{
 // 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 // 		Steps: []resource.TestStep{
 // 			{
@@ -990,12 +1031,18 @@ func (suite *VXCBasicProviderTestSuite) TestAccMegaportVXC_BasicUntagVLAN() {
 // 	})
 // }
 
-func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
+func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
+	azure := pickAzureServiceKey(t)
+	gcp := pickGCPPairingKey(t)
+	mcrLocationID, _ := findMCRTestLocation(t, 5000)
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	vxcName2 := RandomTestName()
 	vxcName3 := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1088,7 +1135,9 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                       ordered_vlan = 0
                     }
 
-                    b_end = {}
+                    b_end = {
+                      requested_product_uid = "%s"
+                    }
 
                     b_end_partner_config = {
                         partner = "azure"
@@ -1098,7 +1147,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
                         }
                     }
                   }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, vxcName1, vxcName1, vxcName2, GooglePairingKeyCSPs, vxcName3, AzureServiceKey),
+                  `, mcrLocationID, locs[0], mcrName, vxcName1, vxcName1, vxcName2, gcp.Key, vxcName3, azure.PartnerPortUID, azure.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1155,11 +1204,16 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithCSPs_Basic() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
+func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	mcrLocID, _ := findMCRTestLocation(t, 5000)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
+	locs := []int{mcrLocID, awsLocs[0]}
 	mcrName := RandomTestName()
 	vxcName1 := RandomTestName()
 	prefixFilterListName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1267,7 +1321,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						"key2" = "value2"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1402,7 +1456,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 						"key2updated" = "value2updated"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1415,36 +1469,28 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXCWithBGP_Basic() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
+func TestGCPVXCWithProductUID(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	gcp := pickGCPPairingKey(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	gcpCostCentreName := RandomTestName()
 	gcpVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "loc1" {
-					id = %d
-				  }
-				
-				data "megaport_partner" "gcp_port" {
-  					connect_type = "GOOGLE"
-  					location_id  = 572
-				  }
-
 				  resource "megaport_mcr" "mcr" {
 					product_name            = "%s"
 					port_speed              = 2500
-					location_id             = data.megaport_location.loc1.id
+					location_id             = %d
 					contract_term_months    = 1
 					asn                      = 64555
 					cost_centre = "%s"
 				  }
-
-				  
 
 				  resource "megaport_vxc" "gcp_vxc" {
 					product_name            = "%s"
@@ -1458,7 +1504,7 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 					}
 
 					b_end = {
-					  requested_product_uid = data.megaport_partner.gcp_port.product_uid
+					  requested_product_uid = "%s"
 					}
 
 					b_end_partner_config = {
@@ -1468,7 +1514,7 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, mcrName, mcrCostCentreName, gcpVXCName, gcpCostCentreName, GooglePairingKeyGCPTest),
+                  `, mcrName, gcp.LocationID, mcrCostCentreName, gcpVXCName, gcpCostCentreName, gcp.PartnerPortUID, gcp.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "product_uid"),
@@ -1480,13 +1526,17 @@ func (suite *VXCCSPProviderTestSuite) TestGCPVXCWithProductUID() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
+func TestOracleVXCWithProductUID(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 2500)
+	oracleVCID := pickOracleVirtualCircuitID(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	oracleCostCentreName := RandomTestName()
 	oracleVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1531,7 +1581,7 @@ func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
                         }
                     }
 				  }
-                  `, VXCLocationID1, mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, OracleVirtualCircuitID),
+                  `, locs[0], mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, oracleVCID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
@@ -1543,13 +1593,17 @@ func (suite *VXCCSPProviderTestSuite) TestOracleVXCWithProductUID() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
+func TestAzureVXCWithProductUID(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	azure := pickAzureServiceKey(t)
+	mcrLocationID, _ := findMCRTestLocation(t, 2500)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	azureCostCentreName := RandomTestName()
 	azureVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1590,7 +1644,7 @@ func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, mcrName, mcrCostCentreName, azureVXCName, azureCostCentreName, AzurePartnerPortUID, AzureServiceKey),
+                  `, mcrLocationID, mcrName, mcrCostCentreName, azureVXCName, azureCostCentreName, azure.PartnerPortUID, azure.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.azure_vxc", "product_uid"),
@@ -1604,7 +1658,10 @@ func (suite *VXCCSPProviderTestSuite) TestAzureVXCWithProductUID() {
 
 // TestAccMegaportMCRVXC_BEndIpMtu tests that ip_mtu is correctly applied to
 // the B-End vrouter partner config of an MCR-to-MCR VXC (GitHub issue #319).
-func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXC_BEndIpMtu() {
+func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrNameA := RandomTestName()
 	mcrNameB := RandomTestName()
 	vxcName := RandomTestName()
@@ -1688,10 +1745,10 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXC_BEndIpMtu() {
 					}
 				}
 			}
-		`, VXCLocationID1, mcrNameA, mcrNameB, vxcName, ipMtu, ipMtu)
+		`, locs[0], mcrNameA, mcrNameB, vxcName, ipMtu, ipMtu)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create MCR-to-MCR VXC with ip_mtu 9000 on both ends
@@ -1718,7 +1775,15 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportMCRVXC_BEndIpMtu() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
+func TestFullEcosystem(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	// loc1 hosts the MCR (2500 Mbps) + LAG port; loc2 needs AWS partner ports; loc3 is unused.
+	mcrLocs := findVXCPortAndMCRTestLocations(t, 1, 2500)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
+	locs := []int{mcrLocs[0], awsLocs[0], awsLocs[0]}
+	azure := pickAzureServiceKey(t)
+	gcp := pickGCPPairingKey(t)
 	portName := RandomTestName()
 	lagPortName := RandomTestName()
 	mcrName := RandomTestName()
@@ -1729,7 +1794,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	gcpVXCName := RandomTestName()
 	azureVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1875,7 +1940,9 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  ordered_vlan = 0
 					}
 
-					b_end = {}
+					b_end = {
+					  requested_product_uid = "%s"
+					}
 
 					b_end_partner_config = {
 					  partner = "azure"
@@ -1885,7 +1952,7 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, VXCLocationID3, lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, GooglePairingKeyEcosystem, azureVXCName, AzureServiceKey),
+                  `, locs[0], locs[1], locs[2], lagPortName, costCentreName, portName, costCentreName, mcrName, portVXCName, mcrVXCName, awsVXCName, awsVXCName, gcpVXCName, gcp.Key, azureVXCName, azure.PartnerPortUID, azure.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -1959,11 +2026,15 @@ func (suite *VXCCSPProviderTestSuite) TestFullEcosystem() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
+func TestAccMegaportOracleVXC_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
+	oracleVCID := pickOracleVirtualCircuitID(t)
 	portName := RandomTestName()
 	oracleVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -1999,7 +2070,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
                         }
                     }
                 }
-                `, VXCLocationID1, portName, oracleVXCName, OracleVirtualCircuitID),
+                `, locs[0], portName, oracleVXCName, oracleVCID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -2011,7 +2082,7 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "rate_limit", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "contract_term_months", "1"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", OracleVirtualCircuitID),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracleVCID),
 				),
 			},
 			// ImportState testing
@@ -2038,13 +2109,19 @@ func (suite *VXCCSPProviderTestSuite) TestAccMegaportOracleVXC_Basic() {
 	})
 }
 
-func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
+func TestMVE_TransitVXC(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
+	mveLocID, _ := findMVETestLocation(t, 0)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	locs := []int{mveLocID, transitLocs[0]}
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
 	transitVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -2117,7 +2194,7 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 					  partner = "transit"
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
+                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
@@ -2146,7 +2223,13 @@ func (suite *VXCMVEProviderTestSuite) TestMVE_TransitVXC() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
+func TestMVE_TransitVXCAWS(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	// loc1 hosts the MVE (needs MVE capacity); loc2 needs both AWS and TRANSIT partner ports.
+	mveLocID, _ := findMVETestLocation(t, 0)
+	partnerLocs := findVXCPortTestLocationsWithPartners(t, 1, "AWS", "TRANSIT")
+	locs := []int{mveLocID, partnerLocs[0]}
 	portName := RandomTestName()
 	portCostCentreName := RandomTestName()
 	portCostCentreNameNew := RandomTestName()
@@ -2167,7 +2250,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 	awsVXCCostCentreName := RandomTestName()
 	awsVXCCostCentreNameNew := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -2293,7 +2376,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
+                  `, locs[0], locs[1], portName, portCostCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreName, portVXCName, portVXCCostCentreName, portVXCAEndInnerVLAN, portVXCBEndInnerVLAN, awsVXCName, awsVXCCostCentreName, awsVXCAEndInnerVLAN, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.port_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", portVXCAEndInnerVLAN)),
@@ -2491,7 +2574,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 					  }
 					}
 				  }
-                  `, VXCLocationID1, VXCLocationID2, portName, portCostCentreNameNew, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
+                  `, locs[0], locs[1], portName, portCostCentreNameNew, mveName, MVEArubaImageID, mveName, mveName, transitVXCName, transitVXCCostCentreNameNew, portVXCName, portVXCCostCentreNameNew, portVXCAEndInnerVLANNew, portVXCBEndInnerVLANNew, awsVXCName, awsVXCCostCentreNameNew, awsVXCAEndInnerVLANNew, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "a_end.inner_vlan", fmt.Sprintf("%d", awsVXCAEndInnerVLANNew)),
@@ -2510,13 +2593,17 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_TransitVXCAWS() {
 	})
 }
 
-func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
+func TestMVE_AWS_VXC(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	mveLocID, _ := findMVETestLocation(t, 0)
+	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	mveName := RandomTestName()
 	awsVXCName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -2601,7 +2688,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
+                  `, mveLocID, awsLocs[0], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2712,7 +2799,7 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 					}
 				  }
 
-                  `, VXCLocationID1, VXCLocationID2, portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
+                  `, mveLocID, awsLocs[0], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, awsVXCName, awsVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", awsVXCName),
@@ -2725,12 +2812,15 @@ func (suite *VXCCSPProviderTestSuite) TestMVE_AWS_VXC() {
 	})
 }
 
-func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANUntagged() {
+func TestAccMegaportVXC_InnerVLANUntagged(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with inner_vlan = -1 (untagged)
@@ -2770,7 +2860,7 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANUntagged
                         inner_vlan = -1
                     }
                 }
-                `, VXCLocationID1, portName1, portName2, vxcName),
+                `, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "-1"),
@@ -2781,12 +2871,15 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANUntagged
 	})
 }
 
-func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANNull() {
+func TestAccMegaportVXC_InnerVLANNull(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC without specifying inner_vlan (null)
@@ -2826,7 +2919,7 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANNull() {
                         // inner_vlan not specified (null)
                     }
                 }
-                `, VXCLocationID1, portName1, portName2, vxcName),
+                `, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
 					resource.TestCheckNoResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan"),
@@ -2837,14 +2930,17 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANNull() {
 	})
 }
 
-func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagged() {
+func TestAccMegaportVXC_InnerVLANToUntagged(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
 
 	initialInnerVLAN := 456
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with specific inner_vlan values
@@ -2884,7 +2980,7 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
                         inner_vlan = %d
                     }
                 }
-                `, VXCLocationID1, portName1, portName2, vxcName, initialInnerVLAN, initialInnerVLAN),
+                `, locs[0], portName1, portName2, vxcName, initialInnerVLAN, initialInnerVLAN),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", fmt.Sprintf("%d", initialInnerVLAN)),
@@ -2928,7 +3024,7 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
                         inner_vlan = -1
                     }
                 }
-                `, VXCLocationID1, portName1, portName2, vxcName),
+                `, locs[0], portName1, portName2, vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc_test", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc_test", "a_end.inner_vlan", "-1"),
@@ -2939,14 +3035,19 @@ func (suite *VXCInnerVLANProviderTestSuite) TestAccMegaportVXC_InnerVLANToUntagg
 	})
 }
 
-func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
+func TestAccMegaportSafeDelete(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	mveLocationID, _ := findMVETestLocationBlueZone(t)
+	mcrLocationID, _ := findMCRTestLocation(t, 1000)
 	portName := RandomTestName()
 	mcrName := RandomTestName()
 	mveName := RandomTestName()
 	vxcPortToMCRName := RandomTestName()
 	vxcMCRToMVEName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create port, MCR, MVE and connect them with VXCs
@@ -3034,9 +3135,9 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     }
                 }
                 `,
-					portName, VXCLocationID1,
-					mcrName, MCRTestLocationIDNum,
-					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+					portName, locs[0],
+					mcrName, mcrLocationID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcPortToMCRName, vxcMCRToMVEName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3143,9 +3244,9 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
                     }
                 }
                 `,
-					portName, VXCLocationID1,
-					mcrName, MCRTestLocationIDNum,
-					mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+					portName, locs[0],
+					mcrName, mcrLocationID,
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.test_port", "product_name", portName),
@@ -3161,14 +3262,17 @@ func (suite *VXCMixedProviderTestSuite) TestAccMegaportSafeDelete() {
 	})
 }
 
-func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
+func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	mveLocationID, _ := findMVETestLocationHighCapacity(t, 4)
 	mveName1 := RandomTestName()
 	mveName2 := RandomTestName()
 	mveName3 := RandomTestName()
 	mveName4 := RandomTestName()
 	vxcName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -3292,10 +3396,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
-					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
-					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
-					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
+					mveName1, mveLocationID, mveName1, mveName1,
+					mveName2, mveLocationID, mveName2, mveName2,
+					mveName3, mveLocationID, mveName3, mveName3,
+					mveName4, mveLocationID, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs
@@ -3437,10 +3541,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
                 }
                 `,
 					MVEArubaImageID,
-					mveName1, VXCMVETestLocationIDNum, mveName1, mveName1,
-					mveName2, VXCMVETestLocationIDNum, mveName2, mveName2,
-					mveName3, VXCMVETestLocationIDNum, mveName3, mveName3,
-					mveName4, VXCMVETestLocationIDNum, mveName4, mveName4,
+					mveName1, mveLocationID, mveName1, mveName1,
+					mveName2, mveLocationID, mveName2, mveName2,
+					mveName3, mveLocationID, mveName3, mveName3,
+					mveName4, mveLocationID, mveName4, mveName4,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check MVEs still exist
@@ -3469,13 +3573,17 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportMVE_to_MVE_VXC() {
 	})
 }
 
-func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
+func TestAccMegaportVXC_MVEVnicIndexUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	mveLocationID, _ := findMVETestLocationBlueZone(t)
 	// Test names
 	portName := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create a Port, MVE, and VXC connecting them with VNIC index 0
@@ -3495,7 +3603,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     product_name         = "%s"
                     location_id          = %d
                     contract_term_months = 1
-                    
+                    diversity_zone       = "blue"
+
                     vnics = [
                         {
                             description = "Data Plane"
@@ -3507,7 +3616,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                             description = "Control Plane"
                         }
                     ]
-                    
+
                     vendor_config = {
                         vendor       = "aruba"
                         product_size = "SMALL"
@@ -3518,7 +3627,7 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                         system_tag   = "Preconfiguration-test-1"
                     }
                 }
-                
+
                 // Connect port to MVE with VXC
                 resource "megaport_vxc" "port_to_mve" {
                     product_name         = "%s"
@@ -3537,8 +3646,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     }
                 }
                 `,
-					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					portName, locs[0],
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3611,8 +3720,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     }
                 }
                 `,
-					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					portName, locs[0],
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3667,8 +3776,8 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
                     }
                 }
                 `,
-					portName, VXCLocationID1,
-					mveName, VXCMVETestLocationIDNum, MVEArubaImageID,
+					portName, locs[0],
+					mveName, mveLocationID, MVEArubaImageID,
 					mveName, mveName,
 					vxcName),
 				PlanOnly: true,
@@ -3679,7 +3788,10 @@ func (suite *VXCMVEProviderTestSuite) TestAccMegaportVXC_MVEVnicIndexUpdate() {
 
 // TestAccMegaportVXC_ImportDrift_Basic tests that a basic VXC import does not cause
 // drift on subsequent plans. This validates the fix for GitHub Issue #263.
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Basic() {
+func TestAccMegaportVXC_ImportDrift_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
@@ -3718,10 +3830,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Bas
 					ordered_vlan          = 200
 				}
 			}
-		`, VXCLocationID1, portName1, portName2, vxcName)
+		`, locs[0], portName1, portName2, vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with user-only fields
@@ -3778,7 +3890,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Bas
 // TestAccMegaportVXC_ImportDrift_WithPartnerConfig tests that a VXC with partner configs
 // does not cause drift after import. This is the scenario from the original bug report
 // where MCR VXCs with vrouter partner configs would continuously show changes.
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithPartnerConfig() {
+func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
@@ -3838,10 +3953,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 					ordered_vlan          = 200
 				}
 			}
-		`, VXCLocationID1, mcrName, portName, vxcName)
+		`, locs[0], mcrName, portName, vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with MCR and vrouter partner config
@@ -3895,7 +4010,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 
 // TestAccMegaportVXC_ImportDrift_WithInnerVLAN tests that a VXC with inner_vlan
 // does not cause drift after import.
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithInnerVLAN() {
+func TestAccMegaportVXC_ImportDrift_WithInnerVLAN(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
 	portName1 := RandomTestName()
 	portName2 := RandomTestName()
 	vxcName := RandomTestName()
@@ -3936,10 +4054,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 					inner_vlan            = 400
 				}
 			}
-		`, VXCLocationID1, portName1, portName2, vxcName)
+		`, locs[0], portName1, portName2, vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create VXC with inner_vlan
@@ -3996,7 +4114,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 // TestAccMegaportVXC_ImportDrift_AWSHostedConnection tests the exact scenario from
 // GitHub Issue #263: an AWS Hosted Connection VXC with b_end_partner_config continuously
 // shows changes after import. This is the primary bug that was reported.
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWSHostedConnection() {
+func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWSHC")
 	portName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4043,10 +4164,10 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWS
 					}
 				}
 			}
-		`, VXCLocationID2, portName, vxcName, vxcName)
+		`, locs[0], portName, vxcName, vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create AWS Hosted Connection VXC
@@ -4105,7 +4226,11 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_AWS
 // MVE with a vnic_index does not cause drift after import. The API does not
 // return the user-configured vnic_index on read, so the provider must preserve
 // it from state/plan to avoid an infinite update loop.
-func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_WithVnicIndex() {
+func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	mveLocationID, _ := findMVETestLocation(t, 2)
 	portName := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -4158,13 +4283,13 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 					ordered_vlan          = 101
 				}
 			}
-		`, portName, VXCLocationID1,
-			mveName, VXCMixedMVETestLocationIDNum, MVEArubaImageID,
+		`, portName, locs[0],
+			mveName, mveLocationID, MVEArubaImageID,
 			mveName, mveName,
 			vxcName)
 	}
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Create Port, MVE, and VXC with vnic_index
@@ -4211,6 +4336,687 @@ func (suite *VXCImportDriftProviderTestSuite) TestAccMegaportVXC_ImportDrift_Wit
 			{
 				Config:   vxcConfig(),
 				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_AttachedProductReplace exercises ESD-1095: when an
+// upstream Port attached to a VXC's a_end is forced to replace (here by
+// changing port_speed, which is RequiresReplace), the dependent VXC's
+// a_end.requested_product_uid becomes unknown at plan time. The VXC
+// ModifyPlan must handle that gracefully rather than failing with
+// "Value Conversion Error / Target Type: provider.vxcEndConfigurationModel".
+func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	configWithSpeed := func(aEndSpeed int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = %d
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 200
+				}
+				b_end = {
+					requested_product_uid = megaport_port.port_2.product_uid
+					ordered_vlan          = 201
+				}
+			}
+		`, locs[0], portName1, aEndSpeed, portName2, vxcName)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithSpeed(1000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.port_1", "port_speed", "1000"),
+				),
+			},
+			// Bump port_1's speed — port_1 is RequiresReplace, so its product_uid
+			// is unknown in the plan. Pre-fix, the VXC ModifyPlan crashed here.
+			// PlanOnly: the goal is to verify planning succeeds without crashing;
+			// the location may not support 10 G ports so we do not apply.
+			{
+				Config:             configWithSpeed(10000),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_TransitInternetTagsUpdate is a regression test for
+// https://github.com/megaport/terraform-provider-megaport/issues/372 (ESD-1101).
+//
+// Scenario: an MCR↔Megaport-Internet (IP Transit) VXC with ordered_vlan = 0 on
+// both ends and no b_end_partner_config block. Adding resource_tags must not
+// trigger a VLAN update — the IP Transit API rejects VLAN mutations.
+//
+// Pre-fix the provider compared plan.OrderedVLAN(=0) to state.VLAN(=API-allocated),
+// which permanently disagreed and queued AEndVLAN/BEndVLAN=0 in every Update.
+// On a Transit VXC the API responded "IP Transit: vlan update not supported".
+func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	mcrLocationID, _ := findMCRTestLocation(t, 1000)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	baseConfig := func(extraVXCAttrs string) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "mcr_loc" {
+				id = %d
+			}
+
+			data "megaport_location" "transit_loc" {
+				id = %d
+			}
+
+			data "megaport_partner" "internet_port" {
+				connect_type = "TRANSIT"
+				location_id  = data.megaport_location.transit_loc.id
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.mcr_loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+
+			resource "megaport_vxc" "transit_vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 0
+				}
+
+				b_end = {
+					requested_product_uid = data.megaport_partner.internet_port.product_uid
+					ordered_vlan          = 0
+				}
+
+				%s
+			}
+		`, mcrLocationID, transitLocs[0], mcrName, vxcName, extraVXCAttrs)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1 — create the Transit VXC with no tags.
+			{
+				Config: baseConfig(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan", "0"),
+				),
+			},
+			// Step 2 — add resource_tags. Pre-fix this PUT was rejected with
+			// "IP Transit: vlan update not supported".
+			{
+				Config: baseConfig(`
+					resource_tags = {
+						owner = "esd-1101"
+					}
+				`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "resource_tags.owner", "esd-1101"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "0"),
+					resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "b_end.ordered_vlan", "0"),
+				),
+			},
+		},
+	})
+}
+
+// nullValueMap returns a map of all attributes in an object type set to null.
+func nullValueMap(objType tftypes.Object) map[string]tftypes.Value {
+	m := make(map[string]tftypes.Value, len(objType.AttributeTypes))
+	for name, attrType := range objType.AttributeTypes {
+		m[name] = tftypes.NewValue(attrType, nil)
+	}
+	return m
+}
+
+// TestVXCModifyPlan_UnknownEndConfiguration verifies that ModifyPlan returns
+// without error when a_end or b_end is a wholly unknown or null object (e.g.
+// from conditional expressions referencing resources that don't yet exist),
+// leaving the plan untouched for the framework to re-evaluate later.
+func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	// Get the schema.
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	// Extract tftypes from the schema.
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+
+	// Find the end configuration object type from the schema.
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+
+	// Build a valid end configuration value (all nulls except requested_product_uid).
+	validEndAttrs := nullValueMap(endObjType)
+	validEndAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	validEndVal := tftypes.NewValue(endObjType, validEndAttrs)
+
+	// Build state: needs non-null product_uid so we enter the code path,
+	// plus valid a_end/b_end objects.
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = validEndVal
+	stateAttrs["b_end"] = validEndVal
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	tests := []struct {
+		name         string
+		overrideEnds []string
+		makeNull     bool // override with a null object instead of an unknown one
+	}{
+		{"unknown_a_end", []string{"a_end"}, false},
+		{"unknown_b_end", []string{"b_end"}, false},
+		{"unknown_both_ends", []string{"a_end", "b_end"}, false},
+		{"null_a_end", []string{"a_end"}, true},
+		{"null_b_end", []string{"b_end"}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build plan: start with valid ends, then override the target end(s)
+			// with an unknown or null object.
+			planAttrs := nullValueMap(schemaObjType)
+			planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+			planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+			planAttrs["a_end"] = validEndVal
+			planAttrs["b_end"] = validEndVal
+
+			override := tftypes.NewValue(endObjType, tftypes.UnknownValue)
+			if tc.makeNull {
+				override = tftypes.NewValue(endObjType, nil)
+			}
+			for _, end := range tc.overrideEnds {
+				planAttrs[end] = override
+			}
+
+			planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+			state := tfsdk.State{Schema: s, Raw: stateVal}
+			plan := tfsdk.Plan{Schema: s, Raw: planVal}
+
+			req := fwresource.ModifyPlanRequest{
+				State: state,
+				Plan:  plan,
+			}
+			resp := fwresource.ModifyPlanResponse{
+				Plan: plan,
+			}
+
+			r.ModifyPlan(ctx, req, &resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Errorf("expected no errors, got: %v", resp.Diagnostics.Errors())
+			}
+			// Verify the plan was not modified on the early-return path.
+			if !resp.Plan.Raw.Equal(planVal) {
+				t.Error("expected plan to be unchanged when end configs are unknown or null")
+			}
+		})
+	}
+}
+
+// TestVXCModifyPlan_ValidEndsReconcile drives the non-early-return path: both
+// ends are valid objects, so ModifyPlan decodes them, reconciles, and writes
+// resp.Plan. It guards the reconcile wiring (correct per-end objects, no
+// conversion error) that the unknown/null test never exercises, and confirms a
+// known requested_product_uid survives reconciliation.
+func TestVXCModifyPlan_ValidEndsReconcile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+
+	// Distinct UIDs per end so the assertions catch an A-End/B-End wiring swap,
+	// not just a decode crash.
+	makeEnd := func(uid string) tftypes.Value {
+		attrs := nullValueMap(endObjType)
+		attrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, uid)
+		return tftypes.NewValue(endObjType, attrs)
+	}
+	aEndVal := makeEnd("port-uid-aaa")
+	bEndVal := makeEnd("port-uid-bbb")
+
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = aEndVal
+	stateAttrs["b_end"] = bEndVal
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	planAttrs := nullValueMap(schemaObjType)
+	planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+	planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+	planAttrs["a_end"] = aEndVal
+	planAttrs["b_end"] = bEndVal
+	planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+	plan := tfsdk.Plan{Schema: s, Raw: planVal}
+	req := fwresource.ModifyPlanRequest{
+		State: tfsdk.State{Schema: s, Raw: stateVal},
+		Plan:  plan,
+	}
+	resp := fwresource.ModifyPlanResponse{Plan: plan}
+
+	r.ModifyPlan(ctx, req, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("expected no errors on reconcile path, got: %v", resp.Diagnostics.Errors())
+	}
+	if len(resp.RequiresReplace) != 0 {
+		t.Errorf("expected no RequiresReplace for non-CSP unchanged ends, got: %v", resp.RequiresReplace)
+	}
+
+	// The reconcile path must have run and produced a usable plan that preserves
+	// each end's known requested_product_uid against the correct end (a swap of
+	// the A-End/B-End reconcile wiring would surface here).
+	var got vxcResourceModel
+	if diags := resp.Plan.Get(ctx, &got); diags.HasError() {
+		t.Fatalf("decoding resp.Plan failed: %v", diags.Errors())
+	}
+	var aEnd, bEnd vxcEndConfigurationModel
+	if diags := got.AEndConfiguration.As(ctx, &aEnd, basetypes.ObjectAsOptions{}); diags.HasError() {
+		t.Fatalf("decoding a_end failed: %v", diags.Errors())
+	}
+	if diags := got.BEndConfiguration.As(ctx, &bEnd, basetypes.ObjectAsOptions{}); diags.HasError() {
+		t.Fatalf("decoding b_end failed: %v", diags.Errors())
+	}
+	if aEnd.RequestedProductUID.ValueString() != "port-uid-aaa" {
+		t.Errorf("expected a_end requested_product_uid preserved as port-uid-aaa, got %q", aEnd.RequestedProductUID.ValueString())
+	}
+	if bEnd.RequestedProductUID.ValueString() != "port-uid-bbb" {
+		t.Errorf("expected b_end requested_product_uid preserved as port-uid-bbb, got %q", bEnd.RequestedProductUID.ValueString())
+	}
+}
+
+// TestReconcileVXCEnd_RequestedProductUID exercises reconcileVXCEnd's
+// requested_product_uid switch directly. It guards the behavior the PR adds (an
+// unknown UID is preserved, not clobbered) and the pre-existing CSP/non-CSP
+// branches.
+func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mkEnd := func(t *testing.T, requested, current types.String) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: requested,
+			CurrentProductUID:   current,
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+	cspPartner := func(t *testing.T) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name           string
+		planRequested  types.String
+		stateRequested types.String
+		stateCurrent   types.String
+		csp            bool
+		wantUnknown    bool
+		wantValue      string
+	}{
+		{
+			name:           "unknown_plan_uid_non_csp_preserved",
+			planRequested:  types.StringUnknown(),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantUnknown:    true,
+		},
+		{
+			name:           "unknown_plan_uid_csp_not_clobbered",
+			planRequested:  types.StringUnknown(),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantUnknown:    true,
+		},
+		{
+			name:           "both_null_uses_current",
+			planRequested:  types.StringNull(),
+			stateRequested: types.StringNull(),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantValue:      "port-current",
+		},
+		{
+			name:           "state_null_plan_known_csp_keeps_plan",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringNull(),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantValue:      "port-new",
+		},
+		{
+			name:           "csp_known_plan_pins_to_state",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantValue:      "port-state",
+		},
+		{
+			name:           "non_csp_known_plan_kept",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantValue:      "port-new",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if tc.csp {
+				planPartner = cspPartner(t)
+			}
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            mkEnd(t, tc.planRequested, types.StringNull()),
+				stateEndObj:           mkEnd(t, tc.stateRequested, tc.stateCurrent),
+				planPartnerConfig:     planPartner,
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			var got vxcEndConfigurationModel
+			if d := gotObj.As(ctx, &got, basetypes.ObjectAsOptions{}); d.HasError() {
+				t.Fatalf("decode result: %v", d.Errors())
+			}
+
+			if tc.wantUnknown {
+				if !got.RequestedProductUID.IsUnknown() {
+					t.Errorf("expected requested_product_uid to stay unknown, got %v", got.RequestedProductUID)
+				}
+				return
+			}
+			if got.RequestedProductUID.ValueString() != tc.wantValue {
+				t.Errorf("requested_product_uid = %q, want %q", got.RequestedProductUID.ValueString(), tc.wantValue)
+			}
+		})
+	}
+}
+
+// TestReconcileVXCEnd_RequiresReplace covers the partner-config replace branch:
+// a changed CSP partner-config forces replacement, while an unchanged CSP
+// config, a non-CSP change, or a null state config must not.
+func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partnerWith := func(t *testing.T, name string) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+	end := func(t *testing.T) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: types.StringValue("port-x"),
+			CurrentProductUID:   types.StringValue("port-x"),
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name         string
+		planPartner  func(t *testing.T) types.Object
+		nullState    bool // state partner config is null
+		statePartner string
+		wantReplace  bool
+	}{
+		{name: "csp_changed_forces_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "azure", wantReplace: true},
+		{name: "csp_unchanged_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "aws", wantReplace: false},
+		{name: "non_csp_change_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "transit") }, statePartner: "aws", wantReplace: false},
+		{name: "null_state_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, nullState: true, wantReplace: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if !tc.nullState {
+				statePartner = partnerWith(t, tc.statePartner)
+			}
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            end(t),
+				stateEndObj:           end(t),
+				planPartnerConfig:     tc.planPartner(t),
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			if tc.wantReplace {
+				if len(rr) != 1 || rr[0].String() != path.Root("a_end_partner_config").String() {
+					t.Errorf("expected requiresReplace [a_end_partner_config], got %v", rr)
+				}
+			} else if len(rr) != 0 {
+				t.Errorf("expected no requiresReplace, got %v", rr)
+			}
+		})
+	}
+}
+
+// TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
+// whose A-End vrouter config declares two interfaces: a subInterface carrying
+// the tunnel source IP, and an ipSecTunnel interface with a single
+// ip_sec_tunnel_options object (one tunnel per ipSecTunnel interface). It then
+// relies on the framework's post-apply plan to confirm the write-only tunnel
+// fields (PSK, lifetimes) produce no drift. The peer addresses are illustrative
+// (RFC 5737 / link-local); a live run against a real peer may need real values.
+func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	mcrLocID, _ := findMCRTestLocation(t, 1000)
+	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "mcr_loc" {
+			id = %d
+		}
+
+		data "megaport_location" "transit_loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.mcr_loc.id
+			contract_term_months = 1
+			port_speed           = 1000
+			asn                  = 64555
+		}
+
+		resource "megaport_mcr_ipsec_addon" "addon" {
+			mcr_id       = megaport_mcr.mcr.product_uid
+			tunnel_count = 10
+		}
+
+		data "megaport_partner" "internet_port" {
+			connect_type = "TRANSIT"
+			location_id  = data.megaport_location.transit_loc.id
+		}
+
+		resource "megaport_vxc" "ipsec_vxc" {
+			product_name         = "%s"
+			rate_limit           = 100
+			contract_term_months = 1
+
+			a_end = {
+				requested_product_uid = megaport_mcr.mcr.product_uid
+			}
+
+			a_end_partner_config = {
+				partner = "vrouter"
+				vrouter_config = {
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["169.254.100.1/30"]
+						},
+						{
+							interface_type = "ipSecTunnel"
+							ip_sec_tunnel_options = {
+								source_ip_address      = "169.254.100.1"
+								destination_ip_address = "203.0.113.10"
+								pre_shared_key         = "tf-acc-test-psk"
+								phase1_lifetime        = 28800
+								phase2_lifetime        = 3600
+							}
+						},
+					]
+				}
+			}
+
+			b_end = {
+				requested_product_uid = data.megaport_partner.internet_port.product_uid
+			}
+
+			depends_on = [megaport_mcr_ipsec_addon.addon]
+		}
+	`, mcrLocID, transitLocs[0], mcrName, vxcName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mcr_ipsec_addon.addon", "add_on_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.ipsec_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.0.interface_type", "subInterface"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.interface_type", "ipSecTunnel"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.source_ip_address", "169.254.100.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.destination_ip_address", "203.0.113.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase1_lifetime", "28800"),
+					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase2_lifetime", "3600"),
+					// pre_shared_key is write-only: it must never be persisted to state.
+					resource.TestCheckNoResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.pre_shared_key"),
+				),
 			},
 		},
 	})

@@ -530,11 +530,11 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"asn": schema.Int64Attribute{
-				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections.",
+				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections. Updating this attribute modifies the ASN in place; the MCR is not destroyed and recreated. Note that any BGP peers attached to VXCs on this MCR will renegotiate against the new ASN.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"vxc_permitted": schema.BoolAttribute{
@@ -615,7 +615,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "Numeric ID of the prefix filter list.",
 							Computed:    true,
 							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
+								int64planmodifier.UseNonNullStateForUnknown(),
 							},
 						},
 						"description": schema.StringAttribute{
@@ -685,7 +685,7 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      waitForTime,
 	}
 
-	if !plan.ASN.IsNull() {
+	if !plan.ASN.IsUnknown() {
 		buyReq.MCRAsn = int(plan.ASN.ValueInt64())
 	}
 
@@ -877,14 +877,12 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 		for _, l := range prefixFilterLists {
-			wg.Add(1)
-			go func(list *megaport.PrefixFilterList) {
-				defer wg.Done()
+			wg.Go(func() {
 				// Get a token from the rate limiter to apply rate limiting
 
 				<-rateLimiter.rateLimitCh
 
-				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), l.Id)
 				if err != nil {
 					mux.Lock()
 					errs = append(errs, err)
@@ -894,7 +892,7 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 				mux.Lock()
 				detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 				mux.Unlock()
-			}(l)
+			})
 		}
 
 		wg.Wait()
@@ -981,12 +979,19 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		contractTermMonths = &months
 	}
 
+	var mcrAsn *int
+	if !plan.ASN.IsUnknown() && !plan.ASN.Equal(state.ASN) {
+		asn := int(plan.ASN.ValueInt64())
+		mcrAsn = &asn
+	}
+
 	_, err := r.client.MCRService.ModifyMCR(ctx, &megaport.ModifyMCRRequest{
 		MCRID:                 plan.UID.ValueString(),
 		Name:                  name,
 		MarketplaceVisibility: &marketplaceVisibility,
 		ContractTermMonths:    contractTermMonths,
 		CostCentre:            costCentre,
+		MCRAsn:                mcrAsn,
 		WaitForUpdate:         true,
 		WaitForTime:           waitForTime,
 	})
@@ -1068,9 +1073,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	rateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
 	for _, planModel := range planPrefixFilterLists {
-		wg.Add(1)
-		go func(planModel *mcrPrefixFilterListModel) {
-			defer wg.Done()
+		wg.Go(func() {
 			// Get a token from the rate limiter to apply rate limiting
 			<-rateLimiter.rateLimitCh
 
@@ -1100,7 +1103,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 					mux.Unlock()
 				}
 			}
-		}(planModel)
+		})
 	}
 
 	wg.Wait()
@@ -1117,49 +1120,44 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Only delete prefix filter lists that are in state but not in plan when the user
-	// is managing inline lists. When plan is empty, the user manages lists via standalone
-	// resources — deleting would destroy those resources.
-	if len(planPrefixFilterLists) > 0 {
-		// Create a RateLimiter with a burst size of 10 and a refill speed of 100 milliseconds for delete operations
-		deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
+	// Delete prefix filter lists in state but not in plan. When plan is empty the
+	// map is also empty, so every state list is deleted — this handles explicit
+	// clear (prefix_filter_lists = []). For standalone-resource users,
+	// statePrefixFilterLists is already empty so the loop is a no-op.
+	deleteRateLimiter := NewRateLimiter(10, 1000*time.Millisecond)
 
-		for _, stateModel := range statePrefixFilterLists {
-			wg.Add(1)
-			go func(stateModel *mcrPrefixFilterListModel) {
-				defer wg.Done()
+	for _, stateModel := range statePrefixFilterLists {
+		wg.Go(func() {
+			<-deleteRateLimiter.rateLimitCh
 
-				<-deleteRateLimiter.rateLimitCh
-
-				// If the prefix filter list does not exist in the plan, delete it.
-				if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
-					_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
-					if deleteErr != nil {
-						mux.Lock()
-						errs = append(errs, deleteErr)
-						mux.Unlock()
-					}
+			// If the prefix filter list does not exist in the plan, delete it.
+			if _, ok := planPrefixFilterListMap[stateModel.ID.ValueInt64()]; !ok {
+				_, deleteErr := r.client.MCRService.DeleteMCRPrefixFilterList(ctx, state.UID.ValueString(), int(stateModel.ID.ValueInt64()))
+				if deleteErr != nil {
+					mux.Lock()
+					errs = append(errs, deleteErr)
+					mux.Unlock()
 				}
-			}(stateModel)
-		}
-		wg.Wait()
-
-		if len(errs) > 0 {
-			var errStr string
-			for _, err := range errs {
-				errStr += err.Error() + ", "
 			}
-			resp.Diagnostics.AddError(
-				"Error Deleting Prefix Filter Lists",
-				"Could not delete prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
-			)
-			return
+		})
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		var errStr string
+		for _, err := range errs {
+			errStr += err.Error() + ", "
 		}
+		resp.Diagnostics.AddError(
+			"Error Deleting Prefix Filter Lists",
+			"Could not delete prefix filter lists for MCR with ID "+state.UID.ValueString()+": "+errStr,
+		)
+		return
 	}
 
-	// Only re-read prefix filter lists from API when the user manages them inline.
-	// When plan is empty, preserve the empty state to avoid triggering update loops
-	// for standalone-managed prefix filter lists.
+	// Re-read prefix filter lists from API when the user manages them inline.
+	// When plan is empty, set state to an empty list — the delete loop above
+	// already removed any lists that were in state.
 	if len(planPrefixFilterLists) > 0 {
 		pfFilterListModels := []*mcrPrefixFilterListModel{}
 
@@ -1181,13 +1179,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		detailedPrefixFilterLists := []*megaport.MCRPrefixFilterList{}
 
 		for _, l := range prefixFilterLists {
-			wg.Add(1)
-			go func(list *megaport.PrefixFilterList) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				<-rateLimiter.rateLimitCh
 
-				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), list.Id)
+				detailedList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, state.UID.ValueString(), l.Id)
 				if err != nil {
 					mux.Lock()
 					errs = append(errs, err)
@@ -1197,7 +1192,7 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				mux.Lock()
 				detailedPrefixFilterLists = append(detailedPrefixFilterLists, detailedList)
 				mux.Unlock()
-			}(l)
+			})
 		}
 		wg.Wait()
 		if len(errs) > 0 {
@@ -1240,10 +1235,16 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			resp.Diagnostics.Append(pfFilterListDiags...)
 			state.PrefixFilterLists = pfFilterLists
 		}
+	} else {
+		emptyList := []types.Object{}
+		pfFilterLists, pfFilterListDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixFilterListModelAttributes), emptyList)
+		resp.Diagnostics.Append(pfFilterListDiags...)
+		state.PrefixFilterLists = pfFilterLists
 	}
 
 	// Update the state with the new values
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -1263,10 +1264,13 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Delete existing order
-	_, err := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
-		MCRID:      state.UID.ValueString(),
-		DeleteNow:  true,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{
+			MCRID:      state.UID.ValueString(),
+			DeleteNow:  true,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(

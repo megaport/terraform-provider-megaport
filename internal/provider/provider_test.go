@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
-	"github.com/stretchr/testify/suite"
 )
 
 var providerConfig = fmt.Sprintf(`
@@ -33,10 +32,6 @@ provider "megaport" {
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"scaffolding": providerserver.NewProtocol6WithError(New("test")()),
 	"megaport":    providerserver.NewProtocol6WithError(New("test")()),
-}
-
-type ProviderTestSuite struct {
-	suite.Suite
 }
 
 var (
@@ -98,6 +93,12 @@ func getProductStatus(ctx context.Context, client *megaport.Client, productUID s
 			return "", err
 		}
 		return vxc.ProvisioningStatus, nil
+	case "megaport_nat_gateway":
+		gw, err := client.NATGatewayService.GetNATGateway(ctx, productUID)
+		if err != nil {
+			return "", err
+		}
+		return gw.ProvisioningStatus, nil
 	default:
 		return "", fmt.Errorf("unsupported resource type: %s", resourceType)
 	}

@@ -27,12 +27,11 @@ var waitForTime time.Duration
 
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
-	Environment       types.String `tfsdk:"environment"`
-	AccessKey         types.String `tfsdk:"access_key"`
-	SecretKey         types.String `tfsdk:"secret_key"`
-	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
-	WaitTime          types.Int64  `tfsdk:"wait_time"`
-	CancelAtEndOfTerm types.Bool   `tfsdk:"cancel_at_end_of_term"`
+	Environment   types.String `tfsdk:"environment"`
+	AccessKey     types.String `tfsdk:"access_key"`
+	SecretKey     types.String `tfsdk:"secret_key"`
+	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
+	WaitTime      types.Int64  `tfsdk:"wait_time"`
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -58,8 +57,7 @@ type megaportProvider struct {
 }
 
 type megaportProviderData struct {
-	client            *megaport.Client
-	cancelAtEndOfTerm bool
+	client *megaport.Client
 }
 
 // Metadata returns the provider type name.
@@ -92,15 +90,11 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
 			"wait_time": schema.Int64Attribute{
-				Description: "The time to wait in minutes for creating and updating resources in Megaport API. Default value is 10.",
+				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers. Does not apply to Internet Exchange (IX) resources, which use a fixed 10-minute wait.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
-			},
-			"cancel_at_end_of_term": schema.BoolAttribute{
-				Optional:    true,
-				Description: "When true, resources will be marked for cancellation at the end of their billing term rather than immediately. Default is false (immediate cancellation). Please note that this is only applicable to resources that support cancellation at the end of the term, which is currently only the case for Single Ports and LAG Ports. For other resources, this attribute will be ignored.",
 			},
 		},
 	}
@@ -190,11 +184,6 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 
 	if !config.WaitTime.IsNull() {
 		waitTime = int(config.WaitTime.ValueInt64())
-	}
-
-	cancelAtEndOfTerm := false
-	if !config.CancelAtEndOfTerm.IsNull() {
-		cancelAtEndOfTerm = config.CancelAtEndOfTerm.ValueBool()
 	}
 
 	ctx = tflog.SetField(ctx, "environment", environment)
@@ -297,8 +286,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Make the Megaport client available during DataSource and Resource
 	// type Configure methods.
 	providerData := &megaportProviderData{
-		client:            megaportClient,
-		cancelAtEndOfTerm: cancelAtEndOfTerm,
+		client: megaportClient,
 	}
 
 	resp.DataSourceData = providerData
@@ -316,6 +304,9 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewMVESizeDataSource,
 		NewMCRPrefixFilterListDataSource,
 		NewMCRsDataSource,
+		NewMVEsDataSource,
+		NewVXCsDataSource,
+		NewNATGatewaySessionsDataSource,
 	}
 }
 
@@ -323,12 +314,17 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewMCRResource,
+		NewMCRIpsecAddonResource,
 		NewMCRPrefixFilterListResource,
 		NewPortResource,
 		NewLagPortResource,
 		NewMVEResource,
 		NewVXCResource,
 		NewIXResource,
+		NewServiceKeyResource,
+		NewNATGatewayResource,
+		NewNATGatewayPacketFilterResource,
+		NewNATGatewayPrefixListResource,
 	}
 }
 

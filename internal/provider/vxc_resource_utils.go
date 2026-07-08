@@ -3,13 +3,53 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// resolvePrefixListID looks up a prefix filter list by description on the
+// supplied slice (typically returned by vrouterPrefixFilterListsForEndpoint).
+// It returns an error diagnostic if zero or more than one list matches —
+// matching by description is convenient but can otherwise silently drop a
+// whitelist/blacklist on typos or when descriptions are reused, leaving the
+// BGP session unfiltered without any signal to the user.
+func resolvePrefixListID(prefixFilterList []*megaport.PrefixFilterList, description, fieldName string) (int, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	matches := make([]*megaport.PrefixFilterList, 0, 1)
+	for _, pfl := range prefixFilterList {
+		if pfl.Description == description {
+			matches = append(matches, pfl)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0].Id, diags
+	case 0:
+		diags.AddError(
+			"Prefix filter list not found",
+			fmt.Sprintf("%s references prefix filter list %q, but no list with that description exists on the attached MCR or NAT Gateway. Prefix lists are resolved by description.", fieldName, description),
+		)
+		return 0, diags
+	default:
+		ids := make([]string, len(matches))
+		for i, m := range matches {
+			ids[i] = strconv.Itoa(m.Id)
+		}
+		diags.AddError(
+			"Ambiguous prefix filter list description",
+			fmt.Sprintf("%s references prefix filter list %q, but %d lists on the attached MCR or NAT Gateway share that description (IDs: %s). Prefix list descriptions must be unique for description-based lookup.", fieldName, description, len(matches), strings.Join(ids, ", ")),
+		)
+		return 0, diags
+	}
+}
 
 // fromAPIVXC updates the resource model from API response data.
 // The optional plan parameter allows preserving user-only fields (like requested_product_uid,
@@ -469,16 +509,64 @@ func createIBMPartnerConfig(ctx context.Context, ibmConfig vxcPartnerConfigIbmMo
 	return diags, ibmPartnerConfig, partnerConfigObj
 }
 
-func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
+// ipSecPreSharedKeysFromConfig reads the write-only pre_shared_key for each
+// vrouter interface from the configuration, keyed by interface index. The PSK is
+// a write-only argument, so it is null in the plan and must be sourced from
+// config when ordering the tunnel. pathRoot is the partner-config attribute name
+// ("a_end_partner_config" or "b_end_partner_config").
+func ipSecPreSharedKeysFromConfig(ctx context.Context, config tfsdk.Config, pathRoot string, ifaceCount int) (map[int]string, diag.Diagnostics) {
+	diags := diag.Diagnostics{}
+	psks := map[int]string{}
+	for i := 0; i < ifaceCount; i++ {
+		tunnelPath := path.Root(pathRoot).
+			AtName("vrouter_config").
+			AtName("interfaces").
+			AtListIndex(i).
+			AtName("ip_sec_tunnel_options")
+		// Read the tunnel object first so we never descend into a null object on
+		// interfaces that have no tunnel.
+		var tunnel types.Object
+		diags.Append(config.GetAttribute(ctx, tunnelPath, &tunnel)...)
+		if diags.HasError() {
+			return psks, diags
+		}
+		if tunnel.IsNull() || tunnel.IsUnknown() {
+			continue
+		}
+		var psk types.String
+		diags.Append(config.GetAttribute(ctx, tunnelPath.AtName("pre_shared_key"), &psk)...)
+		if diags.HasError() {
+			return psks, diags
+		}
+		if !psk.IsNull() && !psk.IsUnknown() {
+			psks[i] = psk.ValueString()
+		}
+	}
+	return psks, diags
+}
+
+func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerConfigVrouterModel, prefixFilterList []*megaport.PrefixFilterList, preSharedKeys map[int]string) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	vrouterPartnerConfig := &megaport.VXCOrderVrouterPartnerConfig{}
 	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
 	ifaceDiags := vrouterConfig.Interfaces.ElementsAs(ctx, &ifaceModels, false)
 	diags.Append(ifaceDiags...)
-	for _, iface := range ifaceModels {
+	for i, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
 		if !iface.IpMtu.IsNull() {
 			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
+		}
+		if !iface.Description.IsNull() {
+			toAppend.Description = iface.Description.ValueString()
+		}
+		if !iface.InterfaceType.IsNull() {
+			toAppend.InterfaceType = iface.InterfaceType.ValueString()
+		}
+		if !iface.PacketFilterIn.IsNull() {
+			toAppend.PacketFilterIn = megaport.PtrTo(iface.PacketFilterIn.ValueInt64())
+		}
+		if !iface.PacketFilterOut.IsNull() {
+			toAppend.PacketFilterOut = megaport.PtrTo(iface.PacketFilterOut.ValueInt64())
 		}
 		if !iface.IPAddresses.IsNull() {
 			ipAddresses := []string{}
@@ -540,38 +628,29 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportWhitelist.ValueString() {
-							bgpToAppend.ImportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ImportWhitelist = id
 				}
 				if !bgpConnection.ImportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportBlacklist.ValueString() {
-							bgpToAppend.ImportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ImportBlacklist = id
 				}
 				if !bgpConnection.ExportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportWhitelist.ValueString() {
-							bgpToAppend.ExportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ExportWhitelist = id
 				}
 				if !bgpConnection.ExportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportBlacklist.ValueString() {
-							bgpToAppend.ExportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ExportBlacklist = id
 				}
 				if !bgpConnection.PermitExportTo.IsNull() {
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() {
@@ -582,6 +661,31 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 				}
 				toAppend.BgpConnections = append(toAppend.BgpConnections, bgpToAppend)
 			}
+		}
+		if !iface.IpSecTunnelOptions.IsNull() && !iface.IpSecTunnelOptions.IsUnknown() {
+			var t ipSecTunnelOptionsModel
+			tunnelDiags := iface.IpSecTunnelOptions.As(ctx, &t, basetypes.ObjectAsOptions{})
+			diags.Append(tunnelDiags...)
+			// pre_shared_key is write-only, so it is null in t (sourced from the
+			// plan). Pull it from the configuration, keyed by interface index.
+			tunnel := megaport.IPsecTunnelConfig{
+				SourceIpAddress:      t.SourceIPAddress.ValueString(),
+				DestinationIpAddress: t.DestinationIPAddress.ValueString(),
+				PreSharedKey:         preSharedKeys[i],
+				LocalId:              t.LocalID.ValueString(),
+				RemoteId:             t.RemoteID.ValueString(),
+			}
+			// Pointer fields: only set when configured so nil keeps the API default.
+			if !t.Passive.IsNull() {
+				tunnel.Passive = megaport.PtrTo(t.Passive.ValueBool())
+			}
+			if !t.Phase1Lifetime.IsNull() {
+				tunnel.Phase1Lifetime = megaport.PtrTo(int(t.Phase1Lifetime.ValueInt64()))
+			}
+			if !t.Phase2Lifetime.IsNull() {
+				tunnel.Phase2Lifetime = megaport.PtrTo(int(t.Phase2Lifetime.ValueInt64()))
+			}
+			toAppend.IpSecTunnelOptions = &tunnel
 		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}
@@ -675,38 +779,29 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportWhitelist.ValueString() {
-							bgpToAppend.ImportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ImportWhitelist = id
 				}
 				if !bgpConnection.ImportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ImportBlacklist.ValueString() {
-							bgpToAppend.ImportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportBlacklist.ValueString(), "import_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ImportBlacklist = id
 				}
 				if !bgpConnection.ExportWhitelist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportWhitelist.ValueString() {
-							bgpToAppend.ExportWhitelist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportWhitelist.ValueString(), "export_whitelist")
+					diags.Append(d...)
+					bgpToAppend.ExportWhitelist = id
 				}
 				if !bgpConnection.ExportBlacklist.IsNull() {
-					for _, pfl := range prefixFilterList {
-						if pfl.Description == bgpConnection.ExportBlacklist.ValueString() {
-							bgpToAppend.ExportBlacklist = pfl.Id
-						}
-					}
+					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ExportBlacklist.ValueString(), "export_blacklist")
+					diags.Append(d...)
+					bgpToAppend.ExportBlacklist = id
 				}
 				if !bgpConnection.PermitExportTo.IsNull() {
 					permitExportTo := []string{}
 					permitDiags := bgpConnection.PermitExportTo.ElementsAs(ctx, &permitExportTo, true)
 					diags.Append(permitDiags...)
-					bgpToAppend.PermitExportTo = permitExportTo
 					bgpToAppend.PermitExportTo = permitExportTo
 				}
 				if !bgpConnection.DenyExportTo.IsNull() {

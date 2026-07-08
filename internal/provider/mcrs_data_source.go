@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -13,7 +14,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ datasource.DataSource = &mcrsDataSource{}
+	_ datasource.DataSource              = &mcrsDataSource{}
+	_ datasource.DataSourceWithConfigure = &mcrsDataSource{}
 
 	mcrDetailAttrs = map[string]attr.Type{
 		"product_uid":            types.StringType,
@@ -269,6 +271,13 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			)
 			return
 		}
+		if mcr == nil {
+			resp.Diagnostics.AddError(
+				"Error reading MCR",
+				fmt.Sprintf("No MCR found with UID %s", data.ProductUID.ValueString()),
+			)
+			return
+		}
 		mcrs = []*megaport.MCR{mcr}
 	} else {
 		// List all MCRs
@@ -342,31 +351,32 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		Cancelable:            types.BoolValue(m.Cancelable),
 	}
 
-	// Time fields
+	// Time fields — emit RFC3339 so values are consumable by Terraform's
+	// formatdate() function; nil dates map to null rather than an empty string.
 	if m.CreateDate != nil {
-		detail.CreateDate = types.StringValue(m.CreateDate.String())
+		detail.CreateDate = types.StringValue(m.CreateDate.Format(time.RFC3339))
 	} else {
-		detail.CreateDate = types.StringValue("")
+		detail.CreateDate = types.StringNull()
 	}
 	if m.LiveDate != nil {
-		detail.LiveDate = types.StringValue(m.LiveDate.String())
+		detail.LiveDate = types.StringValue(m.LiveDate.Format(time.RFC3339))
 	} else {
-		detail.LiveDate = types.StringValue("")
+		detail.LiveDate = types.StringNull()
 	}
 	if m.TerminateDate != nil {
-		detail.TerminateDate = types.StringValue(m.TerminateDate.String())
+		detail.TerminateDate = types.StringValue(m.TerminateDate.Format(time.RFC3339))
 	} else {
-		detail.TerminateDate = types.StringValue("")
+		detail.TerminateDate = types.StringNull()
 	}
 	if m.ContractStartDate != nil {
-		detail.ContractStartDate = types.StringValue(m.ContractStartDate.String())
+		detail.ContractStartDate = types.StringValue(m.ContractStartDate.Format(time.RFC3339))
 	} else {
-		detail.ContractStartDate = types.StringValue("")
+		detail.ContractStartDate = types.StringNull()
 	}
 	if m.ContractEndDate != nil {
-		detail.ContractEndDate = types.StringValue(m.ContractEndDate.String())
+		detail.ContractEndDate = types.StringValue(m.ContractEndDate.Format(time.RFC3339))
 	} else {
-		detail.ContractEndDate = types.StringValue("")
+		detail.ContractEndDate = types.StringNull()
 	}
 
 	// Attribute tags
@@ -380,7 +390,8 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) mcrDetailModel {
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
 
-	// Resource tags
+	// Resource tags: empty or absent tags map to null (not an empty map).
+	// Note this differs from AttributeTags above, which keeps a non-nil empty map.
 	if len(tags) > 0 {
 		resourceTagValues := make(map[string]attr.Value, len(tags))
 		for k, v := range tags {

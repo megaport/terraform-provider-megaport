@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -146,11 +147,16 @@ var (
 
 	// deprecated
 	vxcPartnerConfigAEndAttrs = map[string]attr.Type{
-		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcInterfaceAttrs)),
+		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// deprecated
-	vxcInterfaceAttrs = map[string]attr.Type{
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
+	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
+	// shape; on decode into the model, unmatched attrs remain null, and on
+	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
+	// this map to match the struct breaks encoding with a Value Conversion
+	// Error because the framework requires attr.Type ↔ schema equality.
+	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
@@ -185,13 +191,29 @@ var (
 	}
 
 	vxcVrouterInterfaceAttrs = map[string]attr.Type{
-		"ip_mtu":           types.Int64Type,
-		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
-		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
-		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
-		"bfd":              types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
-		"vlan":             types.Int64Type,
-		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"ip_mtu":                types.Int64Type,
+		"ip_addresses":          types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":             types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses":      types.ListType{}.WithElementType(types.StringType),
+		"bfd":                   types.ObjectType{}.WithAttributeTypes(bfdConfigAttrs),
+		"vlan":                  types.Int64Type,
+		"bgp_connections":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		"ip_sec_tunnel_options": types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs),
+		"description":           types.StringType,
+		"interface_type":        types.StringType,
+		"packet_filter_in":      types.Int64Type,
+		"packet_filter_out":     types.Int64Type,
+	}
+
+	ipSecTunnelOptionsAttrs = map[string]attr.Type{
+		"source_ip_address":      types.StringType,
+		"destination_ip_address": types.StringType,
+		"pre_shared_key":         types.StringType,
+		"passive":                types.BoolType,
+		"local_id":               types.StringType,
+		"remote_id":              types.StringType,
+		"phase1_lifetime":        types.Int64Type,
+		"phase2_lifetime":        types.Int64Type,
 	}
 
 	ipRouteAttrs = map[string]attr.Type{
@@ -407,13 +429,33 @@ type vxcPartnerConfigIbmModel struct {
 
 // vxcPartnerConfigInterfaceModel maps the partner configuration schema data for an interface.
 type vxcPartnerConfigInterfaceModel struct {
-	IpMtu          types.Int64  `tfsdk:"ip_mtu"`
-	IPAddresses    types.List   `tfsdk:"ip_addresses"`
-	IPRoutes       types.List   `tfsdk:"ip_routes"`
-	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
-	Bfd            types.Object `tfsdk:"bfd"`
-	BgpConnections types.List   `tfsdk:"bgp_connections"`
-	VLAN           types.Int64  `tfsdk:"vlan"`
+	IpMtu              types.Int64  `tfsdk:"ip_mtu"`
+	IPAddresses        types.List   `tfsdk:"ip_addresses"`
+	IPRoutes           types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses     types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd                types.Object `tfsdk:"bfd"`
+	BgpConnections     types.List   `tfsdk:"bgp_connections"`
+	IpSecTunnelOptions types.Object `tfsdk:"ip_sec_tunnel_options"`
+	VLAN               types.Int64  `tfsdk:"vlan"`
+	Description        types.String `tfsdk:"description"`
+	InterfaceType      types.String `tfsdk:"interface_type"`
+	PacketFilterIn     types.Int64  `tfsdk:"packet_filter_in"`
+	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
+}
+
+// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
+// never returns the PSK or lifetimes. PreSharedKey is a write-only argument, so
+// it is null in plan/state and sourced from the configuration when ordering;
+// the lifetimes are preserved from plan/state rather than read back.
+type ipSecTunnelOptionsModel struct {
+	SourceIPAddress      types.String `tfsdk:"source_ip_address"`
+	DestinationIPAddress types.String `tfsdk:"destination_ip_address"`
+	PreSharedKey         types.String `tfsdk:"pre_shared_key"`
+	Passive              types.Bool   `tfsdk:"passive"`
+	LocalID              types.String `tfsdk:"local_id"`
+	RemoteID             types.String `tfsdk:"remote_id"`
+	Phase1Lifetime       types.Int64  `tfsdk:"phase1_lifetime"`
+	Phase2Lifetime       types.Int64  `tfsdk:"phase2_lifetime"`
 }
 
 // ipRouteModel maps the IP route schema data.
@@ -466,6 +508,53 @@ type vxcResource struct {
 // Metadata returns the resource type name.
 func (r *vxcResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_vxc"
+}
+
+// vrouterPrefixFilterListsForEndpoint returns the prefix filter lists owned
+// by the given vrouter-class endpoint, normalised to []*megaport.PrefixFilterList
+// so the shared description-to-ID lookup in createVrouterPartnerConfig /
+// createAEndPartnerConfig works uniformly regardless of product type.
+//
+// At the NetAuto layer both MCRs and NAT Gateways are classified as
+// VRouters and share the same BGP prefix-list semantics — the four
+// importWhitelist/importBlacklist/exportWhitelist/exportBlacklist fields on
+// a BGP connection accept any prefix-list ID belonging to the virtual
+// router on the VXC's endpoint. The two products expose their lists on
+// different REST endpoints (GET /v2/product/mcr2/{uid}/prefixLists vs
+// GET /v3/products/nat_gateways/{uid}/prefix_list_summaries) but the
+// resulting summary shape (id / description / addressFamily) is identical.
+//
+// Any other endpoint type (Port, MVE, etc.) has no prefix-list collection,
+// so we return nil — the lookup loops then become no-ops, which is the
+// correct behaviour for non-vrouter endpoints.
+func (r *vxcResource) vrouterPrefixFilterListsForEndpoint(ctx context.Context, productUID string) ([]*megaport.PrefixFilterList, error) {
+	productType, err := r.client.ProductService.GetProductType(ctx, productUID)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case strings.EqualFold(productType, megaport.PRODUCT_MCR):
+		return r.client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
+	case strings.EqualFold(productType, megaport.PRODUCT_NAT_GATEWAY):
+		summaries, err := r.client.NATGatewayService.ListNATGatewayPrefixLists(ctx, productUID)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]*megaport.PrefixFilterList, 0, len(summaries))
+		for _, s := range summaries {
+			if s == nil {
+				continue
+			}
+			out = append(out, &megaport.PrefixFilterList{
+				Id:            s.ID,
+				Description:   s.Description,
+				AddressFamily: s.AddressFamily,
+			})
+		}
+		return out, nil
+	default:
+		return nil, nil
+	}
 }
 
 // Schema defines the schema for the resource.
@@ -1014,7 +1103,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"requested_product_uid": schema.StringAttribute{
-						Description: "The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.",
+						Description: "The Product UID of the B-End product. For partner connections (AWS, Google, etc.), use the `megaport_partner` data source to look up the correct UID. For Google connections this field is especially important: Google exposes multiple partner ports across different locations and diversity zones, so omitting it allows the API to select any available port — which may be in an unexpected region. Set this to a specific Google partner port UID to control the on-ramp location and diversity zone. The value stored in state may differ from the requested UID when Megaport rotates a partner port within the same location and diversity zone.",
 						Optional:    true,
 						Computed:    true,
 						// PlanModifiers: []planmodifier.String{
@@ -1148,8 +1237,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		CostCentre: plan.CostCentre.ValueString(),
 		ServiceKey: plan.ServiceKey.ValueString(),
 
-		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		// Don't wait inside BuyVXC — on wait failure it discards the UID,
+		// orphaning the ordered VXC. We persist the UID to state first,
+		// then wait ourselves (see waitForVXCProvision below).
+		WaitForProvision: false,
 	}
 
 	var serviceKeyBEndUID string
@@ -1432,7 +1523,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1441,7 +1532,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -1462,7 +1558,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1757,7 +1853,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, b.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, b.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1766,7 +1862,12 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(partnerConfigBEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterMegaportConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigBEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -1806,12 +1907,27 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdVXC.TechnicalServiceUID
 
+	// Persist the UID immediately so any failure below leaves a tracked
+	// (tainted) resource instead of an orphan that later applies try to recreate.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
+		resp.Diagnostics.AddError(
+			"VXC ordered but not ready",
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+		)
+		return
+	}
+
 	// get the created VXC
 	vxc, err := r.client.VXCService.GetVXC(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading newly created VXC",
-			"Could not read newly created VXC with ID "+createdID+": "+err.Error(),
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was created but could not be read back: "+err.Error()+". Its UID has been saved to state.",
 		)
 		return
 	}
@@ -1820,7 +1936,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tags for newly created VXC",
-			"Could not read tags for newly created VXC with ID "+createdID+": "+err.Error(),
+			"VXC "+plan.Name.ValueString()+" ("+createdID+") was created but its tags could not be read: "+err.Error()+". Its UID has been saved to state.",
 		)
 		return
 	}
@@ -1839,6 +1955,43 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+}
+
+// waitForVXCProvision polls the VXC until it reaches a ready state, hits a
+// terminal state, or the timeout elapses. Transient read errors are retried
+// rather than aborting the wait, since the order has already been placed.
+func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
+	// The polls share this deadline so a stalled HTTP request can't hang
+	// the wait past the overall timeout.
+	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
+		switch {
+		case err != nil:
+			tflog.Warn(ctx, "error polling VXC provisioning status, will retry", map[string]interface{}{
+				"vxc_uid": uid,
+				"error":   err.Error(),
+			})
+		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
+			return nil
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED:
+			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		}
+
+		select {
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
+		case <-ticker.C:
+		}
 	}
 }
 
@@ -2019,9 +2172,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Only send a VLAN update when the user has actually changed ordered_vlan.
+	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
+	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
+	// allocated a non-zero VLAN — incorrectly queuing a VLAN mutation on every
+	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
 	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2036,7 +2193,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !aEndPlan.OrderedVLAN.IsNull() &&
-				!aEndPlan.OrderedVLAN.Equal(aEndState.VLAN) {
+				!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) {
 				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !aEndState.VLAN.IsNull() &&
 				updateReq.AEndVLAN == nil {
@@ -2056,9 +2213,9 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
 	}
 
-	// If Ordered VLAN is different from actual VLAN, attempt to change it to the ordered VLAN value.
+	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
 	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
@@ -2095,7 +2252,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
 			// Only include VLAN if we need it for validation but don't already have it set correctly
 			if !bEndPlan.OrderedVLAN.IsNull() &&
-				!bEndPlan.OrderedVLAN.Equal(bEndState.VLAN) {
+				!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) {
 				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 			} else if !bEndState.VLAN.IsNull() &&
 				updateReq.BEndVLAN == nil {
@@ -2170,7 +2327,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndPlan.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndPlan.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2199,7 +2356,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2207,7 +2364,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				)
 				return
 			}
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "a_end_partner_config", len(partnerConfigAEnd.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, partnerConfigAEnd, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2247,7 +2409,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.client.MCRService.ListMCRPrefixFilterLists(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, bEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2256,7 +2418,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 				return
 			}
 
-			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList)
+			psks, pskDiags := ipSecPreSharedKeysFromConfig(ctx, req.Config, "b_end_partner_config", len(vrouterModel.Interfaces.Elements()))
+			resp.Diagnostics.Append(pskDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			vrouterDiags, vrouterPartnerConfig, partnerConfigObj := createVrouterPartnerConfig(ctx, vrouterModel, prefixFilterList, psks)
 			if vrouterDiags.HasError() {
 				resp.Diagnostics.Append(vrouterDiags...)
 				return
@@ -2389,6 +2556,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// In Update, pass plan to preserve user-only configuration values
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -2410,8 +2578,10 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	// Delete existing order
-	err := r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
-		DeleteNow: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		return r.client.VXCService.DeleteVXC(ctx, state.UID.ValueString(), &megaport.DeleteVXCRequest{
+			DeleteNow: true,
+		})
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -2640,135 +2810,139 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
 		if !req.Plan.Raw.IsNull() {
-			var aEndCSP, bEndCSP bool
 			aEndStateObj := state.AEndConfiguration
 			bEndStateObj := state.BEndConfiguration
-			aEndStateConfig := &vxcEndConfigurationModel{}
-			bEndStateConfig := &vxcEndConfigurationModel{}
-			aEndDiags := aEndStateObj.As(ctx, aEndStateConfig, basetypes.ObjectAsOptions{})
-			bEndDiags := bEndStateObj.As(ctx, bEndStateConfig, basetypes.ObjectAsOptions{})
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
-			aEndPlanConfig := &vxcEndConfigurationModel{}
-			bEndPlanConfig := &vxcEndConfigurationModel{}
-			aEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			bEndPartnerConfigModel := &vxcPartnerConfigurationModel{}
-			aEndDiags = aEndPlanObj.As(ctx, aEndPlanConfig, basetypes.ObjectAsOptions{})
-			bEndDiags = bEndPlanObj.As(ctx, bEndPlanConfig, basetypes.ObjectAsOptions{})
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			if aEndStateConfig.OrderedVLAN.IsUnknown() {
-				aEndPlanConfig.OrderedVLAN = aEndStateConfig.VLAN
-			}
-			if bEndStateConfig.OrderedVLAN.IsUnknown() {
-				bEndPlanConfig.OrderedVLAN = bEndStateConfig.VLAN
-			}
-			partnerConfigDiags := plan.AEndPartnerConfig.As(ctx, &aEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.AEndPartnerConfig.IsNull() {
-				if !aEndPartnerConfigModel.Partner.IsNull() {
-					if aEndPartnerConfigModel.Partner.ValueString() != "transit" && aEndPartnerConfigModel.Partner.ValueString() != "vrouter" && aEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-						aEndCSP = true
-					}
-				}
-			}
-			if state.AEndPartnerConfig.IsNull() {
-				if !plan.AEndPartnerConfig.IsNull() {
-					state.AEndPartnerConfig = plan.AEndPartnerConfig
-				} else {
-					state.AEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) && aEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("a_end_partner_config"))
-				}
+
+			// Skip the partner-config / UID reconciliation below if any end-config
+			// object is wholly unknown or null. Unknown objects arise from
+			// conditional expressions referencing resources not yet applied; both
+			// unknown and null objects would fail to decode into a struct and
+			// produce a confusing "Value Conversion Error" rather than a useful
+			// diagnostic. (a_end/b_end are Required, so null is defensive.)
+			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
+				return
 			}
 
-			if aEndStateConfig.RequestedProductUID.IsNull() {
-				if aEndPlanConfig.RequestedProductUID.IsNull() {
-					aEndStateConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-					aEndPlanConfig.RequestedProductUID = aEndStateConfig.CurrentProductUID
-				} else {
-					aEndStateConfig.RequestedProductUID = aEndPlanConfig.RequestedProductUID
-				}
-			} else if aEndCSP {
-				if !aEndPlanConfig.RequestedProductUID.IsNull() && !aEndPlanConfig.RequestedProductUID.Equal(aEndStateConfig.RequestedProductUID) {
-					tflog.Info(ctx, "Cloud provider port mapping detected for A-End",
-						map[string]any{
-							"requested_product_uid": aEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   aEndStateConfig.CurrentProductUID.ValueString(),
-						},
-					)
-				}
-				aEndPlanConfig.RequestedProductUID = aEndStateConfig.RequestedProductUID
+			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            aEndPlanObj,
+				stateEndObj:           aEndStateObj,
+				planPartnerConfig:     plan.AEndPartnerConfig,
+				statePartnerConfig:    &state.AEndPartnerConfig,
+				requiresReplace:       &resp.RequiresReplace,
+				diags:                 &diags,
+			})
+			plan.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "B-End",
+				partnerConfigPathRoot: "b_end_partner_config",
+				planEndObj:            bEndPlanObj,
+				stateEndObj:           bEndStateObj,
+				planPartnerConfig:     plan.BEndPartnerConfig,
+				statePartnerConfig:    &state.BEndPartnerConfig,
+				requiresReplace:       &resp.RequiresReplace,
+				diags:                 &diags,
+			})
+			resp.Diagnostics.Append(diags...)
+			if !resp.Diagnostics.HasError() {
+				resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 			}
-
-			partnerConfigDiags = plan.BEndPartnerConfig.As(ctx, &bEndPartnerConfigModel, basetypes.ObjectAsOptions{})
-			diags = append(diags, partnerConfigDiags...)
-			if !plan.BEndPartnerConfig.IsNull() {
-				if !bEndPartnerConfigModel.Partner.IsNull() {
-					if !bEndPartnerConfigModel.Partner.IsNull() {
-						if bEndPartnerConfigModel.Partner.ValueString() != "transit" && bEndPartnerConfigModel.Partner.ValueString() != "vrouter" && bEndPartnerConfigModel.Partner.ValueString() != "a-end" {
-							bEndCSP = true
-						}
-					}
-				}
-			}
-
-			if state.BEndPartnerConfig.IsNull() {
-				if !plan.BEndPartnerConfig.IsNull() {
-					state.BEndPartnerConfig = plan.BEndPartnerConfig
-				} else {
-					state.BEndPartnerConfig = types.ObjectNull(vxcPartnerConfigAttrs)
-				}
-			} else {
-				if !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) && bEndCSP {
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("b_end_partner_config"))
-				}
-			}
-
-			if bEndStateConfig.RequestedProductUID.IsNull() {
-				if bEndPlanConfig.RequestedProductUID.IsNull() {
-					bEndStateConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-					bEndPlanConfig.RequestedProductUID = bEndStateConfig.CurrentProductUID
-				} else {
-					bEndStateConfig.RequestedProductUID = bEndPlanConfig.RequestedProductUID
-				}
-			} else if bEndCSP {
-				if !bEndPlanConfig.RequestedProductUID.IsNull() && bEndPlanConfig.RequestedProductUID.ValueString() != "" && !bEndPlanConfig.RequestedProductUID.Equal(bEndStateConfig.RequestedProductUID) {
-					tflog.Info(ctx, "Cloud provider port mapping detected for B-End",
-						map[string]any{
-							"requested_product_uid": bEndPlanConfig.RequestedProductUID.ValueString(),
-							"current_product_uid":   bEndStateConfig.CurrentProductUID.ValueString(),
-						},
-					)
-				}
-				bEndPlanConfig.RequestedProductUID = bEndStateConfig.RequestedProductUID
-			}
-
-			newPlanAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndPlanConfig)
-			newPlanBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndPlanConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			plan.AEndConfiguration = newPlanAEndObj
-			plan.BEndConfiguration = newPlanBEndObj
-			newStateAEndObj, aEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, aEndStateConfig)
-			newStateBEndObj, bEndDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, bEndStateConfig)
-			diags = append(diags, aEndDiags...)
-			diags = append(diags, bEndDiags...)
-			state.AEndConfiguration = newStateAEndObj
-			state.BEndConfiguration = newStateBEndObj
-			req.Plan.Set(ctx, &plan)
-			resp.Plan.Set(ctx, &plan)
-			stateDiags := req.State.Set(ctx, &state)
-			diags = append(diags, stateDiags...)
 		}
 	}
+}
 
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+type vxcEndReconcileInput struct {
+	endLabel              string
+	partnerConfigPathRoot string
+	planEndObj            types.Object
+	stateEndObj           types.Object
+	planPartnerConfig     types.Object
+	statePartnerConfig    *types.Object
+	requiresReplace       *path.Paths
+	diags                 *diag.Diagnostics
+}
+
+// anyVXCEndObjectUnknownOrNull reports whether any of the given end-config
+// objects is wholly unknown or null.
+func anyVXCEndObjectUnknownOrNull(ends ...types.Object) bool {
+	for _, end := range ends {
+		if end.IsUnknown() || end.IsNull() {
+			return true
+		}
+	}
+	return false
+}
+
+// reconcileVXCEnd performs the per-end plan reconciliation that ModifyPlan
+// applies symmetrically to A-End and B-End: decoding the end configs, fixing
+// up an unknown ordered_vlan, flagging a replace when a cloud-provider (CSP)
+// partner-config changes, and reconciling requested_product_uid against the
+// current product UID returned by the API. Returns the re-encoded plan
+// end-config object. ModifyPlan cannot mutate state, so nothing here writes
+// back to state.
+func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object {
+	stateConfig := &vxcEndConfigurationModel{}
+	planConfig := &vxcEndConfigurationModel{}
+	*in.diags = append(*in.diags, in.stateEndObj.As(ctx, stateConfig, basetypes.ObjectAsOptions{})...)
+	*in.diags = append(*in.diags, in.planEndObj.As(ctx, planConfig, basetypes.ObjectAsOptions{})...)
+
+	if stateConfig.OrderedVLAN.IsUnknown() {
+		planConfig.OrderedVLAN = stateConfig.VLAN
+	}
+
+	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
+
+	// A changed CSP partner-config forces replacement.
+	if !in.statePartnerConfig.IsNull() && csp && !in.planPartnerConfig.Equal(*in.statePartnerConfig) {
+		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))
+	}
+
+	switch {
+	case planConfig.RequestedProductUID.IsUnknown():
+		// Leave unknown as-is: a conditional expression referencing a not-yet-applied
+		// resource resolves once that resource exists. Without this case the CSP branch
+		// below would clobber the unknown with the current state value.
+	case stateConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.IsNull():
+		planConfig.RequestedProductUID = stateConfig.CurrentProductUID
+	case stateConfig.RequestedProductUID.IsNull():
+		// Plan carries an explicit UID and state has none yet; keep the plan value
+		// (and skip the CSP branch, which would otherwise overwrite it with null).
+	case csp:
+		if !planConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.ValueString() != "" && !planConfig.RequestedProductUID.Equal(stateConfig.RequestedProductUID) {
+			tflog.Info(ctx, fmt.Sprintf("Cloud provider port mapping detected for %s", in.endLabel),
+				map[string]any{
+					"requested_product_uid": planConfig.RequestedProductUID.ValueString(),
+					"current_product_uid":   stateConfig.CurrentProductUID.ValueString(),
+				},
+			)
+		}
+		planConfig.RequestedProductUID = stateConfig.RequestedProductUID
+	}
+
+	newPlanObj, planObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, planConfig)
+	*in.diags = append(*in.diags, planObjDiags...)
+	return newPlanObj
+}
+
+// isCSPPartnerConfig reports whether the plan partner-config object is a
+// cloud-provider partner — anything other than the internal "transit",
+// "vrouter", and "a-end" sentinel partners triggers the CSP-specific
+// product-UID rotation handling in ModifyPlan.
+func isCSPPartnerConfig(ctx context.Context, planPartnerConfig types.Object, diags *diag.Diagnostics) bool {
+	if planPartnerConfig.IsNull() || planPartnerConfig.IsUnknown() {
+		return false
+	}
+	var partnerConfigModel vxcPartnerConfigurationModel
+	*diags = append(*diags, planPartnerConfig.As(ctx, &partnerConfigModel, basetypes.ObjectAsOptions{})...)
+	if partnerConfigModel.Partner.IsNull() {
+		return false
+	}
+	switch partnerConfigModel.Partner.ValueString() {
+	case "transit", "vrouter", "a-end":
+		return false
+	default:
+		return true
 	}
 }

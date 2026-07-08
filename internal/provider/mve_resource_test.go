@@ -6,35 +6,22 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
 const (
-	MVEArubaTestLocationIDNum = 59  // Los Angeles "Equinix LA1" (lax-eq1)
-	MVEVersaTestLocationIDNum = 70  // Chicago "CyrusOne Aurora (CHI2)" (chi-tx2)
-	MVEArubaImageIDMVE        = 152 // Aruba MVE image ID
+	MVEArubaImageIDMVE = 152 // Aruba MVE image ID
 )
 
-type MVEArubaProviderTestSuite ProviderTestSuite
-type MVEVersaProviderTestSuite ProviderTestSuite
-
-func TestMVEArubaProviderTestSuite(t *testing.T) {
+func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MVEArubaProviderTestSuite))
-}
-
-func TestMVEVersaProviderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(MVEVersaProviderTestSuite))
-}
-
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
 	costCentreNew := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -83,7 +70,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                  }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -135,6 +122,8 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
   					vendor_filter = "Aruba"
   					id_filter = %d
 				}
+				// Use mixed casing on vendor/size to verify the provider treats them
+				// case-insensitively and does NOT force a destroy+recreate.
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
 					cost_centre = "%s"
@@ -148,8 +137,8 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 					}
 
                     vendor_config = {
-                        vendor = "ArUbA"
-                        product_size = "sMaLl"
+                        vendor = "aRuBa"
+                        product_size = "SmAlL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
 						account_name = "%s"
@@ -170,7 +159,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
+                  }`, locationID, MVEArubaImageIDMVE, mveNameNew, costCentreNew, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -216,11 +205,14 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_Basic() {
 	})
 }
 
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemoval() {
+func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	costCentreName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -262,7 +254,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, costCentreName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreName),
 				),
@@ -306,7 +298,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", ""),
 				),
@@ -315,53 +307,91 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_CostCentreRemova
 	})
 }
 
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpdate() {
+// TestAccMegaportMVEAruba_PromoCode exercises promo_code on megaport_mve
+// against the v1.8.0 ordering endpoint. State tracks the config-supplied
+// value.
+func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	initialPromo := testPromoCode()
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		data "megaport_mve_images" "aruba" {
+			vendor_filter = "Aruba"
+			id_filter = %d
+		}
+		resource "megaport_mve" "mve" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 1
+			%s
+			vendor_config = {
+				vendor       = "aruba"
+				product_size = "SMALL"
+				mve_label    = "MVE 2/8"
+				image_id     = data.megaport_mve_images.aruba.mve_images.0.id
+				account_name = "%s"
+				account_key  = "%s"
+				system_tag   = "Preconfiguration-aruba-test-1"
+			}
+			vnics = [{
+				description = "Data Plane"
+			},
+			{
+				description = "Control Plane"
+			},
+			{
+				description = "Management Plane"
+			},
+			{
+				description = "Extra Plane"
+			}]
+		}`, locationID, MVEArubaImageIDMVE, mveName, promoLine, mveName, mveKey)
+	}
+
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				data "megaport_mve_images" "aruba" {
-					vendor_filter = "Aruba"
-					id_filter = %d
-				}
-				resource "megaport_mve" "mve" {
-					product_name = "%s"
-					location_id = data.megaport_location.test_location.id
-					contract_term_months = 1
-					diversity_zone = "red"
-					vendor_config = {
-						vendor = "aruba"
-						product_size = "SMALL"
-						mve_label = "MVE 2/8"
-						image_id = data.megaport_mve_images.aruba.mve_images.0.id
-						account_name = "%s"
-						account_key = "%s"
-						system_tag = "Preconfiguration-aruba-test-1"
-					}
-					vnics = [{
-						description = "Data Plane"
-					},
-					{
-						description = "Control Plane"
-					},
-					{
-						description = "Management Plane"
-					},
-					{
-						description = "Extra Plane"
-					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_mve.mve"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
 				),
 			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_mve.mve", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -397,21 +427,65 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEAruba_ContractTermUpda
 					{
 						description = "Extra Plane"
 					}]
-				}`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "12"),
+					waitForProvisioningStatus("megaport_mve.mve"),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+					id_filter = %d
+				}
+				resource "megaport_mve" "mve" {
+					product_name = "%s"
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 24
+					diversity_zone = "red"
+					vendor_config = {
+						vendor = "aruba"
+						product_size = "SMALL"
+						mve_label = "MVE 2/8"
+						image_id = data.megaport_mve_images.aruba.mve_images.0.id
+						account_name = "%s"
+						account_key = "%s"
+						system_tag = "Preconfiguration-aruba-test-1"
+					}
+					vnics = [{
+						description = "Data Plane"
+					},
+					{
+						description = "Control Plane"
+					},
+					{
+						description = "Management Plane"
+					},
+					{
+						description = "Extra Plane"
+					}]
+				}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "24"),
 				),
 			},
 		},
 	})
 }
 
-func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
+func TestAccMegaportMVEVersa_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVEVersaTestLocation(t)
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
 	costCentreNew := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -424,7 +498,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
   					vendor_filter = "Versa"
   					id_filter = 20
 				}
-				
+
 				resource "megaport_mve" "mve" {
                     product_name  = "%s"
                     location_id = data.megaport_location.test_location.id
@@ -462,7 +536,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEVersaTestLocationIDNum, mveName, costCentre),
+                  }`, locationID, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -529,8 +603,8 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 					}
 
                     vendor_config = {
-                        vendor = "VeRsA"
-                        product_size = "sMaLl"
+                        vendor = "versa"
+                        product_size = "SMALL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.versa.mve_images.0.id
 						director_address = "director1.versa.com"
@@ -553,7 +627,7 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 						description = "Extra Plane"
 					}
 					]
-                  }`, MVEVersaTestLocationIDNum, mveNameNew, costCentreNew),
+                  }`, locationID, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -599,12 +673,15 @@ func (suite *MVEVersaProviderTestSuite) TestAccMegaportMVEVersa_Basic() {
 	})
 }
 
-func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIgnoreChanges() {
+func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 	costCentre := RandomTestName()
 
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// First create a standard MVE
@@ -642,7 +719,7 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     {
                         description = "Control Plane"
                     }]
-                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName),
 				),
@@ -706,11 +783,283 @@ func (suite *MVEArubaProviderTestSuite) TestAccMegaportMVEImport_WithLifecycleIg
                     lifecycle {
                         ignore_changes = [vendor_config]
                     }
-                }`, MVEArubaTestLocationIDNum, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
+                }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "product_name", mveName+"-updated"),
 					resource.TestCheckResourceAttr("megaport_mve.import_test", "cost_centre", costCentre+"-updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.import_test", "product_uid"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportMVECisco_Basic exercises Cisco FTDv MVE provisioning end-to-end.
+// The test uses manage_locally=true so no FMC details are required.
+// Required fields per the Megaport API: adminPassword (≥9 chars) and manageLocally.
+// Cisco Firewall does not support the "MVE 2/8" size; "MVE 4/16" (MEDIUM) is used.
+// The Cisco Firewall requires at least 4 vNICs.
+func TestAccMegaportMVECisco_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, imageID, _ := findMVECiscoTestLocation(t)
+	mveName := RandomTestName()
+	mveNameNew := RandomTestName()
+	costCentre := RandomTestName()
+	costCentreNew := RandomTestName()
+	// Generate once and reuse across create + update steps so the second
+	// apply doesn't show a vendor_config diff (the value is write-only and
+	// not stored in state, but reusing it keeps the test config readable).
+	adminPassword := mveTestCiscoAdminPassword(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				data "megaport_mve_images" "cisco" {
+					vendor_filter = "Cisco"
+					id_filter     = %d
+				}
+
+				resource "megaport_mve" "mve" {
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
+
+					vendor_config = {
+						vendor         = "cisco"
+						product_size   = "MEDIUM"
+						mve_label      = "MVE 4/16"
+						image_id       = data.megaport_mve_images.cisco.mve_images.0.id
+						manage_locally = true
+						admin_password = "%s"
+					}
+
+					vnics = [
+						{ description = "Data Plane" },
+						{ description = "Control Plane" },
+						{ description = "Management Plane" },
+						{ description = "HA Plane" },
+					]
+				}`, locationID, imageID, mveName, costCentre, adminPassword),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "CISCO"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "mve_size"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+			},
+			// Update: rename and change cost centre.
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				data "megaport_mve_images" "cisco" {
+					vendor_filter = "Cisco"
+					id_filter     = %d
+				}
+
+				resource "megaport_mve" "mve" {
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
+
+					vendor_config = {
+						vendor         = "cisco"
+						product_size   = "MEDIUM"
+						mve_label      = "MVE 4/16"
+						image_id       = data.megaport_mve_images.cisco.mve_images.0.id
+						manage_locally = true
+						admin_password = "%s"
+					}
+
+					vnics = [
+						{ description = "Data Plane" },
+						{ description = "Control Plane" },
+						{ description = "Management Plane" },
+						{ description = "HA Plane" },
+					]
+				}`, locationID, imageID, mveNameNew, costCentreNew, adminPassword),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportMVEPaloAlto_Basic exercises Palo Alto VM-Series MVE provisioning
+// end-to-end. Required fields per the Megaport API: adminPasswordHash (sha256crypt
+// format) and sshPublicKey (RSA 2048 bit). The SSH key is generated freshly per
+// test run via mveTestSSHPublicKey — no external setup needed.
+func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	sshPublicKey := mveTestSSHPublicKey(t)
+	locationID, imageID, _ := findMVEPaloAltoTestLocation(t)
+	mveName := RandomTestName()
+	mveNameNew := RandomTestName()
+	costCentre := RandomTestName()
+	costCentreNew := RandomTestName()
+	// Generate once and reuse across create + update steps. admin_password_hash
+	// is stored in state (not write-only), so using different values would
+	// trigger an unintended vendor_config replace on the update step.
+	adminPasswordHash := mveTestPaloAltoAdminPasswordHash(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				data "megaport_mve_images" "palo_alto" {
+					vendor_filter = "Palo Alto"
+					id_filter     = %d
+				}
+
+				resource "megaport_mve" "mve" {
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
+
+					vendor_config = {
+						vendor              = "palo_alto"
+						product_size        = "MEDIUM"
+						mve_label           = "MVE 4/16"
+						image_id            = data.megaport_mve_images.palo_alto.mve_images.0.id
+						admin_password_hash = "%s"
+						ssh_public_key      = "%s"
+					}
+
+					vnics = [
+						{ description = "Management" },
+						{ description = "Data" },
+					]
+				}`, locationID, imageID, mveName, costCentre, adminPasswordHash, sshPublicKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "PALO_ALTO"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "mve_size"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_mve.mve",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_mve.mve"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+			},
+			// Update: rename and change cost centre.
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+
+				data "megaport_mve_images" "palo_alto" {
+					vendor_filter = "Palo Alto"
+					id_filter     = %d
+				}
+
+				resource "megaport_mve" "mve" {
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
+
+					vendor_config = {
+						vendor              = "palo_alto"
+						product_size        = "MEDIUM"
+						mve_label           = "MVE 4/16"
+						image_id            = data.megaport_mve_images.palo_alto.mve_images.0.id
+						admin_password_hash = "%s"
+						ssh_public_key      = "%s"
+					}
+
+					vnics = [
+						{ description = "Management" },
+						{ description = "Data" },
+					]
+				}`, locationID, imageID, mveNameNew, costCentreNew, adminPasswordHash, sshPublicKey),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
 				),
 			},
 		},

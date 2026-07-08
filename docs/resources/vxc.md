@@ -32,6 +32,18 @@ data "megaport_partner" "aws_port" {
   location_id  = data.megaport_location.syd_gs.id
 }
 
+# Look up the Google partner port for the desired location and diversity zone.
+# The diversity_zone must match the availability domain encoded in the pairing key
+# (e.g. a pairing key ending in "/2" corresponds to diversity zone "blue").
+# Omitting requested_product_uid in b_end lets the API pick any Google port,
+# which may be in a different region than intended.
+data "megaport_partner" "gcp_port" {
+  connect_type   = "GOOGLE"
+  company_name   = "Google"
+  location_id    = data.megaport_location.syd_gs.id
+  diversity_zone = "blue"
+}
+
 resource "megaport_port" "port" {
   product_name           = "Megaport Port Example"
   port_speed             = 1000
@@ -206,7 +218,9 @@ resource "megaport_vxc" "gcp_vxc" {
     ordered_vlan          = 182
   }
 
-  b_end = {}
+  b_end = {
+    requested_product_uid = data.megaport_partner.gcp_port.product_uid
+  }
 
   b_end_partner_config = {
     partner = "google"
@@ -347,7 +361,7 @@ Optional:
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
 - `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
-- `requested_product_uid` (String) The Product UID requested by the user for the B-End configuration. Note: For cloud provider connections, the actual Product UID may differ from the requested UID due to Megaport's automatic port assignment for partner ports. This is expected behavior and ensures proper connectivity.
+- `requested_product_uid` (String) The Product UID of the B-End product. For partner connections (AWS, Google, etc.), use the `megaport_partner` data source to look up the correct UID. For Google connections this field is especially important: Google exposes multiple partner ports across different locations and diversity zones, so omitting it allows the API to select any available port — which may be in an unexpected region. Set this to a specific Google partner port UID to control the on-ramp location and diversity zone. The value stored in state may differ from the requested UID when Megaport rotates a partner port within the same location and diversity zone.
 - `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.
 
 Read-Only:
@@ -371,7 +385,7 @@ Optional:
 
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
+- `google_config` (Attributes) The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = "GOOGLE"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region. (see [below for nested schema](#nestedatt--a_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config))
@@ -391,7 +405,7 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
+- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -422,7 +436,7 @@ Optional:
 - `prefixes` (String) The prefixes of the peer.
 - `primary_subnet` (String) The primary subnet of the peer.
 - `secondary_subnet` (String) The secondary subnet of the peer.
-- `shared_key` (String) The shared key of the peer.
+- `shared_key` (String, Sensitive) The shared key of the peer.
 - `vlan` (Number) The VLAN of the peer.
 
 
@@ -495,16 +509,16 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -537,10 +551,15 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
+- `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd"></a>
@@ -562,16 +581,16 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -589,6 +608,24 @@ Optional:
 - `prefix` (String) The prefix of the IP route.
 
 
+<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options"></a>
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.ip_sec_tunnel_options`
+
+Required:
+
+- `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
+- `pre_shared_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
+
+Optional:
+
+- `local_id` (String) IKE local identifier override, typically used when the Megaport endpoint is behind NAT.
+- `passive` (Boolean) Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.
+- `phase1_lifetime` (Number) IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.
+- `phase2_lifetime` (Number) IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.
+- `remote_id` (String) IKE remote identifier override, typically used when the peer is behind NAT.
+
+
 
 
 
@@ -603,7 +640,7 @@ Optional:
 
 - `aws_config` (Attributes) The AWS partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--aws_config))
 - `azure_config` (Attributes) The Azure partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--azure_config))
-- `google_config` (Attributes) The Google partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
+- `google_config` (Attributes) The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = "GOOGLE"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region. (see [below for nested schema](#nestedatt--b_end_partner_config--google_config))
 - `ibm_config` (Attributes) The IBM partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--ibm_config))
 - `oracle_config` (Attributes) The Oracle partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--oracle_config))
 - `partner_a_end_config` (Attributes, Deprecated) The partner configuration of the A-End order configuration. Only exists for A-End Configurations. DEPRECATED: Use vrouter_config instead. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config))
@@ -623,7 +660,7 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String) The authentication key of the partner configuration.
+- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -654,7 +691,7 @@ Optional:
 - `prefixes` (String) The prefixes of the peer.
 - `primary_subnet` (String) The primary subnet of the peer.
 - `secondary_subnet` (String) The secondary subnet of the peer.
-- `shared_key` (String) The shared key of the peer.
+- `shared_key` (String, Sensitive) The shared key of the peer.
 - `vlan` (Number) The VLAN of the peer.
 
 
@@ -727,16 +764,16 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -769,10 +806,15 @@ Optional:
 
 - `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
+- `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
+- `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
+- `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `vlan` (Number) Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd"></a>
@@ -794,16 +836,16 @@ Optional:
 - `bfd_enabled` (Boolean) Whether BFD is enabled for the BGP connection.
 - `deny_export_to` (List of String) The denied export to of the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (String) The export blacklist of the BGP connection.
+- `export_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (String) The export whitelist of the BGP connection.
-- `import_blacklist` (String) The import blacklist of the BGP connection.
-- `import_whitelist` (String) The import whitelist of the BGP connection.
+- `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
+- `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
+- `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -819,6 +861,24 @@ Optional:
 - `description` (String) The description of the IP route.
 - `next_hop` (String) The next hop of the IP route.
 - `prefix` (String) The prefix of the IP route.
+
+
+<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options"></a>
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.ip_sec_tunnel_options`
+
+Required:
+
+- `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
+- `pre_shared_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
+
+Optional:
+
+- `local_id` (String) IKE local identifier override, typically used when the Megaport endpoint is behind NAT.
+- `passive` (Boolean) Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.
+- `phase1_lifetime` (Number) IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.
+- `phase2_lifetime` (Number) IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.
+- `remote_id` (String) IKE remote identifier override, typically used when the peer is behind NAT.
 
 
 

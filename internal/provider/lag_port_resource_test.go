@@ -6,27 +6,17 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-const (
-	LagPortTestLocation      = "NextDC B1"
-	LagPortTestLocationIDNum = 5 // "NextDC B1"
-)
-
-type LagPortProviderTestSuite ProviderTestSuite
-
-func TestLagPortProviderTestSuite(t *testing.T) {
+func TestAccMegaportLAGPort_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(LagPortProviderTestSuite))
-}
-
-func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
 	portNameNew := RandomTestName()
 	costCentreNameNew := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -46,7 +36,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 						"key1" = "value1"
 						"key2" = "value2"
 					}
-			      }`, LagPortTestLocationIDNum, portName, costCentreName),
+			      }`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
@@ -103,7 +93,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 						"key1updated" = "value1updated"
 						"key2updated" = "value2updated"
 			 	  	}
-			      }`, LagPortTestLocationIDNum, portNameNew, costCentreNameNew),
+			      }`, locationID, portNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "port_speed", "10000"),
@@ -126,10 +116,13 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_Basic() {
 	})
 }
 
-func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_CostCentreRemoval() {
+func TestAccMegaportLAGPort_CostCentreRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -145,7 +138,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_CostCentreRemoval(
 					contract_term_months = 1
 					marketplace_visibility = false
 					lag_count = 1
-				}`, LagPortTestLocationIDNum, portName, costCentreName),
+				}`, locationID, portName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", costCentreName),
 				),
@@ -163,7 +156,7 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_CostCentreRemoval(
 					contract_term_months = 1
 					marketplace_visibility = false
 					lag_count = 1
-				}`, LagPortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "cost_centre", ""),
 				),
@@ -172,29 +165,66 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_CostCentreRemoval(
 	})
 }
 
-func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_ContractTermUpdate() {
+// TestAccMegaportLAGPort_PromoCode exercises promo_code against the v1.8.0
+// ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportLAGPort_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
 	portName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	initialPromo := testPromoCode()
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_lag_port" "lag_port" {
+			product_name           = "%s"
+			port_speed             = 10000
+			location_id            = data.megaport_location.test_location.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+			lag_count              = 1
+			%s
+		}`, locationID, portName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerConfig + fmt.Sprintf(`
-				data "megaport_location" "test_location" {
-					id = %d
-				}
-				resource "megaport_lag_port" "lag_port" {
-					product_name  = "%s"
-					port_speed  = 10000
-					location_id = data.megaport_location.test_location.id
-					contract_term_months = 1
-					marketplace_visibility = false
-					lag_count = 1
-				}`, LagPortTestLocationIDNum, portName),
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "1"),
-					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_lag_port.lag_port", "product_uid"),
 				),
 			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_lag_port.lag_port", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccMegaportLAGPort_ContractTermUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
+	portName := RandomTestName()
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -207,9 +237,27 @@ func (suite *LagPortProviderTestSuite) TestAccMegaportLAGPort_ContractTermUpdate
 					contract_term_months = 12
 					marketplace_visibility = false
 					lag_count = 1
-				}`, LagPortTestLocationIDNum, portName),
+				}`, locationID, portName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "12"),
+					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+				),
+			},
+			{
+				Config: providerConfig + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_lag_port" "lag_port" {
+					product_name  = "%s"
+					port_speed  = 10000
+					location_id = data.megaport_location.test_location.id
+					contract_term_months = 24
+					marketplace_visibility = false
+					lag_count = 1
+				}`, locationID, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "contract_term_months", "24"),
 				),
 			},
 		},

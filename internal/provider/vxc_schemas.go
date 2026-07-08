@@ -41,6 +41,7 @@ var (
 			},
 			"auth_key": schema.StringAttribute{
 				Description: "The authentication key of the partner configuration.",
+				Sensitive:   true,
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
@@ -104,6 +105,7 @@ var (
 						},
 						"shared_key": schema.StringAttribute{
 							Description: "The shared key of the peer.",
+							Sensitive:   true,
 							Optional:    true,
 						},
 						"vlan": schema.Int64Attribute{
@@ -116,7 +118,7 @@ var (
 		},
 	}
 	googlePartnerConfigSchema = schema.SingleNestedAttribute{
-		Description: "The Google partner configuration.",
+		Description: "The Google partner configuration. Google exposes multiple partner ports across different locations and diversity zones. Use the `megaport_partner` data source with `connect_type = \"GOOGLE\"` and set `requested_product_uid` in the `b_end` block to pin the connection to a specific on-ramp location and diversity zone. Omitting `requested_product_uid` lets the API choose any available Google port, which may not match your intended region.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"pairing_key": schema.StringAttribute{
@@ -171,6 +173,25 @@ var (
 				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
+						"description": schema.StringAttribute{
+							Description: "Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.",
+							Optional:    true,
+						},
+						"interface_type": schema.StringAttribute{
+							Description: "Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.",
+							Optional:    true,
+							Validators: []validator.String{
+								stringvalidator.OneOf("subInterface", "ipSecTunnel"),
+							},
+						},
+						"packet_filter_in": schema.Int64Attribute{
+							Description: "ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.",
+							Optional:    true,
+						},
+						"packet_filter_out": schema.Int64Attribute{
+							Description: "ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.",
+							Optional:    true,
+						},
 						"ip_mtu": schema.Int64Attribute{
 							Description: "The IP MTU of the partner configuration interface. Defaults to 1500.",
 							Optional:    true,
@@ -230,6 +251,55 @@ var (
 							Description: "Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan.",
 							Optional:    true,
 						},
+						"ip_sec_tunnel_options": schema.SingleNestedAttribute{
+							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift.",
+							Optional:    true,
+							Validators: []validator.Object{
+								ipSecPhaseLifetimeValidator{},
+							},
+							Attributes: map[string]schema.Attribute{
+								"source_ip_address": schema.StringAttribute{
+									Description: "Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.",
+									Required:    true,
+								},
+								"destination_ip_address": schema.StringAttribute{
+									Description: "Remote peer IPv4 address the tunnel connects to.",
+									Required:    true,
+								},
+								"pre_shared_key": schema.StringAttribute{
+									Description: "Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.",
+									Required:    true,
+									Sensitive:   true,
+									WriteOnly:   true,
+								},
+								"passive": schema.BoolAttribute{
+									Description: "Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.",
+									Optional:    true,
+								},
+								"local_id": schema.StringAttribute{
+									Description: "IKE local identifier override, typically used when the Megaport endpoint is behind NAT.",
+									Optional:    true,
+								},
+								"remote_id": schema.StringAttribute{
+									Description: "IKE remote identifier override, typically used when the peer is behind NAT.",
+									Optional:    true,
+								},
+								"phase1_lifetime": schema.Int64Attribute{
+									Description: "IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.",
+									Optional:    true,
+									Validators: []validator.Int64{
+										int64validator.Between(3600, 604800),
+									},
+								},
+								"phase2_lifetime": schema.Int64Attribute{
+									Description: "IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.",
+									Optional:    true,
+									Validators: []validator.Int64{
+										int64validator.Between(600, 86400),
+									},
+								},
+							},
+						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
@@ -260,6 +330,7 @@ var (
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
+										Sensitive:   true,
 										Optional:    true,
 									},
 									"shutdown": schema.BoolAttribute{
@@ -297,19 +368,19 @@ var (
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
-										Description: "The import whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.",
 										Optional:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
-										Description: "The import blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.",
 										Optional:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
-										Description: "The export whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.",
 										Optional:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
-										Description: "The export blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.",
 										Optional:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{
@@ -406,6 +477,7 @@ var (
 									},
 									"password": schema.StringAttribute{
 										Description: "The password of the BGP connection.",
+										Sensitive:   true,
 										Optional:    true,
 									},
 									"shutdown": schema.BoolAttribute{
@@ -443,19 +515,19 @@ var (
 										ElementType: types.StringType,
 									},
 									"import_whitelist": schema.StringAttribute{
-										Description: "The import whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.",
 										Optional:    true,
 									},
 									"import_blacklist": schema.StringAttribute{
-										Description: "The import blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.",
 										Optional:    true,
 									},
 									"export_whitelist": schema.StringAttribute{
-										Description: "The export whitelist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.",
 										Optional:    true,
 									},
 									"export_blacklist": schema.StringAttribute{
-										Description: "The export blacklist of the BGP connection.",
+										Description: "Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes matching the prefix list are not advertised on this connection.",
 										Optional:    true,
 									},
 									"as_path_prepend_count": schema.Int64Attribute{

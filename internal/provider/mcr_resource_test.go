@@ -9,22 +9,12 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/stretchr/testify/suite"
 )
 
-const (
-	MCRTestLocation      = "Digital Realty Silicon Valley SJC34 (SCL2)"
-	MCRTestLocationIDNum = 65 // "Digital Realty Silicon Valley SJC34 (SCL2)"
-)
-
-type MCRProviderTestSuite ProviderTestSuite
-
-func TestMCRProviderTestSuite(t *testing.T) {
+func TestAccMegaportMCR_Basic(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(MCRProviderTestSuite))
-}
-
-func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	prefixFilterName := RandomTestName()
 	prefixFilterName2 := RandomTestName()
@@ -37,7 +27,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 	mcrNameNew2 := RandomTestName()
 	costCentreNameNew := RandomTestName()
 	costCentreNameNew2 := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -95,7 +85,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
+				  `, locationID, mcrName, costCentreName, prefixFilterName, prefixFilterName2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -227,7 +217,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocationIDNum, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
+				  `, locationID, mcrName, costCentreName, prefixFilterNameNew, prefixFilterNameNew2, prefixFilterNameNew3),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -306,7 +296,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 						]
 					  }]
 				  }
-				  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
+				  `, locationID, mcrNameNew, costCentreNameNew, prefixFilterNameNew4),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -345,7 +335,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 
 					prefix_filter_lists = []
 				  }
-				  `, MCRTestLocationIDNum, mcrNameNew2, costCentreNameNew2),
+				  `, locationID, mcrNameNew2, costCentreNameNew2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew2),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -365,10 +355,13 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_Basic() {
 	})
 }
 
-func (suite *MCRProviderTestSuite) TestAccMegaportMCR_CostCentreRemoval() {
+func TestAccMegaportMCR_CostCentreRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	costCentreName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -382,7 +375,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_CostCentreRemoval() {
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					cost_centre = "%s"
-				}`, MCRTestLocationIDNum, mcrName, costCentreName),
+				}`, locationID, mcrName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", costCentreName),
 				),
@@ -398,7 +391,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_CostCentreRemoval() {
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 1
 					cost_centre = ""
-				}`, MCRTestLocationIDNum, mcrName),
+				}`, locationID, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "cost_centre", ""),
 				),
@@ -407,9 +400,62 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_CostCentreRemoval() {
 	})
 }
 
-func (suite *MCRProviderTestSuite) TestAccMegaportMCR_ContractTermUpdate() {
+// TestAccMegaportMCR_PromoCode exercises promo_code against the v1.8.0
+// ordering endpoint. State tracks the config-supplied value.
+func TestAccMegaportMCR_PromoCode(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	initialPromo := testPromoCode()
+	const otherPromo = "tf-acc-test-promo-other"
+
+	configFor := func(promoLine string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed            = 1000
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 1
+			%s
+		}`, locationID, mcrName, promoLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, initialPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "promo_code", initialPromo),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+				),
+			},
+			{
+				Config: configFor(fmt.Sprintf(`promo_code = "%s"`, otherPromo)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "promo_code", otherPromo),
+				),
+			},
+			{
+				Config: configFor(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_mcr.mcr", "promo_code"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccMegaportMCR_ContractTermUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -421,10 +467,10 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_ContractTermUpdate() {
 					product_name = "%s"
 					port_speed = 1000
 					location_id = data.megaport_location.test_location.id
-					contract_term_months = 1
-				}`, MCRTestLocationIDNum, mcrName),
+					contract_term_months = 12
+				}`, locationID, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
 					waitForProvisioningStatus("megaport_mcr.mcr"),
 				),
 			},
@@ -437,22 +483,25 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCR_ContractTermUpdate() {
 					product_name = "%s"
 					port_speed = 1000
 					location_id = data.megaport_location.test_location.id
-					contract_term_months = 12
-				}`, MCRTestLocationIDNum, mcrName),
+					contract_term_months = 24
+				}`, locationID, mcrName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "12"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "contract_term_months", "24"),
 				),
 			},
 		},
 	})
 }
 
-func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
+func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
 	mcrName := RandomTestName()
 	mcrNameNew := RandomTestName()
 	costCentreName := RandomTestName()
 	costCentreNameNew := RandomTestName()
-	resource.Test(suite.T(), resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -473,7 +522,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 						"key2" = "value2"
 					}
 				  }
-				  `, MCRTestLocationIDNum, mcrName, costCentreName),
+				  `, locationID, mcrName, costCentreName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -528,7 +577,7 @@ func (suite *MCRProviderTestSuite) TestAccMegaportMCRCustomASN_Basic() {
 
 					resource_tags = {"key1updated" = "value1updated", "key2updated" = "value2updated"}
 				  }
-				  `, MCRTestLocationIDNum, mcrNameNew, costCentreNameNew),
+				  `, locationID, mcrNameNew, costCentreNameNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameNew),
 					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "1000"),
@@ -634,6 +683,95 @@ func TestRateLimiter_Concurrent(t *testing.T) {
 	if atomic.LoadInt32(&successCount) != 10 {
 		t.Errorf("Expected 10 successful token acquisitions, got %d", successCount)
 	}
+}
+
+// TestAccMegaportMCR_UpdateASN exercises ESD-1094: changing the BGP ASN on
+// an existing MCR must update the resource in place rather than forcing a
+// destroy-and-recreate. The test asserts the product_uid is preserved
+// across the ASN change and that the new ASN reads back from the API.
+func TestAccMegaportMCR_UpdateASN(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+
+	configWithASN := func(asn int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "test_location" {
+				id = %d
+			}
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				port_speed           = 1000
+				location_id          = data.megaport_location.test_location.id
+				contract_term_months = 12
+				asn                  = %d
+			}
+		`, locationID, mcrName, asn)
+	}
+
+	configNoASN := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed           = 1000
+			location_id          = data.megaport_location.test_location.id
+			contract_term_months = 12
+		}
+	`, locationID, mcrName)
+
+	var originalUID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configWithASN(64512),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "64512"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						originalUID = rs.Primary.Attributes["product_uid"]
+						return nil
+					},
+				),
+			},
+			// Change ASN — must NOT replace.
+			{
+				Config: configWithASN(64513),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "asn", "64513"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						if rs.Primary.Attributes["product_uid"] != originalUID {
+							return fmt.Errorf("MCR was replaced (product_uid changed) when ASN was updated; want in-place update. before=%s after=%s", originalUID, rs.Primary.Attributes["product_uid"])
+						}
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after the in-place update.
+			{
+				Config:   configWithASN(64513),
+				PlanOnly: true,
+			},
+			// Omit asn from config — must NOT plan a reset to the default 133937.
+			{
+				Config:             configNoASN,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
 }
 
 func TestRateLimiter_RateOverTime(t *testing.T) {

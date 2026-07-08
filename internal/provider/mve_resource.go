@@ -108,6 +108,7 @@ type vendorConfigModel struct {
 	CloudInit          types.String `tfsdk:"cloud_init"`
 	LicenseData        types.String `tfsdk:"license_data"`
 	AdminPasswordHash  types.String `tfsdk:"admin_password_hash"`
+	AdminPassword      types.String `tfsdk:"admin_password"`
 	DirectorAddress    types.String `tfsdk:"director_address"`
 	ControllerAddress  types.String `tfsdk:"controller_address"`
 	LocalAuth          types.String `tfsdk:"local_auth"`
@@ -252,6 +253,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 			MVELabel:           v.MVELabel.ValueString(),
 			AdminSSHPublicKey:  v.AdminSSHPublicKey.ValueString(),
 			SSHPublicKey:       v.SSHPublicKey.ValueString(),
+			AdminPassword:      v.AdminPassword.ValueString(),
 			ManageLocally:      v.ManageLocally.ValueBool(),
 			CloudInit:          v.CloudInit.ValueString(),
 			FMCIPAddress:       v.FMCIPAddress.ValueString(),
@@ -620,6 +622,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"account_key": schema.StringAttribute{
 						Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
@@ -636,11 +639,19 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"license_data": schema.StringAttribute{
 						Description: "The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"admin_password_hash": schema.StringAttribute{
-						Description: `The admin password hash for the vendor config. Required for Palo Alto MVE. Must be a SHA-256 crypt hash in the format "$5$<salt>$<hash>" (e.g., "$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC"). On Linux/macOS, you can generate this using: "mkpasswd -m sha-256 'your_password'".`,
+						Description: "The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).",
+						Sensitive:   true,
 						Optional:    true,
+					},
+					"admin_password": schema.StringAttribute{
+						Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `\"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.",
+						Optional:    true,
+						Sensitive:   true,
+						WriteOnly:   true,
 					},
 					"director_address": schema.StringAttribute{
 						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
@@ -656,10 +667,12 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"local_auth": schema.StringAttribute{
 						Description: "The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"remote_auth": schema.StringAttribute{
 						Description: "The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"serial_number": schema.StringAttribute{
@@ -676,6 +689,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"vco_activation_code": schema.StringAttribute{
 						Description: "The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"fmc_ip_address": schema.StringAttribute{
@@ -684,6 +698,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"fmc_registration_key": schema.StringAttribute{
 						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"fmc_nat_id": schema.StringAttribute{
@@ -692,14 +707,17 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					},
 					"token": schema.StringAttribute{
 						Description: "The token for the vendor config. Required for Meraki MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"ion_key": schema.StringAttribute{
 						Description: "The vION key for the vendor config. Required for Prisma MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 					"secret_key": schema.StringAttribute{
 						Description: "The secret key for the vendor config. Required for Prisma MVE.",
+						Sensitive:   true,
 						Optional:    true,
 					},
 				},
@@ -747,6 +765,15 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	vcModel := &vendorConfigModel{}
 	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
 	resp.Diagnostics = append(resp.Diagnostics, vcDiags...)
+	// admin_password is a write-only attribute, so it is null in req.Plan.
+	// Pull it from req.Config and apply it to the vendor model before mapping
+	// to the API request.
+	var configAdminPassword types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("vendor_config").AtName("admin_password"), &configAdminPassword)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	vcModel.AdminPassword = configAdminPassword
 	vendorConfig, apiVCDiags := toAPIVendorConfig(vcModel)
 	resp.Diagnostics = append(resp.Diagnostics, apiVCDiags...)
 	if resp.Diagnostics.HasError() {
@@ -879,10 +906,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	// If Imported, VendorConfig will be Null. Set VendorConfig in state to existing one in plan.
-	if state.VendorConfig.IsNull() {
-		state.VendorConfig = plan.VendorConfig
-	}
+	// Preserve the plan's VendorConfig in state. This handles two cases:
+	// 1. After Import, VendorConfig in state is null — adopt the plan value.
+	// 2. Case-only changes (e.g., "aruba" → "aRuBa") — adopt the plan's casing
+	//    so Terraform doesn't see an inconsistent result after apply.
+	state.VendorConfig = plan.VendorConfig
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -960,6 +988,7 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.PromoCode = plan.PromoCode
 
 	diags := resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -980,9 +1009,12 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	// Call the API to delete the resource
 	productUID := state.UID.ValueString()
-	_, err := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
-		MVEID:      productUID,
-		SafeDelete: true,
+	err := retryTransientDelete(ctx, 3, func() error {
+		_, deleteErr := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
+			MVEID:      productUID,
+			SafeDelete: true,
+		})
+		return deleteErr
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1065,7 +1097,40 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			}
 			state.VendorConfig = plan.VendorConfig
 		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
-			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+			// During destroy, the plan's VendorConfig is null — nothing to compare.
+			if plan.VendorConfig.IsNull() || plan.VendorConfig.IsUnknown() {
+				// No replacement decision needed during destroy.
+			} else {
+				// vendor_config cannot be changed after creation — require replace on
+				// any change. However, the API normalizes vendor/size to uppercase
+				// (e.g., "aruba" → "ARUBA"), so Equal() can return false on casing
+				// differences alone. Compare vendor and size case-insensitively to
+				// avoid unnecessary destroy+recreate on case-only changes.
+				var planVC vendorConfigModel
+				planVCDiags := plan.VendorConfig.As(ctx, &planVC, basetypes.ObjectAsOptions{})
+				resp.Diagnostics.Append(planVCDiags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !strings.EqualFold(state.Vendor.ValueString(), planVC.Vendor.ValueString()) ||
+					!strings.EqualFold(state.Size.ValueString(), planVC.ProductSize.ValueString()) {
+					// Vendor or size changed (case-insensitive) — must replace.
+					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+				} else {
+					// Vendor/size match case-insensitively. Normalize them in the
+					// plan to match state casing, then check remaining fields.
+					planVC.Vendor = types.StringValue(state.Vendor.ValueString())
+					planVC.ProductSize = types.StringValue(state.Size.ValueString())
+					normalized, normDiags := types.ObjectValueFrom(ctx, plan.VendorConfig.AttributeTypes(ctx), &planVC)
+					resp.Diagnostics.Append(normDiags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					if !normalized.Equal(state.VendorConfig) {
+						resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
+					}
+				}
+			}
 		}
 		diags := req.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)

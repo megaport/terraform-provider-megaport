@@ -56,8 +56,22 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
+
+  # Optional. Minutes to wait for resources to finish provisioning before
+  # timing out. Defaults to 10. See "Provisioning Wait Time" below.
+  # wait_time = 30
 }
 ```
+
+### Provider Argument Reference
+
+| Argument | Required | Default | Description |
+|---|---|---|---|
+| `environment` | No | `staging` | Megaport API environment: `production`, `staging`, or `development`. Can also be set with `MEGAPORT_ENVIRONMENT`. |
+| `access_key` | Yes | — | API access key. Can also be set with `MEGAPORT_ACCESS_KEY`. |
+| `secret_key` | Yes | — | API secret key. Can also be set with `MEGAPORT_SECRET_KEY`. |
+| `accept_purchase_terms` | Yes | `false` | Acceptance of the Megaport API terms. Can also be set with `MEGAPORT_ACCEPT_PURCHASE_TERMS`. |
+| `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
 
 ## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
 
@@ -628,11 +642,11 @@ Example plan output:
 4. Run `terraform apply` to update the state
 5. Run `terraform plan` again - should show no changes
 
-## End-of-Term Cancellation
+## Provisioning Wait Time
 
-By default, when Terraform deletes resources, they are immediately cancelled in the Megaport portal. However, you may prefer to have resources marked for cancellation at the end of their current billing term instead of immediate cancellation.
+Most Megaport resources are provisioned asynchronously. After Terraform places an order, the service is deployed across the Megaport network before it becomes live. During `terraform apply`, the provider polls the Megaport API until the resource reaches its ready state before reporting the create or update as complete.
 
-The provider supports this with the `cancel_at_end_of_term` configuration option:
+The `wait_time` provider option controls how long, in minutes, the provider waits for a resource to finish provisioning. The default is `10` minutes and the minimum is `1`.
 
 ```terraform
 provider "megaport" {
@@ -640,14 +654,52 @@ provider "megaport" {
   access_key            = "your-access-key"
   secret_key            = "your-secret-key"
   accept_purchase_terms = true
-  cancel_at_end_of_term = true  # Mark resources for end-of-term cancellation
+  wait_time             = 30 # Wait up to 30 minutes for resources to provision
 }
 ```
 
-**Important notes:**
+`wait_time` is set once on the provider and applies to every resource it manages; it cannot currently be set per resource.
 
-- This feature is currently only supported for Single Ports and LAG Ports
-- For other resource types, the option will be ignored and immediate cancellation will occur
-- When `cancel_at_end_of_term` is set to `true`, resources will show as "CANCELLING" in the Megaport portal until the end of their billing term
-- Resources are removed from Terraform state as soon as the API call returns successfully, regardless of whether immediate or end-of-term cancellation is used
-- If you reapply your configuration after a resource has been deleted, Terraform will create a new resource, even if the original resource is still visible in the Megaport portal with "CANCELLING" status
+### When to increase `wait_time`
+
+Ten minutes is enough for most resources, but some take longer and benefit from a higher value:
+
+- **Megaport Virtual Edges (MVEs)** — vendor appliances can take several minutes to boot and become reachable.
+- **VXCs to cloud providers** — provisioning on the cloud side (AWS, Azure, Google, Oracle, and others) can add delay outside Megaport's control.
+- **Large applies** — ordering many resources at once.
+
+If applies regularly time out while resources are still provisioning, raise `wait_time`.
+
+### What happens when the wait time is exceeded
+
+If a resource does not reach its ready state within `wait_time`, the apply fails with a timeout error such as:
+
+```
+Error: time expired waiting for Port [...] to provision
+```
+
+**The order has already been placed**, so the resource usually keeps provisioning in the Megaport portal and becomes live shortly after. However, because the apply failed before Terraform could record the resource, **it is not saved to Terraform state**. Running `terraform apply` again will try to create a *new* resource rather than adopt the one that is still provisioning.
+
+To recover, do one of the following before re-applying:
+
+1. **Import the resource** that was created, using its UID from the Megaport portal:
+
+   ```bash
+   terraform import megaport_port.example <product-uid>
+   ```
+
+2. **Cancel the resource** in the Megaport portal, then re-run `terraform apply`.
+
+Setting `wait_time` high enough for your slowest-provisioning resources avoids this situation entirely.
+
+> **Note:** Internet Exchange (IX) resources use a fixed 10-minute provisioning wait and are not affected by `wait_time`.
+
+## Resource Cancellation
+
+When Terraform deletes a Megaport resource, the provider issues an immediate cancellation or deletion request to the Megaport API. Resources are removed from Terraform state as soon as the API call returns successfully. For Ports and LAG Ports specifically, this is always a `CANCEL_NOW` action against the Megaport Products API.
+
+Delayed cancellation (cancel-at-end-of-term) is not supported by the provider. The previously available `cancel_at_end_of_term` provider option has been removed because the Megaport API no longer accepts delayed cancellation for Ports or LAG Ports.
+
+**Billing impact:** Cancelling a Megaport resource before the end of its committed minimum term may incur early termination charges. Review your contract terms before destroying resources, especially in production.
+
+**Upgrade note:** If your existing Terraform configuration still sets `cancel_at_end_of_term` in the `provider "megaport"` block, Terraform will report it as an unsupported provider argument. Remove that setting before planning or applying with this version.
