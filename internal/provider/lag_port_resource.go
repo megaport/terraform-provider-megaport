@@ -160,8 +160,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		Description: "Link Aggregation Group (LAG) Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A LAG bundles physical ports to create a single data path, where the traffic load is distributed among the ports to increase overall connection reliability.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
+				Description:        "The last time the resource was updated.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
@@ -171,8 +172,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
+				Description:        "The numeric ID of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -182,16 +184,19 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
+				Description:        "The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the product was created.",
-				Computed:    true,
+				Description:        "The date the product was created.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
-				Computed:    true,
+				Description:        "The user who created the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -207,16 +212,19 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"terminate_date": schema.StringAttribute{
-				Description: "The date the product will be terminated.",
-				Computed:    true,
+				Description:        "The date the product will be terminated.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the product went live.",
-				Computed:    true,
+				Description:        "The date the product went live.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"market": schema.StringAttribute{
-				Description: "The market the product is in.",
-				Computed:    true,
+				Description:        "The market the product is in.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -243,8 +251,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm for the product.",
-				Computed:    true,
+				Description:        "The usage algorithm for the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The unique identifier of the company.",
@@ -262,48 +271,55 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract started.",
-				Computed:    true,
+				Description:        "The date the contract started.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends.",
-				Computed:    true,
+				Description:        "The date the contract ends.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace.",
 				Required:    true,
 			},
 			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted on this product.",
-				Computed:    true,
+				Description:        "Whether VXC is permitted on this product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto-approved on this product.",
-				Computed:    true,
+				Description:        "Whether VXC is auto-approved on this product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual. Always false for LAG orders.",
-				Computed:    true,
+				Description:        "Whether the product is virtual. Always false for LAG orders.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
+				Description:        "Whether the product is locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
+				Description:        "Whether the product is cancelable.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
