@@ -172,81 +172,193 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
 - `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.
 - `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
 - `product_name` (String) The name of the MVE.
-- `vendor_config` (Attributes) The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. This field cannot be changed after the MVE is created and if it is modified, the MVE will be deleted and re-created. Imported MVEs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply. (see [below for nested schema](#nestedatt--vendor_config))
 
 ### Optional
 
+- `aruba_config` (Attributes) Aruba MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--aruba_config))
+- `aviatrix_config` (Attributes) Aviatrix MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--aviatrix_config))
+- `cisco_config` (Attributes) Cisco MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--cisco_config))
 - `cost_centre` (String) The cost centre of the MVE.
 - `diversity_zone` (String) The diversity zone of the MVE.
+- `fortinet_config` (Attributes) Fortinet MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--fortinet_config))
+- `meraki_config` (Attributes) Meraki MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--meraki_config))
+- `palo_alto_config` (Attributes) Palo Alto MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--palo_alto_config))
+- `prisma_config` (Attributes) Prisma MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--prisma_config))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
+- `sixwind_config` (Attributes) 6WIND MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--sixwind_config))
+- `versa_config` (Attributes) Versa MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--versa_config))
+- `vmware_config` (Attributes) VMware MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--vmware_config))
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. (see [below for nested schema](#nestedatt--vnics))
 
 ### Read-Only
 
-- `admin_locked` (Boolean) Whether the MVE is admin locked.
 - `attribute_tags` (Map of String) The attribute tags of the MVE.
-- `buyout_port` (Boolean) Whether the port is buyout.
-- `cancelable` (Boolean) Whether the MVE is cancelable.
-- `company_name` (String) The company name of the MVE.
 - `company_uid` (String) The company UID of the MVE.
-- `contract_end_date` (String) The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `contract_start_date` (String) The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `create_date` (String) The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `created_by` (String) The user who created the MVE.
-- `last_updated` (String) The last time the MVE was updated by the Terraform Provider.
-- `live_date` (String) The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `locked` (Boolean) Whether the MVE is locked.
-- `market` (String) The market the MVE is in.
 - `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
 - `mve_size` (String) The size of the MVE.
-- `product_id` (Number) The Numeric ID of the MVE.
-- `product_type` (String) The type of product (MVE).
 - `product_uid` (String) The unique identifier of the MVE.
-- `provisioning_status` (String) The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
-- `secondary_name` (String) The secondary name of the MVE.
-- `terminate_date` (String) The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `usage_algorithm` (String) The usage algorithm of the MVE.
 - `vendor` (String) The vendor of the MVE.
-- `virtual` (Boolean) Whether the MVE is virtual.
-- `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
-- `vxc_permitted` (Boolean) Whether VXC is permitted.
 
-<a id="nestedatt--vendor_config"></a>
-### Nested Schema for `vendor_config`
+<a id="nestedatt--aruba_config"></a>
+### Nested Schema for `aruba_config`
 
 Required:
 
 - `image_id` (Number) The image ID of the MVE. Indicates the software version.
-- `product_size` (String) The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections. Use the `megaport_mve_sizes` data source to query available sizes dynamically. Common values include SMALL (2 cores), MEDIUM (4 cores), LARGE (8 cores), X_LARGE_16 (16 cores), and X_LARGE_32 (32 cores).
-- `vendor` (String) The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".
+- `product_size` (String) The product size for the vendor config.
 
 Optional:
 
-- `account_key` (String, Sensitive) The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.
-- `account_name` (String) The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.
-- `admin_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.
-- `admin_password_hash` (String, Sensitive) The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).
-- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.
-- `cloud_init` (String) The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.
-- `controller_address` (String) The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.
-- `director_address` (String) The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.
+- `account_key` (String, Sensitive) The account key for the vendor config. Enter the Account Key from Aruba Orchestrator.
+- `account_name` (String) The account name for the vendor config. Enter the Account Name from Aruba Orchestrator.
+- `mve_label` (String) The MVE label for the vendor config.
+- `system_tag` (String) The system tag for the vendor config. Aruba Orchestrator System Tags register the EC-V with the Cloud Portal and Orchestrator.
+
+
+<a id="nestedatt--aviatrix_config"></a>
+### Nested Schema for `aviatrix_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `cloud_init` (String) The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix.
+- `mve_label` (String) The MVE label for the vendor config.
+
+
+<a id="nestedatt--cisco_config"></a>
+### Nested Schema for `cisco_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `admin_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only. Must be 9–100 characters and may not contain `"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.
+- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
+- `cloud_init` (String) The Base64 encoded cloud init file for the vendor config. Required for Cisco C8000v.
 - `fmc_ip_address` (String) The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `fmc_nat_id` (String) The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.
 - `fmc_registration_key` (String, Sensitive) The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.
-- `ion_key` (String, Sensitive) The vION key for the vendor config. Required for Prisma MVE.
-- `license_data` (String, Sensitive) The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.
-- `local_auth` (String, Sensitive) The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.
 - `manage_locally` (Boolean) Whether to manage the MVE locally. Required for Cisco MVE.
 - `mve_label` (String) The MVE label for the vendor config.
-- `remote_auth` (String, Sensitive) The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.
-- `secret_key` (String, Sensitive) The secret key for the vendor config. Required for Prisma MVE.
-- `serial_number` (String) The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.
-- `ssh_public_key` (String) The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'
-- `system_tag` (String) The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.
-- `token` (String, Sensitive) The token for the vendor config. Required for Meraki MVE.
-- `vco_activation_code` (String, Sensitive) The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.
-- `vco_address` (String) The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.
+- `ssh_public_key` (String) The SSH public key for the vendor config.
+
+
+<a id="nestedatt--fortinet_config"></a>
+### Nested Schema for `fortinet_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
+- `license_data` (String, Sensitive) The license data for the vendor config. Required for Fortinet.
+- `mve_label` (String) The MVE label for the vendor config.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Must be a 2048-bit RSA key.
+
+
+<a id="nestedatt--meraki_config"></a>
+### Nested Schema for `meraki_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `mve_label` (String) The MVE label for the vendor config.
+- `token` (String, Sensitive) The token for the vendor config. Required for Meraki.
+
+
+<a id="nestedatt--palo_alto_config"></a>
+### Nested Schema for `palo_alto_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `admin_password_hash` (String, Sensitive) The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE. Must match the format `$5$<salt>$<hash>`.
+- `license_data` (String, Sensitive) The license data for the vendor config. Required for Palo Alto.
+- `mve_label` (String) The MVE label for the vendor config.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Must be a 2048-bit RSA key.
+
+
+<a id="nestedatt--prisma_config"></a>
+### Nested Schema for `prisma_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `ion_key` (String, Sensitive) The vION key for the vendor config. Required for Prisma.
+- `mve_label` (String) The MVE label for the vendor config.
+- `secret_key` (String, Sensitive) The secret key for the vendor config. Required for Prisma.
+
+
+<a id="nestedatt--sixwind_config"></a>
+### Nested Schema for `sixwind_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `mve_label` (String) The MVE label for the vendor config.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Must be a 2048-bit RSA key.
+
+
+<a id="nestedatt--versa_config"></a>
+### Nested Schema for `versa_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `controller_address` (String) A FQDN or IPv4 address of your Versa Controller. Required for Versa.
+- `director_address` (String) A FQDN or IPv4 address of your Versa Director. Required for Versa.
+- `local_auth` (String, Sensitive) The local auth string as configured in your Versa Director. Required for Versa.
+- `mve_label` (String) The MVE label for the vendor config.
+- `remote_auth` (String, Sensitive) The remote auth string as configured in your Versa Director. Required for Versa.
+- `serial_number` (String) The serial number specified when creating the device in Versa Director. Required for Versa.
+
+
+<a id="nestedatt--vmware_config"></a>
+### Nested Schema for `vmware_config`
+
+Required:
+
+- `image_id` (Number) The image ID of the MVE. Indicates the software version.
+- `product_size` (String) The product size for the vendor config.
+
+Optional:
+
+- `admin_ssh_public_key` (String) The admin SSH public key for the vendor config.
+- `mve_label` (String) The MVE label for the vendor config.
+- `ssh_public_key` (String) The SSH public key for the vendor config. Must be a 2048-bit RSA key.
+- `vco_activation_code` (String, Sensitive) The VCO activation code provided by Orchestrator after creating the edge device. Required for VMware.
+- `vco_address` (String) A FQDN or IPv4/IPv6 address for the Orchestrator where you created the edge device. Required for VMware.
 
 
 <a id="nestedatt--vnics"></a>
@@ -255,10 +367,6 @@ Optional:
 Required:
 
 - `description` (String) The description of the network interface.
-
-Read-Only:
-
-- `vlan` (Number) The VLAN of the network interface.
 
 ## Import
 
