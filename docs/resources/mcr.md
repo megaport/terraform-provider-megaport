@@ -42,34 +42,34 @@ resource "megaport_mcr" "mcr" {
 
 ### Read-Only
 
-- `admin_locked` (Boolean) Whether the product is admin locked.
-- `aggregation_id` (Number) Numeric ID of the aggregation.
+- `admin_locked` (Boolean, Deprecated) Whether the product is admin locked.
+- `aggregation_id` (Number, Deprecated) Numeric ID of the aggregation.
 - `attribute_tags` (Map of String) Attribute tags of the product.
-- `buyout_port` (Boolean) Whether the product is bought out.
-- `cancelable` (Boolean) Whether the product is cancelable.
-- `company_name` (String) Name of the company.
+- `buyout_port` (Boolean, Deprecated) Whether the product is bought out.
+- `cancelable` (Boolean, Deprecated) Whether the product is cancelable.
+- `company_name` (String, Deprecated) Name of the company.
 - `company_uid` (String) Megaport Company UID of the product.
-- `contract_end_date` (String) Contract end date of the product.
-- `contract_start_date` (String) Contract start date of the product.
-- `create_date` (String) The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `created_by` (String) User who created the product.
-- `lag_id` (Number) Numeric ID of the LAG.
-- `lag_primary` (Boolean) Whether the product is a LAG primary.
-- `last_updated` (String) Last updated by the Terraform provider.
-- `live_date` (String) The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
-- `locked` (Boolean) Whether the product is locked.
-- `market` (String) Market the product is in.
+- `contract_end_date` (String, Deprecated) Contract end date of the product.
+- `contract_start_date` (String, Deprecated) Contract start date of the product.
+- `create_date` (String, Deprecated) The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `created_by` (String, Deprecated) User who created the product.
+- `lag_id` (Number, Deprecated) Numeric ID of the LAG.
+- `lag_primary` (Boolean, Deprecated) Whether the product is a LAG primary.
+- `last_updated` (String, Deprecated) Last updated by the Terraform provider.
+- `live_date` (String, Deprecated) The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
+- `locked` (Boolean, Deprecated) Whether the product is locked.
+- `market` (String, Deprecated) Market the product is in.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace.
-- `product_id` (Number) Numeric ID of the product.
-- `product_type` (String) Type of the product.
+- `product_id` (Number, Deprecated) Numeric ID of the product.
+- `product_type` (String, Deprecated) Type of the product.
 - `product_uid` (String) UID identifier of the product.
-- `provisioning_status` (String) Provisioning status of the product.
-- `secondary_name` (String) Secondary name of the product.
-- `terminate_date` (String) Date the product will be terminated.
-- `usage_algorithm` (String) Usage algorithm of the product.
-- `virtual` (Boolean) Whether the product is virtual.
-- `vxc_auto_approval` (Boolean) Whether VXC is auto approved.
-- `vxc_permitted` (Boolean) Whether VXC is permitted.
+- `provisioning_status` (String, Deprecated) Provisioning status of the product.
+- `secondary_name` (String, Deprecated) Secondary name of the product.
+- `terminate_date` (String, Deprecated) Date the product will be terminated.
+- `usage_algorithm` (String, Deprecated) Usage algorithm of the product.
+- `virtual` (Boolean, Deprecated) Whether the product is virtual.
+- `vxc_auto_approval` (Boolean, Deprecated) Whether VXC is auto approved.
+- `vxc_permitted` (Boolean, Deprecated) Whether VXC is permitted.
 
 <a id="nestedatt--prefix_filter_lists"></a>
 ### Nested Schema for `prefix_filter_lists`

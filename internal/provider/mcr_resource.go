@@ -368,8 +368,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs. The MCR is a managed virtual router service that establishes Layer 3 connectivity on the worldwide Megaport software-defined network (SDN). MCR instances are preconfigured in data centers in key global routing zones. An MCR enables data transfer between multi-cloud or hybrid cloud networks, network service providers, and cloud service providers.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
-				Description: "Last updated by the Terraform provider.",
-				Computed:    true,
+				Description:        "Last updated by the Terraform provider.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "UID identifier of the product.",
@@ -379,8 +380,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_id": schema.Int64Attribute{
-				Description: "Numeric ID of the product.",
-				Computed:    true,
+				Description:        "Numeric ID of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -390,15 +392,17 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"product_type": schema.StringAttribute{
-				Description: "Type of the product.",
-				Computed:    true,
+				Description:        "Type of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "Provisioning status of the product.",
-				Computed:    true,
+				Description:        "Provisioning status of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.",
@@ -417,15 +421,17 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the MCR was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_by": schema.StringAttribute{
-				Description: "User who created the product.",
-				Computed:    true,
+				Description:        "User who created the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -441,16 +447,19 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"terminate_date": schema.StringAttribute{
-				Description: "Date the product will be terminated.",
-				Computed:    true,
+				Description:        "Date the product will be terminated.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the MCR went live. This value is set by the Megaport API when the MCR becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"market": schema.StringAttribute{
-				Description: "Market the product is in.",
-				Computed:    true,
+				Description:        "Market the product is in.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -470,8 +479,9 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
-				Description: "Usage algorithm of the product.",
-				Computed:    true,
+				Description:        "Usage algorithm of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -492,35 +502,42 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "Contract start date of the product.",
-				Computed:    true,
+				Description:        "Contract start date of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "Contract end date of the product.",
-				Computed:    true,
+				Description:        "Contract end date of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"secondary_name": schema.StringAttribute{
-				Description: "Secondary name of the product.",
-				Computed:    true,
+				Description:        "Secondary name of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"lag_primary": schema.BoolAttribute{
-				Description: "Whether the product is a LAG primary.",
-				Computed:    true,
+				Description:        "Whether the product is a LAG primary.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"lag_id": schema.Int64Attribute{
-				Description: "Numeric ID of the LAG.",
-				Computed:    true,
+				Description:        "Numeric ID of the LAG.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"aggregation_id": schema.Int64Attribute{
-				Description: "Numeric ID of the aggregation.",
-				Computed:    true,
+				Description:        "Numeric ID of the aggregation.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"company_name": schema.StringAttribute{
-				Description: "Name of the company.",
-				Computed:    true,
+				Description:        "Name of the company.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the Marketplace.",
@@ -538,50 +555,57 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted.",
-				Computed:    true,
+				Description:        "Whether VXC is permitted.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto approved.",
-				Computed:    true,
+				Description:        "Whether VXC is auto approved.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual.",
-				Computed:    true,
+				Description:        "Whether the product is virtual.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"buyout_port": schema.BoolAttribute{
-				Description: "Whether the product is bought out.",
-				Computed:    true,
+				Description:        "Whether the product is bought out.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
+				Description:        "Whether the product is locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the product is admin locked.",
-				Computed:    true,
+				Description:        "Whether the product is admin locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
+				Description:        "Whether the product is cancelable.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"attribute_tags": schema.MapAttribute{
 				ElementType: types.StringType,
