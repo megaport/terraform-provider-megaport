@@ -333,7 +333,7 @@ func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagno
 	return nil, apiDiags
 }
 
-// NewPortResource is a helper function to simplify the provider implementation.
+// NewMVEResource is a helper function to simplify the provider implementation.
 func NewMVEResource() resource.Resource {
 	return &mveResource{}
 }
@@ -728,7 +728,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 
 // Create a new resource.
 func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Retrieve values from plan
 	var plan mveResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -812,7 +811,6 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdMVE.TechnicalServiceUID
 
-	// get the created MVE
 	mve, err := r.client.MVEService.GetMVE(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -831,12 +829,10 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	// update the plan with the MVE info
 	apiDiags := plan.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -846,7 +842,6 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 // Read resource information.
 func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	// Get current state
 	var state mveResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -854,7 +849,6 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	// Get refreshed MVE value from API
 	mve, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
 	if err != nil {
 		// MVE has been deleted or is not found
@@ -892,7 +886,6 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	apiDiags := state.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
-	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -916,7 +909,6 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// Check on changes
 	var name, costCentre string
 	var contractTermMonths *int
 	if !plan.Name.Equal(state.Name) {
@@ -999,7 +991,6 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Retrieve the state
 	var state mveResourceModel
 	stateDiags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(stateDiags...)
@@ -1007,7 +998,6 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	// Call the API to delete the resource
 	productUID := state.UID.ValueString()
 	err := retryTransientDelete(ctx, 3, func() error {
 		_, deleteErr := r.client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{
@@ -1024,7 +1014,6 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	// Remove the resource from the state
 	resp.State.RemoveResource(ctx)
 }
 
@@ -1050,12 +1039,13 @@ func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest
 }
 
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("product_uid"), req, resp)
 }
 
 func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// Get the plan and state
+	if req.Plan.Raw.IsNull() {
+		return
+	}
 	var plan, state mveResourceModel
 	if !req.Plan.Raw.IsNull() {
 		planDiags := req.Plan.Get(ctx, &plan)
