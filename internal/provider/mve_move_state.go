@@ -12,11 +12,12 @@ func (r *mveResource) MoveState(ctx context.Context) []resource.StateMover {
 	schemaResp := &resource.SchemaResponse{}
 	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
 
-	// The V2 schema is the V1 schema minus the removed legacy fields and the
-	// removed vnics.vlan attribute, so the V2 schema doubles as the source
-	// schema: the framework decodes the V1 raw state against it, silently
-	// dropping attributes that no longer exist. vendor_config is unchanged, so
-	// it carries over unmodified.
+	// The V2 schema is the source schema. The framework decodes the V1 raw
+	// state against it with IgnoreUndefinedAttributes, silently dropping the
+	// removed legacy fields, the old union vendor_config block, and the removed
+	// vnics.vlan attribute. The per-vendor config blocks are absent from V1
+	// state, so they decode to null and are reconciled from config on the first
+	// apply after the move.
 	return []resource.StateMover{
 		{
 			SourceSchema: &schemaResp.Schema,
@@ -25,9 +26,7 @@ func (r *mveResource) MoveState(ctx context.Context) []resource.StateMover {
 	}
 }
 
-// moveStateMVE migrates a V1 megaport_mve state to V2. The removed legacy
-// fields and vnics.vlan are already dropped by the SourceSchema decode; all
-// remaining attributes carry over unchanged.
+// moveStateMVE migrates a V1 megaport_mve state to V2.
 func moveStateMVE(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
 	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_mve" {
 		return

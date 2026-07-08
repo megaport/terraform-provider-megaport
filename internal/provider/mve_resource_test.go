@@ -42,8 +42,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					cost_centre = "%s"
 					diversity_zone = "red"
 
-                    vendor_config = {
-                        vendor = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -103,7 +102,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"aruba_config", "resources"},
 			},
 			// Update Testing
 			{
@@ -129,8 +128,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 
-                    vendor_config = {
-                        vendor = "aRuBa"
+                    aruba_config = {
                         product_size = "SmAlL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -185,7 +183,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"aruba_config", "resources"},
 			},
 		},
 	})
@@ -216,8 +214,7 @@ func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
 					contract_term_months = 1
 					cost_centre = "%s"
 					diversity_zone = "red"
-					vendor_config = {
-						vendor = "aruba"
+					aruba_config = {
 						product_size = "SMALL"
 						mve_label = "MVE 2/8"
 						image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -260,8 +257,7 @@ func TestAccMegaportMVEAruba_CostCentreRemoval(t *testing.T) {
 					contract_term_months = 1
 					cost_centre = ""
 					diversity_zone = "red"
-					vendor_config = {
-						vendor = "aruba"
+					aruba_config = {
 						product_size = "SMALL"
 						mve_label = "MVE 2/8"
 						image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -319,8 +315,7 @@ func TestAccMegaportMVEAruba_PromoCode(t *testing.T) {
 			location_id          = data.megaport_location.test_location.id
 			contract_term_months = 1
 			%s
-			vendor_config = {
-				vendor       = "aruba"
+			aruba_config = {
 				product_size = "SMALL"
 				mve_label    = "MVE 2/8"
 				image_id     = data.megaport_mve_images.aruba.mve_images.0.id
@@ -392,8 +387,7 @@ func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 12
 					diversity_zone = "red"
-					vendor_config = {
-						vendor = "aruba"
+					aruba_config = {
 						product_size = "SMALL"
 						mve_label = "MVE 2/8"
 						image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -433,8 +427,7 @@ func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 					location_id = data.megaport_location.test_location.id
 					contract_term_months = 24
 					diversity_zone = "red"
-					vendor_config = {
-						vendor = "aruba"
+					aruba_config = {
 						product_size = "SMALL"
 						mve_label = "MVE 2/8"
 						image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -497,8 +490,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 						"key2" = "value2"
 					}
 
-                    vendor_config = {
-                        vendor = "versa"
+                    versa_config = {
                         product_size = "SMALL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.versa.mve_images.0.id
@@ -555,7 +547,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"versa_config", "resources"},
 			},
 			// Update Testing
 			{
@@ -581,8 +573,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 
-                    vendor_config = {
-                        vendor = "versa"
+                    versa_config = {
                         product_size = "SMALL"
 						mve_label = "MVE 2/8"
                         image_id = data.megaport_mve_images.versa.mve_images.0.id
@@ -639,7 +630,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"versa_config", "resources"},
 			},
 		},
 	})
@@ -675,8 +666,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
                     cost_centre = "%s"
                     diversity_zone = "red"
 
-                    vendor_config = {
-                        vendor = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
                         mve_label = "MVE Import Test"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -714,7 +704,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"aruba_config", "resources"},
 			},
 			// Test a modification with lifecycle.ignore_changes
 			{
@@ -735,8 +725,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
                     cost_centre = "%s-updated"
                     diversity_zone = "red"
 
-                    vendor_config = {
-                        vendor = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
                         mve_label = "MVE Import Test"
                         image_id = data.megaport_mve_images.aruba.mve_images.0.id
@@ -753,7 +742,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
                     }]
 
                     lifecycle {
-                        ignore_changes = [vendor_config]
+                        ignore_changes = [aruba_config]
                     }
                 }`, locationID, MVEArubaImageIDMVE, mveName, costCentre, mveName, mveKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -804,8 +793,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 					cost_centre          = "%s"
 					diversity_zone       = "red"
 
-					vendor_config = {
-						vendor         = "cisco"
+					cisco_config = {
 						product_size   = "MEDIUM"
 						mve_label      = "MVE 4/16"
 						image_id       = data.megaport_mve_images.cisco.mve_images.0.id
@@ -850,7 +838,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"cisco_config", "resources"},
 			},
 			// Update: rename and change cost centre.
 			{
@@ -871,8 +859,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 					cost_centre          = "%s"
 					diversity_zone       = "red"
 
-					vendor_config = {
-						vendor         = "cisco"
+					cisco_config = {
 						product_size   = "MEDIUM"
 						mve_label      = "MVE 4/16"
 						image_id       = data.megaport_mve_images.cisco.mve_images.0.id
@@ -935,8 +922,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 					cost_centre          = "%s"
 					diversity_zone       = "red"
 
-					vendor_config = {
-						vendor              = "palo_alto"
+					palo_alto_config = {
 						product_size        = "MEDIUM"
 						mve_label           = "MVE 4/16"
 						image_id            = data.megaport_mve_images.palo_alto.mve_images.0.id
@@ -979,7 +965,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
+				ImportStateVerifyIgnore: []string{"palo_alto_config", "resources"},
 			},
 			// Update: rename and change cost centre.
 			{
@@ -1000,8 +986,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 					cost_centre          = "%s"
 					diversity_zone       = "red"
 
-					vendor_config = {
-						vendor              = "palo_alto"
+					palo_alto_config = {
 						product_size        = "MEDIUM"
 						mve_label           = "MVE 4/16"
 						image_id            = data.megaport_mve_images.palo_alto.mve_images.0.id
