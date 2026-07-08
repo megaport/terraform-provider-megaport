@@ -693,6 +693,13 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 		buyReq.DiversityZone = plan.DiversityZone.ValueString()
 	}
 
+	// marketplace_visibility is computed-only, so an unset value arrives as
+	// Unknown (no prior state) rather than Null; only send it when known.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		buyReq.MarketplaceVisibility = &marketplaceVisibility
+	}
+
 	if !plan.ResourceTags.IsNull() {
 		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
 		resp.Diagnostics.Append(tagDiags...)

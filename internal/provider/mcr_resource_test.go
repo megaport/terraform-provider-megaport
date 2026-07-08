@@ -600,6 +600,46 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 	})
 }
 
+func TestAccMegaportMCR_MarketplaceVisibilityOnCreate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+	config := providerConfig + fmt.Sprintf(`
+	data "megaport_location" "test_location" {
+		id = %d
+	}
+	  resource "megaport_mcr" "mcr" {
+		product_name             = "%s"
+		port_speed               = 1000
+		location_id              = data.megaport_location.test_location.id
+		contract_term_months     = 12
+		cost_centre              = "%s"
+	  }
+	  `, locationID, mcrName, costCentreName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+				),
+			},
+			// Plan-only: the create request's marketplace_visibility handling must leave no drift.
+			{
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
 func TestRateLimiter_SingleToken(t *testing.T) {
 	rl := NewRateLimiter(5, 100*time.Millisecond)
 
