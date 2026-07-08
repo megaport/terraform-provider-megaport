@@ -563,8 +563,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "Virtual Cross Connect (VXC) Resource for the Megaport Terraform Provider. This resource allows you to create, modify, and update VXCs. VXCs are Layer 2 Ethernet circuits providing private, flexible, and on-demand connections between any of the locations on the Megaport network with 1 Mbps to 100 Gbps of capacity.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
+				Description:        "The last time the resource was updated.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
@@ -574,8 +575,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
+				Description:        "The numeric ID of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -604,8 +606,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"product_type": schema.StringAttribute{
-				Description: "The type of the product.",
-				Computed:    true,
+				Description:        "The type of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -618,19 +621,22 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
+				Description:        "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"secondary_name": schema.StringAttribute{
-				Description: "The secondary name of the product.",
-				Computed:    true,
+				Description:        "The secondary name of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm of the product.",
-				Computed:    true,
+				Description:        "The usage algorithm of the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -643,19 +649,22 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
-				Computed:    true,
+				Description:        "The user who created the product.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.",
-				Computed:    true,
+				Description:        "The date the VXC went live. This value is set by the Megaport API when the VXC becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior as the field is being populated from the API.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the VXC was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"contract_term_months": schema.Int64Attribute{
 				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
@@ -958,12 +967,14 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the contract starts. This value is managed by the Megaport API and may be updated when the VXC is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"company_uid": schema.StringAttribute{
 				Description: "The UID of the company the product is associated with.",
@@ -973,22 +984,25 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"company_name": schema.StringAttribute{
-				Description: "The name of the company the product is associated with.",
-				Computed:    true,
+				Description:        "The name of the company the product is associated with.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
+				Description:        "Whether the product is locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the product is admin locked.",
-				Computed:    true,
+				Description:        "Whether the product is admin locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
@@ -1002,8 +1016,9 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
+				Description:        "Whether the product is cancelable.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
