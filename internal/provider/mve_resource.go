@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -34,44 +33,20 @@ var (
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
-		"vlan":        types.Int64Type,
 	}
 )
 
 // mveResourceModel maps the resource schema data.
 type mveResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
-	ID                    types.Int64  `tfsdk:"product_id"`
 	UID                   types.String `tfsdk:"product_uid"`
 	Name                  types.String `tfsdk:"product_name"`
-	Type                  types.String `tfsdk:"product_type"`
-	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
-	CreateDate            types.String `tfsdk:"create_date"`
-	CreatedBy             types.String `tfsdk:"created_by"`
-	TerminateDate         types.String `tfsdk:"terminate_date"`
-	LiveDate              types.String `tfsdk:"live_date"`
-	Market                types.String `tfsdk:"market"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
-	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
-	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
-	SecondaryName         types.String `tfsdk:"secondary_name"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
-	CompanyName           types.String `tfsdk:"company_name"`
-	ContractStartDate     types.String `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
-
-	Virtual     types.Bool `tfsdk:"virtual"`
-	BuyoutPort  types.Bool `tfsdk:"buyout_port"`
-	Locked      types.Bool `tfsdk:"locked"`
-	AdminLocked types.Bool `tfsdk:"admin_locked"`
-	Cancelable  types.Bool `tfsdk:"cancelable"`
 
 	Vendor types.String `tfsdk:"vendor"`
 	Size   types.String `tfsdk:"mve_size"`
@@ -87,7 +62,6 @@ type mveResourceModel struct {
 // mveNetworkInterfaceModel represents a vNIC.
 type mveNetworkInterfaceModel struct {
 	Description types.String `tfsdk:"description"`
-	VLAN        types.Int64  `tfsdk:"vlan"`
 }
 
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
@@ -129,55 +103,16 @@ type vendorConfigModel struct {
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags map[string]string) diag.Diagnostics {
 	apiDiags := diag.Diagnostics{}
-	orm.ID = types.Int64Value(int64(p.ID))
 	orm.UID = types.StringValue(p.UID)
 	orm.Name = types.StringValue(p.Name)
-	orm.Type = types.StringValue(p.Type)
-	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.CreatedBy = types.StringValue(p.CreatedBy)
-	orm.Market = types.StringValue(p.Market)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
-	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
 	orm.MarketplaceVisibility = types.BoolValue(p.MarketplaceVisibility)
-	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
-	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
-	orm.SecondaryName = types.StringValue(p.SecondaryName)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
-	orm.CompanyName = types.StringValue(p.CompanyName)
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
-	orm.Virtual = types.BoolValue(p.Virtual)
-	orm.BuyoutPort = types.BoolValue(p.BuyoutPort)
-	orm.Locked = types.BoolValue(p.Locked)
-	orm.AdminLocked = types.BoolValue(p.AdminLocked)
-	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.Vendor = types.StringValue(p.Vendor)
 	orm.Size = types.StringValue(p.Size)
-	orm.LiveDate = types.StringValue("")
-	orm.TerminateDate = types.StringValue("")
 	orm.CostCentre = types.StringValue(p.CostCentre)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
-
-	if p.CreateDate != nil {
-		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringValue("")
-	}
-	if p.TerminateDate != nil {
-		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
-	}
-	if p.LiveDate != nil {
-		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	}
-	if p.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringValue("")
-	}
-	if p.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringValue("")
-	}
 
 	if p.AttributeTags != nil {
 		tags, tagDiags := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
@@ -199,7 +134,6 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	for _, n := range p.NetworkInterfaces {
 		model := &mveNetworkInterfaceModel{
 			Description: types.StringValue(n.Description),
-			VLAN:        types.Int64Value(int64(n.VLAN)),
 		}
 		vnic, vnicDiags := types.ObjectValueFrom(ctx, vnicAttrs, model)
 		apiDiags = append(apiDiags, vnicDiags...)
@@ -353,10 +287,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	resp.Schema = schema.Schema{
 		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the `megaport_mve_sizes` data source to query available MVE sizes and the `megaport_mve_images` data source to query available MVE images.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the MVE was updated by the Terraform Provider.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
 				Computed:    true,
@@ -364,42 +294,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"product_id": schema.Int64Attribute{
-				Description: "The Numeric ID of the MVE.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
 			"product_name": schema.StringAttribute{
 				Description: "The name of the MVE.",
 				Required:    true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
-			},
-			"create_date": schema.StringAttribute{
-				Description: "The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the MVE.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"terminate_date": schema.StringAttribute{
-				Description: "The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"live_date": schema.StringAttribute{
-				Description: "The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the MVE.",
@@ -410,25 +307,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"market": schema.StringAttribute{
-				Description: "The market the MVE is in.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the product. This value can be retrieved from the data source megaport_location.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
-				},
-			},
-			"product_type": schema.StringAttribute{
-				Description: "The type of product (MVE).",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
@@ -438,27 +321,12 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
 				},
 			},
-			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm of the MVE.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"company_uid": schema.StringAttribute{
 				Description: "The company UID of the MVE.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-			},
-			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre of the MVE.",
@@ -467,69 +335,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the MVE is visible in the marketplace.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto approved.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"secondary_name": schema.StringAttribute{
-				Description: "The secondary name of the MVE.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"company_name": schema.StringAttribute{
-				Description: "The company name of the MVE.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"virtual": schema.BoolAttribute{
-				Description: "Whether the MVE is virtual.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"buyout_port": schema.BoolAttribute{
-				Description: "Whether the port is buyout.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the MVE is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the MVE is admin locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cancelable": schema.BoolAttribute{
-				Description: "Whether the MVE is cancelable.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -570,13 +375,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						"description": schema.StringAttribute{
 							Description: "The description of the network interface.",
 							Required:    true,
-						},
-						"vlan": schema.Int64Attribute{
-							Description: "The VLAN of the network interface.",
-							Computed:    true,
-							PlanModifiers: []planmodifier.Int64{
-								int64planmodifier.UseStateForUnknown(),
-							},
 						},
 					},
 				},
@@ -834,7 +632,6 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// update the plan with the MVE info
 	apiDiags := plan.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -987,7 +784,6 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	apiDiags := state.fromAPIMVE(ctx, updatedMVE, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
 	diags := resp.State.Set(ctx, state)
