@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	megaport "github.com/megaport/megaportgo"
 	"github.com/stretchr/testify/assert"
 )
@@ -308,4 +309,31 @@ func TestMVEImageDetailsAttrs(t *testing.T) {
 	// Verify available_sizes is the correct type
 	availableSizesType := mveImageDetailsAttrs["available_sizes"]
 	assert.Equal(t, types.ListType{ElemType: types.StringType}, availableSizesType)
+}
+
+// TestAccMegaportMVEImagesDataSource_AvailableSizes exercises the read-only
+// mve_images data source end-to-end against the API and asserts the v4
+// available_sizes field flows through to state. No infrastructure is provisioned.
+func TestAccMegaportMVEImagesDataSource_AvailableSizes(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + `
+				data "megaport_mve_images" "aruba" {
+					vendor_filter = "Aruba"
+				}
+				`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.id"),
+					resource.TestCheckResourceAttr("data.megaport_mve_images.aruba", "mve_images.0.vendor", "Aruba"),
+					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.available_sizes.#"),
+					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.available_sizes.0"),
+				),
+			},
+		},
+	})
 }
