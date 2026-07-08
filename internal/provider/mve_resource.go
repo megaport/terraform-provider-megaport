@@ -354,8 +354,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the `megaport_mve_sizes` data source to query available MVE sizes and the `megaport_mve_images` data source to query available MVE images.",
 		Attributes: map[string]schema.Attribute{
 			"last_updated": schema.StringAttribute{
-				Description: "The last time the MVE was updated by the Terraform Provider.",
-				Computed:    true,
+				Description:        "The last time the MVE was updated by the Terraform Provider.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier of the MVE.",
@@ -365,8 +366,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_id": schema.Int64Attribute{
-				Description: "The Numeric ID of the MVE.",
-				Computed:    true,
+				Description:        "The Numeric ID of the MVE.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -376,30 +378,35 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
+				Description:        "The provisioning status of the MVE. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the MVE lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"create_date": schema.StringAttribute{
-				Description: "The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the MVE was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_by": schema.StringAttribute{
-				Description: "The user who created the MVE.",
-				Computed:    true,
+				Description:        "The user who created the MVE.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"terminate_date": schema.StringAttribute{
-				Description: "The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the MVE will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"live_date": schema.StringAttribute{
-				Description: "The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the MVE.",
@@ -411,8 +418,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"market": schema.StringAttribute{
-				Description: "The market the MVE is in.",
-				Computed:    true,
+				Description:        "The market the MVE is in.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -425,8 +433,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"product_type": schema.StringAttribute{
-				Description: "The type of product (MVE).",
-				Computed:    true,
+				Description:        "The type of product (MVE).",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -439,8 +448,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm of the MVE.",
-				Computed:    true,
+				Description:        "The usage algorithm of the MVE.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -453,12 +463,14 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the contract starts. This value is managed by the Megaport API and may be updated when the MVE is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
+				Description:        "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 			},
 			"cost_centre": schema.StringAttribute{
 				Description: "The cost centre of the MVE.",
@@ -473,64 +485,73 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted.",
-				Computed:    true,
+				Description:        "Whether VXC is permitted.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto approved.",
-				Computed:    true,
+				Description:        "Whether VXC is auto approved.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"secondary_name": schema.StringAttribute{
-				Description: "The secondary name of the MVE.",
-				Computed:    true,
+				Description:        "The secondary name of the MVE.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"company_name": schema.StringAttribute{
-				Description: "The company name of the MVE.",
-				Computed:    true,
+				Description:        "The company name of the MVE.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"virtual": schema.BoolAttribute{
-				Description: "Whether the MVE is virtual.",
-				Computed:    true,
+				Description:        "Whether the MVE is virtual.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"buyout_port": schema.BoolAttribute{
-				Description: "Whether the port is buyout.",
-				Computed:    true,
+				Description:        "Whether the port is buyout.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locked": schema.BoolAttribute{
-				Description: "Whether the MVE is locked.",
-				Computed:    true,
+				Description:        "Whether the MVE is locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"admin_locked": schema.BoolAttribute{
-				Description: "Whether the MVE is admin locked.",
-				Computed:    true,
+				Description:        "Whether the MVE is admin locked.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cancelable": schema.BoolAttribute{
-				Description: "Whether the MVE is cancelable.",
-				Computed:    true,
+				Description:        "Whether the MVE is cancelable.",
+				DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
