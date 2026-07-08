@@ -2,10 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -28,6 +27,7 @@ var (
 	_ resource.Resource                = &portResource{}
 	_ resource.ResourceWithConfigure   = &portResource{}
 	_ resource.ResourceWithImportState = &portResource{}
+	_ resource.ResourceWithMoveState   = &portResource{}
 
 	portResourcesAttrs = map[string]attr.Type{
 		"interface": types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),
@@ -41,31 +41,14 @@ var (
 
 // singlePortResourceModel maps the resource schema data.
 type singlePortResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                   types.String `tfsdk:"product_uid"`
-	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
-	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
-	CreateDate            types.String `tfsdk:"create_date"`
-	CreatedBy             types.String `tfsdk:"created_by"`
 	PortSpeed             types.Int64  `tfsdk:"port_speed"`
-	TerminateDate         types.String `tfsdk:"terminate_date"`
-	LiveDate              types.String `tfsdk:"live_date"`
-	Market                types.String `tfsdk:"market"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
-	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
-	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
-	ContractStartDate     types.String `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
-	Virtual               types.Bool   `tfsdk:"virtual"`
-	Locked                types.Bool   `tfsdk:"locked"`
-	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 
@@ -87,49 +70,14 @@ type portInterfaceModel struct {
 func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Port, tags map[string]string) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 	orm.UID = types.StringValue(p.UID)
-	orm.ID = types.Int64Value(int64(p.ID))
-	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
-	if p.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
-	if p.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	if p.CreateDate != nil {
-		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = types.StringValue(p.DiversityZone)
-	if p.LiveDate != nil {
-		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
-	orm.Locked = types.BoolValue(p.Locked)
-	orm.Market = types.StringValue(p.Market)
 	orm.MarketplaceVisibility = types.BoolValue(p.MarketplaceVisibility)
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
-	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	if p.TerminateDate != nil {
-		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
-	} else {
-		orm.TerminateDate = types.StringNull()
-	}
-	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
-	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
-	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
-	orm.Virtual = types.BoolValue(p.Virtual)
 
 	resourcesModel := &portResourcesModel{}
 	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
@@ -170,10 +118,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = schema.Schema{
 		Description: "Single Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport Ports. Your organization’s Port is the physical point of connection between your organization’s network and the Megaport network. You will need to deploy a Port wherever you want to direct traffic.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
@@ -181,31 +125,9 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
 			"product_name": schema.StringAttribute{
 				Description: "The name of the product. Specify a name for the Port that is easily identifiable, particularly if you plan on having more than one Port.",
 				Required:    true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
-			},
-			"create_date": schema.StringAttribute{
-				Description: "The date the port was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"port_speed": schema.Int64Attribute{
 				Description: "The speed of the port in Mbps. Can be 1000(1g), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available.",
@@ -215,21 +137,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 				Validators: []validator.Int64{
 					int64validator.OneOf(1000, 10000, 100000, 400000),
-				},
-			},
-			"terminate_date": schema.StringAttribute{
-				Description: "The date the port will be or was terminated. This value is set by the Megaport API when termination is scheduled or completed. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"live_date": schema.StringAttribute{
-				Description: "The date the port went live. This value is set by the Megaport API when the port becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"market": schema.StringAttribute{
-				Description: "The market the product is in.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
@@ -244,13 +151,6 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
-				},
-			},
-			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm for the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"company_uid": schema.StringAttribute{
@@ -275,52 +175,9 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract starts. This value is managed by the Megaport API and may be updated when the port is provisioned or when contract terms change. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
-			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends. This value is calculated by the Megaport API based on the contract start date and term. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
-				Computed:    true,
-			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace. By default, the Port is private to your enterprise and consumes services from the Megaport network for your own internal company, team, and resources. When set to Private, the Port is not searchable in the Megaport Marketplace (however, others can still connect to you using a service key). Click Public to make the new Port and profile visible on the Megaport network for inbound connection requests. It is possible to change the Port from Private to Public after the initial setup.",
 				Required:    true,
-			},
-			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto-approved on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the product.",
@@ -446,7 +303,6 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// update the plan with the port info
 	apiDiags := plan.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -596,7 +452,6 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Update the state
 	state.fromAPIPort(ctx, port, tags)
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
 	// Set state to fully populated data
@@ -664,6 +519,48 @@ func (r *portResource) ImportState(ctx context.Context, req resource.ImportState
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// MoveState implements resource.ResourceWithMoveState to support automatic
+// V1-to-V2 state migration when users move from megaport/megaport (v1) to v2.
+func (r *portResource) MoveState(ctx context.Context) []resource.StateMover {
+	return []resource.StateMover{
+		{
+			StateMover: moveStatePort,
+		},
+	}
+}
+
+// moveStatePort migrates a V1 megaport_port state to V2 by extracting only the
+// fields that exist in the V2 schema and dropping all removed fields.
+func moveStatePort(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
+	if req.SourceProviderAddress != "registry.terraform.io/megaport/megaport" || req.SourceTypeName != "megaport_port" {
+		return
+	}
+
+	if req.SourceRawState == nil {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state is nil")
+		return
+	}
+	rawJSON := req.SourceRawState.JSON
+	if len(rawJSON) == 0 {
+		resp.Diagnostics.AddError("Unable to migrate V1 state", "Source raw state JSON is empty")
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rawJSON, &raw); err != nil {
+		resp.Diagnostics.AddError("Unable to unmarshal V1 state", err.Error())
+		return
+	}
+
+	model, diags := portModelFromV1RawState(ctx, raw)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.TargetState.Set(ctx, model)...)
 }
 
 func fromAPIPortInterface(ctx context.Context, p *megaport.PortInterface) (types.Object, diag.Diagnostics) {
