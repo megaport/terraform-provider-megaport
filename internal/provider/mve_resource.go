@@ -593,8 +593,9 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Required:    true,
 						},
 						"vlan": schema.Int64Attribute{
-							Description: "The VLAN of the network interface.",
-							Computed:    true,
+							Description:        "The VLAN of the network interface.",
+							Computed:           true,
+							DeprecationMessage: "This attribute is deprecated and will be removed in a future release.",
 							PlanModifiers: []planmodifier.Int64{
 								int64planmodifier.UseStateForUnknown(),
 							},

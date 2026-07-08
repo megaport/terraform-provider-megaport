@@ -258,7 +258,7 @@ Required:
 
 Read-Only:
 
-- `vlan` (Number) The VLAN of the network interface.
+- `vlan` (Number, Deprecated) The VLAN of the network interface.
 
 ## Import
 
