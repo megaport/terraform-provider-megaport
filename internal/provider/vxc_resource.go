@@ -2508,7 +2508,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// Only show VLAN mismatch warnings if waitForVXCUpdate failed (timed out or errored)
 	if isChanged && waitErr != nil {
-		if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+		if updateReq.AEndInnerVLAN != nil && !innerVLANMatches(*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN) {
 			resp.Diagnostics.AddWarning(
 				"A-End Inner VLAN Mismatch",
 				fmt.Sprintf("Expected A-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
@@ -2516,7 +2516,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			)
 		}
 
-		if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+		if updateReq.BEndInnerVLAN != nil && !innerVLANMatches(*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN) {
 			resp.Diagnostics.AddWarning(
 				"B-End Inner VLAN Mismatch",
 				fmt.Sprintf("Expected B-End inner_vlan=%d but API returned %d. This may indicate API propagation delay.",
