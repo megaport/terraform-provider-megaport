@@ -5,53 +5,75 @@ All notable changes to the Megaport Terraform Provider will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — V2
+## [Unreleased] - V2
 
 ### Breaking Changes
 
 - Module path changed to `github.com/megaport/terraform-provider-megaport/v2`
-- Removed read-only metadata fields from all resources (`product_id`, `provisioning_status`, `usage_algorithm`, `virtual`, `locked`, `cancelable`, `vxc_permitted`, `vxc_auto_approval`, `live_date`, `create_date`, `created_by`, `market`, `terminate_date`, `contract_start_date`, `contract_end_date`)
-- VXC partner configs moved inside `a_end_config`/`b_end_config` blocks
-- MVE `vendor_config` replaced with per-vendor blocks (`aruba_config`, `cisco_config`, etc.)
-- MCR inline `prefix_filter_lists` removed — use `megaport_mcr_prefix_filter_list` resource
-- Removed `last_updated` field from all resources
-- Removed `ordered_vlan` from VXC — use `vlan` only
-- Date formats standardized to RFC 3339
-- VXC end config UIDs renamed: `requested_product_uid` → `product_uid`, `current_product_uid` → `assigned_product_uid`
-
-### Added
-
-- `ResourceWithMoveState` for automatic V1 → V2 state migration
-- Per-resource configurable timeouts via `timeouts` block
-- Data source: `megaport_vxc_csp_connection`
-- Shared retry/backoff utilities with exponential backoff and jitter
-- Enriched API error messages with HTTP status and trace ID
-- Unit tests for `fromAPI` mapping functions across all resources
-- `GNUmakefile` with standard build targets
-
-### Fixed
-
-- IX resource now respects provider-level `wait_time` setting
-- MCR rate limiter goroutine leak in prefix filter list operations
-- Silent diagnostic swallowing in `fromAPI` methods
-- Global `waitForTime` variable thread-safety issue (moved to per-resource field)
-
-### Changed
-
-- Retry strategies standardized across all resources (exponential backoff + jitter)
-- Shared `configureMegaportResource` helper extracted for all resources
-- Port resource helpers extracted into `port_resource_utils.go`
 
 ---
 
 ## Release History
 
-### [v1.10.1] — 2026-06-11
+### [v1.11.0] - 2026-07-09
+
+- test: use megaport.PtrTo() instead of local pointer helpers
+- fix: normalize inner_vlan -1/0 in Update() mismatch warnings
+- fix: normalize inner_vlan -1/0 in verifyUpdateApplied
+- test: note expected propagation-delay warning on MVE-to-MVE inner_vlan re-home
+- fix: mask access_key in provider debug logs
+- refactor: extract unknown/null end-config check into helper
+- test: consolidate duplicate Aruba MVE image ID constants
+- test: drop unused port from TestMVE_TransitVXC
+- test: co-locate MVE and TRANSIT VXC end in TestMVE_TransitVXC
+- test: drop redundant transit_loc data source from region-locked VXC tests
+- fix: drive mcrs Read end-to-end and guard nil GetMCR result
+- test: cover reconcileVXCEnd partner-config RequiresReplace branch
+- test: cover VXC ModifyPlan reconcile path and end asymmetry
+- refactor: simplify reconcileVXCEnd to return only the plan object
+- test: drop unused name return from findMCRWithPartnerTestLocation
+- test: give each IX test a unique MAC address
+- test: co-locate MCR and TRANSIT partner for region-sensitive VXCs
+- test: set inner_vlan on MVE-to-MVE VXC move
+- ESD-1539: make pre_shared_key a write-only argument
+- fix: drop Plan.Set diagnostics, guard unknown RequestedProductUID, fix gitignore
+- fix: harden ModifyPlan guard against null end configs and assert plan immutability
+- fix: clean up ModifyPlan dead writes and duplicate .gitignore entry
+- Add unit test for VXC ModifyPlan with unknown end configurations
+- Add terraform-provider-megaport binary to .gitignore
+- ESD-1204: Fail open on empty NAT Gateway matrix; add validator unit test
+- ESD-1204: Validate NAT Gateway speed/session in-provider
+- ESD-1204: Validate during NAT Gateway replacement too
+- ESD-1204: Address Copilot review comments on PR #388
+- ESD-1204: Distinguish matrix validator sentinels from API failures
+- ESD-1204: Address review comments
+- ESD-1204: Address review comments
+- ESD-1204: Validate NAT Gateway speed/sessions at plan time
+- ESD-1205: Document intentional zero-session-count skip
+- ESD-1205: Pin megaportgo v1.14.1 for ListNATGatewaySessions
+- ESD-1205: error on empty NAT Gateway sessions matrix
+- ESD-1205: model sessions as types.List in data source
+- ESD-1205: use types.List for session_count in data source model
+- ESD-1205: skip empty session_count entries in data source
+- ESD-1205: assert session_count is populated in acceptance test
+- ESD-1205: cast speed_mbps to string in nat_gateway_sessions example
+- ESD-1205: Add docs and example for nat_gateway_sessions data source
+- ESD-1205: Add megaport_nat_gateway_sessions data source
+- ESD-1539: wait out async tunnel deprovisioning when deleting IPsec add-on
+- ESD-1539: Rework IPsec tunnel options to a single object, bump megaportgo to v1.14.1
+- feat: add IPsec tunnel configuration to the VXC resource
+- chore(deps): bump the gomod group with 2 updates
+- ci: pin OpenTofu compat test to a filesystem mirror
+- chore(deps): bump github.com/megaport/megaportgo in the gomod group
+- chore(deps): bump golang.org/x/crypto
+- ESD-1232: document provider wait_time option
+
+### [v1.10.1] - 2026-06-11
 
 - ESD-1368 Mark all sensitive fields as such.
 - docs: flag cancel_at_end_of_term removal as a breaking change in README
 
-### [v1.10.0] — 2026-06-04
+### [v1.10.0] - 2026-06-04
 
 - Bound provisioning polls with a deadline context
 - Poll immediately and short-circuit on terminal VXC states
@@ -62,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: address copilot review feedback
 - fix: prevent delayed cancellation for ports
 
-### [v1.9.1] — 2026-05-21
+### [v1.9.1] - 2026-05-21
 
 - ESD-1192: address review feedback on NAT Gateway example values
 - ESD-1192: make NAT Gateway examples self-contained and follow convention
@@ -76,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - chore(deps): bump github.com/hashicorp/terraform-plugin-go
 - chore(deps): bump github.com/hashicorp/terraform-plugin-framework
 
-### [v1.9.0] — 2026-05-20
+### [v1.9.0] - 2026-05-20
 
 - test: use add_on_uid as import identifier for MCR IPsec addon
 - fix: address PR review nits on NAT Gateway resources
@@ -114,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: address PR review feedback on nat_gateway resource
 - feat: add megaport_nat_gateway resource
 
-### [v1.8.0] — 2026-05-10
+### [v1.8.0] - 2026-05-10
 
 - ESD-1094: bump golangci-lint to v2.11.4 for Go 1.25 support
 - ESD-1094: bump go.mod to 1.25 and use sync.WaitGroup.Go
@@ -146,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: make resource tag fetching opt-in via include_resource_tags
 - feat: add megaport_vxcs data source and bump megaportgo to v1.7.0
 
-### [v1.7.0] — 2026-04-27
+### [v1.7.0] - 2026-04-27
 
 - ESD-884: fix GCP VXC example missing requested_product_uid, improve docs
 - cleanup: move timeout logic to megaportgo, bump megaport go module
@@ -193,7 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: use MCR-aware location picker for tests that create MCRs
 - fix: use partner-aware location picker for AWS and Oracle VXC tests
 - fix: use partner-aware location picker for tests requiring AWS/TRANSIT partner ports
-- fix: address review feedback — release claims, mask keys, surface parse errors, set TF_ACC in scripts
+- fix: address review feedback - release claims, mask keys, surface parse errors, set TF_ACC in scripts
 - fix: replace hardcoded VXC location constants with dynamic pickers
 - fix: remove CSP credentials from version control, support env var injection
 - fix: address code review feedback for test helpers and retry logic
@@ -205,7 +227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: date fallback values
 - feat: add megaport_service_key resource for creating and managing service keys
 
-### [v1.6.0] — 2026-04-03
+### [v1.6.0] - 2026-04-03
 
 - fix: remove unused data source filter utilities
 - fix: simplify MCR data source to only filter by product_uid
@@ -218,11 +240,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: add megaport_mcrs data source
 - fix: fix transit VXC update assigning partner config to wrong end and correct error message
 
-### [v1.5.2] — 2026-04-01
+### [v1.5.2] - 2026-04-01
 
 - fix: detect partner config changes when state is null during VXC update
 
-### [v1.5.1] — 2026-03-23
+### [v1.5.1] - 2026-03-23
 
 - fix: replace volatile string-based partner port filters with stable connect_type + location_id lookups and use separate GCP pairing keys per test
 - fix: change safe delete test location again
@@ -237,7 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: add depends_on to both test VXC resources so Terraform destroys the VXC (and its BGP connection) before attempting to delete the prefix filter lists
 - fix: MCR Read/Update to skip prefix filter list API fetch when using standalone resource
 
-### [v1.5.0] — 2026-03-02
+### [v1.5.0] - 2026-03-02
 
 - fix: remove wait logic from create
 - fix: poll API for vnic_index propagation after create/update, preserve from state on read
@@ -256,7 +278,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: preserve VXC user-only fields after import to prevent infinite update drift, update gitignore
 - fix(mve): fix mve_sizes data source bugs and improve MVE size documentation
 
-### [v1.4.7] — 2026-01-15
+### [v1.4.7] - 2026-01-15
 
 - fix: use prefix-based lookup for normalization to handle entry reordering
 - fix: add prefix validation before normalizing to guard against entry reordering
@@ -273,11 +295,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: change location name to id for global switch
 - docs: add 6WIND MVE examples and clarify RSA 2048-bit SSH key requirement
 
-### [v1.4.6] — 2025-11-05
+### [v1.4.6] - 2025-11-05
 
 - fix: adds CODEOWNERS
 
-### [v1.4.5] — 2025-10-31
+### [v1.4.5] - 2025-10-31
 
 - fix: change field to use ID in vxc test because of location rename
 - docs/location-id-improvement
@@ -297,7 +319,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: add update timeout and verification to account for api delayed propagation
 - fix: refine inner vlan state change to only untag on updates
 
-### [v1.4.4] — 2025-10-23
+### [v1.4.4] - 2025-10-23
 
 - docs: specify SHA-256 crypt format for Palo Alto MVE admin_password_hash field
 - cleanup: Address PR feedback: remove redundant cost_centre, add case-insensitive validator, clarify lifecycle rules, remove deprecation timeline
@@ -312,7 +334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: mcr docs
 - feat: mcr prefix filter list standalone resource
 
-### [v1.4.3] — 2025-09-18
+### [v1.4.3] - 2025-09-18
 
 - fix: cost centre for vxc update
 - fix: index template
@@ -324,7 +346,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: typo
 - docs: fortinet mve transit vxc example
 
-### [v1.4.2] — 2025-09-08
+### [v1.4.2] - 2025-09-08
 
 - fix: allow user to manually input product UID for partner port with azure/gcp/oracle vxc, fix location name in data source test
 - docs: update docs to use full readme in template
@@ -339,11 +361,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: only add Product UID to Update call if the end connection requested UID is different from that of the state. this prevents unnecessary move attempts in the api.
 - fix: only add VNIC Index to Update call if end connection product type is MVE
 
-### [v1.4.1] — 2025-08-12
+### [v1.4.1] - 2025-08-12
 
 - fix: bump megaportgo version, make vendor config fields more flexible
 
-### [v1.4.0] — 2025-08-04
+### [v1.4.0] - 2025-08-04
 
 - fix: correct lint action version
 - fix: yaml syntax
@@ -357,7 +379,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: remove unused variables
 - fix: migrate locations data source to use V3 API methods
 
-### [v1.3.9] — 2025-07-24
+### [v1.3.9] - 2025-07-24
 
 - test: add acceptance test for ignore lifecycle change for vendor config
 - fix: handle null vendor_config during import with lifecycle.ignore_changes
@@ -382,13 +404,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(release): Automate release notes generation from PRs
 - fix: add check for b end product uid being provided before warning about service key uid
 
-### [v1.3.8] — 2025-06-24
+### [v1.3.8] - 2025-06-24
 
 - fix: warn that the requested B-End Product UID is being overridden by the Service Key lookup if product uids dont match
 - fix: use product uid from service key so user does not need to use both for service key vxcs
 - fix: check for included vnic index in updates to mve vxcs, otherwise keep vnic index same on end config
 
-### [v1.3.7] — 2025-06-04
+### [v1.3.7] - 2025-06-04
 
 - fix: ensure consistent representation of empty MCR prefix filter list
 - fix: resolve merge conflict
@@ -427,7 +449,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: unzip command for installing opentofu
 - feat: ci testing for opentofu-compatability
 
-### [v1.3.6] — 2025-04-29
+### [v1.3.6] - 2025-04-29
 
 - fix: bump x/net to 0.38
 - fix: PRODUCT_MVE
@@ -442,11 +464,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: add computed vlan field for mve vnics
 - fix: change validation for aws partner config, move partner config schemas into reusable schema files
 
-### [v1.3.5] — 2025-04-15
+### [v1.3.5] - 2025-04-15
 
 - feat: support new mcr port speeds
 
-### [v1.3.4] — 2025-04-10
+### [v1.3.4] - 2025-04-10
 
 - fix: schema for cloud init for aviatrix edge, use fake creds
 - fix: improve clarity of warning message and documentation regarding requested_product_uid involving partner csp ports
@@ -454,15 +476,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - cleanup: file organization for readability
 - feat: Add Internet Exchange (IX) resource
 
-### [v1.3.3] — 2025-03-12
+### [v1.3.3] - 2025-03-12
 
 - fix: properly parse lag count from API response
 
-### [v1.3.2] — 2025-03-06
+### [v1.3.2] - 2025-03-06
 
 - feat: Update LAG port resource to handle LagPortUIDs and LagCount correctly
 
-### [v1.3.1] — 2025-02-25
+### [v1.3.1] - 2025-02-25
 
 - fix: remove repeated code and bump timeout to 10m
 - fix: remove deprecated linters
@@ -474,7 +496,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: make localAsn a pointer in megaportgo
 - fix: add local asn to bgp connection config in vxc resource
 
-### [v1.3.0] — 2025-02-07
+### [v1.3.0] - 2025-02-07
 
 - fix: remove excess muxes and wait groups
 - fix: remove select
@@ -490,21 +512,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: add location filtering by ID and update docs/tests to reflect such
 - docs: location clarification and API endpoint
 
-### [v1.2.9] — 2025-02-04
+### [v1.2.9] - 2025-02-04
 
 - docs: add language about month to month contract term for contract_term_months
 - fix: remove vlan check
 - fix: correction in tests
 - feat: support for resource tagging
 
-### [v1.2.8] — 2025-01-29
+### [v1.2.8] - 2025-01-29
 
 - fix: change name for mel-mdc data center location
 - fix: change name for mel-mdc data center location
 - fix: position of check for equality between partner configs
 - fix: detect change in partner config, remove repeated code
 
-### [v1.2.7] — 2025-01-15
+### [v1.2.7] - 2025-01-15
 
 - fix: add support for development environment in terraform
 - fix: change tests to only ignore user provided end config values
@@ -512,7 +534,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: multicloud example scenarios
 - fix: bring back modify plan logicfor imports
 
-### [v1.2.6] — 2024-12-12
+### [v1.2.6] - 2024-12-12
 
 - chore(deps): bump golang.org/x/crypto from 0.21.0 to 0.31.0
 - fix: add missing ibm partner config in update calls
@@ -526,7 +548,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: change state of ordered vlan when updating to prevent unintended null ordered vlan
 - fix: make lag count require replace
 
-### [v1.2.5] — 2024-12-02
+### [v1.2.5] - 2024-12-02
 
 - fix: set vlan to computed for end config, prevent user from inputting it
 - fix: misspelling of cost_centre :)
@@ -536,7 +558,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: only untag a-end owned vlan for aws vxc and do untag test for port vxc test
 - fix: support untagged VLAN in vxc resource, tests to reflect this
 
-### [v1.2.4] — 2024-11-22
+### [v1.2.4] - 2024-11-22
 
 - fix: move csps from partner config update support
 - fix: move tests back to old suites
@@ -552,12 +574,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: plan modifier for ordered vlan
 - fix: make check for vendor and size case-insensitive
 
-### [v1.2.3] — 2024-11-20
+### [v1.2.3] - 2024-11-20
 
 - fix: examples and passing tests for mve image filtering
 - fix: change aws port to loc2 for FullEcosystem example
 
-### [v1.2.2] — 2024-11-20
+### [v1.2.2] - 2024-11-20
 
 - docs: generate docs
 - cleanup: remove debug code and error handle
@@ -585,7 +607,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: contract term months in update port, mcr, mve
 - fix: change azure service key to 197d927b-90bc-4b1b-bffd-fca17a7ec735
 
-### [v1.2.1] — 2024-11-06
+### [v1.2.1] - 2024-11-06
 
 - deps: bumps megaportgo to latest
 - fix: try changing loop variables for linter
@@ -596,36 +618,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: support updating partner config in vxc update
 - feat: support diversity zone in MVE
 
-### [v1.2.0] — 2024-09-18
+### [v1.2.0] - 2024-09-18
 
 - fix: generate docs for mve updates
 
-### [v1.1.9] — 2024-09-18
+### [v1.1.9] - 2024-09-18
 
 - feat: add new MVE image types
 
-### [v1.1.8] — 2024-09-12
+### [v1.1.8] - 2024-09-12
 
 - fix: partner end config misname
 - fix: variable misname for b-end product uid
 - fix: ip routes
 - fix: refine warning to list matching partner ports when multiple matching ports found
 
-### [v1.1.7] — 2024-09-05
+### [v1.1.7] - 2024-09-05
 
 - fix: make service_key sensitive
 - fix: generate docs
 - feat: add service key to vxc input
 
-### [v1.1.6] — 2024-09-04
+### [v1.1.6] - 2024-09-04
 
 - _No user-facing changes._
 
-### [v1.1.5] — 2024-09-04
+### [v1.1.5] - 2024-09-04
 
 - fix: prevent partner port from failing if more than one partner port
 
-### [v1.1.4] — 2024-08-30
+### [v1.1.4] - 2024-08-30
 
 - fix: remove adminSSHPublicKey from palo alto config for mve
 - fix: sshPublicKey variable
@@ -633,17 +655,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: docs
 - fix: ssh public key and go version
 
-### [v1.1.3] — 2024-08-29
+### [v1.1.3] - 2024-08-29
 
 - fix: tidies modules
 - fix: bumps docs generation version to fix #140
 - fix: bumps megaportgo version to handle issue creating MVEs
 
-### [v1.1.2] — 2024-08-14
+### [v1.1.2] - 2024-08-14
 
 - fix: improves partner port data source and cleans up code
 
-### [v1.1.1] — 2024-08-12
+### [v1.1.1] - 2024-08-12
 
 - fix: typo
 - generate: docs
@@ -656,7 +678,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update issue templates to add feature request
 - Update issue templates
 
-### [v1.1.0] — 2024-07-26
+### [v1.1.0] - 2024-07-26
 
 - fix: removes planmodifier for requested_product_uid temporarily
 - fix: remove comments for mve tests
@@ -721,7 +743,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: updates service_key to be sensitive, closes #28
 - fix: adds checks to see if the product has been deleted in the API so it can be recreated
 
-### [v1.0.1] — 2024-06-25
+### [v1.0.1] - 2024-06-25
 
 - fix: go module update
 - fix: acceptance test and mve resources
@@ -827,7 +849,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: dont run all csp vxc tests in parallel because megaport api gets mad
 - feat: refactor tests to testify and run all tests in parallel to save time
 
-### [v1.0.0] — 2024-06-03
+### [v1.0.0] - 2024-06-03
 
 - fix: improves VXC error messages
 - fix: move lag port tests and examples down to single lagCount, update docs
@@ -936,122 +958,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: start mcr boilerplate
 - wip: ports
 
-### [v0.4.2] — 2024-04-30
+### [v0.4.2] - 2024-04-30
 
 - fix: updates to newest version of megaportgo that fixes #54
 
-### [v0.4.1] — 2023-11-08
+### [v0.4.1] - 2023-11-08
 
 - Remove explicit ldflags from goreleaser config
 
-### [v0.4.0] — 2023-11-08
+### [v0.4.0] - 2023-11-08
 
 - Update GitHub Action to use Go 1.21
 - Remove toolchain statement from go.mod
 - Merge branch 'feature/add-mve' into 'master'
 
-### [v0.3.0] — 2023-10-05
+### [v0.3.0] - 2023-10-05
 
 - Update GitHub Actions
 - Merge branch 'feature/DEVOPS-2991-auth-updates-CD' into 'master'
 
-### [v0.2.10] — 2023-07-28
+### [v0.2.10] - 2023-07-28
 
 - Fix typo
 - DEVOPS-2886 oracle oci support
 - Adding Oracle and OCI VXC
 
-### [v0.2.9] — 2023-04-05
+### [v0.2.9] - 2023-04-05
 
 - Update go.mod
 - Update go.mod
 
-### [v0.2.8] — 2023-02-20
+### [v0.2.8] - 2023-02-20
 
 - Merge branch 'feature/DEVOPS-2327-diversity-zone-filtering' into 'master'
 
-### [v0.2.7] — 2022-12-08
+### [v0.2.7] - 2022-12-08
 
 - \# 0.2.7-beta (Dec 8, 2022)
 
-### [v0.2.6] — 2022-11-02
+### [v0.2.6] - 2022-11-02
 
 - Update go.mod
 - Update Makefile
 - \# 0.2.6-beta (Nov 2, 2022)
 
-### [v0.2.5] — 2022-05-05
+### [v0.2.5] - 2022-05-05
 
 - \# 0.2.5-beta (May 5, 2022)
 - Import `MarshallMcrAEndConfig` from upstream megaportgo client.
 
-### [v0.2.4] — 2022-04-06
+### [v0.2.4] - 2022-04-06
 
 - Remove tab
 - \# 0.2.4-beta (April 6, 2022)
 - Add import support for megaport_aws_connection Add a connection_name attribute for AWS connection Remove erroneous Required flags on requested_asn and amazon_asn (not supported on AWSHC)
 - Add optional connection_name attribute for AWS connections
 
-### [v0.2.3] — 2022-03-24
+### [v0.2.3] - 2022-03-24
 
 - \# 0.2.3-beta (March 24, 2022)
 
-### [v0.2.2] — 2022-03-02
+### [v0.2.2] - 2022-03-02
 
 - \# 0.2.2-beta (March 2, 2022)
 
-### [v0.2.1] — 2022-02-22
+### [v0.2.1] - 2022-02-22
 
 - \# 0.2.1-beta (February 22, 2022)
 
-### [v0.2.0] — 2022-01-27
+### [v0.2.0] - 2022-01-27
 
 - \# 0.2.0-beta (January 27, 2022)
 
-### [v0.1.10] — 2021-11-05
+### [v0.1.10] - 2021-11-05
 
 - \# 0.1.10-beta (November 5, 2021)
 
-### [v0.1.9] — 2021-08-19
+### [v0.1.9] - 2021-08-19
 
 - \# 0.1.9-beta (August 19, 2021)
 
-### [v0.1.8] — 2021-06-19
+### [v0.1.8] - 2021-06-19
 
 - \## 0.1.8-beta (June 19, 2021) Notes
 - updated megaportgo reference to latest tag
 - added requested_product_id to gcp_connection csp settings to allow selecting the google b end location
 
-### [v0.1.7] — 2021-06-04
+### [v0.1.7] - 2021-06-04
 
 - Notes
 - Update doco, add in mfa env, chaneg user env
 - add provider environment vars
 
-### [v0.1.6] — 2021-02-11
+### [v0.1.6] - 2021-02-11
 
 - 0.1.6-beta (February 11, 2021)
 
-### [v0.1.5] — 2021-02-10
+### [v0.1.5] - 2021-02-10
 
 - \## 0.1.4-beta (January 12, 2021)
 
-### [v0.1.4] — 2021-01-12
+### [v0.1.4] - 2021-01-12
 
 - 0.1.4-beta (January 12, 2021)
 
-### [v0.1.3] — 2020-12-22
+### [v0.1.3] - 2020-12-22
 
 - Wiki Documentation update (No functionality changes)
 - Wiki Documentation update (No functionality changes)
 
-### [v0.1.2] — 2020-12-09
+### [v0.1.2] - 2020-12-09
 
 - Reformat Documentation for Terraform
 - Documentation update (no functionality changes).
 - Documentation and examples update (no functionality changes).
 
-### [v0.1.1] — 2020-12-01
+### [v0.1.1] - 2020-12-01
 
 - 0.1.0-beta (December 1, 2020)
 - Add Workflow
