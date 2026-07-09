@@ -1284,23 +1284,11 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 // Configure adds the provider configured client to the resource.
 func (r *mcrResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 	r.waitForTime = data.waitForTime
 }
 
