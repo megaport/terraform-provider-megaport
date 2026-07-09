@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -35,6 +36,10 @@ var (
 		"vxc_auto_approval":      types.BoolType,
 		"secondary_name":         types.StringType,
 		"lag_primary":            types.BoolType,
+		"lag_id":                 types.Int64Type,
+		"aggregation_id":         types.Int64Type,
+		"lag_count":              types.Int64Type,
+		"lag_port_uids":          types.ListType{ElemType: types.StringType},
 		"company_uid":            types.StringType,
 		"company_name":           types.StringType,
 		"cost_centre":            types.StringType,
@@ -78,6 +83,10 @@ type portDetailModel struct {
 	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	SecondaryName         types.String `tfsdk:"secondary_name"`
 	LAGPrimary            types.Bool   `tfsdk:"lag_primary"`
+	LAGID                 types.Int64  `tfsdk:"lag_id"`
+	AggregationID         types.Int64  `tfsdk:"aggregation_id"`
+	LagCount              types.Int64  `tfsdk:"lag_count"`
+	LagPortUIDs           types.List   `tfsdk:"lag_port_uids"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CompanyName           types.String `tfsdk:"company_name"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
@@ -179,6 +188,23 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 							Description: "Whether the port is a LAG primary.",
 							Computed:    true,
 						},
+						"lag_id": schema.Int64Attribute{
+							Description: "Numeric ID of the LAG this port belongs to. Zero if the port is not part of a LAG.",
+							Computed:    true,
+						},
+						"aggregation_id": schema.Int64Attribute{
+							Description: "Numeric ID of the LAG aggregation this port belongs to. Zero if the port is not part of a LAG.",
+							Computed:    true,
+						},
+						"lag_count": schema.Int64Attribute{
+							Description: "The number of ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; always 0 when listing all ports.",
+							Computed:    true,
+						},
+						"lag_port_uids": schema.ListAttribute{
+							ElementType: types.StringType,
+							Description: "The unique identifiers of the ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; empty when listing all ports.",
+							Computed:    true,
+						},
 						"company_uid": schema.StringAttribute{
 							Description: "The Megaport Company UID of the port owner.",
 							Computed:    true,
@@ -221,7 +247,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 						},
 						"resource_tags": schema.MapAttribute{
 							ElementType: types.StringType,
-							Description: "The resource tags associated with the port. Only populated when include_resource_tags is set to true.",
+							Description: "The resource tags associated with the port. Only populated when include_resource_tags is set to true; null otherwise (including when the port has no tags).",
 							Computed:    true,
 						},
 					},
@@ -277,6 +303,17 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			resp.Diagnostics.AddError(
 				"Error reading port",
 				"Port not found: "+data.ProductUID.ValueString(),
+			)
+			return
+		}
+		// GetPort hits the generic /v2/product/{uid} endpoint, so a UID
+		// belonging to a non-port product unmarshals into this struct with
+		// zeroed port-only fields (e.g. port_speed=0) instead of erroring.
+		// productType is the reliable discriminator returned by the API.
+		if !strings.EqualFold(port.Type, megaport.PRODUCT_MEGAPORT) {
+			resp.Diagnostics.AddError(
+				"Error reading port",
+				fmt.Sprintf("product_uid %q is not a port (got type %q)", data.ProductUID.ValueString(), port.Type),
 			)
 			return
 		}
@@ -376,6 +413,9 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailMode
 		VXCAutoApproval:       types.BoolValue(p.VXCAutoApproval),
 		SecondaryName:         types.StringValue(p.SecondaryName),
 		LAGPrimary:            types.BoolValue(p.LAGPrimary),
+		LAGID:                 types.Int64Value(int64(p.LAGID)),
+		AggregationID:         types.Int64Value(int64(p.AggregationID)),
+		LagCount:              types.Int64Value(int64(p.LagCount)),
 		CompanyUID:            types.StringValue(p.CompanyUID),
 		CompanyName:           types.StringValue(p.CompanyName),
 		CostCentre:            types.StringValue(p.CostCentre),
@@ -412,6 +452,19 @@ func fromAPIPortDetail(p *megaport.Port, tags map[string]string) (portDetailMode
 		detail.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC3339))
 	} else {
 		detail.ContractEndDate = types.StringNull()
+	}
+
+	// LAG port UIDs
+	if len(p.LagPortUIDs) > 0 {
+		lagPortUIDValues := make([]attr.Value, 0, len(p.LagPortUIDs))
+		for _, uid := range p.LagPortUIDs {
+			lagPortUIDValues = append(lagPortUIDValues, types.StringValue(uid))
+		}
+		lagPortUIDsList, lagDiags := types.ListValue(types.StringType, lagPortUIDValues)
+		diags.Append(lagDiags...)
+		detail.LagPortUIDs = lagPortUIDsList
+	} else {
+		detail.LagPortUIDs = types.ListNull(types.StringType)
 	}
 
 	// Resource tags

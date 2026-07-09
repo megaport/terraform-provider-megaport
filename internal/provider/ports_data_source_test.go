@@ -177,7 +177,7 @@ func TestReadPorts_ListAll(t *testing.T) {
 func TestReadPorts_GetByUID(t *testing.T) {
 	ctx := context.Background()
 	mockPortService := &MockPortService{
-		GetPortResult: &megaport.Port{UID: "port-1", Name: "Port One"},
+		GetPortResult: &megaport.Port{UID: "port-1", Name: "Port One", Type: megaport.PRODUCT_MEGAPORT},
 	}
 	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
@@ -241,6 +241,22 @@ func TestReadPorts_GetByUIDReturnsNil(t *testing.T) {
 	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "not found")
 }
 
+func TestReadPorts_GetByUIDWrongProductType(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		GetPortResult: &megaport.Port{UID: "mcr-1", Name: "Not A Port", Type: megaport.PRODUCT_MCR},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	uid := "mcr-1"
+	req, resp := portsReadRequest(t, ds, &uid, nil)
+	ds.Read(ctx, req, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "is not a port")
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "mcr-1")
+}
+
 func TestReadPorts_ListSkipsInactive(t *testing.T) {
 	ctx := context.Background()
 	mockPortService := &MockPortService{
@@ -278,7 +294,7 @@ func TestReadPorts_GetByUIDReturnsInactive(t *testing.T) {
 	for _, status := range []string{megaport.STATUS_DECOMMISSIONED, megaport.STATUS_CANCELLED} {
 		t.Run(status, func(t *testing.T) {
 			mockPortService := &MockPortService{
-				GetPortResult: &megaport.Port{UID: "port-inactive", ProvisioningStatus: status},
+				GetPortResult: &megaport.Port{UID: "port-inactive", ProvisioningStatus: status, Type: megaport.PRODUCT_MEGAPORT},
 			}
 			ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
 
@@ -424,7 +440,7 @@ func TestReadPorts_TagFetchErrorProducesWarningNotError(t *testing.T) {
 func TestReadPorts_GetByUIDWithTags(t *testing.T) {
 	ctx := context.Background()
 	mockPortService := &MockPortService{
-		GetPortResult:              &megaport.Port{UID: "port-1", Name: "Port One"},
+		GetPortResult:              &megaport.Port{UID: "port-1", Name: "Port One", Type: megaport.PRODUCT_MEGAPORT},
 		ListPortResourceTagsResult: map[string]string{"env": "prod"},
 	}
 	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
@@ -460,6 +476,10 @@ func TestFromAPIPortDetail(t *testing.T) {
 			VXCAutoApproval:       false,
 			SecondaryName:         "Secondary Port",
 			LAGPrimary:            false,
+			LAGID:                 42,
+			AggregationID:         7,
+			LagCount:              2,
+			LagPortUIDs:           []string{"port-lag-a", "port-lag-b"},
 			CompanyUID:            "company-abc",
 			CompanyName:           "Acme Corp",
 			CostCentre:            "CC-001",
@@ -490,6 +510,12 @@ func TestFromAPIPortDetail(t *testing.T) {
 		assert.Equal(t, false, detail.VXCAutoApproval.ValueBool())
 		assert.Equal(t, "Secondary Port", detail.SecondaryName.ValueString())
 		assert.Equal(t, false, detail.LAGPrimary.ValueBool())
+		assert.Equal(t, int64(42), detail.LAGID.ValueInt64())
+		assert.Equal(t, int64(7), detail.AggregationID.ValueInt64())
+		assert.Equal(t, int64(2), detail.LagCount.ValueInt64())
+		var lagPortUIDs []string
+		assert.False(t, detail.LagPortUIDs.ElementsAs(context.Background(), &lagPortUIDs, false).HasError())
+		assert.Equal(t, []string{"port-lag-a", "port-lag-b"}, lagPortUIDs)
 		assert.Equal(t, "company-abc", detail.CompanyUID.ValueString())
 		assert.Equal(t, "Acme Corp", detail.CompanyName.ValueString())
 		assert.Equal(t, "CC-001", detail.CostCentre.ValueString())
@@ -541,6 +567,20 @@ func TestFromAPIPortDetail(t *testing.T) {
 		assert.False(t, diags.HasError())
 
 		assert.True(t, detail.ResourceTags.IsNull())
+	})
+
+	t.Run("No LAG port UIDs produce null list", func(t *testing.T) {
+		port := &megaport.Port{
+			UID: "port-not-in-lag",
+		}
+
+		detail, diags := fromAPIPortDetail(port, nil)
+		assert.False(t, diags.HasError())
+
+		assert.True(t, detail.LagPortUIDs.IsNull())
+		assert.Equal(t, int64(0), detail.LAGID.ValueInt64())
+		assert.Equal(t, int64(0), detail.AggregationID.ValueInt64())
+		assert.Equal(t, int64(0), detail.LagCount.ValueInt64())
 	})
 }
 

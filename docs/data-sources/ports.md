@@ -30,6 +30,7 @@ Looks up active ports in the Megaport API. Optionally filter by product_uid to r
 Read-Only:
 
 - `admin_locked` (Boolean) Whether the port is admin locked.
+- `aggregation_id` (Number) Numeric ID of the LAG aggregation this port belongs to. Zero if the port is not part of a LAG.
 - `cancelable` (Boolean) Whether the port can be cancelled.
 - `company_name` (String) The name of the company that owns the port.
 - `company_uid` (String) The Megaport Company UID of the port owner.
@@ -40,6 +41,9 @@ Read-Only:
 - `create_date` (String) The date the port was created.
 - `created_by` (String) The user who created the port.
 - `diversity_zone` (String) The diversity zone of the port.
+- `lag_count` (Number) The number of ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; always 0 when listing all ports.
+- `lag_id` (Number) Numeric ID of the LAG this port belongs to. Zero if the port is not part of a LAG.
+- `lag_port_uids` (List of String) The unique identifiers of the ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; empty when listing all ports.
 - `lag_primary` (Boolean) Whether the port is a LAG primary.
 - `live_date` (String) The date the port went live.
 - `location_id` (Number) The numeric location ID of the port.
@@ -50,7 +54,7 @@ Read-Only:
 - `product_name` (String) The name of the port.
 - `product_uid` (String) The unique identifier of the port.
 - `provisioning_status` (String) The provisioning status of the port.
-- `resource_tags` (Map of String) The resource tags associated with the port. Only populated when include_resource_tags is set to true.
+- `resource_tags` (Map of String) The resource tags associated with the port. Only populated when include_resource_tags is set to true; null otherwise (including when the port has no tags).
 - `secondary_name` (String) The secondary name of the port.
 - `terminate_date` (String) The date the port will be terminated.
 - `vxc_auto_approval` (Boolean) Whether VXC connections are auto-approved on this port.
