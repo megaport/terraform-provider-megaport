@@ -26,7 +26,11 @@ generate:
 
 fmt:
 	gofmt -w .
-	@command -v terraform >/dev/null 2>&1 && terraform fmt -recursive examples/ || echo "Skipping terraform fmt: terraform CLI not found"
+	@if command -v terraform >/dev/null 2>&1; then \
+		terraform fmt -recursive examples/; \
+	else \
+		echo "Skipping terraform fmt: terraform CLI not found"; \
+	fi
 
 clean:
 	go clean
