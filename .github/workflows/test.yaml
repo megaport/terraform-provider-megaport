@@ -6,11 +6,13 @@ on:
       - 'README.md'
     branches:
       - 'main'
+      - 'feat/v2'
   pull_request:
     paths-ignore:
       - 'README.md'
     branches:
       - 'main'
+      - 'feat/v2'
   workflow_dispatch:
 
 # Testing only needs permissions to read the repository contents.

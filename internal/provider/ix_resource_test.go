@@ -15,6 +15,7 @@ func TestAccMegaportIX_Basic(t *testing.T) {
 	locationID, _ := findPortTestLocation(t, 1000)
 	ixName := RandomTestName()
 	portName := RandomTestName()
+	ixMAC := RandomMACAddress()
 	ixNameUpdated := ixName + "-updated"
 	ixRateLimit := 500
 	ixRateLimitUpdated := 750
@@ -35,12 +36,12 @@ resource "megaport_ix" "test_ix" {
     requested_product_uid = megaport_port.test_port.product_uid
     network_service_type = "Sydney IX"
     asn                 = 12345
-    mac_address         = "00:CA:FE:BA:BE:01"
+    mac_address         = "%s"
     rate_limit          = %d
     vlan                = %d
     shutdown            = false
 }
-`, portName, locationID, ixName, ixRateLimit, ixVLAN)
+`, portName, locationID, ixName, ixMAC, ixRateLimit, ixVLAN)
 
 	// Updated Terraform config
 	configUpdated := fmt.Sprintf(`
@@ -57,12 +58,12 @@ resource "megaport_ix" "test_ix" {
     requested_product_uid = megaport_port.test_port.product_uid
     network_service_type = "Sydney IX"
     asn                 = 12345
-    mac_address         = "00:CA:FE:BA:BE:01"
+    mac_address         = "%s"
     rate_limit          = %d
     vlan                = %d
     shutdown            = false
 }
-`, portName, locationID, ixNameUpdated, ixRateLimitUpdated, ixVLANUpdated)
+`, portName, locationID, ixNameUpdated, ixMAC, ixRateLimitUpdated, ixVLANUpdated)
 
 	resourceName := "megaport_ix.test_ix"
 
@@ -117,6 +118,7 @@ func TestAccMegaportIX_PromoCode(t *testing.T) {
 	locationID, _ := findPortTestLocation(t, 1000)
 	ixName := RandomTestName()
 	portName := RandomTestName()
+	ixMAC := RandomMACAddress()
 	initialPromo := testPromoCode()
 	const otherPromo = "tf-acc-test-promo-other"
 
@@ -135,13 +137,13 @@ resource "megaport_ix" "test_ix" {
     requested_product_uid = megaport_port.test_port.product_uid
     network_service_type  = "Sydney IX"
     asn                   = 12345
-    mac_address           = "00:CA:FE:BA:BE:01"
+    mac_address           = "%s"
     rate_limit            = 500
     vlan                  = 2001
     shutdown              = false
     %s
 }
-`, portName, locationID, ixName, promoLine)
+`, portName, locationID, ixName, ixMAC, promoLine)
 	}
 
 	resource.Test(t, resource.TestCase{
