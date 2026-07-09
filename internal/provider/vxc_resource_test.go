@@ -2165,8 +2165,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  }
 					]
 
-					vendor_config = {
-					  vendor        = "aruba"
+					aruba_config = {
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
 					  image_id      = %d
@@ -2299,8 +2298,7 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 					  }
 					]
 
-					vendor_config = {
-					  vendor        = "aruba"
+					aruba_config = {
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
 					  image_id      = %d
@@ -2497,8 +2495,7 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 					  }
 					]
 
-					vendor_config = {
-					  vendor        = "aruba"
+					aruba_config = {
 					  product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
 					  image_id      = %d
@@ -2644,8 +2641,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
 						},
 					]
 
-                    vendor_config = {
-                        vendor = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
                         image_id = %d
@@ -2756,8 +2752,7 @@ func TestMVE_AWS_VXC(t *testing.T) {
 						},
 					]
 
-                    vendor_config = {
-                        vendor = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
                         image_id = %d
@@ -3089,8 +3084,7 @@ func TestAccMegaportSafeDelete(t *testing.T) {
                         }
                     ]
 
-                    vendor_config = {
-                        vendor       = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
                         image_id     = %d
@@ -3233,8 +3227,7 @@ func TestAccMegaportSafeDelete(t *testing.T) {
                         }
                     ]
 
-                    vendor_config = {
-                        vendor       = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
 						mve_label     = "MVE 2/8"
                         image_id     = %d
@@ -3296,8 +3289,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3321,8 +3313,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3346,8 +3337,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3371,8 +3361,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3441,8 +3430,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3466,8 +3454,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3491,8 +3478,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3516,8 +3502,7 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                         description = "Control Plane"
                       }
                     ]
-                    vendor_config = {
-                      vendor        = "aruba"
+                    aruba_config = {
                       product_size  = "SMALL"
 					  mve_label     = "MVE 2/8"
                       image_id      = data.megaport_mve_images.aruba.mve_images.0.id
@@ -3617,8 +3602,7 @@ func TestAccMegaportVXC_MVEVnicIndexUpdate(t *testing.T) {
                         }
                     ]
 
-                    vendor_config = {
-                        vendor       = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
                         image_id     = %d
@@ -3691,8 +3675,7 @@ func TestAccMegaportVXC_MVEVnicIndexUpdate(t *testing.T) {
                         }
                     ]
 
-                    vendor_config = {
-                        vendor       = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
                         image_id     = %d
@@ -3751,8 +3734,7 @@ func TestAccMegaportVXC_MVEVnicIndexUpdate(t *testing.T) {
                         { description = "Management Plane" },
                         { description = "Control Plane" }
                     ]
-                    vendor_config = {
-                        vendor       = "aruba"
+                    aruba_config = {
                         product_size = "SMALL"
                         mve_label    = "MVE 2/8"
                         image_id     = %d
@@ -4256,8 +4238,7 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 					{ description = "Control Plane" }
 				]
 
-				vendor_config = {
-					vendor       = "aruba"
+				aruba_config = {
 					product_size = "SMALL"
 					mve_label    = "MVE 2/8"
 					image_id     = %d
