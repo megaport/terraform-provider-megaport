@@ -1,10 +1,18 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
@@ -2104,12 +2112,9 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 0)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
-	locs := []int{mveLocID, transitLocs[0]}
-	portName := RandomTestName()
-	costCentreName := RandomTestName()
+	// The MVE and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both VXC ends.
+	mveLocID := findMVEWithPartnerTestLocation(t, "TRANSIT")
 	mveName := RandomTestName()
 	transitVXCName := RandomTestName()
 
@@ -2122,22 +2127,9 @@ func TestMVE_TransitVXC(t *testing.T) {
 					id = %d
 				  }
 
-				  data "megaport_location" "loc2" {
-					id = %d
-				  }
-
-				  resource "megaport_port" "port" {
-					product_name           = "%s"
-					port_speed             = 1000
-					location_id            = data.megaport_location.loc1.id
-					contract_term_months   = 12
-					marketplace_visibility = true
-					cost_centre            = "%s"
-				  }
-
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					location_id   = data.megaport_location.loc2.id
+					location_id   = data.megaport_location.loc1.id
 				  }
 
 				  resource "megaport_mve" "mve" {
@@ -2186,7 +2178,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  partner = "transit"
 					}
 				  }
-                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
+                  `, mveLocID, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
@@ -3525,10 +3517,12 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                     a_end = {
                       requested_product_uid = megaport_mve.mve_3.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                     b_end = {
                       requested_product_uid = megaport_mve.mve_4.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                 }
                 `,
@@ -3549,6 +3543,8 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.vnic_index", "1"),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.inner_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.inner_vlan", "-1"),
 
 					// Verify VXC is now connected to the new MVEs
 					resource.TestCheckResourceAttrPair(
@@ -4419,8 +4415,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 
-	mcrLocationID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocationID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4430,13 +4427,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 				id = %d
 			}
 
-			data "megaport_location" "transit_loc" {
-				id = %d
-			}
-
 			data "megaport_partner" "internet_port" {
 				connect_type = "TRANSIT"
-				location_id  = data.megaport_location.transit_loc.id
+				location_id  = data.megaport_location.mcr_loc.id
 			}
 
 			resource "megaport_mcr" "mcr" {
@@ -4464,7 +4457,7 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 
 				%s
 			}
-		`, mcrLocationID, transitLocs[0], mcrName, vxcName, extraVXCAttrs)
+		`, mcrLocationID, mcrName, vxcName, extraVXCAttrs)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -4497,6 +4490,419 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 	})
 }
 
+// nullValueMap returns a map of all attributes in an object type set to null.
+func nullValueMap(objType tftypes.Object) map[string]tftypes.Value {
+	m := make(map[string]tftypes.Value, len(objType.AttributeTypes))
+	for name, attrType := range objType.AttributeTypes {
+		m[name] = tftypes.NewValue(attrType, nil)
+	}
+	return m
+}
+
+// TestVXCModifyPlan_UnknownEndConfiguration verifies that ModifyPlan returns
+// without error when a_end or b_end is a wholly unknown or null object (e.g.
+// from conditional expressions referencing resources that don't yet exist),
+// leaving the plan untouched for the framework to re-evaluate later.
+func TestVXCModifyPlan_UnknownEndConfiguration(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	// Get the schema.
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	// Extract tftypes from the schema.
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+
+	// Find the end configuration object type from the schema.
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+
+	// Build a valid end configuration value (all nulls except requested_product_uid).
+	validEndAttrs := nullValueMap(endObjType)
+	validEndAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	validEndVal := tftypes.NewValue(endObjType, validEndAttrs)
+
+	// Build state: needs non-null product_uid so we enter the code path,
+	// plus valid a_end/b_end objects.
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = validEndVal
+	stateAttrs["b_end"] = validEndVal
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	tests := []struct {
+		name         string
+		overrideEnds []string
+		makeNull     bool // override with a null object instead of an unknown one
+	}{
+		{"unknown_a_end", []string{"a_end"}, false},
+		{"unknown_b_end", []string{"b_end"}, false},
+		{"unknown_both_ends", []string{"a_end", "b_end"}, false},
+		{"null_a_end", []string{"a_end"}, true},
+		{"null_b_end", []string{"b_end"}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build plan: start with valid ends, then override the target end(s)
+			// with an unknown or null object.
+			planAttrs := nullValueMap(schemaObjType)
+			planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+			planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+			planAttrs["a_end"] = validEndVal
+			planAttrs["b_end"] = validEndVal
+
+			override := tftypes.NewValue(endObjType, tftypes.UnknownValue)
+			if tc.makeNull {
+				override = tftypes.NewValue(endObjType, nil)
+			}
+			for _, end := range tc.overrideEnds {
+				planAttrs[end] = override
+			}
+
+			planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+			state := tfsdk.State{Schema: s, Raw: stateVal}
+			plan := tfsdk.Plan{Schema: s, Raw: planVal}
+
+			req := fwresource.ModifyPlanRequest{
+				State: state,
+				Plan:  plan,
+			}
+			resp := fwresource.ModifyPlanResponse{
+				Plan: plan,
+			}
+
+			r.ModifyPlan(ctx, req, &resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Errorf("expected no errors, got: %v", resp.Diagnostics.Errors())
+			}
+			// Verify the plan was not modified on the early-return path.
+			if !resp.Plan.Raw.Equal(planVal) {
+				t.Error("expected plan to be unchanged when end configs are unknown or null")
+			}
+		})
+	}
+}
+
+// TestVXCModifyPlan_ValidEndsReconcile drives the non-early-return path: both
+// ends are valid objects, so ModifyPlan decodes them, reconciles, and writes
+// resp.Plan. It guards the reconcile wiring (correct per-end objects, no
+// conversion error) that the unknown/null test never exercises, and confirms a
+// known requested_product_uid survives reconciliation.
+func TestVXCModifyPlan_ValidEndsReconcile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+
+	// Distinct UIDs per end so the assertions catch an A-End/B-End wiring swap,
+	// not just a decode crash.
+	makeEnd := func(uid string) tftypes.Value {
+		attrs := nullValueMap(endObjType)
+		attrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, uid)
+		return tftypes.NewValue(endObjType, attrs)
+	}
+	aEndVal := makeEnd("port-uid-aaa")
+	bEndVal := makeEnd("port-uid-bbb")
+
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = aEndVal
+	stateAttrs["b_end"] = bEndVal
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	planAttrs := nullValueMap(schemaObjType)
+	planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+	planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+	planAttrs["a_end"] = aEndVal
+	planAttrs["b_end"] = bEndVal
+	planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+	plan := tfsdk.Plan{Schema: s, Raw: planVal}
+	req := fwresource.ModifyPlanRequest{
+		State: tfsdk.State{Schema: s, Raw: stateVal},
+		Plan:  plan,
+	}
+	resp := fwresource.ModifyPlanResponse{Plan: plan}
+
+	r.ModifyPlan(ctx, req, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("expected no errors on reconcile path, got: %v", resp.Diagnostics.Errors())
+	}
+	if len(resp.RequiresReplace) != 0 {
+		t.Errorf("expected no RequiresReplace for non-CSP unchanged ends, got: %v", resp.RequiresReplace)
+	}
+
+	// The reconcile path must have run and produced a usable plan that preserves
+	// each end's known requested_product_uid against the correct end (a swap of
+	// the A-End/B-End reconcile wiring would surface here).
+	var got vxcResourceModel
+	if diags := resp.Plan.Get(ctx, &got); diags.HasError() {
+		t.Fatalf("decoding resp.Plan failed: %v", diags.Errors())
+	}
+	var aEnd, bEnd vxcEndConfigurationModel
+	if diags := got.AEndConfiguration.As(ctx, &aEnd, basetypes.ObjectAsOptions{}); diags.HasError() {
+		t.Fatalf("decoding a_end failed: %v", diags.Errors())
+	}
+	if diags := got.BEndConfiguration.As(ctx, &bEnd, basetypes.ObjectAsOptions{}); diags.HasError() {
+		t.Fatalf("decoding b_end failed: %v", diags.Errors())
+	}
+	if aEnd.RequestedProductUID.ValueString() != "port-uid-aaa" {
+		t.Errorf("expected a_end requested_product_uid preserved as port-uid-aaa, got %q", aEnd.RequestedProductUID.ValueString())
+	}
+	if bEnd.RequestedProductUID.ValueString() != "port-uid-bbb" {
+		t.Errorf("expected b_end requested_product_uid preserved as port-uid-bbb, got %q", bEnd.RequestedProductUID.ValueString())
+	}
+}
+
+// TestReconcileVXCEnd_RequestedProductUID exercises reconcileVXCEnd's
+// requested_product_uid switch directly. It guards the behavior the PR adds (an
+// unknown UID is preserved, not clobbered) and the pre-existing CSP/non-CSP
+// branches.
+func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mkEnd := func(t *testing.T, requested, current types.String) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: requested,
+			CurrentProductUID:   current,
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+	cspPartner := func(t *testing.T) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name           string
+		planRequested  types.String
+		stateRequested types.String
+		stateCurrent   types.String
+		csp            bool
+		wantUnknown    bool
+		wantValue      string
+	}{
+		{
+			name:           "unknown_plan_uid_non_csp_preserved",
+			planRequested:  types.StringUnknown(),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantUnknown:    true,
+		},
+		{
+			name:           "unknown_plan_uid_csp_not_clobbered",
+			planRequested:  types.StringUnknown(),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantUnknown:    true,
+		},
+		{
+			name:           "both_null_uses_current",
+			planRequested:  types.StringNull(),
+			stateRequested: types.StringNull(),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantValue:      "port-current",
+		},
+		{
+			name:           "state_null_plan_known_csp_keeps_plan",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringNull(),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantValue:      "port-new",
+		},
+		{
+			name:           "csp_known_plan_pins_to_state",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            true,
+			wantValue:      "port-state",
+		},
+		{
+			name:           "non_csp_known_plan_kept",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			csp:            false,
+			wantValue:      "port-new",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if tc.csp {
+				planPartner = cspPartner(t)
+			}
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            mkEnd(t, tc.planRequested, types.StringNull()),
+				stateEndObj:           mkEnd(t, tc.stateRequested, tc.stateCurrent),
+				planPartnerConfig:     planPartner,
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			var got vxcEndConfigurationModel
+			if d := gotObj.As(ctx, &got, basetypes.ObjectAsOptions{}); d.HasError() {
+				t.Fatalf("decode result: %v", d.Errors())
+			}
+
+			if tc.wantUnknown {
+				if !got.RequestedProductUID.IsUnknown() {
+					t.Errorf("expected requested_product_uid to stay unknown, got %v", got.RequestedProductUID)
+				}
+				return
+			}
+			if got.RequestedProductUID.ValueString() != tc.wantValue {
+				t.Errorf("requested_product_uid = %q, want %q", got.RequestedProductUID.ValueString(), tc.wantValue)
+			}
+		})
+	}
+}
+
+// TestReconcileVXCEnd_RequiresReplace covers the partner-config replace branch:
+// a changed CSP partner-config forces replacement, while an unchanged CSP
+// config, a non-CSP change, or a null state config must not.
+func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partnerWith := func(t *testing.T, name string) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+	end := func(t *testing.T) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: types.StringValue("port-x"),
+			CurrentProductUID:   types.StringValue("port-x"),
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name         string
+		planPartner  func(t *testing.T) types.Object
+		nullState    bool // state partner config is null
+		statePartner string
+		wantReplace  bool
+	}{
+		{name: "csp_changed_forces_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "azure", wantReplace: true},
+		{name: "csp_unchanged_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "aws", wantReplace: false},
+		{name: "non_csp_change_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "transit") }, statePartner: "aws", wantReplace: false},
+		{name: "null_state_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, nullState: true, wantReplace: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if !tc.nullState {
+				statePartner = partnerWith(t, tc.statePartner)
+			}
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            end(t),
+				stateEndObj:           end(t),
+				planPartnerConfig:     tc.planPartner(t),
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			if tc.wantReplace {
+				if len(rr) != 1 || rr[0].String() != path.Root("a_end_partner_config").String() {
+					t.Errorf("expected requiresReplace [a_end_partner_config], got %v", rr)
+				}
+			} else if len(rr) != 0 {
+				t.Errorf("expected no requiresReplace, got %v", rr)
+			}
+		})
+	}
+}
+
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
 // whose A-End vrouter config declares two interfaces: a subInterface carrying
 // the tunnel source IP, and an ipSecTunnel interface with a single
@@ -4507,17 +4913,14 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	mcrLocID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
 	config := providerConfig + fmt.Sprintf(`
 		data "megaport_location" "mcr_loc" {
-			id = %d
-		}
-
-		data "megaport_location" "transit_loc" {
 			id = %d
 		}
 
@@ -4536,7 +4939,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 		data "megaport_partner" "internet_port" {
 			connect_type = "TRANSIT"
-			location_id  = data.megaport_location.transit_loc.id
+			location_id  = data.megaport_location.mcr_loc.id
 		}
 
 		resource "megaport_vxc" "ipsec_vxc" {
@@ -4576,7 +4979,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 			depends_on = [megaport_mcr_ipsec_addon.addon]
 		}
-	`, mcrLocID, transitLocs[0], mcrName, vxcName)
+	`, mcrLocID, mcrName, vxcName)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
