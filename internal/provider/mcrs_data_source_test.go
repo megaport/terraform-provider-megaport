@@ -410,7 +410,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			ContractEndDate:   &megaport.Time{Time: ts},
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, diags := fromAPIMCRDetail(mcr, nil)
+		assert.False(t, diags.HasError())
 
 		assert.Equal(t, "2024-03-15T10:30:00Z", detail.CreateDate.ValueString())
 		assert.Equal(t, "2024-03-15T10:30:00Z", detail.LiveDate.ValueString())
@@ -471,7 +472,8 @@ func TestFromAPIMCRDetail(t *testing.T) {
 			AttributeTags: map[string]string{},
 		}
 
-		detail := fromAPIMCRDetail(mcr, nil)
+		detail, diags := fromAPIMCRDetail(mcr, nil)
+		assert.False(t, diags.HasError())
 
 		assert.False(t, detail.AttributeTags.IsNull())
 		assert.Empty(t, detail.AttributeTags.Elements())
