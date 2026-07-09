@@ -734,6 +734,111 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesEchoOmittedFields(t *testing.
 	assertInt64(t, "as_path_prepend_count", bgp.AsPathPrependCount, 3)
 }
 
+// TestMergeVrouterPartnerConfigFromAPI_PreservesLocalAsnWhenAPIOmits verifies
+// that local_asn (a *int, omitempty field in the SDK) is preserved when the
+// read endpoint doesn't echo it, rather than nulled, avoiding false drift.
+func TestMergeVrouterPartnerConfigFromAPI_PreservesLocalAsnWhenAPIOmits(t *testing.T) {
+	ctx := context.Background()
+
+	stateBGP := nullBGPModel()
+	stateBGP.PeerIPAddress = types.StringValue("10.0.0.2")
+	stateBGP.LocalAsn = types.Int64Value(65000)
+
+	existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP})
+
+	// API echoes the peer IP but omits local_asn (nil).
+	vrConn := megaport.CSPConnectionVirtualRouter{
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
+			{
+				BGPConnections: []megaport.BgpConnectionConfig{
+					{PeerIpAddress: "10.0.0.2"},
+				},
+			},
+		},
+	}
+
+	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+
+	bgp := extractBGPFromResult(t, ctx, result)
+	assertInt64(t, "local_asn", bgp.LocalAsn, 65000)
+}
+
+// TestMergeVrouterPartnerConfigFromAPI_UpdatesLocalAsnWhenAPIReturnsValue verifies
+// that local_asn does track the API when the API does return a value.
+func TestMergeVrouterPartnerConfigFromAPI_UpdatesLocalAsnWhenAPIReturnsValue(t *testing.T) {
+	ctx := context.Background()
+
+	stateBGP := nullBGPModel()
+	stateBGP.PeerIPAddress = types.StringValue("10.0.0.2")
+	stateBGP.LocalAsn = types.Int64Value(65000)
+
+	existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP})
+
+	apiLocalAsn := 65001
+	vrConn := megaport.CSPConnectionVirtualRouter{
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
+			{
+				BGPConnections: []megaport.BgpConnectionConfig{
+					{PeerIpAddress: "10.0.0.2", LocalAsn: &apiLocalAsn},
+				},
+			},
+		},
+	}
+
+	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+
+	bgp := extractBGPFromResult(t, ctx, result)
+	assertInt64(t, "local_asn", bgp.LocalAsn, 65001)
+}
+
+// TestAnyPrefixFilterListsConfigured covers the gate used to skip the
+// ListMCRPrefixFilterLists round-trip when nothing needs resolving.
+func TestAnyPrefixFilterListsConfigured(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no interfaces", func(t *testing.T) {
+		if anyPrefixFilterListsConfigured(ctx, nil) {
+			t.Error("expected false for no interfaces")
+		}
+	})
+
+	t.Run("null bgp_connections", func(t *testing.T) {
+		ifaces := []*vxcPartnerConfigInterfaceModel{
+			{BgpConnections: types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig))},
+		}
+		if anyPrefixFilterListsConfigured(ctx, ifaces) {
+			t.Error("expected false when bgp_connections is null")
+		}
+	})
+
+	t.Run("bgp connection with no prefix filters configured", func(t *testing.T) {
+		bgp := nullBGPModel()
+		bgp.PeerIPAddress = types.StringValue("10.0.0.2")
+		existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{bgp})
+		iface := extractInterfaceFromResult(t, ctx, existing)
+		if anyPrefixFilterListsConfigured(ctx, []*vxcPartnerConfigInterfaceModel{iface}) {
+			t.Error("expected false when no prefix filter fields are configured")
+		}
+	})
+
+	t.Run("bgp connection with import_whitelist configured", func(t *testing.T) {
+		bgp := nullBGPModel()
+		bgp.PeerIPAddress = types.StringValue("10.0.0.2")
+		bgp.ImportWhitelist = types.StringValue("my-filter")
+		existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{bgp})
+		iface := extractInterfaceFromResult(t, ctx, existing)
+		if !anyPrefixFilterListsConfigured(ctx, []*vxcPartnerConfigInterfaceModel{iface}) {
+			t.Error("expected true when import_whitelist is configured")
+		}
+	})
+}
+
 // buildVrouterConfigWithRoutes builds a vrouter partner config object with a single
 // interface carrying the given IP routes (and no BGP connections).
 func buildVrouterConfigWithRoutes(t *testing.T, ctx context.Context, routes []ipRouteModel) basetypes.ObjectValue {

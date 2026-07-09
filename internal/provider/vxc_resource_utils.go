@@ -536,9 +536,11 @@ func mergeVrouterPartnerConfigFromAPI(
 		return existingPartnerConfig, diags
 	}
 
-	// Look up prefix filter lists for ID→name mapping
+	// Look up prefix filter lists for ID→name mapping. Skip the round-trip
+	// entirely when no BGP connection has a prefix filter list field
+	// configured, since there would be nothing to resolve.
 	var prefixFilterLists []*megaport.PrefixFilterList
-	if client != nil && mcrUID != "" {
+	if client != nil && mcrUID != "" && anyPrefixFilterListsConfigured(ctx, existingIfaces) {
 		var err error
 		prefixFilterLists, err = client.MCRService.ListMCRPrefixFilterLists(ctx, mcrUID)
 		if err != nil {
@@ -675,12 +677,12 @@ func mergeVrouterPartnerConfigFromAPI(
 				if !existingBgp.BfdEnabled.IsNull() {
 					existingBgp.BfdEnabled = types.BoolValue(apiBgp.BfdEnabled)
 				}
-				if !existingBgp.LocalAsn.IsNull() {
-					if apiBgp.LocalAsn != nil {
-						existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
-					} else {
-						existingBgp.LocalAsn = types.Int64Null()
-					}
+				// local_asn is a pointer with omitempty in the SDK, so a nil
+				// API value is indistinguishable from "not echoed". Only
+				// overwrite when the API actually returns a value, otherwise
+				// preserve state to avoid false drift on every refresh.
+				if !existingBgp.LocalAsn.IsNull() && apiBgp.LocalAsn != nil {
+					existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
 				}
 				// peer_type, description, med_in, med_out, export_policy and
 				// as_path_prepend_count are omitempty in the SDK, so a zero/empty
@@ -789,6 +791,28 @@ func prefixFilterIDToName(id int, pflMap map[int]string, existing basetypes.Stri
 		return types.StringValue(name)
 	}
 	return existing
+}
+
+// anyPrefixFilterListsConfigured reports whether any interface's BGP connections
+// have a prefix filter list field set in state, so mergeVrouterPartnerConfigFromAPI
+// can skip the ListMCRPrefixFilterLists round-trip when there's nothing to resolve.
+func anyPrefixFilterListsConfigured(ctx context.Context, ifaces []*vxcPartnerConfigInterfaceModel) bool {
+	for _, iface := range ifaces {
+		if iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+			continue
+		}
+		var bgps []*bgpConnectionConfigModel
+		if diags := iface.BgpConnections.ElementsAs(ctx, &bgps, false); diags.HasError() {
+			continue
+		}
+		for _, b := range bgps {
+			if !b.ImportWhitelist.IsNull() || !b.ImportBlacklist.IsNull() ||
+				!b.ExportWhitelist.IsNull() || !b.ExportBlacklist.IsNull() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // These functions are used for partner configurations for ordering VXC Resources through the Megaport API.
