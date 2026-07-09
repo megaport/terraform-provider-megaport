@@ -17,7 +17,7 @@ Looks up IXs in the Megaport API. Optionally filter by product_uid to retrieve a
 
 ### Optional
 
-- `product_uid` (String) The unique identifier of a specific IX to look up. If not provided, all active IXs are returned.
+- `product_uid` (String) The unique identifier of a specific IX to look up. Must be the UID of an IX: the API has no product-type check on this lookup, so passing the UID of another product (port, MCR, MVE, etc.) returns undefined field values instead of an error. If not provided, all active IXs are returned; a product_uid lookup can also return an inactive IX.
 
 ### Read-Only
 

@@ -83,7 +83,7 @@ func (d *ixsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 		Attributes: map[string]schema.Attribute{
 			"product_uid": schema.StringAttribute{
 				Optional:    true,
-				Description: "The unique identifier of a specific IX to look up. If not provided, all active IXs are returned.",
+				Description: "The unique identifier of a specific IX to look up. Must be the UID of an IX: the API has no product-type check on this lookup, so passing the UID of another product (port, MCR, MVE, etc.) returns undefined field values instead of an error. If not provided, all active IXs are returned; a product_uid lookup can also return an inactive IX.",
 			},
 			"ixs": schema.ListNestedAttribute{
 				Description: "List of IXs with detailed information.",
@@ -274,7 +274,7 @@ func fromAPIIXDetail(ix *megaport.IX) (ixDetailModel, diag.Diagnostics) {
 		NetworkServiceType: types.StringValue(ix.NetworkServiceType),
 	}
 
-	// Time fields — use RFC3339 to match the IX resource, null when unset
+	// Time fields: use RFC3339 to match the IX resource, null when unset
 	if ix.CreateDate != nil {
 		detail.CreateDate = types.StringValue(ix.CreateDate.Format(time.RFC3339))
 	} else {
