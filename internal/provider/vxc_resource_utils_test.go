@@ -102,6 +102,25 @@ func TestMapVXCUpdateError(t *testing.T) {
 			t.Errorf("expected generic summary for a non-400 status, got %q", summary)
 		}
 	})
+
+	t.Run("sentinel carried in .Data instead of .Message is still matched", func(t *testing.T) {
+		// NetAuto sometimes surfaces the descriptive text via .Data with a
+		// generic .Message; the matcher must check both fields.
+		dataOnlyErr := newMegaportAPIErrorWithData(
+			"/v3/product/vxc/"+vxcUID, http.StatusBadRequest,
+			"2b3c4d5e", "Bad Request",
+			"VRouter: localAsn may not change the neighbour relationship from IBGP to EBGP, "+
+				"Validation of csp_request failed",
+		)
+		summary, detail := mapVXCUpdateError(dataOnlyErr, vxcUID)
+
+		if !strings.Contains(strings.ToLower(summary), "bgp") {
+			t.Errorf("summary should mention BGP when the sentinel is only in .Data, got %q", summary)
+		}
+		if !strings.Contains(detail, vxcUID) {
+			t.Errorf("detail should reference the VXC UID %q, got %q", vxcUID, detail)
+		}
+	})
 }
 
 // TestCreateVrouterPartnerConfig_IPsecTunnelOptions verifies the model -> SDK

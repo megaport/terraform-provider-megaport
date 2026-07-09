@@ -1084,7 +1084,7 @@ func isVXCLocalAsnIBGPEBGPError(err error) bool {
 		return false
 	}
 	return apiErr.Response.StatusCode == http.StatusBadRequest &&
-		strings.Contains(apiErr.Message, vxcLocalAsnIBGPEBGPSentinel)
+		strings.Contains(apiErr.Message+" "+apiErr.Data, vxcLocalAsnIBGPEBGPSentinel)
 }
 
 // mapVXCUpdateError turns an error from VXCService.UpdateVXC into a Terraform

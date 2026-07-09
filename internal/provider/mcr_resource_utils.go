@@ -13,11 +13,8 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// mcrAsnAttachedVXCSentinel is the verbatim substring the Megaport platform
-// returns (from MegaPortService.validateMcrAsn in Megalith) in the .Message of
-// a 400 when an MCR ASN update is rejected because live VXCs are still attached.
-// The "to this MCR" qualifier keeps the match MCR-specific: the NAT Gateway
-// backend emits the same prefix but ends "to this NAT Gateway".
+// mcrAsnAttachedVXCSentinel is the platform's 400 message for a rejected MCR ASN update.
+// NAT Gateway shares this error path but ends "to this NAT Gateway" instead, so the qualifier stays MCR-specific.
 const mcrAsnAttachedVXCSentinel = "Cannot update ASN while VXCs are attached to this MCR"
 
 // isMCRAsnAttachedVXCError reports whether err is the platform's HTTP 400
@@ -30,7 +27,7 @@ func isMCRAsnAttachedVXCError(err error) bool {
 		return false
 	}
 	return apiErr.Response.StatusCode == http.StatusBadRequest &&
-		strings.Contains(apiErr.Message, mcrAsnAttachedVXCSentinel)
+		strings.Contains(apiErr.Message+" "+apiErr.Data, mcrAsnAttachedVXCSentinel)
 }
 
 // mapMCRUpdateError turns an error from MCRService.ModifyMCR into a Terraform

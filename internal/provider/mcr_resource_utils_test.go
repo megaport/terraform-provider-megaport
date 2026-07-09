@@ -15,6 +15,13 @@ import (
 // megaportgo SDK returns for a non-2xx API response, so the diagnostic mappers
 // can be exercised against the concrete error type they match on.
 func newMegaportAPIError(path string, status int, traceID, message string) *megaport.ErrorResponse {
+	return newMegaportAPIErrorWithData(path, status, traceID, message, "")
+}
+
+// newMegaportAPIErrorWithData is newMegaportAPIError plus the .Data field, for
+// exercising the case where the platform puts the sentinel text in .Data
+// rather than .Message.
+func newMegaportAPIErrorWithData(path string, status int, traceID, message, data string) *megaport.ErrorResponse {
 	return &megaport.ErrorResponse{
 		Response: &http.Response{
 			StatusCode: status,
@@ -25,6 +32,7 @@ func newMegaportAPIError(path string, status int, traceID, message string) *mega
 		},
 		TraceID: traceID,
 		Message: message,
+		Data:    data,
 	}
 }
 
@@ -108,6 +116,25 @@ func TestMapMCRUpdateError(t *testing.T) {
 
 		if summary != "Error Updating MCR" {
 			t.Errorf("expected generic summary for a non-400 status, got %q", summary)
+		}
+	})
+
+	t.Run("sentinel carried in .Data instead of .Message is still matched", func(t *testing.T) {
+		// The Megaport API sometimes puts the descriptive text in .Data with
+		// a generic .Message; the matcher must check both fields.
+		dataOnlyErr := newMegaportAPIErrorWithData(
+			"/v2/product/mcr2/"+mcrUID, http.StatusBadRequest,
+			"3c1d9e4f", "Bad Request",
+			"Cannot update ASN while VXCs are attached to this MCR. "+
+				"Please remove all VXC connections before changing the ASN.",
+		)
+		summary, detail := mapMCRUpdateError(dataOnlyErr, mcrUID)
+
+		if !strings.Contains(summary, "ASN") {
+			t.Errorf("summary should mention ASN when the sentinel is only in .Data, got %q", summary)
+		}
+		if !strings.Contains(detail, mcrUID) {
+			t.Errorf("detail should reference the MCR UID %q, got %q", mcrUID, detail)
 		}
 	})
 }
