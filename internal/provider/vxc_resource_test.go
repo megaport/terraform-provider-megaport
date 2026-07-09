@@ -2112,12 +2112,9 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 func TestMVE_TransitVXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// loc1 hosts the MVE (needs MVE capacity); loc2 needs TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 0)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
-	locs := []int{mveLocID, transitLocs[0]}
-	portName := RandomTestName()
-	costCentreName := RandomTestName()
+	// The MVE and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both VXC ends.
+	mveLocID := findMVEWithPartnerTestLocation(t, "TRANSIT")
 	mveName := RandomTestName()
 	transitVXCName := RandomTestName()
 
@@ -2130,22 +2127,9 @@ func TestMVE_TransitVXC(t *testing.T) {
 					id = %d
 				  }
 
-				  data "megaport_location" "loc2" {
-					id = %d
-				  }
-
-				  resource "megaport_port" "port" {
-					product_name           = "%s"
-					port_speed             = 1000
-					location_id            = data.megaport_location.loc1.id
-					contract_term_months   = 12
-					marketplace_visibility = true
-					cost_centre            = "%s"
-				  }
-
 				  data "megaport_partner" "internet_port" {
 					connect_type  = "TRANSIT"
-					location_id   = data.megaport_location.loc2.id
+					location_id   = data.megaport_location.loc1.id
 				  }
 
 				  resource "megaport_mve" "mve" {
@@ -2193,7 +2177,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 					  partner = "transit"
 					}
 				  }
-                  `, locs[0], locs[1], portName, costCentreName, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
+                  `, mveLocID, mveName, MVEArubaImageID, mveName, mveName, transitVXCName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
 				),
@@ -3518,10 +3502,12 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                     a_end = {
                       requested_product_uid = megaport_mve.mve_3.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                     b_end = {
                       requested_product_uid = megaport_mve.mve_4.product_uid
                       vnic_index            = 1
+                      inner_vlan            = -1
                     }
                 }
                 `,
@@ -3542,6 +3528,8 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.vnic_index", "1"),
 					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.vnic_index", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "a_end.inner_vlan", "-1"),
+					resource.TestCheckResourceAttr("megaport_vxc.mve_vxc", "b_end.inner_vlan", "-1"),
 
 					// Verify VXC is now connected to the new MVEs
 					resource.TestCheckResourceAttrPair(
@@ -4408,8 +4396,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 
-	mcrLocationID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocationID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4419,13 +4408,9 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 				id = %d
 			}
 
-			data "megaport_location" "transit_loc" {
-				id = %d
-			}
-
 			data "megaport_partner" "internet_port" {
 				connect_type = "TRANSIT"
-				location_id  = data.megaport_location.transit_loc.id
+				location_id  = data.megaport_location.mcr_loc.id
 			}
 
 			resource "megaport_mcr" "mcr" {
@@ -4453,7 +4438,7 @@ func TestAccMegaportVXC_TransitInternetTagsUpdate(t *testing.T) {
 
 				%s
 			}
-		`, mcrLocationID, transitLocs[0], mcrName, vxcName, extraVXCAttrs)
+		`, mcrLocationID, mcrName, vxcName, extraVXCAttrs)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -4909,17 +4894,14 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	mcrLocID, _ := findMCRTestLocation(t, 1000)
-	transitLocs := findVXCPortTestLocationsWithPartner(t, 1, "TRANSIT")
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
 	config := providerConfig + fmt.Sprintf(`
 		data "megaport_location" "mcr_loc" {
-			id = %d
-		}
-
-		data "megaport_location" "transit_loc" {
 			id = %d
 		}
 
@@ -4938,7 +4920,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 		data "megaport_partner" "internet_port" {
 			connect_type = "TRANSIT"
-			location_id  = data.megaport_location.transit_loc.id
+			location_id  = data.megaport_location.mcr_loc.id
 		}
 
 		resource "megaport_vxc" "ipsec_vxc" {
@@ -4978,7 +4960,7 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 			depends_on = [megaport_mcr_ipsec_addon.addon]
 		}
-	`, mcrLocID, transitLocs[0], mcrName, vxcName)
+	`, mcrLocID, mcrName, vxcName)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
