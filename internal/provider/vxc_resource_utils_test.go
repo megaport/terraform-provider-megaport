@@ -164,8 +164,6 @@ func TestIPSecPhaseLifetimeValidator(t *testing.T) {
 // returned untagged) inner VLAN normalization, a genuine mismatch that must
 // still fail, and unrelated fields being unaffected by the normalization.
 func TestVerifyUpdateApplied(t *testing.T) {
-	intPtr := func(v int) *int { return &v }
-
 	cases := []struct {
 		name      string
 		vxc       *megaport.VXC
@@ -179,8 +177,8 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				BEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 0},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(-1),
-				BEndInnerVLAN: intPtr(-1),
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				BEndInnerVLAN: megaport.PtrTo(-1),
 			},
 			want: true,
 		},
@@ -190,7 +188,7 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 200},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(100),
+				AEndInnerVLAN: megaport.PtrTo(100),
 			},
 			want: false,
 		},
@@ -200,7 +198,7 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 100},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(-1),
+				AEndInnerVLAN: megaport.PtrTo(-1),
 			},
 			want: false,
 		},
@@ -211,8 +209,8 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				BEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 200},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(100),
-				BEndInnerVLAN: intPtr(200),
+				AEndInnerVLAN: megaport.PtrTo(100),
+				BEndInnerVLAN: megaport.PtrTo(200),
 			},
 			want: true,
 		},
@@ -226,9 +224,9 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(-1),
-				Name:          strPtr("updated-name"),
-				RateLimit:     intPtr(500),
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				Name:          megaport.PtrTo("updated-name"),
+				RateLimit:     megaport.PtrTo(500),
 			},
 			want: true,
 		},
@@ -241,8 +239,8 @@ func TestVerifyUpdateApplied(t *testing.T) {
 				},
 			},
 			updateReq: &megaport.UpdateVXCRequest{
-				AEndInnerVLAN: intPtr(-1),
-				Name:          strPtr("different-name"),
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				Name:          megaport.PtrTo("different-name"),
 			},
 			want: false,
 		},
@@ -255,5 +253,3 @@ func TestVerifyUpdateApplied(t *testing.T) {
 		})
 	}
 }
-
-func strPtr(s string) *string { return &s }
