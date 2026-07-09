@@ -169,20 +169,253 @@ type vmwareConfigModel struct {
 	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
 }
 
+// mveVendorSpec is the single source of truth for one per-vendor MVE config
+// block: its canonical vendor name, its schema attribute name, how to get/set
+// it on the model, and how to convert it to the API vendor config type.
+// Adding or removing a vendor only requires editing mveVendors below.
+type mveVendorSpec struct {
+	name     string
+	attrName string
+	get      func(*mveResourceModel) types.Object
+	set      func(*mveResourceModel, types.Object)
+	toAPI    func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics)
+}
+
+// mveVendors is the registry of all per-vendor MVE config blocks.
+var mveVendors = []mveVendorSpec{
+	{
+		name: "aruba", attrName: "aruba_config",
+		get: func(m *mveResourceModel) types.Object { return m.ArubaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.ArubaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg arubaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.ArubaConfig{
+				Vendor:      "aruba",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				AccountName: cfg.AccountName.ValueString(),
+				AccountKey:  cfg.AccountKey.ValueString(),
+				SystemTag:   cfg.SystemTag.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "aviatrix", attrName: "aviatrix_config",
+		get: func(m *mveResourceModel) types.Object { return m.AviatrixConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.AviatrixConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg aviatrixConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.AviatrixConfig{
+				Vendor:      "aviatrix",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				CloudInit:   cfg.CloudInit.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "cisco", attrName: "cisco_config",
+		get: func(m *mveResourceModel) types.Object { return m.CiscoConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.CiscoConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg ciscoConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.CiscoConfig{
+				Vendor:             "cisco",
+				ImageID:            int(cfg.ImageID.ValueInt64()),
+				ProductSize:        cfg.ProductSize.ValueString(),
+				MVELabel:           cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey:  cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:       cfg.SSHPublicKey.ValueString(),
+				AdminPassword:      adminPassword,
+				ManageLocally:      cfg.ManageLocally.ValueBool(),
+				CloudInit:          cfg.CloudInit.ValueString(),
+				FMCIPAddress:       cfg.FMCIPAddress.ValueString(),
+				FMCRegistrationKey: cfg.FMCRegistrationKey.ValueString(),
+				FMCNatID:           cfg.FMCNatID.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "fortinet", attrName: "fortinet_config",
+		get: func(m *mveResourceModel) types.Object { return m.FortinetConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.FortinetConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg fortinetConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.FortinetConfig{
+				Vendor:            "fortinet",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				LicenseData:       cfg.LicenseData.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "meraki", attrName: "meraki_config",
+		get: func(m *mveResourceModel) types.Object { return m.MerakiConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.MerakiConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg merakiConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.MerakiConfig{
+				Vendor:      "meraki",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				Token:       cfg.Token.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "palo_alto", attrName: "palo_alto_config",
+		get: func(m *mveResourceModel) types.Object { return m.PaloAltoConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.PaloAltoConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg paloAltoConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.PaloAltoConfig{
+				Vendor:            "palo_alto",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
+				LicenseData:       cfg.LicenseData.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "prisma", attrName: "prisma_config",
+		get: func(m *mveResourceModel) types.Object { return m.PrismaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.PrismaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg prismaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.PrismaConfig{
+				Vendor:      "prisma",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				IONKey:      cfg.IONKey.ValueString(),
+				SecretKey:   cfg.SecretKey.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "6wind", attrName: "sixwind_config",
+		get: func(m *mveResourceModel) types.Object { return m.SixwindConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.SixwindConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg sixwindConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.SixwindVSRConfig{
+				Vendor:       "6wind",
+				ImageID:      int(cfg.ImageID.ValueInt64()),
+				ProductSize:  cfg.ProductSize.ValueString(),
+				MVELabel:     cfg.MVELabel.ValueString(),
+				SSHPublicKey: cfg.SSHPublicKey.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "versa", attrName: "versa_config",
+		get: func(m *mveResourceModel) types.Object { return m.VersaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.VersaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg versaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.VersaConfig{
+				Vendor:            "versa",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				DirectorAddress:   cfg.DirectorAddress.ValueString(),
+				ControllerAddress: cfg.ControllerAddress.ValueString(),
+				LocalAuth:         cfg.LocalAuth.ValueString(),
+				RemoteAuth:        cfg.RemoteAuth.ValueString(),
+				SerialNumber:      cfg.SerialNumber.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "vmware", attrName: "vmware_config",
+		get: func(m *mveResourceModel) types.Object { return m.VmwareConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.VmwareConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg vmwareConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.VmwareConfig{
+				Vendor:            "vmware",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				VcoAddress:        cfg.VcoAddress.ValueString(),
+				VcoActivationCode: cfg.VcoActivationCode.ValueString(),
+			}, diags
+		},
+	},
+}
+
+// specForVendor returns the registry entry for the given canonical vendor
+// name (case-insensitive), or false if no such vendor exists.
+func specForVendor(name string) (mveVendorSpec, bool) {
+	for _, v := range mveVendors {
+		if strings.EqualFold(v.name, name) {
+			return v, true
+		}
+	}
+	return mveVendorSpec{}, false
+}
+
 // mveVendorConfigPaths lists path expressions for all per-vendor config blocks,
 // used with ExactlyOneOf validators.
-var mveVendorConfigPaths = []path.Expression{
-	path.MatchRoot("aruba_config"),
-	path.MatchRoot("aviatrix_config"),
-	path.MatchRoot("cisco_config"),
-	path.MatchRoot("fortinet_config"),
-	path.MatchRoot("meraki_config"),
-	path.MatchRoot("palo_alto_config"),
-	path.MatchRoot("prisma_config"),
-	path.MatchRoot("sixwind_config"),
-	path.MatchRoot("versa_config"),
-	path.MatchRoot("vmware_config"),
-}
+var mveVendorConfigPaths = func() []path.Expression {
+	paths := make([]path.Expression, len(mveVendors))
+	for i, v := range mveVendors {
+		paths[i] = path.MatchRoot(v.attrName)
+	}
+	return paths
+}()
 
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
 	return &megaport.MVENetworkInterface{
@@ -190,12 +423,13 @@ func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkIn
 	}
 }
 
-// vendorObjects returns all 10 vendor config blocks from the model.
+// vendorObjects returns all vendor config blocks from the model.
 func (m *mveResourceModel) vendorObjects() []types.Object {
-	return []types.Object{
-		m.ArubaConfig, m.AviatrixConfig, m.CiscoConfig, m.FortinetConfig, m.MerakiConfig,
-		m.PaloAltoConfig, m.PrismaConfig, m.SixwindConfig, m.VersaConfig, m.VmwareConfig,
+	objs := make([]types.Object, len(mveVendors))
+	for i, v := range mveVendors {
+		objs[i] = v.get(m)
 	}
+	return objs
 }
 
 func objectSet(o types.Object) bool { return !o.IsNull() && !o.IsUnknown() }
@@ -210,44 +444,20 @@ func allVendorConfigsNull(m mveResourceModel) bool {
 	return true
 }
 
-// copyVendorConfigs copies all 10 vendor config blocks from src to dst.
+// copyVendorConfigs copies all vendor config blocks from src to dst.
 func copyVendorConfigs(dst, src *mveResourceModel) {
-	dst.ArubaConfig = src.ArubaConfig
-	dst.AviatrixConfig = src.AviatrixConfig
-	dst.CiscoConfig = src.CiscoConfig
-	dst.FortinetConfig = src.FortinetConfig
-	dst.MerakiConfig = src.MerakiConfig
-	dst.PaloAltoConfig = src.PaloAltoConfig
-	dst.PrismaConfig = src.PrismaConfig
-	dst.SixwindConfig = src.SixwindConfig
-	dst.VersaConfig = src.VersaConfig
-	dst.VmwareConfig = src.VmwareConfig
+	for _, v := range mveVendors {
+		v.set(dst, v.get(src))
+	}
 }
 
 // vendorNameFromModel returns the canonical vendor name based on which config
 // block is set in the model, or "" if none is set.
 func vendorNameFromModel(m mveResourceModel) string {
-	switch {
-	case objectSet(m.ArubaConfig):
-		return "aruba"
-	case objectSet(m.AviatrixConfig):
-		return "aviatrix"
-	case objectSet(m.CiscoConfig):
-		return "cisco"
-	case objectSet(m.FortinetConfig):
-		return "fortinet"
-	case objectSet(m.MerakiConfig):
-		return "meraki"
-	case objectSet(m.PaloAltoConfig):
-		return "palo_alto"
-	case objectSet(m.PrismaConfig):
-		return "prisma"
-	case objectSet(m.SixwindConfig):
-		return "6wind"
-	case objectSet(m.VersaConfig):
-		return "versa"
-	case objectSet(m.VmwareConfig):
-		return "vmware"
+	for _, v := range mveVendors {
+		if objectSet(v.get(&m)) {
+			return v.name
+		}
 	}
 	return ""
 }
@@ -255,56 +465,20 @@ func vendorNameFromModel(m mveResourceModel) string {
 // vendorConfigPath returns the root path for the config block matching the given
 // vendor name. Used for RequiresReplace in ModifyPlan.
 func vendorConfigPath(vendorName string) path.Path {
-	switch strings.ToLower(vendorName) {
-	case "aruba":
-		return path.Root("aruba_config")
-	case "aviatrix":
-		return path.Root("aviatrix_config")
-	case "cisco":
-		return path.Root("cisco_config")
-	case "fortinet":
-		return path.Root("fortinet_config")
-	case "meraki":
-		return path.Root("meraki_config")
-	case "palo_alto":
-		return path.Root("palo_alto_config")
-	case "prisma":
-		return path.Root("prisma_config")
-	case "6wind":
-		return path.Root("sixwind_config")
-	case "versa":
-		return path.Root("versa_config")
-	case "vmware":
-		return path.Root("vmware_config")
+	spec, ok := specForVendor(vendorName)
+	if !ok {
+		return path.Empty()
 	}
-	return path.Empty()
+	return path.Root(spec.attrName)
 }
 
 // blockForVendor returns the config block object for the given vendor name.
 func blockForVendor(m mveResourceModel, vendorName string) types.Object {
-	switch strings.ToLower(vendorName) {
-	case "aruba":
-		return m.ArubaConfig
-	case "aviatrix":
-		return m.AviatrixConfig
-	case "cisco":
-		return m.CiscoConfig
-	case "fortinet":
-		return m.FortinetConfig
-	case "meraki":
-		return m.MerakiConfig
-	case "palo_alto":
-		return m.PaloAltoConfig
-	case "prisma":
-		return m.PrismaConfig
-	case "6wind":
-		return m.SixwindConfig
-	case "versa":
-		return m.VersaConfig
-	case "vmware":
-		return m.VmwareConfig
+	spec, ok := specForVendor(vendorName)
+	if !ok {
+		return types.ObjectNull(nil)
 	}
-	return types.ObjectNull(nil)
+	return spec.get(&m)
 }
 
 // vendorBlockEqualIgnoringSizeCase compares two vendor config objects, treating
@@ -361,161 +535,12 @@ func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel, adminP
 		return nil, diags
 	}
 
-	switch {
-	case objectSet(m.ArubaConfig):
-		var cfg arubaConfigModel
-		diags.Append(m.ArubaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.ArubaConfig{
-			Vendor:      "aruba",
-			ImageID:     int(cfg.ImageID.ValueInt64()),
-			ProductSize: cfg.ProductSize.ValueString(),
-			MVELabel:    cfg.MVELabel.ValueString(),
-			AccountName: cfg.AccountName.ValueString(),
-			AccountKey:  cfg.AccountKey.ValueString(),
-			SystemTag:   cfg.SystemTag.ValueString(),
-		}, diags
-	case objectSet(m.AviatrixConfig):
-		var cfg aviatrixConfigModel
-		diags.Append(m.AviatrixConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.AviatrixConfig{
-			Vendor:      "aviatrix",
-			ImageID:     int(cfg.ImageID.ValueInt64()),
-			ProductSize: cfg.ProductSize.ValueString(),
-			MVELabel:    cfg.MVELabel.ValueString(),
-			CloudInit:   cfg.CloudInit.ValueString(),
-		}, diags
-	case objectSet(m.CiscoConfig):
-		var cfg ciscoConfigModel
-		diags.Append(m.CiscoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.CiscoConfig{
-			Vendor:             "cisco",
-			ImageID:            int(cfg.ImageID.ValueInt64()),
-			ProductSize:        cfg.ProductSize.ValueString(),
-			MVELabel:           cfg.MVELabel.ValueString(),
-			AdminSSHPublicKey:  cfg.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:       cfg.SSHPublicKey.ValueString(),
-			AdminPassword:      adminPassword,
-			ManageLocally:      cfg.ManageLocally.ValueBool(),
-			CloudInit:          cfg.CloudInit.ValueString(),
-			FMCIPAddress:       cfg.FMCIPAddress.ValueString(),
-			FMCRegistrationKey: cfg.FMCRegistrationKey.ValueString(),
-			FMCNatID:           cfg.FMCNatID.ValueString(),
-		}, diags
-	case objectSet(m.FortinetConfig):
-		var cfg fortinetConfigModel
-		diags.Append(m.FortinetConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.FortinetConfig{
-			Vendor:            "fortinet",
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			MVELabel:          cfg.MVELabel.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
-			LicenseData:       cfg.LicenseData.ValueString(),
-		}, diags
-	case objectSet(m.MerakiConfig):
-		var cfg merakiConfigModel
-		diags.Append(m.MerakiConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.MerakiConfig{
-			Vendor:      "meraki",
-			ImageID:     int(cfg.ImageID.ValueInt64()),
-			ProductSize: cfg.ProductSize.ValueString(),
-			MVELabel:    cfg.MVELabel.ValueString(),
-			Token:       cfg.Token.ValueString(),
-		}, diags
-	case objectSet(m.PaloAltoConfig):
-		var cfg paloAltoConfigModel
-		diags.Append(m.PaloAltoConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.PaloAltoConfig{
-			Vendor:            "palo_alto",
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			MVELabel:          cfg.MVELabel.ValueString(),
-			SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
-			AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
-			LicenseData:       cfg.LicenseData.ValueString(),
-		}, diags
-	case objectSet(m.PrismaConfig):
-		var cfg prismaConfigModel
-		diags.Append(m.PrismaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.PrismaConfig{
-			Vendor:      "prisma",
-			ImageID:     int(cfg.ImageID.ValueInt64()),
-			ProductSize: cfg.ProductSize.ValueString(),
-			MVELabel:    cfg.MVELabel.ValueString(),
-			IONKey:      cfg.IONKey.ValueString(),
-			SecretKey:   cfg.SecretKey.ValueString(),
-		}, diags
-	case objectSet(m.SixwindConfig):
-		var cfg sixwindConfigModel
-		diags.Append(m.SixwindConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.SixwindVSRConfig{
-			Vendor:       "6wind",
-			ImageID:      int(cfg.ImageID.ValueInt64()),
-			ProductSize:  cfg.ProductSize.ValueString(),
-			MVELabel:     cfg.MVELabel.ValueString(),
-			SSHPublicKey: cfg.SSHPublicKey.ValueString(),
-		}, diags
-	case objectSet(m.VersaConfig):
-		var cfg versaConfigModel
-		diags.Append(m.VersaConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.VersaConfig{
-			Vendor:            "versa",
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			MVELabel:          cfg.MVELabel.ValueString(),
-			DirectorAddress:   cfg.DirectorAddress.ValueString(),
-			ControllerAddress: cfg.ControllerAddress.ValueString(),
-			LocalAuth:         cfg.LocalAuth.ValueString(),
-			RemoteAuth:        cfg.RemoteAuth.ValueString(),
-			SerialNumber:      cfg.SerialNumber.ValueString(),
-		}, diags
-	case objectSet(m.VmwareConfig):
-		var cfg vmwareConfigModel
-		diags.Append(m.VmwareConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		return &megaport.VmwareConfig{
-			Vendor:            "vmware",
-			ImageID:           int(cfg.ImageID.ValueInt64()),
-			ProductSize:       cfg.ProductSize.ValueString(),
-			MVELabel:          cfg.MVELabel.ValueString(),
-			AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
-			VcoAddress:        cfg.VcoAddress.ValueString(),
-			VcoActivationCode: cfg.VcoActivationCode.ValueString(),
-		}, diags
+	spec, ok := specForVendor(vendorNameFromModel(*m))
+	if !ok {
+		diags.AddError("No vendor config set", "Exactly one vendor config block must be set")
+		return nil, diags
 	}
-	diags.AddError("No vendor config set", "Exactly one vendor config block must be set")
-	return nil, diags
+	return spec.toAPI(ctx, spec.get(m), adminPassword)
 }
 
 // planProductSizeFromModel extracts product_size from whichever vendor config
