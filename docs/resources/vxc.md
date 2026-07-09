@@ -518,7 +518,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -556,6 +556,7 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
@@ -605,6 +606,24 @@ Optional:
 - `description` (String) The description of the IP route.
 - `next_hop` (String) The next hop of the IP route.
 - `prefix` (String) The prefix of the IP route.
+
+
+<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options"></a>
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.ip_sec_tunnel_options`
+
+Required:
+
+- `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
+- `pre_shared_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
+
+Optional:
+
+- `local_id` (String) IKE local identifier override, typically used when the Megaport endpoint is behind NAT.
+- `passive` (Boolean) Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.
+- `phase1_lifetime` (Number) IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.
+- `phase2_lifetime` (Number) IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.
+- `remote_id` (String) IKE remote identifier override, typically used when the peer is behind NAT.
 
 
 
@@ -754,7 +773,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String) The password of the BGP connection.
+- `password` (String, Sensitive) The password of the BGP connection.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -792,6 +811,7 @@ Optional:
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes))
+- `ip_sec_tunnel_options` (Attributes) The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options))
 - `nat_ip_addresses` (List of String) The NAT IP addresses of the partner configuration.
 - `packet_filter_in` (Number) ID of a NAT Gateway packet filter to apply to inbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
 - `packet_filter_out` (Number) ID of a NAT Gateway packet filter to apply to outbound traffic on this interface. Only valid when this interface is on a NAT Gateway endpoint — the API will reject the request if the endpoint is an MCR or any other vrouter product. The provider does not enforce this client-side.
@@ -841,6 +861,24 @@ Optional:
 - `description` (String) The description of the IP route.
 - `next_hop` (String) The next hop of the IP route.
 - `prefix` (String) The prefix of the IP route.
+
+
+<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_sec_tunnel_options"></a>
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.ip_sec_tunnel_options`
+
+Required:
+
+- `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
+- `pre_shared_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.
+- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source. Must live on a separate `subInterface` interface, not on this `ipSecTunnel` interface.
+
+Optional:
+
+- `local_id` (String) IKE local identifier override, typically used when the Megaport endpoint is behind NAT.
+- `passive` (Boolean) Whether the tunnel operates in passive mode (waits for the peer to initiate). Defaults to true on the API when omitted.
+- `phase1_lifetime` (Number) IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.
+- `phase2_lifetime` (Number) IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.
+- `remote_id` (String) IKE remote identifier override, typically used when the peer is behind NAT.
 
 
 

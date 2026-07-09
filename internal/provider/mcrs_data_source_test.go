@@ -6,8 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	megaport "github.com/megaport/megaportgo"
 )
@@ -22,6 +26,7 @@ type MockMCRService struct {
 	ListMCRResourceTagsErr    error
 	ListMCRResourceTagsResult map[string]string
 	CapturedResourceTagMCRUID string
+	CapturedGetMCRID          string
 }
 
 func (m *MockMCRService) ListMCRs(ctx context.Context, req *megaport.ListMCRsRequest) ([]*megaport.MCR, error) {
@@ -35,6 +40,7 @@ func (m *MockMCRService) ListMCRs(ctx context.Context, req *megaport.ListMCRsReq
 }
 
 func (m *MockMCRService) GetMCR(ctx context.Context, mcrId string) (*megaport.MCR, error) {
+	m.CapturedGetMCRID = mcrId
 	if m.GetMCRErr != nil {
 		return nil, m.GetMCRErr
 	}
@@ -119,60 +125,204 @@ func (m *MockMCRService) WaitForMCRReady(ctx context.Context, mcrID string, time
 	return nil
 }
 
+// mcrsReadRequest builds a datasource.ReadRequest and ReadResponse for the mcrs
+// data source schema. When productUID is non-nil the config sets product_uid to
+// that value; otherwise the attribute is null (triggering a list-all call).
+func mcrsReadRequest(t *testing.T, ds *mcrsDataSource, productUID *string) (datasource.ReadRequest, *datasource.ReadResponse) {
+	t.Helper()
+	ctx := context.Background()
+
+	schemaResp := datasource.SchemaResponse{}
+	ds.Schema(ctx, datasource.SchemaRequest{}, &schemaResp)
+
+	tfType := schemaResp.Schema.Type().TerraformType(ctx)
+
+	// Build a null value for every top-level attribute so the helper stays
+	// correct if the schema gains attributes, then set product_uid if supplied.
+	attrValues := make(map[string]tftypes.Value, len(schemaResp.Schema.Attributes))
+	for name, attr := range schemaResp.Schema.Attributes {
+		attrValues[name] = tftypes.NewValue(attr.GetType().TerraformType(ctx), nil)
+	}
+	if productUID != nil {
+		attrValues["product_uid"] = tftypes.NewValue(tftypes.String, *productUID)
+	}
+	configRaw := tftypes.NewValue(tfType, attrValues)
+
+	req := datasource.ReadRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: configRaw},
+	}
+	resp := &datasource.ReadResponse{
+		State: tfsdk.State{Schema: schemaResp.Schema},
+	}
+	return req, resp
+}
+
 func TestReadMCRs_ListAll(t *testing.T) {
+	ctx := context.Background()
+	var taggedUIDs []string
 	mockMCRService := &MockMCRService{
 		ListMCRsResult: []*megaport.MCR{
 			{UID: "mcr-1", Name: "MCR One"},
 			{UID: "mcr-2", Name: "MCR Two"},
 		},
+		ListMCRResourceTagsFunc: func(_ context.Context, mcrID string) (map[string]string, error) {
+			taggedUIDs = append(taggedUIDs, mcrID)
+			return map[string]string{"owner": mcrID}, nil
+		},
 	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcrs, err := ds.client.MCRService.ListMCRs(context.Background(), &megaport.ListMCRsRequest{IncludeInactive: false})
-	assert.NoError(t, err)
-	assert.Len(t, mcrs, 2)
-	assert.Equal(t, "mcr-1", mcrs[0].UID)
-	assert.Equal(t, "mcr-2", mcrs[1].UID)
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state mcrsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+
+	var details []mcrDetailModel
+	diags = state.MCRs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	// List order mirrors the API response order, so positional assertions are valid.
+	require.Len(t, details, 2)
+	assert.Equal(t, "mcr-1", details[0].UID.ValueString())
+	assert.Equal(t, "MCR One", details[0].Name.ValueString())
+	assert.Equal(t, "mcr-2", details[1].UID.ValueString())
+	assert.Equal(t, "MCR Two", details[1].Name.ValueString())
+
+	// Tags are fetched once per MCR, and each MCR's tags land on its own detail.
+	// The mock echoes the requested UID as the "owner" tag, so owner == the
+	// detail's own UID proves the right UID was used for the right MCR.
+	assert.ElementsMatch(t, []string{"mcr-1", "mcr-2"}, taggedUIDs)
+	for _, d := range details {
+		var tags map[string]string
+		require.False(t, d.ResourceTags.ElementsAs(ctx, &tags, false).HasError())
+		assert.Equal(t, d.UID.ValueString(), tags["owner"])
+	}
 }
 
 func TestReadMCRs_GetByUID(t *testing.T) {
+	ctx := context.Background()
 	mockMCRService := &MockMCRService{
-		GetMCRResult: &megaport.MCR{UID: "mcr-1", Name: "MCR One"},
+		GetMCRResult:              &megaport.MCR{UID: "mcr-1", Name: "MCR One"},
+		ListMCRResourceTagsResult: map[string]string{"owner": "team-a"},
 	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcr, err := ds.client.MCRService.GetMCR(context.Background(), "mcr-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "mcr-1", mcr.UID)
-	assert.Equal(t, "MCR One", mcr.Name)
+	uid := "mcr-1"
+	req, resp := mcrsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state mcrsModel
+	diags := resp.State.Get(ctx, &state)
+	require.False(t, diags.HasError())
+
+	assert.Equal(t, "mcr-1", state.ProductUID.ValueString())
+	assert.Equal(t, "mcr-1", mockMCRService.CapturedGetMCRID, "GetMCR should be called with the requested UID")
+
+	var details []mcrDetailModel
+	diags = state.MCRs.ElementsAs(ctx, &details, false)
+	require.False(t, diags.HasError())
+
+	require.Len(t, details, 1)
+	assert.Equal(t, "mcr-1", details[0].UID.ValueString())
+	assert.Equal(t, "MCR One", details[0].Name.ValueString())
+
+	assert.Equal(t, "mcr-1", mockMCRService.CapturedResourceTagMCRUID)
+	var tags map[string]string
+	require.False(t, details[0].ResourceTags.ElementsAs(ctx, &tags, false).HasError())
+	assert.Equal(t, "team-a", tags["owner"])
 }
 
 func TestReadMCRs_ListError(t *testing.T) {
-	mockMCRService := &MockMCRService{
-		ListMCRsErr: errors.New("API error"),
-	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockMCRService := &MockMCRService{ListMCRsErr: errors.New("API error")}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcrs, err := ds.client.MCRService.ListMCRs(context.Background(), &megaport.ListMCRsRequest{IncludeInactive: false})
-	assert.Error(t, err)
-	assert.Nil(t, mcrs)
-	assert.Contains(t, err.Error(), "API error")
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.Len(t, resp.Diagnostics.Errors(), 1)
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "API error")
 }
 
 func TestReadMCRs_GetByUIDError(t *testing.T) {
-	mockMCRService := &MockMCRService{
-		GetMCRErr: errors.New("MCR not found"),
-	}
-	mockClient := &megaport.Client{MCRService: mockMCRService}
-	ds := &mcrsDataSource{client: mockClient}
+	ctx := context.Background()
+	mockMCRService := &MockMCRService{GetMCRErr: errors.New("MCR not found")}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
 
-	mcr, err := ds.client.MCRService.GetMCR(context.Background(), "mcr-nonexistent")
-	assert.Error(t, err)
-	assert.Nil(t, mcr)
-	assert.Contains(t, err.Error(), "MCR not found")
+	uid := "mcr-nonexistent"
+	req, resp := mcrsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.Len(t, resp.Diagnostics.Errors(), 1)
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "MCR not found")
+}
+
+func TestReadMCRs_GetByUIDNilResult(t *testing.T) {
+	ctx := context.Background()
+	// GetMCR can return (nil, nil) for a UID the API resolves to "data": null.
+	mockMCRService := &MockMCRService{GetMCRResult: nil}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
+
+	uid := "mcr-nonexistent"
+	req, resp := mcrsReadRequest(t, ds, &uid)
+	ds.Read(ctx, req, resp)
+
+	require.Len(t, resp.Diagnostics.Errors(), 1)
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "No MCR found with UID")
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "mcr-nonexistent")
+}
+
+func TestReadMCRs_ResourceTagWarning(t *testing.T) {
+	ctx := context.Background()
+	mockMCRService := &MockMCRService{
+		ListMCRsResult:         []*megaport.MCR{{UID: "mcr-1", Name: "MCR One"}},
+		ListMCRResourceTagsErr: errors.New("tags unavailable"),
+	}
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: mockMCRService}}
+
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	// A tag-fetch failure is a warning, not an error: the MCR still lands in
+	// state with null resource_tags.
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	require.Len(t, resp.Diagnostics.Warnings(), 1)
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "mcr-1")
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "tags unavailable")
+
+	var state mcrsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+
+	var details []mcrDetailModel
+	require.False(t, state.MCRs.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 1)
+	assert.Equal(t, "mcr-1", details[0].UID.ValueString())
+	assert.True(t, details[0].ResourceTags.IsNull())
+}
+
+func TestReadMCRs_EmptyList(t *testing.T) {
+	ctx := context.Background()
+	ds := &mcrsDataSource{client: &megaport.Client{MCRService: &MockMCRService{}}}
+
+	req, resp := mcrsReadRequest(t, ds, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state mcrsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+
+	assert.True(t, state.ProductUID.IsNull())
+	assert.False(t, state.MCRs.IsNull(), "mcrs should be an empty list, not null")
+	assert.Empty(t, state.MCRs.Elements())
 }
 
 func TestFromAPIMCRDetail(t *testing.T) {
@@ -238,6 +388,35 @@ func TestFromAPIMCRDetail(t *testing.T) {
 		assert.Equal(t, true, detail.Cancelable.ValueBool())
 		assert.False(t, detail.AttributeTags.IsNull())
 		assert.False(t, detail.ResourceTags.IsNull())
+
+		ctx := context.Background()
+		var attrTags map[string]string
+		require.False(t, detail.AttributeTags.ElementsAs(ctx, &attrTags, false).HasError())
+		assert.Equal(t, map[string]string{"tag1": "val1", "tag2": "val2"}, attrTags)
+
+		var resTags map[string]string
+		require.False(t, detail.ResourceTags.ElementsAs(ctx, &resTags, false).HasError())
+		assert.Equal(t, map[string]string{"env": "production", "owner": "team-a"}, resTags)
+	})
+
+	t.Run("Non-nil time fields format as RFC3339", func(t *testing.T) {
+		ts := time.Date(2024, 3, 15, 10, 30, 0, 0, time.UTC)
+		mcr := &megaport.MCR{
+			UID:               "mcr-times",
+			CreateDate:        &megaport.Time{Time: ts},
+			LiveDate:          &megaport.Time{Time: ts},
+			TerminateDate:     &megaport.Time{Time: ts},
+			ContractStartDate: &megaport.Time{Time: ts},
+			ContractEndDate:   &megaport.Time{Time: ts},
+		}
+
+		detail := fromAPIMCRDetail(mcr, nil)
+
+		assert.Equal(t, "2024-03-15T10:30:00Z", detail.CreateDate.ValueString())
+		assert.Equal(t, "2024-03-15T10:30:00Z", detail.LiveDate.ValueString())
+		assert.Equal(t, "2024-03-15T10:30:00Z", detail.TerminateDate.ValueString())
+		assert.Equal(t, "2024-03-15T10:30:00Z", detail.ContractStartDate.ValueString())
+		assert.Equal(t, "2024-03-15T10:30:00Z", detail.ContractEndDate.ValueString())
 	})
 
 	t.Run("Nil time fields produce null values", func(t *testing.T) {
@@ -283,9 +462,23 @@ func TestFromAPIMCRDetail(t *testing.T) {
 
 		assert.True(t, detail.ResourceTags.IsNull())
 	})
+
+	t.Run("Empty non-nil attribute tags produce an empty map", func(t *testing.T) {
+		// AttributeTags branches on != nil (not len > 0), so a non-nil empty
+		// map yields an empty, non-null map. This differs from resource tags.
+		mcr := &megaport.MCR{
+			UID:           "mcr-empty-attr-tags",
+			AttributeTags: map[string]string{},
+		}
+
+		detail := fromAPIMCRDetail(mcr, nil)
+
+		assert.False(t, detail.AttributeTags.IsNull())
+		assert.Empty(t, detail.AttributeTags.Elements())
+	})
 }
 
-// Ensure mcrsModel compiles with the new schema (no filter/tags fields).
+// Ensure mcrsModel compiles with the schema.
 func TestMCRsModel_Structure(t *testing.T) {
 	model := mcrsModel{
 		ProductUID: types.StringValue("mcr-123"),

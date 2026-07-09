@@ -191,7 +191,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
 	ctx = tflog.SetField(ctx, "wait_time", waitTime)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key")
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key", "access_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
 
@@ -306,6 +306,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewMCRsDataSource,
 		NewMVEsDataSource,
 		NewVXCsDataSource,
+		NewNATGatewaySessionsDataSource,
 	}
 }
 

@@ -15,7 +15,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ datasource.DataSource = &mcrsDataSource{}
+	_ datasource.DataSource              = &mcrsDataSource{}
+	_ datasource.DataSourceWithConfigure = &mcrsDataSource{}
 
 	mcrDetailAttrs = map[string]attr.Type{
 		"product_uid":            types.StringType,
@@ -271,6 +272,13 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			)
 			return
 		}
+		if mcr == nil {
+			resp.Diagnostics.AddError(
+				"Error reading MCR",
+				fmt.Sprintf("No MCR found with UID %s", data.ProductUID.ValueString()),
+			)
+			return
+		}
 		mcrs = []*megaport.MCR{mcr}
 	} else {
 		// List all MCRs
@@ -390,7 +398,8 @@ func fromAPIMCRDetail(m *megaport.MCR, tags map[string]string) (mcrDetailModel, 
 		detail.AttributeTags = types.MapNull(types.StringType)
 	}
 
-	// Resource tags
+	// Resource tags: empty or absent tags map to null (not an empty map).
+	// Note this differs from AttributeTags above, which keeps a non-nil empty map.
 	if len(tags) > 0 {
 		resourceTagValues := make(map[string]attr.Value, len(tags))
 		for k, v := range tags {
