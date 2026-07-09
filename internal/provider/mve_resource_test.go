@@ -510,7 +510,7 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 					system_tag = "Preconfiguration-aruba-test-1"
 				}
 				vnics = %s
-			}`, locationID, MVEArubaImageIDMVE, mveName, mveName, mveKey, vnics)
+			}`, locationID, MVEArubaImageID, mveName, mveName, mveKey, vnics)
 	}
 
 	twoVnics := `[
