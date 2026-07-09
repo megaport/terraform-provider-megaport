@@ -3518,6 +3518,12 @@ func TestAccMegaportMVE_to_MVE_VXC(t *testing.T) {
                     }
                 }
                 `,
+					// This step is expected to log a "VXC Update Propagation Delay" warning and
+					// take the full updateTimeout (120s): verifyUpdateApplied compares the
+					// requested inner_vlan=-1 directly against the API's returned value, which is
+					// 0 for an untagged end, so it never matches. This is not new flakiness; it's
+					// a known provider gap (verifyUpdateApplied doesn't normalize -1/0 the way
+					// fromAPIVXC's Read-path does), tracked in a separate follow-up ticket.
 					MVEArubaImageID,
 					mveName1, mveLocationID, mveName1, mveName1,
 					mveName2, mveLocationID, mveName2, mveName2,
