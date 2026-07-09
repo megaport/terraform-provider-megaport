@@ -37,7 +37,7 @@ resource "megaport_port" "port" {
 ### Optional
 
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service. Please note that a VXC associated with the Port is not automatically updated with the Port service level reference number.
-- `diversity_zone` (String) The diversity zone of the product.
+- `diversity_zone` (String) The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. To correct a value that was genuinely wrong, run `terraform state rm` followed by `terraform import` on this resource.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
 

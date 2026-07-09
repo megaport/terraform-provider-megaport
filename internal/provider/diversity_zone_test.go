@@ -73,6 +73,26 @@ func TestDiversityZoneFromAPI(t *testing.T) {
 	}
 }
 
+// TestDiversityZoneRecoveryViaImport pins the only supported path for correcting
+// a diversity_zone value that was genuinely wrong, not just a transient empty
+// read: terraform state rm + terraform import. ImportStatePassthroughID sets
+// only product_uid, so every other field, including diversity_zone, starts
+// from its zero value (null) on the Read that follows import. That null current
+// value clears the preserve guard, so the fresh API value is taken verbatim,
+// even if it's empty. A stale non-empty value can't otherwise be dislodged, by
+// design, since RequiresReplace already handles a real, intentional config change.
+func TestDiversityZoneRecoveryViaImport(t *testing.T) {
+	afterImport := diversityZoneFromAPI(types.StringNull(), "")
+	if !afterImport.Equal(types.StringValue("")) {
+		t.Fatalf("post-import read should accept the API value verbatim, got %v", afterImport)
+	}
+
+	subsequentRead := diversityZoneFromAPI(afterImport, "")
+	if !subsequentRead.Equal(types.StringValue("")) {
+		t.Fatalf("subsequent reads should keep reflecting the now-known empty value, got %v", subsequentRead)
+	}
+}
+
 // requiresReplaceOnChange runs every plan modifier declared on the resource's
 // diversity_zone attribute for a state->plan transition and reports whether the
 // resource is planned for replacement.

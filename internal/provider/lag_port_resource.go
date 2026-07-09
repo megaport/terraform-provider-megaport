@@ -308,7 +308,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the product.",
+				Description: "The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. To correct a value that was genuinely wrong, run `terraform state rm` followed by `terraform import` on this resource.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
