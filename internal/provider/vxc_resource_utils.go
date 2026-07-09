@@ -1400,6 +1400,16 @@ func (r *vxcResource) waitForVXCUpdate(ctx context.Context, uid string, updateRe
 	return fmt.Errorf("update verification timed out after %v", timeout)
 }
 
+// innerVLANMatches compares a requested inner VLAN to the value returned by the API,
+// treating requested -1 (untagged) as satisfied by a returned 0, mirroring the
+// normalization fromAPIVXC applies on Read.
+func innerVLANMatches(requested, actual int) bool {
+	if requested == -1 && actual == 0 {
+		return true
+	}
+	return requested == actual
+}
+
 // verifyUpdateApplied checks if the VXC returned from the API matches the expected values
 // from the update request. It verifies all fields that can be updated.
 //
@@ -1410,10 +1420,10 @@ func (r *vxcResource) waitForVXCUpdate(ctx context.Context, uid string, updateRe
 // Returns true if all updated fields match their expected values, false otherwise.
 func (r *vxcResource) verifyUpdateApplied(vxc *megaport.VXC, updateReq *megaport.UpdateVXCRequest) bool {
 	// Verify VLAN-related fields
-	if updateReq.AEndInnerVLAN != nil && vxc.AEndConfiguration.InnerVLAN != *updateReq.AEndInnerVLAN {
+	if updateReq.AEndInnerVLAN != nil && !innerVLANMatches(*updateReq.AEndInnerVLAN, vxc.AEndConfiguration.InnerVLAN) {
 		return false
 	}
-	if updateReq.BEndInnerVLAN != nil && vxc.BEndConfiguration.InnerVLAN != *updateReq.BEndInnerVLAN {
+	if updateReq.BEndInnerVLAN != nil && !innerVLANMatches(*updateReq.BEndInnerVLAN, vxc.BEndConfiguration.InnerVLAN) {
 		return false
 	}
 	if updateReq.AEndVLAN != nil && vxc.AEndConfiguration.VLAN != *updateReq.AEndVLAN {

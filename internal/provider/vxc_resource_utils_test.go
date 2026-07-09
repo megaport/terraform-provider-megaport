@@ -825,3 +825,97 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesIPRouteDescription(t *testing
 	assert.True(t, byPrefix["10.0.0.0/24"].Description.IsNull(), "expected null description preserved as null")
 	assertString(t, "description", byPrefix["10.0.1.0/24"].Description, "kept")
 }
+
+// TestVerifyUpdateApplied covers the -1 (requested untagged) / 0 (API
+// returned untagged) inner VLAN normalization, a genuine mismatch that must
+// still fail, and unrelated fields being unaffected by the normalization.
+func TestVerifyUpdateApplied(t *testing.T) {
+	cases := []struct {
+		name      string
+		vxc       *megaport.VXC
+		updateReq *megaport.UpdateVXCRequest
+		want      bool
+	}{
+		{
+			name: "untagged inner VLAN match: requested -1, API returns 0",
+			vxc: &megaport.VXC{
+				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 0},
+				BEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 0},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				BEndInnerVLAN: megaport.PtrTo(-1),
+			},
+			want: true,
+		},
+		{
+			name: "genuine inner VLAN mismatch is not masked",
+			vxc: &megaport.VXC{
+				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 200},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(100),
+			},
+			want: false,
+		},
+		{
+			name: "requested -1 but API returns a tagged value is a mismatch",
+			vxc: &megaport.VXC{
+				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 100},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(-1),
+			},
+			want: false,
+		},
+		{
+			name: "matching non-zero inner VLAN values still verify",
+			vxc: &megaport.VXC{
+				AEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 100},
+				BEndConfiguration: megaport.VXCEndConfiguration{InnerVLAN: 200},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(100),
+				BEndInnerVLAN: megaport.PtrTo(200),
+			},
+			want: true,
+		},
+		{
+			name: "unrelated fields (name, rate limit) unaffected by normalization",
+			vxc: &megaport.VXC{
+				Name:      "updated-name",
+				RateLimit: 500,
+				AEndConfiguration: megaport.VXCEndConfiguration{
+					InnerVLAN: 0,
+				},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				Name:          megaport.PtrTo("updated-name"),
+				RateLimit:     megaport.PtrTo(500),
+			},
+			want: true,
+		},
+		{
+			name: "unrelated field mismatch still fails despite VLAN match",
+			vxc: &megaport.VXC{
+				Name: "current-name",
+				AEndConfiguration: megaport.VXCEndConfiguration{
+					InnerVLAN: 0,
+				},
+			},
+			updateReq: &megaport.UpdateVXCRequest{
+				AEndInnerVLAN: megaport.PtrTo(-1),
+				Name:          megaport.PtrTo("different-name"),
+			},
+			want: false,
+		},
+	}
+
+	r := &vxcResource{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, r.verifyUpdateApplied(tc.vxc, tc.updateReq))
+		})
+	}
+}
