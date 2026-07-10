@@ -31,7 +31,6 @@ var (
 	_ resource.Resource                = &mveResource{}
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
-	_ resource.ResourceWithMoveState   = &mveResource{}
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
