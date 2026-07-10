@@ -276,7 +276,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
 	waitForTime = (time.Duration(waitTime) * time.Minute)
-	megaportClient, err := megaport.New(nil,
+	clientOpts := []megaport.ClientOpt{
 		megaport.WithEnvironment(megaportGoEnv),
 		megaport.WithCredentials(accessKey, secretKey),
 		megaport.WithLogHandler(tfhandler{}),
@@ -284,8 +284,11 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 			"x-app": "terraform",
 		}),
 		megaport.WithUserAgent(userAgent),
-		megaport.WithCallContext(managedAccountUID),
-	)
+	}
+	if managedAccountUID != "" {
+		clientOpts = append(clientOpts, megaport.WithCallContext(managedAccountUID))
+	}
+	megaportClient, err := megaport.New(nil, clientOpts...)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Megaport API Client",
