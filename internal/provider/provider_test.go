@@ -182,13 +182,13 @@ func waitForProvisioningStatus(resourceName string) func(*terraform.State) error
 // authorization instead of exercising the attribute, so the test skips
 // rather than substituting a placeholder.
 func TestAccMegaportProvider_ManagedAccountUID(t *testing.T) {
-	t.Parallel()
-	defer acquireAccTestSlot(t)()
-
 	managedAccountUID := os.Getenv("MEGAPORT_TEST_MANAGED_ACCOUNT_UID")
 	if managedAccountUID == "" {
 		t.Skip("MEGAPORT_TEST_MANAGED_ACCOUNT_UID not set, skipping managed account provisioning test")
 	}
+
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
 
 	locationID, _ := findPortTestLocation(t, 1000)
 	portName := RandomTestName()

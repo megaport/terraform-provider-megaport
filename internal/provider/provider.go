@@ -166,6 +166,15 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		)
 	}
 
+	if config.WaitTime.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("wait_time"),
+			"Unknown Megaport wait time",
+			"The provider cannot create the Megaport API client as there is an unknown configuration value for the Megaport provisioning wait time. "+
+				"Either target apply the source of the value first, or set the value statically in the configuration.",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
