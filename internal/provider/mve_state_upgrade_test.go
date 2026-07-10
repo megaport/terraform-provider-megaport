@@ -15,6 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The V1 to V2 state upgrade needs no upgrader code: the framework's
+// UpgradeResourceState passthrough decodes prior state against the current
+// schema with IgnoreUndefinedAttributes, so removed attributes (including
+// the nested vnics.vlan) are dropped. These tests replicate that
+// passthrough to prove real V1 state still decodes against the V2 schema
+// (i.e. no kept attribute changed type).
+
 // v1MVEState returns a complete V1 MVE state JSON with all fields that existed
 // in V1, including the removed legacy fields and the removed vnics.vlan
 // attribute. The union vendor_config block is unchanged in V2.
@@ -80,61 +87,43 @@ func v1MVEState() []byte {
 	return b
 }
 
-// invokeMVEStateMover decodes the raw V1 state against the mover's SourceSchema
-// exactly as the framework server does, then runs the mover.
-func invokeMVEStateMover(t *testing.T, providerAddr, typeName string, rawJSON []byte) *resource.MoveStateResponse {
+// decodeV1MVEStateAgainstV2Schema mimics the framework's same-version
+// UpgradeResourceState passthrough (fwserver/server_upgraderesourcestate.go).
+func decodeV1MVEStateAgainstV2Schema(t *testing.T, rawJSON []byte) tfsdk.State {
 	t.Helper()
 	ctx := context.Background()
-	r := &mveResource{}
 
-	movers := r.MoveState(ctx)
-	require.Len(t, movers, 1)
-	require.NotNil(t, movers[0].SourceSchema)
+	schemaResp := &resource.SchemaResponse{}
+	(&mveResource{}).Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	require.False(t, schemaResp.Diagnostics.HasError())
 
-	req := resource.MoveStateRequest{
-		SourceProviderAddress: providerAddr,
-		SourceTypeName:        typeName,
-		SourceRawState:        &tfprotov6.RawState{JSON: rawJSON},
-	}
-
-	if rawJSON != nil {
-		rawValue, err := req.SourceRawState.UnmarshalWithOpts(
-			movers[0].SourceSchema.Type().TerraformType(ctx),
-			tfprotov6.UnmarshalOpts{
-				ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
-					IgnoreUndefinedAttributes: true,
-				},
+	rawState := &tfprotov6.RawState{JSON: rawJSON}
+	rawValue, err := rawState.UnmarshalWithOpts(
+		schemaResp.Schema.Type().TerraformType(ctx),
+		tfprotov6.UnmarshalOpts{
+			ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
+				IgnoreUndefinedAttributes: true,
 			},
-		)
-		require.NoError(t, err, "failed to decode V1 state against the V2 schema")
-		req.SourceState = &tfsdk.State{
-			Raw:    rawValue,
-			Schema: *movers[0].SourceSchema,
-		}
-	}
-
-	resp := &resource.MoveStateResponse{
-		TargetState: tfsdk.State{
-			Schema: *movers[0].SourceSchema,
-			Raw:    tftypes.NewValue(movers[0].SourceSchema.Type().TerraformType(ctx), nil),
 		},
-	}
+	)
+	require.NoError(t, err, "V1 state failed to decode against the V2 schema")
 
-	movers[0].StateMover(ctx, req, resp)
-	return resp
+	return tfsdk.State{
+		Raw:    rawValue,
+		Schema: schemaResp.Schema,
+	}
 }
 
-func TestMoveState_MVE_V1ToV2(t *testing.T) {
+func TestMVEStateUpgrade_V1ToV2(t *testing.T) {
 	ctx := context.Background()
 
-	resp := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", v1MVEState())
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	state := decodeV1MVEStateAgainstV2Schema(t, v1MVEState())
 
 	var model mveResourceModel
-	diags := resp.TargetState.Get(ctx, &model)
-	require.False(t, diags.HasError(), "failed to read target state: %v", diags)
+	diags := state.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
-	// Kept fields migrate unchanged.
+	// Verify kept fields survive the upgrade.
 	assert.Equal(t, "mve-uid-123", model.UID.ValueString())
 	assert.Equal(t, "My MVE", model.Name.ValueString())
 	assert.Equal(t, int64(7), model.LocationID.ValueInt64())
@@ -157,7 +146,7 @@ func TestMoveState_MVE_V1ToV2(t *testing.T) {
 	assert.Equal(t, "SMALL", vc.ProductSize.ValueString())
 	assert.Equal(t, "10.0.0.1", vc.FMCIPAddress.ValueString())
 
-	// vnics carry over, but the removed vlan attribute is dropped.
+	// vnics carry over, but the removed nested vlan attribute is dropped.
 	require.False(t, model.NetworkInterfaces.IsNull())
 	vnicElements := model.NetworkInterfaces.Elements()
 	require.Len(t, vnicElements, 2)
@@ -169,16 +158,17 @@ func TestMoveState_MVE_V1ToV2(t *testing.T) {
 	assert.Equal(t, "Data Plane", vnic.Description.ValueString())
 	vnicAttrKeys := vnicObj.Attributes()
 	_, hasVLAN := vnicAttrKeys["vlan"]
-	assert.False(t, hasVLAN, "expected vnics.vlan to be dropped after migration")
+	assert.False(t, hasVLAN, "expected vnics.vlan to be dropped after upgrade")
 
 	// Resource tags carry over.
 	require.False(t, model.ResourceTags.IsNull())
 	require.Len(t, model.ResourceTags.Elements(), 1)
 }
 
-func TestMoveState_MVE_V1ToV2_NilOptionals(t *testing.T) {
+func TestMVEStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	ctx := context.Background()
 
+	// V1 state with null or missing optional fields.
 	state := map[string]interface{}{
 		"product_uid":          "mve-nil-test",
 		"product_name":         "Nil MVE",
@@ -201,12 +191,11 @@ func TestMoveState_MVE_V1ToV2_NilOptionals(t *testing.T) {
 	rawJSON, err := json.Marshal(state)
 	require.NoError(t, err)
 
-	resp := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", rawJSON)
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	upgraded := decodeV1MVEStateAgainstV2Schema(t, rawJSON)
 
 	var model mveResourceModel
-	diags := resp.TargetState.Get(ctx, &model)
-	require.False(t, diags.HasError(), "failed to read target state: %v", diags)
+	diags := upgraded.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	assert.Equal(t, "mve-nil-test", model.UID.ValueString())
 	assert.Equal(t, "Nil MVE", model.Name.ValueString())
@@ -218,25 +207,4 @@ func TestMoveState_MVE_V1ToV2_NilOptionals(t *testing.T) {
 	assert.True(t, model.NetworkInterfaces.IsNull())
 	assert.True(t, model.ResourceTags.IsNull())
 	assert.True(t, model.VendorConfig.IsNull())
-}
-
-func TestMoveState_MVE_WrongProvider(t *testing.T) {
-	resp := invokeMVEStateMover(t, "registry.terraform.io/other/other", "megaport_mve", v1MVEState())
-
-	assert.False(t, resp.Diagnostics.HasError())
-	assert.True(t, resp.TargetState.Raw.IsNull(), "expected target state to remain null for wrong provider")
-}
-
-func TestMoveState_MVE_WrongType(t *testing.T) {
-	resp := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_vxc", v1MVEState())
-
-	assert.False(t, resp.Diagnostics.HasError())
-	assert.True(t, resp.TargetState.Raw.IsNull(), "expected target state to remain null for wrong type")
-}
-
-func TestMoveState_MVE_NilSourceState(t *testing.T) {
-	resp := invokeMVEStateMover(t, "registry.terraform.io/megaport/megaport", "megaport_mve", nil)
-
-	require.True(t, resp.Diagnostics.HasError())
-	assert.Contains(t, resp.Diagnostics.Errors()[0].Summary(), "Unable to migrate V1 state")
 }
