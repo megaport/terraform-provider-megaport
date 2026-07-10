@@ -100,6 +100,9 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			"managed_account_uid": schema.StringAttribute{
 				Optional:    true,
 				Description: "The UID of a managed account to act on behalf of when provisioning resources, using the partner's own credentials. Can also be set using the environment variable MEGAPORT_MANAGED_ACCOUNT_UID.",
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 		},
 	}
