@@ -26,7 +26,6 @@ var (
 	_ resource.Resource                = &portResource{}
 	_ resource.ResourceWithConfigure   = &portResource{}
 	_ resource.ResourceWithImportState = &portResource{}
-	_ resource.ResourceWithMoveState   = &portResource{}
 
 	portResourcesAttrs = map[string]attr.Type{
 		"interface": types.ObjectType{}.WithAttributeTypes(portInterfaceAttrs),

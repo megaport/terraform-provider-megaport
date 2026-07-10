@@ -27,7 +27,6 @@ var (
 	_ resource.Resource                = &lagPortResource{}
 	_ resource.ResourceWithConfigure   = &lagPortResource{}
 	_ resource.ResourceWithImportState = &lagPortResource{}
-	_ resource.ResourceWithMoveState   = &lagPortResource{}
 )
 
 // lagPortResourceModel maps the resource schema data.

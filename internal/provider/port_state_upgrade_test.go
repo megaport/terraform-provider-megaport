@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The V1 to V2 state upgrade needs no upgrader code: the framework's
+// UpgradeResourceState passthrough decodes prior state against the current
+// schema with IgnoreUndefinedAttributes, so removed attributes are dropped.
+// These tests replicate that passthrough to prove real V1 state still
+// decodes against the V2 schema (i.e. no kept attribute changed type).
+
 // v1PortState returns a complete V1 port state JSON with all fields that
 // existed in V1 (including those removed in V2).
 func v1PortState() []byte {
@@ -108,60 +114,44 @@ func v1LagPortState() []byte {
 	return b
 }
 
-// invokePortStateMover decodes the raw V1 state against the mover's
-// SourceSchema exactly as the framework server does, then runs the mover.
-func invokePortStateMover(t *testing.T, r resource.ResourceWithMoveState, providerAddr, typeName string, rawJSON []byte) *resource.MoveStateResponse {
+// decodePortV1StateAgainstV2Schema mimics the framework's same-version
+// UpgradeResourceState passthrough (fwserver/server_upgraderesourcestate.go)
+// against the given resource's current schema.
+func decodePortV1StateAgainstV2Schema(t *testing.T, r resource.Resource, rawJSON []byte) tfsdk.State {
 	t.Helper()
 	ctx := context.Background()
 
-	movers := r.MoveState(ctx)
-	require.Len(t, movers, 1)
-	require.NotNil(t, movers[0].SourceSchema)
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	require.False(t, schemaResp.Diagnostics.HasError())
 
-	req := resource.MoveStateRequest{
-		SourceProviderAddress: providerAddr,
-		SourceTypeName:        typeName,
-		SourceRawState:        &tfprotov6.RawState{JSON: rawJSON},
-	}
-
-	if rawJSON != nil {
-		rawValue, err := req.SourceRawState.UnmarshalWithOpts(
-			movers[0].SourceSchema.Type().TerraformType(ctx),
-			tfprotov6.UnmarshalOpts{
-				ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
-					IgnoreUndefinedAttributes: true,
-				},
+	rawState := &tfprotov6.RawState{JSON: rawJSON}
+	rawValue, err := rawState.UnmarshalWithOpts(
+		schemaResp.Schema.Type().TerraformType(ctx),
+		tfprotov6.UnmarshalOpts{
+			ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
+				IgnoreUndefinedAttributes: true,
 			},
-		)
-		require.NoError(t, err, "failed to decode V1 state against the V2 schema")
-		req.SourceState = &tfsdk.State{
-			Raw:    rawValue,
-			Schema: *movers[0].SourceSchema,
-		}
-	}
-
-	resp := &resource.MoveStateResponse{
-		TargetState: tfsdk.State{
-			Schema: *movers[0].SourceSchema,
-			Raw:    tftypes.NewValue(movers[0].SourceSchema.Type().TerraformType(ctx), nil),
 		},
-	}
+	)
+	require.NoError(t, err, "V1 state failed to decode against the V2 schema")
 
-	movers[0].StateMover(ctx, req, resp)
-	return resp
+	return tfsdk.State{
+		Raw:    rawValue,
+		Schema: schemaResp.Schema,
+	}
 }
 
-func TestMoveState_Port_V1ToV2(t *testing.T) {
+func TestPortStateUpgrade_V1ToV2(t *testing.T) {
 	ctx := context.Background()
 
-	resp := invokePortStateMover(t, &portResource{}, "registry.terraform.io/megaport/megaport", "megaport_port", v1PortState())
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	state := decodePortV1StateAgainstV2Schema(t, &portResource{}, v1PortState())
 
 	var model singlePortResourceModel
-	diags := resp.TargetState.Get(ctx, &model)
-	require.False(t, diags.HasError(), "failed to read target state: %v", diags)
+	diags := state.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
-	// Verify kept fields are correctly migrated.
+	// Verify kept fields survive the upgrade.
 	assert.Equal(t, "uid-abc-123", model.UID.ValueString())
 	assert.Equal(t, "My Port", model.Name.ValueString())
 	assert.Equal(t, int64(10000), model.PortSpeed.ValueInt64())
@@ -188,7 +178,7 @@ func TestMoveState_Port_V1ToV2(t *testing.T) {
 	assert.Equal(t, "infra", teamTag.ValueString())
 }
 
-func TestMoveState_Port_V1ToV2_NilOptionals(t *testing.T) {
+func TestPortStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	ctx := context.Background()
 
 	// V1 state with null optional fields.
@@ -212,12 +202,11 @@ func TestMoveState_Port_V1ToV2_NilOptionals(t *testing.T) {
 	}
 	rawJSON, _ := json.Marshal(state)
 
-	resp := invokePortStateMover(t, &portResource{}, "registry.terraform.io/megaport/megaport", "megaport_port", rawJSON)
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	upgraded := decodePortV1StateAgainstV2Schema(t, &portResource{}, rawJSON)
 
 	var model singlePortResourceModel
-	diags := resp.TargetState.Get(ctx, &model)
-	require.False(t, diags.HasError(), "failed to read target state: %v", diags)
+	diags := upgraded.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	assert.Equal(t, "uid-nil-test", model.UID.ValueString())
 	assert.Equal(t, "Nil Port", model.Name.ValueString())
@@ -229,15 +218,14 @@ func TestMoveState_Port_V1ToV2_NilOptionals(t *testing.T) {
 	assert.True(t, model.ResourceTags.IsNull())
 }
 
-func TestMoveState_LagPort_V1ToV2(t *testing.T) {
+func TestLagPortStateUpgrade_V1ToV2(t *testing.T) {
 	ctx := context.Background()
 
-	resp := invokePortStateMover(t, &lagPortResource{}, "registry.terraform.io/megaport/megaport", "megaport_lag_port", v1LagPortState())
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics)
+	state := decodePortV1StateAgainstV2Schema(t, &lagPortResource{}, v1LagPortState())
 
 	var model lagPortResourceModel
-	diags := resp.TargetState.Get(ctx, &model)
-	require.False(t, diags.HasError(), "failed to read target state: %v", diags)
+	diags := state.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	// Verify kept fields.
 	assert.Equal(t, "lag-uid-456", model.UID.ValueString())
@@ -273,44 +261,4 @@ func TestMoveState_LagPort_V1ToV2(t *testing.T) {
 	envTag, ok := tagElements["env"].(types.String)
 	require.True(t, ok)
 	assert.Equal(t, "prod", envTag.ValueString())
-}
-
-func TestMoveState_Port_WrongProvider(t *testing.T) {
-	resp := invokePortStateMover(t, &portResource{}, "registry.terraform.io/other/other", "megaport_port", v1PortState())
-
-	// Should be a no-op (skipped): no diagnostics, no state set.
-	assert.False(t, resp.Diagnostics.HasError())
-	assert.True(t, resp.TargetState.Raw.IsNull(), "expected target state to remain null for wrong provider")
-}
-
-func TestMoveState_Port_WrongType(t *testing.T) {
-	resp := invokePortStateMover(t, &portResource{}, "registry.terraform.io/megaport/megaport", "megaport_vxc", v1PortState())
-
-	// Should be a no-op (skipped).
-	assert.False(t, resp.Diagnostics.HasError())
-	assert.True(t, resp.TargetState.Raw.IsNull(), "expected target state to remain null for wrong type")
-}
-
-func TestMoveState_LagPort_WrongType(t *testing.T) {
-	resp := invokePortStateMover(t, &lagPortResource{}, "registry.terraform.io/megaport/megaport", "megaport_port", v1LagPortState())
-
-	// Should be a no-op (skipped).
-	assert.False(t, resp.Diagnostics.HasError())
-	assert.True(t, resp.TargetState.Raw.IsNull(), "expected target state to remain null for wrong type")
-}
-
-func TestMoveState_Port_NilSourceState(t *testing.T) {
-	// A nil SourceState means the framework could not decode the source raw
-	// state against the source schema; the mover must error, not panic.
-	resp := invokePortStateMover(t, &portResource{}, "registry.terraform.io/megaport/megaport", "megaport_port", nil)
-
-	require.True(t, resp.Diagnostics.HasError())
-	assert.Contains(t, resp.Diagnostics.Errors()[0].Summary(), "Unable to migrate V1 state")
-}
-
-func TestMoveState_LagPort_NilSourceState(t *testing.T) {
-	resp := invokePortStateMover(t, &lagPortResource{}, "registry.terraform.io/megaport/megaport", "megaport_lag_port", nil)
-
-	require.True(t, resp.Diagnostics.HasError())
-	assert.Contains(t, resp.Diagnostics.Errors()[0].Summary(), "Unable to migrate V1 state")
 }
