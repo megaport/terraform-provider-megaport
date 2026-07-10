@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -24,6 +26,20 @@ provider "megaport" {
   accept_purchase_terms = true
 }
 `, os.Getenv("MEGAPORT_ACCESS_KEY"), os.Getenv("MEGAPORT_SECRET_KEY"))
+
+// managedAccountProviderConfig mirrors providerConfig but sets
+// managed_account_uid so the client acts on behalf of a managed account.
+func managedAccountProviderConfig(managedAccountUID string) string {
+	return fmt.Sprintf(`
+provider "megaport" {
+  environment            = "staging"
+  access_key             = "%s"
+  secret_key             = "%s"
+  accept_purchase_terms  = true
+  managed_account_uid    = "%s"
+}
+`, os.Getenv("MEGAPORT_ACCESS_KEY"), os.Getenv("MEGAPORT_SECRET_KEY"), managedAccountUID)
+}
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
 // acceptance testing. The factory function will be invoked for every Terraform
@@ -156,4 +172,47 @@ func waitForProvisioningStatus(resourceName string) func(*terraform.State) error
 		return fmt.Errorf("ERROR: timeout waiting for %s to reach status %s after %v. Current status: %s",
 			resourceName, expectedStatus, timeout, finalStatus)
 	}
+}
+
+// TestAccMegaportProvider_ManagedAccountUID exercises managed_account_uid
+// end to end: with it set, the client sends X-Call-Context and resources
+// provision inside the managed account rather than the partner's own.
+// Requires MEGAPORT_TEST_MANAGED_ACCOUNT_UID, a real managed account UID the
+// test credentials can act on behalf of. A fake UID would just fail
+// authorization instead of exercising the attribute, so the test skips
+// rather than substituting a placeholder.
+func TestAccMegaportProvider_ManagedAccountUID(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	managedAccountUID := os.Getenv("MEGAPORT_TEST_MANAGED_ACCOUNT_UID")
+	if managedAccountUID == "" {
+		t.Skip("MEGAPORT_TEST_MANAGED_ACCOUNT_UID not set, skipping managed account provisioning test")
+	}
+
+	locationID, _ := findPortTestLocation(t, 1000)
+	portName := RandomTestName()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: managedAccountProviderConfig(managedAccountUID) + fmt.Sprintf(`
+				data "megaport_location" "test_location" {
+					id = %d
+				}
+				resource "megaport_port" "managed" {
+					product_name           = "%s"
+					port_speed             = 1000
+					location_id            = data.megaport_location.test_location.id
+					contract_term_months   = 1
+					marketplace_visibility = false
+				}`, locationID, portName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_port.managed", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_port.managed", "company_uid", managedAccountUID),
+				),
+			},
+		},
+	})
 }

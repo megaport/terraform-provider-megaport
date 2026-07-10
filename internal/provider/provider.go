@@ -27,11 +27,12 @@ var waitForTime time.Duration
 
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
-	Environment   types.String `tfsdk:"environment"`
-	AccessKey     types.String `tfsdk:"access_key"`
-	SecretKey     types.String `tfsdk:"secret_key"`
-	TermsAccepted types.Bool   `tfsdk:"accept_purchase_terms"`
-	WaitTime      types.Int64  `tfsdk:"wait_time"`
+	Environment       types.String `tfsdk:"environment"`
+	AccessKey         types.String `tfsdk:"access_key"`
+	SecretKey         types.String `tfsdk:"secret_key"`
+	TermsAccepted     types.Bool   `tfsdk:"accept_purchase_terms"`
+	WaitTime          types.Int64  `tfsdk:"wait_time"`
+	ManagedAccountUID types.String `tfsdk:"managed_account_uid"`
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -96,6 +97,10 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					int64validator.AtLeast(1),
 				},
 			},
+			"managed_account_uid": schema.StringAttribute{
+				Optional:    true,
+				Description: "The UID of a managed account to act on behalf of when provisioning resources, using the partner's own credentials. Can also be set using the environment variable MEGAPORT_MANAGED_ACCOUNT_UID.",
+			},
 		},
 	}
 }
@@ -149,6 +154,15 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		)
 	}
 
+	if config.ManagedAccountUID.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("managed_account_uid"),
+			"Unknown Megaport managed account UID",
+			"The provider cannot create the Megaport API client as there is an unknown configuration value for the Megaport managed account UID. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the MEGAPORT_MANAGED_ACCOUNT_UID environment variable.",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -159,6 +173,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	environment := os.Getenv("MEGAPORT_ENVIRONMENT")
 	accessKey := os.Getenv("MEGAPORT_ACCESS_KEY")
 	secretKey := os.Getenv("MEGAPORT_SECRET_KEY")
+	managedAccountUID := os.Getenv("MEGAPORT_MANAGED_ACCOUNT_UID")
 	acceptTerms := false
 	waitTime := 10
 	if strings.ToLower(os.Getenv("MEGAPORT_ACCEPT_PURCHASE_TERMS")) == "true" ||
@@ -178,6 +193,10 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		secretKey = config.SecretKey.ValueString()
 	}
 
+	if !config.ManagedAccountUID.IsNull() {
+		managedAccountUID = config.ManagedAccountUID.ValueString()
+	}
+
 	if !config.TermsAccepted.IsNull() {
 		acceptTerms = config.TermsAccepted.ValueBool()
 	}
@@ -191,6 +210,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	ctx = tflog.SetField(ctx, "secret_key", secretKey)
 	ctx = tflog.SetField(ctx, "terms_accepted", acceptTerms)
 	ctx = tflog.SetField(ctx, "wait_time", waitTime)
+	ctx = tflog.SetField(ctx, "managed_account_uid", managedAccountUID)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "secret_key", "access_key")
 
 	tflog.Debug(ctx, "Creating Megaport client")
@@ -261,6 +281,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 			"x-app": "terraform",
 		}),
 		megaport.WithUserAgent(userAgent),
+		megaport.WithCallContext(managedAccountUID),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(
