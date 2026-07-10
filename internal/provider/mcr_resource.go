@@ -27,7 +27,6 @@ var (
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
-	_ resource.ResourceWithMoveState   = &mcrResource{}
 )
 
 // mcrResourceModel maps the resource schema data.
