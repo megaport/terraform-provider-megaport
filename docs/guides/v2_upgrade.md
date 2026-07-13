@@ -53,14 +53,39 @@ The inline `prefix_filter_lists` attribute on `megaport_mcr` has been removed. P
 Upgrading does not touch your existing prefix filter lists. They remain configured on the MCR but are unmanaged by Terraform until you import them:
 
 1. Upgrade to v2 and remove `prefix_filter_lists` from your `megaport_mcr` configuration.
-2. Add a `megaport_mcr_prefix_filter_list` resource for each existing list.
-3. Import each list using the `mcr_uid:prefix_list_id` format:
+2. Add a `megaport_mcr_prefix_filter_list` resource and an `import` block (Terraform 1.5 or later) for each existing list. The import ID format is `mcr_uid:prefix_list_id`:
 
-   ```shell
-   terraform import megaport_mcr_prefix_filter_list.example "11111111-1111-1111-1111-111111111111:123"
+   ```hcl
+   import {
+     to = megaport_mcr_prefix_filter_list.example
+     id = "11111111-1111-1111-1111-111111111111:123"
+   }
+
+   resource "megaport_mcr_prefix_filter_list" "example" {
+     mcr_id         = megaport_mcr.example.product_uid
+     description    = "Allow private IPv4 networks"
+     address_family = "IPv4"
+
+     entries = [
+       {
+         action = "permit"
+         prefix = "10.0.0.0/8"
+       },
+     ]
+   }
    ```
 
+3. Run `terraform plan` and review the planned imports. Match each resource's arguments to the existing list so the plan shows imports with no accompanying updates, then apply. The `import` blocks can be removed once the apply succeeds.
+
+On Terraform versions without `import` block support, use the CLI instead:
+
+```shell
+terraform import megaport_mcr_prefix_filter_list.example "11111111-1111-1111-1111-111111111111:123"
+```
+
 Importing preserves the prefix filter list IDs, so any BGP connection filters on your VXCs that reference those IDs keep working. See the `megaport_mcr_prefix_filter_list` resource documentation for details on the import format and finding list IDs.
+
+If you prefer the lists never to be unmanaged, you can run the same import while still on v1: the resource and import ID format are identical there. Add `lifecycle { ignore_changes = [prefix_filter_lists] }` to the `megaport_mcr` resource first so the inline attribute does not fight the standalone resources, import, then upgrade and remove the inline attribute and the `ignore_changes` entry together (v2 rejects `ignore_changes` entries for attributes that no longer exist).
 
 ## MVE vendor configuration
 
