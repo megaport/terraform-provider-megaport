@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -20,16 +21,18 @@ import (
 // carries a diversity_zone.
 func TestDiversityZoneFromAPI(t *testing.T) {
 	tests := []struct {
-		name    string
-		current types.String
-		apiVal  string
-		want    types.String
+		name     string
+		current  types.String
+		apiVal   string
+		want     types.String
+		wantWarn bool
 	}{
 		{
-			name:    "known zone, empty API echo preserves state",
-			current: types.StringValue("red"),
-			apiVal:  "",
-			want:    types.StringValue("red"),
+			name:     "known zone, empty API echo preserves state and warns",
+			current:  types.StringValue("red"),
+			apiVal:   "",
+			want:     types.StringValue("red"),
+			wantWarn: true,
 		},
 		{
 			name:    "empty state, empty API stays empty",
@@ -65,31 +68,47 @@ func TestDiversityZoneFromAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := diversityZoneFromAPI(tt.current, tt.apiVal)
+			diags := diag.Diagnostics{}
+			got := diversityZoneFromAPI(tt.current, tt.apiVal, "test-uid", &diags)
 			if !got.Equal(tt.want) {
 				t.Errorf("diversityZoneFromAPI(%v, %q) = %v, want %v", tt.current, tt.apiVal, got, tt.want)
+			}
+			if tt.wantWarn != (diags.WarningsCount() == 1) {
+				t.Errorf("diversityZoneFromAPI(%v, %q) warnings = %d, wantWarn %v", tt.current, tt.apiVal, diags.WarningsCount(), tt.wantWarn)
+			}
+			if diags.ErrorsCount() != 0 {
+				t.Errorf("diversityZoneFromAPI(%v, %q) produced unexpected errors: %v", tt.current, tt.apiVal, diags.Errors())
 			}
 		})
 	}
 }
 
-// TestDiversityZoneRecoveryViaImport pins the only supported path for correcting
-// a diversity_zone value that was genuinely wrong, not just a transient empty
-// read: terraform state rm + terraform import. ImportStatePassthroughID sets
-// only product_uid, so every other field, including diversity_zone, starts
+// TestDiversityZoneRecoveryViaImport pins the state-side half of correcting a
+// diversity_zone value that was genuinely wrong, not just a transient empty
+// read. The config side comes first: a value pinned in configuration must be
+// removed or updated there, or the post-import plan still replaces. Then
+// terraform state rm + terraform import resets the stored value:
+// ImportStatePassthroughID sets only product_uid, so diversity_zone starts
 // from its zero value (null) on the Read that follows import. That null current
 // value clears the preserve guard, so the fresh API value is taken verbatim,
 // even if it's empty. A stale non-empty value can't otherwise be dislodged, by
 // design, since RequiresReplace already handles a real, intentional config change.
 func TestDiversityZoneRecoveryViaImport(t *testing.T) {
-	afterImport := diversityZoneFromAPI(types.StringNull(), "")
+	diags := diag.Diagnostics{}
+	afterImport := diversityZoneFromAPI(types.StringNull(), "", "test-uid", &diags)
 	if !afterImport.Equal(types.StringValue("")) {
 		t.Fatalf("post-import read should accept the API value verbatim, got %v", afterImport)
 	}
+	if diags.WarningsCount() != 0 {
+		t.Fatalf("post-import read should not warn, got %v", diags.Warnings())
+	}
 
-	subsequentRead := diversityZoneFromAPI(afterImport, "")
+	subsequentRead := diversityZoneFromAPI(afterImport, "", "test-uid", &diags)
 	if !subsequentRead.Equal(types.StringValue("")) {
 		t.Fatalf("subsequent reads should keep reflecting the now-known empty value, got %v", subsequentRead)
+	}
+	if diags.WarningsCount() != 0 {
+		t.Fatalf("subsequent empty-on-empty reads should not warn, got %v", diags.Warnings())
 	}
 }
 
