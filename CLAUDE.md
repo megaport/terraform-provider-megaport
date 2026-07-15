@@ -58,7 +58,7 @@ This is a **Terraform Plugin Framework** provider (not the older SDK/v2). All pr
 - `tflog_slog_handler.go` — bridges megaportgo slog logging to Terraform's tflog
 
 ### External API Client
-The provider uses `github.com/megaport/megaportgo` (v1.12.1) as its API client library. The `megaportProviderData` struct (in `provider.go`) holds the configured `*megaport.Client` and is passed to all resources/data sources via `Configure()`.
+The provider uses `github.com/megaport/megaportgo` (v1.14.1) as its API client library. The `megaportProviderData` struct (in `provider.go`) holds the configured `*megaport.Client` and is passed to all resources/data sources via `Configure()`.
 
 ## Key Patterns
 
