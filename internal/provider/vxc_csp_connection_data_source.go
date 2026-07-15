@@ -161,6 +161,7 @@ func (d *vxcCSPConnectionDataSource) Schema(_ context.Context, _ datasource.Sche
 						"pairing_key": schema.StringAttribute{
 							Description: "The pairing key of the Google Cloud connection.",
 							Computed:    true,
+							Sensitive:   true,
 						},
 						"ip_addresses": schema.ListAttribute{
 							Description: "The IP addresses of the Virtual Router.",

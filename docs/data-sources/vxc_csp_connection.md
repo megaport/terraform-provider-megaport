@@ -50,7 +50,7 @@ Read-Only:
 - `managed` (Boolean) Whether the CSP connection is managed.
 - `name` (String) The name of the CSP connection.
 - `owner_account` (String) The owner's AWS account of the CSP connection.
-- `pairing_key` (String) The pairing key of the Google Cloud connection.
+- `pairing_key` (String, Sensitive) The pairing key of the Google Cloud connection.
 - `peer_asn` (Number) The peer ASN of the CSP connection.
 - `provider_ip_address` (String) The provider IP address of the CSP connection.
 - `resource_name` (String) The resource name of the CSP connection.
