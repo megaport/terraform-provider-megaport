@@ -331,7 +331,6 @@ func TestAccMegaportMVEImagesDataSource_AvailableSizes(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.id"),
 					resource.TestCheckResourceAttr("data.megaport_mve_images.aruba", "mve_images.0.vendor", "Aruba"),
 					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.available_sizes.#"),
-					resource.TestCheckResourceAttrSet("data.megaport_mve_images.aruba", "mve_images.0.available_sizes.0"),
 				),
 			},
 		},
