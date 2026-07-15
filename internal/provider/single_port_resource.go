@@ -595,7 +595,10 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update the state
-	state.fromAPIPort(ctx, port, tags)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
