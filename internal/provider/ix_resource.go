@@ -574,8 +574,15 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	// Get the created IX
-	ix, err := r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
+	// Get the created IX. Retry transient errors so a single 5xx or network
+	// blip on this read doesn't trigger cleanup of the just-provisioned,
+	// billable IX.
+	var ix *megaport.IX
+	err = retryTransientGet(ctx, 3, func() error {
+		var getErr error
+		ix, getErr = r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
+		return getErr
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading IX",
