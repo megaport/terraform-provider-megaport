@@ -1047,12 +1047,10 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		return
 	}
 	var plan, state mveResourceModel
-	if !req.Plan.Raw.IsNull() {
-		planDiags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(planDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	planDiags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(planDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	if !req.State.Raw.IsNull() {
 		stateDiags := req.State.Get(ctx, &state)
@@ -1063,7 +1061,7 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	}
 
 	if !state.UID.IsNull() {
-		// If VendorConfig is null in the state, set it to the value from the plan
+		// State has no vendor_config yet; compare the plan's vendor/size to decide if a replace is required.
 		if state.VendorConfig.IsNull() {
 			// Add this check to avoid trying to convert a null value
 			if plan.VendorConfig.IsNull() {
@@ -1085,7 +1083,6 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			if !strings.EqualFold(state.Vendor.ValueString(), planVendorConfig.Vendor.ValueString()) {
 				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
 			}
-			state.VendorConfig = plan.VendorConfig
 		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
 			// During destroy, the plan's VendorConfig is null — nothing to compare.
 			if plan.VendorConfig.IsNull() || plan.VendorConfig.IsUnknown() {
@@ -1121,11 +1118,6 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					}
 				}
 			}
-		}
-		diags := req.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
 		}
 	}
 }
