@@ -113,6 +113,8 @@ type mveProbeOpts struct {
 	vendorConfig  megaport.VendorConfig
 	diversityZone string
 	vnicCount     int
+	// locationFilter, if set, restricts candidates to locations it returns true for.
+	locationFilter func(*megaport.LocationV3) bool
 }
 
 // findMVETestLocation returns a staging location with confirmed Aruba SMALL MVE
@@ -123,7 +125,7 @@ func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
 	return findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
-			ImageID:     MVEArubaImageIDMVE,
+			ImageID:     MVEArubaImageID,
 			ProductSize: "SMALL",
 			MVELabel:    "MVE 2/8",
 			AccountName: "probe",
@@ -133,6 +135,54 @@ func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
 		diversityZone: "red",
 		vnicCount:     2,
 	})
+}
+
+// findMVEWithPartnerTestLocation returns a single ACTIVE staging location that
+// has confirmed Aruba SMALL MVE capacity AND hosts a VXC-permitted partner port
+// of connectType. Provisioning the MVE and the partner-facing VXC end at one
+// location keeps them in the same region, which the API enforces for partner
+// types like TRANSIT. Picking the MVE and partner locations independently can
+// straddle regions under parallel load. Claims the location in the MVE pool.
+func findMVEWithPartnerTestLocation(t *testing.T, connectType string) (id int) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return 0
+	}
+	partnerLocs := map[int]bool{}
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) && pp.VXCPermitted {
+			partnerLocs[pp.LocationId] = true
+		}
+	}
+	if len(partnerLocs) == 0 {
+		t.Skipf("skipping: no VXC-permitted %s partner ports found", connectType)
+		return 0
+	}
+	id, _ = findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.ArubaConfig{
+			Vendor:      "aruba",
+			ImageID:     MVEArubaImageID,
+			ProductSize: "SMALL",
+			MVELabel:    "MVE 2/8",
+			AccountName: "probe",
+			AccountKey:  "probe",
+			SystemTag:   "Preconfiguration-aruba-test-1",
+		},
+		diversityZone: "red",
+		vnicCount:     2,
+		locationFilter: func(loc *megaport.LocationV3) bool {
+			return partnerLocs[loc.ID]
+		},
+	})
+	return id
 }
 
 // findMVETestLocationHighCapacity returns a staging location with enough capacity
@@ -169,7 +219,7 @@ func findMVETestLocationHighCapacity(t *testing.T, count int) (id int, name stri
 				Term:       1,
 				VendorConfig: &megaport.ArubaConfig{
 					Vendor:      "aruba",
-					ImageID:     MVEArubaImageIDMVE,
+					ImageID:     MVEArubaImageID,
 					ProductSize: "SMALL",
 					MVELabel:    "MVE 2/8",
 					AccountName: fmt.Sprintf("probe-%d", i),
@@ -254,7 +304,7 @@ func findMVETestLocationBlueZone(t *testing.T) (id int, name string) {
 	return findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
-			ImageID:     MVEArubaImageIDMVE,
+			ImageID:     MVEArubaImageID,
 			ProductSize: "SMALL",
 			MVELabel:    "MVE 2/8",
 			AccountName: "probe",
@@ -479,6 +529,9 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 		if !strings.EqualFold(loc.Status, "active") || !loc.HasMVESupport() {
 			return false
 		}
+		if opts.locationFilter != nil && !opts.locationFilter(loc) {
+			return false
+		}
 		vnics := make([]megaport.MVENetworkInterface, opts.vnicCount)
 		for i := range vnics {
 			vnics[i] = megaport.MVENetworkInterface{Description: fmt.Sprintf("vNIC %d", i)}
@@ -616,6 +669,56 @@ func findMCRTestLocation(t *testing.T, speedMbps int) (id int, name string) {
 	}
 	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity", speedMbps)
 	return 0, ""
+}
+
+// findMCRWithPartnerTestLocation returns a single ACTIVE staging location that
+// supports an MCR at mcrSpeedMbps AND hosts a VXC-permitted partner port of
+// connectType. Provisioning both VXC ends at one location keeps them in the
+// same region, which the API enforces for partner types like TRANSIT
+// ("LongHaul Transit VXC must be in the same region"). Picking the MCR and
+// partner locations independently can straddle regions under parallel load.
+// Claims the location in the MCR pool.
+func findMCRWithPartnerTestLocation(t *testing.T, mcrSpeedMbps int, connectType string) (id int) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0
+	}
+	locations, err := client.LocationService.ListLocationsV3(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list locations: %v", err)
+		return 0
+	}
+	partnerPorts, err := client.PartnerService.ListPartnerMegaports(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list partner ports: %v", err)
+		return 0
+	}
+	partnerLocs := map[int]bool{}
+	for _, pp := range partnerPorts {
+		if strings.EqualFold(pp.ConnectType, connectType) && pp.VXCPermitted {
+			partnerLocs[pp.LocationId] = true
+		}
+	}
+	mcrClaimedMu.Lock()
+	defer mcrClaimedMu.Unlock()
+	for _, loc := range locations {
+		if strings.EqualFold(loc.Status, "active") && mcrLocationHasCapacity(loc, mcrSpeedMbps) && partnerLocs[loc.ID] && !mcrClaimedLocations[loc.ID] {
+			locID := loc.ID
+			mcrClaimedLocations[locID] = true
+			t.Cleanup(func() {
+				mcrClaimedMu.Lock()
+				defer mcrClaimedMu.Unlock()
+				delete(mcrClaimedLocations, locID)
+			})
+			t.Logf("findMCRWithPartnerTestLocation(%s): using location %d (%s)", connectType, locID, loc.Name)
+			return locID
+		}
+	}
+	t.Skipf("skipping: no unclaimed ACTIVE location with %d Mbps MCR capacity and %s partner ports", mcrSpeedMbps, connectType)
+	return 0
 }
 
 // findNATGatewayTestLocation returns a staging location ID that supports NAT
