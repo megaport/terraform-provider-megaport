@@ -550,7 +550,9 @@ func mergeVrouterPartnerConfigFromAPI(
 				"Could not refresh BGP prefix filter list names",
 				fmt.Sprintf("ListMCRPrefixFilterLists for %s failed: %s. Prefix filter list names in state may be stale.", mcrUID, err.Error()),
 			)
-			return existingPartnerConfig, diags
+			// Fall through with no resolved names so prefixFilterIDToName preserves
+			// the existing names; the other BGP/IP fields must still be merged.
+			prefixFilterLists = nil
 		}
 	}
 	pflMap := make(map[int]string)
@@ -588,6 +590,8 @@ func mergeVrouterPartnerConfigFromAPI(
 				if r.Description == "" {
 					if existingDesc, ok := existingDescByPrefix[r.Prefix]; ok {
 						desc = existingDesc
+					} else {
+						desc = types.StringNull()
 					}
 				}
 				routeModels = append(routeModels, ipRouteModel{
