@@ -1068,9 +1068,9 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 }
 
 // vxcLocalAsnIBGPEBGPSentinel is the substring NetAuto returns (verbatim,
-// surfaced through Megalith's NetAutoErrorDecoder) in the .Message of a 400
-// when an in-place VXC update would flip a BGP session from iBGP to eBGP: the
-// new local_asn no longer matches the peer's ASN.
+// surfaced through Megalith's NetAutoErrorDecoder) in either the .Message or
+// .Data field of a 400 when an in-place VXC update would flip a BGP session
+// from iBGP to eBGP: the new local_asn no longer matches the peer's ASN.
 const vxcLocalAsnIBGPEBGPSentinel = "localAsn may not change the neighbour relationship"
 
 // isVXCLocalAsnIBGPEBGPError reports whether err is the platform's HTTP 400
