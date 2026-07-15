@@ -28,8 +28,7 @@ resource "megaport_mve" "mve_location_1" {
   contract_term_months = 1
   diversity_zone       = "red"
 
-  vendor_config = {
-    vendor         = "cisco"
+  cisco_config = {
     image_id       = 83
     product_size   = "SMALL"
     ssh_public_key = "ssh-rsa <public key>"

@@ -754,7 +754,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Aviatrix MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -766,7 +765,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Cisco MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -785,7 +783,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Fortinet MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -799,7 +796,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Meraki MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -811,7 +807,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Palo Alto MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":            schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":        schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -825,7 +820,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Prisma MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -838,7 +832,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "6WIND MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":       schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":   schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -850,7 +843,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "Versa MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":           schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":       schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
@@ -866,7 +858,6 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description:   "VMware MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
 				Optional:      true,
 				PlanModifiers: vendorConfigPlanModifiers,
-				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
 					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
 					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
