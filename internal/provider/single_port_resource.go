@@ -449,7 +449,10 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update the state
-	state.fromAPIPort(ctx, port, tags)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.PromoCode = plan.PromoCode
 
 	// Set state to fully populated data

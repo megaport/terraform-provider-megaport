@@ -479,7 +479,10 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Update the state
-	state.fromAPIPort(ctx, port, tags)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.PromoCode = plan.PromoCode
 
 	// Set state to fully populated data
