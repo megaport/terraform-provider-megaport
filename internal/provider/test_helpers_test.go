@@ -1542,10 +1542,10 @@ var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test res
 // front end to the same cleanup. Never fails; always skips at the end.
 //
 //	# List only:
-//	go test -v -run TestCleanupOrphanedResources ./internal/provider/
+//	TF_ACC=1 go test -v -run TestCleanupOrphanedResources ./internal/provider/
 //
 //	# Delete:
-//	go test -v -run TestCleanupOrphanedResources -cleanup-delete ./internal/provider/
+//	TF_ACC=1 go test -v -run TestCleanupOrphanedResources ./internal/provider/ -cleanup-delete
 func TestCleanupOrphanedResources(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("cleanup requires TF_ACC")
