@@ -47,6 +47,14 @@ func init() {
 		Dependencies: []string{"megaport_vxc", "megaport_ix"},
 		F:            sweepResource(cleanupOrphanedPorts),
 	})
+	// cleanupOrphanedPorts already covers LAG ports (ListPorts returns them
+	// alongside single ports), but a separate sweeper name lets -sweep target
+	// megaport_lag_port directly and lets other sweepers depend on it by name.
+	resource.AddTestSweepers("megaport_lag_port", &resource.Sweeper{
+		Name:         "megaport_lag_port",
+		Dependencies: []string{"megaport_vxc", "megaport_ix"},
+		F:            sweepResource(cleanupOrphanedPorts),
+	})
 }
 
 // resourceCleaner lists live orphans of one resource type whose name carries
