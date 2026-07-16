@@ -48,12 +48,13 @@ func init() {
 		F:            sweepResource(cleanupOrphanedPorts),
 	})
 	// cleanupOrphanedPorts already covers LAG ports (ListPorts returns them
-	// alongside single ports), but a separate sweeper name lets -sweep target
-	// megaport_lag_port directly and lets other sweepers depend on it by name.
+	// alongside single ports). This is a no-op alias depending on
+	// megaport_port so -sweep=megaport_lag_port still works without running
+	// cleanupOrphanedPorts a second time under -sweep=all.
 	resource.AddTestSweepers("megaport_lag_port", &resource.Sweeper{
 		Name:         "megaport_lag_port",
-		Dependencies: []string{"megaport_vxc", "megaport_ix"},
-		F:            sweepResource(cleanupOrphanedPorts),
+		Dependencies: []string{"megaport_port"},
+		F:            func(_ string) error { return nil },
 	})
 }
 
