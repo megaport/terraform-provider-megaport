@@ -1542,10 +1542,10 @@ var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test res
 // front end to the same cleanup. Never fails; always skips at the end.
 //
 //	# List only:
-//	TF_ACC=1 go test -v -run TestCleanupOrphanedResources ./internal/provider/
+//	TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -run TestCleanupOrphanedResources ./internal/provider/
 //
 //	# Delete:
-//	TF_ACC=1 go test -v -run TestCleanupOrphanedResources ./internal/provider/ -cleanup-delete
+//	TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -run TestCleanupOrphanedResources ./internal/provider/ -cleanup-delete
 func TestCleanupOrphanedResources(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("cleanup requires TF_ACC")
@@ -1575,6 +1575,8 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		n, cleanErr := c.clean(ctx, client, del)
 		if cleanErr != nil {
 			t.Logf("WARN: %v", cleanErr)
+			summary[i] = fmt.Sprintf("? %s (error)", c.label)
+			continue
 		}
 		summary[i] = fmt.Sprintf("%d %s", n, c.label)
 	}
