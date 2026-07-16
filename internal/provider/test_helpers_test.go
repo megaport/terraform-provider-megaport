@@ -1557,8 +1557,9 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	ctx := context.Background()
 	del := *cleanupDelete
 
-	// Same order the sweepers enforce: VXCs and IXs before the endpoints they
-	// sit on (MVE/MCR/port), ports last.
+	// Same order the sweepers enforce: VXCs and IXs attach to MCR/MVE/port, so
+	// they run first. MCR, MVE, and port don't attach to one another, so their
+	// relative order doesn't matter.
 	cleaners := []struct {
 		label string
 		clean resourceCleaner
