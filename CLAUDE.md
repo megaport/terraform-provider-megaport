@@ -21,9 +21,10 @@ go test -v -timeout=30m -run TestFunctionName ./internal/provider/
 TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -timeout=30m -cover ./internal/provider/
 
 # Sweep orphaned staging test resources (deletes live TestNamePrefix-matched, i.e.
-# "tf-acc-test-*", VXC/MVE/MCR/IX/port).
-# Endpoints (MCR/MVE/port) use SafeDelete, so one still carrying an attachment is left
-# for a later sweep instead of being force-cancelled. Re-run to clear the stragglers.
+# "tf-acc-test-*", VXC/MVE/MCR/IX/port/NAT gateway).
+# Endpoints (MCR/MVE/port/NAT gateway) use SafeDelete, so one still carrying an
+# attachment is left for a later sweep instead of being force-cancelled. Re-run to
+# clear the stragglers.
 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test ./internal/provider/ -sweep=all
 
 # List orphans without deleting (dry run; add -cleanup-delete to delete)

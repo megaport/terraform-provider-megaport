@@ -1557,9 +1557,10 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	ctx := context.Background()
 	del := *cleanupDelete
 
-	// Same order the sweepers enforce: VXCs and IXs attach to MCR/MVE/port, so
-	// they run first. MCR, MVE, and port don't attach to one another, so their
-	// relative order doesn't matter.
+	// Same order the sweepers enforce: VXCs attach to MCR/MVE/port/NAT gateway
+	// and IXs to MCR/MVE/port, so both run first. MCR, MVE, port, and NAT
+	// gateway don't attach to one another, so their relative order doesn't
+	// matter.
 	cleaners := []struct {
 		label string
 		clean resourceCleaner
@@ -1569,6 +1570,7 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		{"MVE", cleanupOrphanedMVEs},
 		{"MCR", cleanupOrphanedMCRs},
 		{"Port", cleanupOrphanedPorts},
+		{"NAT Gateway", cleanupOrphanedNATGateways},
 	}
 	summary := make([]string, len(cleaners))
 	for i, c := range cleaners {

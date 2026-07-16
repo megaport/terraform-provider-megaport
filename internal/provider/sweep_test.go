@@ -21,9 +21,9 @@ func TestMain(m *testing.M) {
 }
 
 func init() {
-	// VXCs and IXs attach to MCR/MVE/port, so they must be swept first. MCR,
-	// MVE, and port don't attach to one another, so their relative order
-	// doesn't matter.
+	// VXCs attach to MCR/MVE/port/NAT gateway and IXs to MCR/MVE/port, so
+	// both are swept first. MCR, MVE, port, and NAT gateway don't attach to
+	// one another, so their relative order doesn't matter.
 	resource.AddTestSweepers("megaport_vxc", &resource.Sweeper{
 		Name: "megaport_vxc",
 		F:    sweepResource(cleanupOrphanedVXCs),
@@ -47,6 +47,11 @@ func init() {
 		Dependencies: []string{"megaport_vxc", "megaport_ix"},
 		F:            sweepResource(cleanupOrphanedPorts),
 	})
+	resource.AddTestSweepers("megaport_nat_gateway", &resource.Sweeper{
+		Name:         "megaport_nat_gateway",
+		Dependencies: []string{"megaport_vxc"},
+		F:            sweepResource(cleanupOrphanedNATGateways),
+	})
 	// cleanupOrphanedPorts already covers LAG ports (ListPorts returns them
 	// alongside single ports). This is a no-op alias depending on
 	// megaport_port so -sweep=megaport_lag_port still works without running
@@ -62,10 +67,11 @@ func init() {
 // TestNamePrefix and, when del is true, deletes them. It returns the count of
 // live orphans found.
 //
-// Endpoint resources (MCR/MVE/port) delete with SafeDelete so the API refuses
-// when something is still attached, guarding against a force-delete cascading
-// into a resource that lacks the test prefix. A parent still carrying an
-// attachment is left for a later sweep rather than force-cancelled.
+// Endpoint resources (MCR/MVE/port/NAT gateway) delete with SafeDelete so the
+// API refuses when something is still attached, guarding against a
+// force-delete cascading into a resource that lacks the test prefix. A parent
+// still carrying an attachment is left for a later sweep rather than
+// force-cancelled.
 type resourceCleaner func(ctx context.Context, client *megaport.Client, del bool) (int, error)
 
 // sweepResource adapts a resourceCleaner to the framework's SweeperFunc. The
@@ -192,6 +198,38 @@ func cleanupOrphanedPorts(ctx context.Context, client *megaport.Client, del bool
 			continue
 		}
 		if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true, SafeDelete: true}); delErr != nil {
+			log.Printf("[sweep]   delete failed: %v", delErr)
+		}
+	}
+	return n, nil
+}
+
+func cleanupOrphanedNATGateways(ctx context.Context, client *megaport.Client, del bool) (int, error) {
+	gws, err := client.NATGatewayService.ListNATGateways(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("listing NAT Gateways: %w", err)
+	}
+	var n int
+	for _, gw := range gws {
+		if !sweepable(gw.ProductName, gw.ProvisioningStatus) {
+			continue
+		}
+		n++
+		log.Printf("[sweep] NGW  %s (%s) status=%s", gw.ProductName, gw.ProductUID, gw.ProvisioningStatus)
+		if !del {
+			continue
+		}
+		// DeleteNATGateway has no SafeDelete option, so provisioned gateways
+		// go through DeleteProduct directly to keep the attachment guard.
+		// DESIGN records were never purchased (nothing attached) and need the
+		// design-only delete path that DeleteNATGateway routes to.
+		var delErr error
+		if strings.EqualFold(gw.ProvisioningStatus, megaport.STATUS_DESIGN) {
+			delErr = client.NATGatewayService.DeleteNATGateway(ctx, gw.ProductUID)
+		} else {
+			_, delErr = client.ProductService.DeleteProduct(ctx, &megaport.DeleteProductRequest{ProductID: gw.ProductUID, DeleteNow: true, SafeDelete: true})
+		}
+		if delErr != nil {
 			log.Printf("[sweep]   delete failed: %v", delErr)
 		}
 	}
