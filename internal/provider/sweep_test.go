@@ -21,8 +21,9 @@ func TestMain(m *testing.M) {
 }
 
 func init() {
-	// VXCs and IXs sit on the endpoint resources (MCR/MVE/port), so they must
-	// be swept first; ports come last because everything else sits on them.
+	// VXCs and IXs attach to MCR/MVE/port, so they must be swept first. MCR,
+	// MVE, and port don't attach to one another, so their relative order
+	// doesn't matter.
 	resource.AddTestSweepers("megaport_vxc", &resource.Sweeper{
 		Name: "megaport_vxc",
 		F:    sweepResource(cleanupOrphanedVXCs),
