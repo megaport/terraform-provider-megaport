@@ -14,10 +14,6 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// sweepResourcePrefix is the name prefix every acceptance-test resource carries
-// (see RandomTestName). Only resources matching it are ever swept.
-const sweepResourcePrefix = "tf-acc-test-"
-
 // TestMain wires up the terraform-plugin-testing sweeper framework. With no
 // -sweep flag it just runs the tests, so normal suites are unaffected.
 func TestMain(m *testing.M) {
@@ -25,25 +21,25 @@ func TestMain(m *testing.M) {
 }
 
 func init() {
-	// VXCs must be swept before the endpoints they terminate on; ports come
-	// last because both VXCs and IXs sit on them.
+	// VXCs and IXs sit on the endpoint resources (MCR/MVE/port), so they must
+	// be swept first; ports come last because everything else sits on them.
 	resource.AddTestSweepers("megaport_vxc", &resource.Sweeper{
 		Name: "megaport_vxc",
 		F:    sweepResource(cleanupOrphanedVXCs),
 	})
+	resource.AddTestSweepers("megaport_ix", &resource.Sweeper{
+		Name: "megaport_ix",
+		F:    sweepResource(cleanupOrphanedIXs),
+	})
 	resource.AddTestSweepers("megaport_mcr", &resource.Sweeper{
 		Name:         "megaport_mcr",
-		Dependencies: []string{"megaport_vxc"},
+		Dependencies: []string{"megaport_vxc", "megaport_ix"},
 		F:            sweepResource(cleanupOrphanedMCRs),
 	})
 	resource.AddTestSweepers("megaport_mve", &resource.Sweeper{
 		Name:         "megaport_mve",
-		Dependencies: []string{"megaport_vxc"},
+		Dependencies: []string{"megaport_vxc", "megaport_ix"},
 		F:            sweepResource(cleanupOrphanedMVEs),
-	})
-	resource.AddTestSweepers("megaport_ix", &resource.Sweeper{
-		Name: "megaport_ix",
-		F:    sweepResource(cleanupOrphanedIXs),
 	})
 	resource.AddTestSweepers("megaport_port", &resource.Sweeper{
 		Name:         "megaport_port",
@@ -70,8 +66,10 @@ func sweepResource(clean resourceCleaner) resource.SweeperFunc {
 }
 
 // sweepable reports whether a resource is a live orphan created by the suite.
+// Only resources whose name carries TestNamePrefix (see RandomTestName) are
+// ever swept.
 func sweepable(name, status string) bool {
-	return strings.HasPrefix(name, sweepResourcePrefix) && !strings.EqualFold(status, "DECOMMISSIONED")
+	return strings.HasPrefix(name, TestNamePrefix) && !strings.EqualFold(status, "DECOMMISSIONED")
 }
 
 func cleanupOrphanedVXCs(ctx context.Context, client *megaport.Client, del bool) (int, error) {
@@ -162,6 +160,8 @@ func cleanupOrphanedIXs(ctx context.Context, client *megaport.Client, del bool) 
 	return n, nil
 }
 
+// cleanupOrphanedPorts sweeps standard ports only. ListPorts filters to the
+// "megaport" product type, so LAG ports are not covered here.
 func cleanupOrphanedPorts(ctx context.Context, client *megaport.Client, del bool) (int, error) {
 	ports, err := client.PortService.ListPorts(ctx)
 	if err != nil {
