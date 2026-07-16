@@ -49,8 +49,9 @@ func init() {
 	})
 }
 
-// resourceCleaner lists live tf-acc-test-* orphans of one resource type and,
-// when del is true, deletes them. It returns the count of live orphans found.
+// resourceCleaner lists live orphans of one resource type whose name carries
+// TestNamePrefix and, when del is true, deletes them. It returns the count of
+// live orphans found.
 //
 // Endpoint resources (MCR/MVE/port) delete with SafeDelete so the API refuses
 // when something is still attached, guarding against a force-delete cascading

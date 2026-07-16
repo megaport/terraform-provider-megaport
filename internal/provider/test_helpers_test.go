@@ -1537,7 +1537,7 @@ func TestListPortCapacity(t *testing.T) {
 var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test resources in TestCleanupOrphanedResources")
 
 // TestCleanupOrphanedResources lists (and with -cleanup-delete, deletes)
-// staging resources whose name starts with "tf-acc-test-". It shares its
+// staging resources whose name carries TestNamePrefix. It shares its
 // per-type logic with the sweepers in sweep_test.go, so it is a dry-run-first
 // front end to the same cleanup. Never fails; always skips at the end.
 //
