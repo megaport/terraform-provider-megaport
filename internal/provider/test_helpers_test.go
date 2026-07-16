@@ -1557,15 +1557,16 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	ctx := context.Background()
 	del := *cleanupDelete
 
-	// Same order the sweepers enforce: VXCs before their endpoints, ports last.
+	// Same order the sweepers enforce: VXCs and IXs before the endpoints they
+	// sit on (MVE/MCR/port), ports last.
 	cleaners := []struct {
 		label string
 		clean resourceCleaner
 	}{
 		{"VXC", cleanupOrphanedVXCs},
+		{"IX", cleanupOrphanedIXs},
 		{"MVE", cleanupOrphanedMVEs},
 		{"MCR", cleanupOrphanedMCRs},
-		{"IX", cleanupOrphanedIXs},
 		{"Port", cleanupOrphanedPorts},
 	}
 	summary := make([]string, len(cleaners))

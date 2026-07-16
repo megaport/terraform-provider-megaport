@@ -50,6 +50,11 @@ func init() {
 
 // resourceCleaner lists live tf-acc-test-* orphans of one resource type and,
 // when del is true, deletes them. It returns the count of live orphans found.
+//
+// Endpoint resources (MCR/MVE/port) delete with SafeDelete so the API refuses
+// when something is still attached, guarding against a force-delete cascading
+// into a resource that lacks the test prefix. A parent still carrying an
+// attachment is left for a later sweep rather than force-cancelled.
 type resourceCleaner func(ctx context.Context, client *megaport.Client, del bool) (int, error)
 
 // sweepResource adapts a resourceCleaner to the framework's SweeperFunc. The
@@ -109,7 +114,7 @@ func cleanupOrphanedMVEs(ctx context.Context, client *megaport.Client, del bool)
 		if !del {
 			continue
 		}
-		if _, delErr := client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{MVEID: mve.UID}); delErr != nil {
+		if _, delErr := client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{MVEID: mve.UID, SafeDelete: true}); delErr != nil {
 			log.Printf("[sweep]   delete failed: %v", delErr)
 		}
 	}
@@ -131,7 +136,7 @@ func cleanupOrphanedMCRs(ctx context.Context, client *megaport.Client, del bool)
 		if !del {
 			continue
 		}
-		if _, delErr := client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{MCRID: mcr.UID, DeleteNow: true}); delErr != nil {
+		if _, delErr := client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{MCRID: mcr.UID, DeleteNow: true, SafeDelete: true}); delErr != nil {
 			log.Printf("[sweep]   delete failed: %v", delErr)
 		}
 	}
@@ -160,8 +165,6 @@ func cleanupOrphanedIXs(ctx context.Context, client *megaport.Client, del bool) 
 	return n, nil
 }
 
-// cleanupOrphanedPorts sweeps standard ports only. ListPorts filters to the
-// "megaport" product type, so LAG ports are not covered here.
 func cleanupOrphanedPorts(ctx context.Context, client *megaport.Client, del bool) (int, error) {
 	ports, err := client.PortService.ListPorts(ctx)
 	if err != nil {
@@ -177,7 +180,7 @@ func cleanupOrphanedPorts(ctx context.Context, client *megaport.Client, del bool
 		if !del {
 			continue
 		}
-		if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true}); delErr != nil {
+		if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true, SafeDelete: true}); delErr != nil {
 			log.Printf("[sweep]   delete failed: %v", delErr)
 		}
 	}
