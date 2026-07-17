@@ -108,7 +108,7 @@ func (orm *singlePortResourceModel) fromAPIPort(ctx context.Context, p *megaport
 		orm.CreateDate = types.StringNull()
 	}
 	orm.CreatedBy = types.StringValue(p.CreatedBy)
-	orm.DiversityZone = types.StringValue(p.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone, p.UID, &diags)
 	if p.LiveDate != nil {
 		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
 	} else {
@@ -324,7 +324,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the product.",
+				Description: "The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -596,7 +596,10 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update the state
-	state.fromAPIPort(ctx, port, tags)
+	resp.Diagnostics.Append(state.fromAPIPort(ctx, port, tags)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
