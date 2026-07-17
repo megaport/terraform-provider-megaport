@@ -645,21 +645,33 @@ func mergeVrouterPartnerConfigFromAPI(
 				}
 			}
 			apiUsed := make([]bool, len(apiIface.BGPConnections))
+			matchedIdx := make([]int, len(existingBgps))
 
+			// First pass: resolve all peer-IP matches before any positional
+			// fallback claims a slot, so an entry without a peer IP can't
+			// steal the API slot that a later entry's exact match needs.
 			for bgpIdx, existingBgp := range existingBgps {
-				apiIdx := -1
+				matchedIdx[bgpIdx] = -1
 				if ip := existingBgp.PeerIPAddress.ValueString(); ip != "" {
 					if idx, ok := apiIdxByPeerIP[ip]; ok && !apiUsed[idx] {
-						apiIdx = idx
+						matchedIdx[bgpIdx] = idx
+						apiUsed[idx] = true
 					}
 				}
-				if apiIdx == -1 && bgpIdx < len(apiIface.BGPConnections) && !apiUsed[bgpIdx] {
-					apiIdx = bgpIdx
+			}
+			// Second pass: fill remaining unmatched entries positionally.
+			for bgpIdx := range existingBgps {
+				if matchedIdx[bgpIdx] == -1 && bgpIdx < len(apiIface.BGPConnections) && !apiUsed[bgpIdx] {
+					matchedIdx[bgpIdx] = bgpIdx
+					apiUsed[bgpIdx] = true
 				}
+			}
+
+			for bgpIdx, existingBgp := range existingBgps {
+				apiIdx := matchedIdx[bgpIdx]
 				if apiIdx == -1 {
 					continue // no API counterpart; preserve state
 				}
-				apiUsed[apiIdx] = true
 				apiBgp := apiIface.BGPConnections[apiIdx]
 
 				// Update fields only if the user configured them (non-null in
