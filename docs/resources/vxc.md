@@ -514,7 +514,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection. Changing this on an existing VXC cannot flip the BGP session between iBGP and eBGP; the VXC must be deleted and recreated to do that.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -586,7 +586,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection. Changing this on an existing VXC cannot flip the BGP session between iBGP and eBGP; the VXC must be deleted and recreated to do that.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -769,7 +769,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection. Changing this on an existing VXC cannot flip the BGP session between iBGP and eBGP; the VXC must be deleted and recreated to do that.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -841,7 +841,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_asn` (Number) The local ASN of the BGP connection. Changing this on an existing VXC cannot flip the BGP session between iBGP and eBGP; the VXC must be deleted and recreated to do that.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
