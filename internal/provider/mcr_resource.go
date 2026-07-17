@@ -182,7 +182,7 @@ func (orm *mcrResourceModel) fromAPIMCR(ctx context.Context, m *megaport.MCR, ta
 	orm.Locked = types.BoolValue(m.Locked)
 	orm.AdminLocked = types.BoolValue(m.AdminLocked)
 	orm.Cancelable = types.BoolValue(m.Cancelable)
-	orm.DiversityZone = types.StringValue(m.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, m.DiversityZone, m.UID, &apiDiags)
 
 	if m.CreateDate != nil {
 		orm.CreateDate = types.StringValue(m.CreateDate.String())
@@ -401,7 +401,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated.",
+				Description: "Diversity zone of the product. If the parameter is not provided, a diversity zone will be automatically allocated. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
