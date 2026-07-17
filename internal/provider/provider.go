@@ -334,3 +334,25 @@ func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, dia
 	diags := in.ElementsAs(ctx, &tags, false)
 	return tags, diags
 }
+
+// diversityZoneFromAPI reconciles a diversity_zone read from the API with the
+// value already in state. Diversity zone is fixed at order time, so an empty
+// value from Read is a backend data gap, not a real change; overwriting a known
+// zone with it would let the RequiresReplace modifier destroy a live resource.
+// Preserve the known value on an empty read, warning so the drift stays
+// visible; otherwise take the API value.
+func diversityZoneFromAPI(current types.String, apiVal, productUID string, diags *diag.Diagnostics) types.String {
+	if apiVal == "" && !current.IsNull() && !current.IsUnknown() {
+		if current.ValueString() != "" {
+			diags.AddWarning(
+				"Diversity zone not reported by API",
+				fmt.Sprintf("The Megaport API reported no diversity zone for %s; keeping %q from state. "+
+					"If this is a correction rather than a transient gap, remove or update diversity_zone in your configuration, "+
+					"then optionally run 'terraform state rm' and 'terraform import' on this resource to reset the stored value.",
+					productUID, current.ValueString()),
+			)
+		}
+		return current
+	}
+	return types.StringValue(apiVal)
+}
