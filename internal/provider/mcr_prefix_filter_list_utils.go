@@ -51,7 +51,7 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 			apiEntry, convertDiags := convertEntryToAPI(entry, m.AddressFamily.ValueString())
 			diags.Append(convertDiags...)
 			if diags.HasError() {
-				continue
+				return nil, diags
 			}
 
 			apiList.Entries = append(apiList.Entries, apiEntry)
