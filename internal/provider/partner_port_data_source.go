@@ -125,10 +125,7 @@ func (d *partnerPortDataSource) Read(ctx context.Context, req datasource.ReadReq
 
 	partnerPorts, listErr := d.client.PartnerService.ListPartnerMegaports(ctx)
 	if listErr != nil {
-		resp.Diagnostics.AddError(
-			"Error listing partner ports",
-			"Could not list partner ports: "+listErr.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("Partner Port", "list"), listErr)
 		return
 	}
 
