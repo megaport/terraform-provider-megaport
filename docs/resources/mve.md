@@ -175,7 +175,7 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
 - `aviatrix_config` (Attributes) Aviatrix MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--aviatrix_config))
 - `cisco_config` (Attributes) Cisco MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--cisco_config))
 - `cost_centre` (String) The cost centre of the MVE.
-- `diversity_zone` (String) The diversity zone of the MVE.
+- `diversity_zone` (String) The diversity zone of the MVE. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.
 - `fortinet_config` (Attributes) Fortinet MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--fortinet_config))
 - `meraki_config` (Attributes) Meraki MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--meraki_config))
 - `palo_alto_config` (Attributes) Palo Alto MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes. (see [below for nested schema](#nestedatt--palo_alto_config))

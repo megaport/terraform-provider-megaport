@@ -74,20 +74,23 @@ func (m *natGatewayResourceModel) fromAPINATGateway(gw *megaport.NATGateway) dia
 	m.ServiceLevelReference = types.StringValue(gw.ServiceLevelReference)
 	m.ProvisioningStatus = types.StringValue(gw.ProvisioningStatus)
 
+	var diags diag.Diagnostics
+
 	// Config fields
-	m.DiversityZone = types.StringValue(gw.Config.DiversityZone)
+	m.DiversityZone = diversityZoneFromAPI(m.DiversityZone, gw.Config.DiversityZone, gw.ProductUID, &diags)
 	m.ASN = types.Int64Value(int64(gw.Config.ASN))
 	m.BGPShutdownDefault = types.BoolValue(gw.Config.BGPShutdownDefault)
 	m.SessionCount = types.Int64Value(int64(gw.Config.SessionCount))
 
 	// Resource tags
-	var diags diag.Diagnostics
 	if len(gw.ResourceTags) > 0 {
 		tagMap := make(map[string]attr.Value, len(gw.ResourceTags))
 		for _, tag := range gw.ResourceTags {
 			tagMap[tag.Key] = types.StringValue(tag.Value)
 		}
-		m.ResourceTags, diags = types.MapValue(types.StringType, tagMap)
+		tagVal, tagDiags := types.MapValue(types.StringType, tagMap)
+		diags.Append(tagDiags...)
+		m.ResourceTags = tagVal
 	} else {
 		m.ResourceTags = types.MapNull(types.StringType)
 	}

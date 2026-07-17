@@ -148,10 +148,7 @@ func (d *mveImageDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	mveImages, listErr := d.client.MVEService.ListMVEImages(ctx)
 	if listErr != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading MVE Images",
-			"Could not list MVE Images: "+listErr.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Images", "list"), listErr)
 		return
 	}
 

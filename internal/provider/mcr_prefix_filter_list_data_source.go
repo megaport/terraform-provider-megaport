@@ -146,11 +146,7 @@ func (d *mcrPrefixFilterListDataSource) Read(ctx context.Context, req datasource
 	// Get prefix filter lists from API
 	prefixFilterLists, err := d.client.MCRService.ListMCRPrefixFilterLists(ctx, config.MCRID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading MCR prefix filter lists",
-			fmt.Sprintf("Could not read prefix filter lists for MCR %s: %s",
-				config.MCRID.ValueString(), err.Error()),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MCR Prefix Filter List", config.MCRID.ValueString()), err)
 		return
 	}
 

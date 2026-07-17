@@ -567,7 +567,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	orm.Vendor = types.StringValue(p.Vendor)
 	orm.Size = types.StringValue(p.Size)
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.DiversityZone = types.StringValue(p.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone, p.UID, &apiDiags)
 
 	if p.AttributeTags != nil {
 		tags, tagDiags := types.MapValueFrom(ctx, types.StringType, p.AttributeTags)
@@ -640,7 +640,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the MVE.",
+				Description: "The diversity zone of the MVE. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -932,20 +932,14 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	err := r.client.MVEService.ValidateMVEOrder(ctx, mveReq)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Validation error while attempting to create MVE",
-			"Validation error while attempting to create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, createErrorSummary("MVE", plan.Name.ValueString()), err)
 		return
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading MVE",
-			"Could not create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, createErrorSummary("MVE", plan.Name.ValueString()), err)
 		return
 	}
 
@@ -954,19 +948,13 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// get the created MVE
 	mve, err := r.client.MVEService.GetMVE(ctx, createdID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading newly created MVE",
-			"Could not read newly created MVE with ID "+createdID+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", createdID), err)
 		return
 	}
 
 	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, createdID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for newly created MVE",
-			"Could not read tags for newly created MVE with ID "+createdID+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", createdID), err)
 		return
 	}
 
@@ -1004,10 +992,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			}
 		}
 
-		resp.Diagnostics.AddError(
-			"Error Reading MVE",
-			"Could not read MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -1020,10 +1005,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Get tags
 	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for MVE",
-			"Could not read tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", state.UID.ValueString()), err)
 		return
 	}
 
@@ -1082,19 +1064,13 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating MVE",
-			"Could not update MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, updateErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
 	updatedMVE, err := r.client.MVEService.GetMVE(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading updated MVE",
-			"Could not read updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -1106,20 +1082,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 		err = r.client.MVEService.UpdateMVEResourceTags(ctx, state.UID.ValueString(), tagMap)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating tags for MVE",
-				"Could not update tags for MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-			)
+			addAPIError(&resp.Diagnostics, updateErrorSummary("MVE Tags", state.UID.ValueString()), err)
 			return
 		}
 	}
 
 	tags, err := r.client.MVEService.ListMVEResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading tags for updated MVE",
-			"Could not read tags for updated MVE with ID "+state.UID.ValueString()+": "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("MVE Tags", state.UID.ValueString()), err)
 		return
 	}
 
@@ -1155,10 +1125,7 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return deleteErr
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting MVE",
-			fmt.Sprintf("Could not delete MVE with product UID %s: %s", productUID, err),
-		)
+		addAPIError(&resp.Diagnostics, deleteErrorSummary("MVE", state.UID.ValueString()), err)
 		return
 	}
 
@@ -1168,23 +1135,11 @@ func (r *mveResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 // Configure adds the provider configured client to the resource.
 func (r *mveResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 }
 
 func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

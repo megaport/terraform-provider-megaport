@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -578,20 +577,14 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 	// Create the IX
 	ixResp, err := r.client.IXService.BuyIX(ctx, buyReq)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating IX",
-			"Could not create IX, unexpected error: "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, createErrorSummary("IX", plan.ProductName.ValueString()), err)
 		return
 	}
 
 	// Get the created IX
 	ix, err := r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading IX",
-			"Could not read IX after creation, unexpected error: "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("IX", ixResp.TechnicalServiceUID), err)
 		return
 	}
 
@@ -686,10 +679,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		updateReq.Shutdown != nil {
 		_, err := r.client.IXService.UpdateIX(ctx, state.ProductUID.ValueString(), updateReq)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating IX",
-				"Could not update IX, unexpected error: "+err.Error(),
-			)
+			addAPIError(&resp.Diagnostics, updateErrorSummary("IX", state.ProductUID.ValueString()), err)
 			return
 		}
 	}
@@ -697,10 +687,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// Refetch the updated IX
 	updatedIX, err := r.client.IXService.GetIX(ctx, state.ProductUID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading IX",
-			"Could not read IX after update, unexpected error: "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, readErrorSummary("IX", state.ProductUID.ValueString()), err)
 		return
 	}
 
@@ -730,10 +717,7 @@ func (r *ixResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		})
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting IX",
-			"Could not delete IX, unexpected error: "+err.Error(),
-		)
+		addAPIError(&resp.Diagnostics, deleteErrorSummary("IX", state.ProductUID.ValueString()), err)
 		return
 	}
 
@@ -748,21 +732,9 @@ func (r *ixResource) ImportState(ctx context.Context, req resource.ImportStateRe
 
 // Configure adds the provider configured client to the resource.
 func (r *ixResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	data, ok := req.ProviderData.(*megaportProviderData)
+	data, ok := configureMegaportResource(req, resp)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
 		return
 	}
-
-	client := data.client
-
-	r.client = client
+	r.client = data.client
 }
