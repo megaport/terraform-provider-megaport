@@ -328,6 +328,21 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	}
 }
 
+func configureMegaportResource(req resource.ConfigureRequest, resp *resource.ConfigureResponse) (*megaportProviderData, bool) {
+	if req.ProviderData == nil {
+		return nil, false
+	}
+	providerData, ok := req.ProviderData.(*megaportProviderData)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Provider Data Type",
+			fmt.Sprintf("Expected *megaportProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return nil, false
+	}
+	return providerData, true
+}
+
 func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, diag.Diagnostics) {
 	tags := map[string]string{}
 	diags := in.ElementsAs(ctx, &tags, false)
