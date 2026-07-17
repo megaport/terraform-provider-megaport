@@ -59,6 +59,7 @@ if [ "${#tags[@]}" -eq 0 ]; then
     echo "Ensure tags are fetched (for example, in shallow clones or CI environments) to include one." >&2
     echo "_No release tags found in this checkout._" >> "$TMPOUT"
     echo "" >> "$TMPOUT"
+    chmod 644 "$TMPOUT"
     mv "$TMPOUT" "$OUT"
     trap - EXIT
     exit 0
@@ -102,5 +103,6 @@ for i in "${!tags[@]}"; do
     echo "" >> "$TMPOUT"
 done
 
+chmod 644 "$TMPOUT"
 mv "$TMPOUT" "$OUT"
 trap - EXIT
