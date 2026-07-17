@@ -70,21 +70,14 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
@@ -106,7 +99,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 			// Update Testing
 			{
@@ -159,7 +152,6 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "ARUBA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
@@ -167,14 +159,8 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
 			// Make sure resource has not been destroyed by change of casing in Vendor Config
@@ -195,7 +181,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 		},
 	})
@@ -536,21 +522,14 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
@@ -572,7 +551,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 			// Update Testing
 			{
@@ -627,21 +606,14 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
@@ -663,7 +635,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "vendor_config", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 		},
 	})
@@ -738,7 +710,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 			// Test a modification with lifecycle.ignore_changes
 			{
@@ -847,20 +819,13 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "CISCO"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "mve_size"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
 			// ImportState testing
@@ -881,7 +846,7 @@ func TestAccMegaportMVECisco_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 			// Update: rename and change cost centre.
 			{
@@ -983,20 +948,13 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "PALO_ALTO"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "mve_size"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_id"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "create_date"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "created_by"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "market"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "location_id"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_uid"),
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
 			// ImportState testing
@@ -1017,7 +975,7 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "vendor_config", "resources", "provisioning_status"},
+				ImportStateVerifyIgnore: []string{"vendor_config", "resources"},
 			},
 			// Update: rename and change cost centre.
 			{
