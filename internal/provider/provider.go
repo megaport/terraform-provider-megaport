@@ -88,7 +88,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
 			"wait_time": schema.Int64Attribute{
-				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers. Does not apply to Internet Exchange (IX) resources, which use a fixed 10-minute wait.",
+				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
