@@ -265,10 +265,7 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		// Look up a specific MCR by UID
 		mcr, err := d.client.MCRService.GetMCR(ctx, data.ProductUID.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error reading MCR",
-				fmt.Sprintf("Unable to read MCR %s: %v", data.ProductUID.ValueString(), err),
-			)
+			addAPIError(&resp.Diagnostics, readErrorSummary("MCR", data.ProductUID.ValueString()), err)
 			return
 		}
 		if mcr == nil {
@@ -286,10 +283,7 @@ func (d *mcrsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			IncludeInactive: false,
 		})
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error listing MCRs",
-				fmt.Sprintf("Unable to list MCRs: %v", err),
-			)
+			addAPIError(&resp.Diagnostics, readErrorSummary("MCR", "list"), err)
 			return
 		}
 	}
