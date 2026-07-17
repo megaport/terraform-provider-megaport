@@ -1536,116 +1536,54 @@ func TestListPortCapacity(t *testing.T) {
 // Pass -cleanup-delete on the go test command line to enable deletion.
 var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test resources in TestCleanupOrphanedResources")
 
-// TestCleanupOrphanedResources lists (and optionally deletes) staging resources
-// whose name starts with "tf-acc-test-". VXCs are deleted first (before their
-// endpoints). Never fails — always skips at the end.
+// TestCleanupOrphanedResources lists (and with -cleanup-delete, deletes)
+// staging resources whose name carries TestNamePrefix. It shares its
+// per-type logic with the sweepers in sweep_test.go, so it is a dry-run-first
+// front end to the same cleanup. Never fails; always skips at the end.
 //
 //	# List only:
-//	go test -v -run TestCleanupOrphanedResources ./internal/provider/
+//	TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -run TestCleanupOrphanedResources ./internal/provider/
 //
 //	# Delete:
-//	go test -v -run TestCleanupOrphanedResources -cleanup-delete ./internal/provider/
+//	TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -run TestCleanupOrphanedResources ./internal/provider/ -cleanup-delete
 func TestCleanupOrphanedResources(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("cleanup requires TF_ACC")
 	}
-	const prefix = "tf-acc-test-"
-	ctx := context.Background()
 	client, err := getTestClient()
 	if err != nil {
 		t.Skipf("no client: %v", err)
 	}
+	ctx := context.Background()
+	del := *cleanupDelete
 
-	// isLive returns true for resources that are not yet decommissioned.
-	isLive := func(status string) bool {
-		return !strings.EqualFold(status, "DECOMMISSIONED")
+	// Same order the sweepers enforce: VXCs attach to MCR/MVE/port/NAT gateway
+	// and IXs to MCR/MVE/port, so both run first. MCR, MVE, port, and NAT
+	// gateway don't attach to one another, so their relative order doesn't
+	// matter.
+	cleaners := []struct {
+		label string
+		clean resourceCleaner
+	}{
+		{"VXC", cleanupOrphanedVXCs},
+		{"IX", cleanupOrphanedIXs},
+		{"MVE", cleanupOrphanedMVEs},
+		{"MCR", cleanupOrphanedMCRs},
+		{"Port", cleanupOrphanedPorts},
+		{"NAT Gateway", cleanupOrphanedNATGateways},
 	}
-
-	// VXCs first — must be deleted before their A/B-end resources
-	var vxcLive int
-	vxcs, err := client.VXCService.ListVXCs(ctx, &megaport.ListVXCsRequest{})
-	if err != nil {
-		t.Logf("WARN: could not list VXCs: %v", err)
-	}
-	for _, vxc := range vxcs {
-		if !strings.HasPrefix(vxc.Name, prefix) || !isLive(vxc.ProvisioningStatus) {
+	summary := make([]string, len(cleaners))
+	for i, c := range cleaners {
+		n, cleanErr := c.clean(ctx, client, del)
+		if cleanErr != nil {
+			t.Logf("WARN: %v", cleanErr)
+			summary[i] = fmt.Sprintf("? %s (error)", c.label)
 			continue
 		}
-		vxcLive++
-		t.Logf("VXC  %s (%s) status=%s", vxc.Name, vxc.UID, vxc.ProvisioningStatus)
-		if *cleanupDelete {
-			if delErr := client.VXCService.DeleteVXC(ctx, vxc.UID, &megaport.DeleteVXCRequest{DeleteNow: true}); delErr != nil {
-				t.Logf("  delete failed: %v", delErr)
-			} else {
-				t.Logf("  deleted")
-			}
-		}
+		summary[i] = fmt.Sprintf("%d %s", n, c.label)
 	}
 
-	// MVEs
-	var mveLive int
-	mves, err := client.MVEService.ListMVEs(ctx, &megaport.ListMVEsRequest{})
-	if err != nil {
-		t.Logf("WARN: could not list MVEs: %v", err)
-	}
-	for _, mve := range mves {
-		if !strings.HasPrefix(mve.Name, prefix) || !isLive(mve.ProvisioningStatus) {
-			continue
-		}
-		mveLive++
-		t.Logf("MVE  %s (%s) status=%s", mve.Name, mve.UID, mve.ProvisioningStatus)
-		if *cleanupDelete {
-			if _, delErr := client.MVEService.DeleteMVE(ctx, &megaport.DeleteMVERequest{MVEID: mve.UID}); delErr != nil {
-				t.Logf("  delete failed: %v", delErr)
-			} else {
-				t.Logf("  deleted")
-			}
-		}
-	}
-
-	// MCRs
-	var mcrLive int
-	mcrs, err := client.MCRService.ListMCRs(ctx, &megaport.ListMCRsRequest{})
-	if err != nil {
-		t.Logf("WARN: could not list MCRs: %v", err)
-	}
-	for _, mcr := range mcrs {
-		if !strings.HasPrefix(mcr.Name, prefix) || !isLive(mcr.ProvisioningStatus) {
-			continue
-		}
-		mcrLive++
-		t.Logf("MCR  %s (%s) status=%s", mcr.Name, mcr.UID, mcr.ProvisioningStatus)
-		if *cleanupDelete {
-			if _, delErr := client.MCRService.DeleteMCR(ctx, &megaport.DeleteMCRRequest{MCRID: mcr.UID, DeleteNow: true}); delErr != nil {
-				t.Logf("  delete failed: %v", delErr)
-			} else {
-				t.Logf("  deleted")
-			}
-		}
-	}
-
-	// Ports (last — must come after VXCs that connect to them)
-	var portLive int
-	ports, err := client.PortService.ListPorts(ctx)
-	if err != nil {
-		t.Logf("WARN: could not list ports: %v", err)
-	}
-	for _, port := range ports {
-		if !strings.HasPrefix(port.Name, prefix) || !isLive(port.ProvisioningStatus) {
-			continue
-		}
-		portLive++
-		t.Logf("Port %s (%s) status=%s", port.Name, port.UID, port.ProvisioningStatus)
-		if *cleanupDelete {
-			if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true}); delErr != nil {
-				t.Logf("  delete failed: %v", delErr)
-			} else {
-				t.Logf("  deleted")
-			}
-		}
-	}
-
-	t.Logf("orphaned test resources (live): %d VXC, %d MVE, %d MCR, %d Port", vxcLive, mveLive, mcrLive, portLive)
+	t.Logf("orphaned test resources (live): %s", strings.Join(summary, ", "))
 	t.Skip("cleanup scan complete")
 }
 
