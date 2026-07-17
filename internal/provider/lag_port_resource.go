@@ -56,7 +56,7 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.DiversityZone = types.StringValue(p.DiversityZone)
+	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone, p.UID, &diags)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
 	orm.MarketplaceVisibility = types.BoolValue(p.MarketplaceVisibility)
 	orm.Name = types.StringValue(p.Name)
@@ -164,7 +164,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"diversity_zone": schema.StringAttribute{
-				Description: "The diversity zone of the product.",
+				Description: "The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
