@@ -2034,14 +2034,15 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 			})
 		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
 			return nil
-		// FAILED is checked before the approval status so a rejected or expired
-		// order errors even if a stale PENDING_* approval accompanies it.
+		// FAILED and the CANCELLED-family terminal states are checked before the
+		// approval status so a rejected, expired, or cancelled order errors even if
+		// a stale PENDING_* approval accompanies it.
 		case vxc.ProvisioningStatus == vxcStatusFailed:
 			return fmt.Errorf("VXC %s failed to provision (status %q); the order may have been rejected or expired unapproved", uid, vxc.ProvisioningStatus)
-		case vxc.VXCApproval != nil && (vxc.VXCApproval.Status == vxcApprovalPendingExternal || vxc.VXCApproval.Status == vxcApprovalPendingInternal):
-			return &vxcPendingApprovalError{approval: *vxc.VXCApproval}
 		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED || vxc.ProvisioningStatus == vxcStatusCancelledParent:
 			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		case vxc.VXCApproval != nil && (vxc.VXCApproval.Status == vxcApprovalPendingExternal || vxc.VXCApproval.Status == vxcApprovalPendingInternal):
+			return &vxcPendingApprovalError{approval: *vxc.VXCApproval}
 		}
 
 		select {
