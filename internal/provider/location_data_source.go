@@ -357,20 +357,14 @@ func (d *locationDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if !state.ID.IsNull() {
 		l, err := d.client.LocationService.GetLocationByIDV3(ctx, int(state.ID.ValueInt64()))
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to Get location by ID",
-				err.Error(),
-			)
+			addAPIError(&resp.Diagnostics, readErrorSummary("Location", fmt.Sprintf("%d", state.ID.ValueInt64())), err)
 			return
 		}
 		location = l
 	} else if !state.Name.IsNull() {
 		l, err := d.client.LocationService.GetLocationByNameV3(ctx, state.Name.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to Get location by name",
-				err.Error(),
-			)
+			addAPIError(&resp.Diagnostics, readErrorSummary("Location", state.Name.ValueString()), err)
 			return
 		}
 		location = l
