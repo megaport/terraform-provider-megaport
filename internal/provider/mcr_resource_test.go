@@ -600,6 +600,124 @@ func TestAccMegaportMCRCustomASN_Basic(t *testing.T) {
 	})
 }
 
+// TestAccMegaportMCR_MarketplaceVisibilityOnCreate covers AC1: a config that
+// sets marketplace_visibility must have that value sent on create (not left
+// at the API default), with no drift on the next plan. It also confirms the
+// value survives a forced replacement, since that recreates the resource via
+// the same Create path.
+func TestAccMegaportMCR_MarketplaceVisibilityOnCreate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	configWithPortSpeed := func(portSpeed int) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		  resource "megaport_mcr" "mcr" {
+			product_name             = "%s"
+			port_speed               = %d
+			location_id              = data.megaport_location.test_location.id
+			contract_term_months     = 12
+			cost_centre              = "%s"
+			marketplace_visibility   = true
+		  }
+		  `, locationID, mcrName, portSpeed, costCentreName)
+	}
+
+	var originalUID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// The API defaults marketplace_visibility to false, so seeing
+				// true here proves create actually sent the configured value.
+				Config: configWithPortSpeed(1000),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "true"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						originalUID = rs.Primary.Attributes["product_uid"]
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after create.
+			{
+				Config:   configWithPortSpeed(1000),
+				PlanOnly: true,
+			},
+			// Changing port_speed forces replacement, which recreates the MCR
+			// via the same Create path; the configured value must still land.
+			{
+				Config: configWithPortSpeed(2500),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "port_speed", "2500"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "true"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mcr.mcr"]
+						if !ok {
+							return fmt.Errorf("megaport_mcr.mcr not found in state")
+						}
+						if rs.Primary.Attributes["product_uid"] == originalUID {
+							return fmt.Errorf("expected MCR to be replaced (new product_uid), got original UID %s", originalUID)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportMCR_MarketplaceVisibilityUnsetOnCreate covers AC2: omitting
+// marketplace_visibility from config must not force a value onto the buy
+// request, leaving the API's own default in place with no drift.
+func TestAccMegaportMCR_MarketplaceVisibilityUnsetOnCreate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+	data "megaport_location" "test_location" {
+		id = %d
+	}
+	  resource "megaport_mcr" "mcr" {
+		product_name             = "%s"
+		port_speed               = 1000
+		location_id              = data.megaport_location.test_location.id
+		contract_term_months     = 12
+		cost_centre              = "%s"
+	  }
+	  `, locationID, mcrName, costCentreName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "marketplace_visibility", "false"),
+				),
+			},
+			// Plan-only to confirm no drift after create.
+			{
+				Config:   config,
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 func TestRateLimiter_SingleToken(t *testing.T) {
 	rl := NewRateLimiter(5, 100*time.Millisecond)
 
