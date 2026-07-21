@@ -2712,8 +2712,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			VirtualRouterName: types.StringValue(provider.VirtualRouterName),
 		}
 		virtualRouterModel.Bandwidths = types.ListNull(types.Int64Type)
-		ipAddresses := []string{}
-		ipAddresses = append(ipAddresses, ipAddresses...)
+		ipAddresses := append([]string{}, provider.IPAddresses...)
 		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
 		apiDiags = append(apiDiags, ipListDiags...)
 		virtualRouterModel.IPAddresses = ipList
