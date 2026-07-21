@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release History
 
+### [v1.11.1] - 2026-07-16
+
+- fix: surface diversity-zone preserve warning on port Update and preserve diversity_zone for nat_gateway
+- fix: warn when preserving diversity_zone on an empty API read, lead recovery docs with the config edit
+- docs: document state rm + import as the diversity_zone correction path
+- fix: address Copilot review findings on diversity_zone fix
+- fix: preserve diversity_zone in state when the API returns empty
+
 ### [v1.11.0] - 2026-07-09
 
 - test: use megaport.PtrTo() instead of local pointer helpers
