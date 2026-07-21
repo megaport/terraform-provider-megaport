@@ -176,6 +176,7 @@ var (
 		"med_in":                types.Int64Type,
 		"med_out":               types.Int64Type,
 		"bfd_enabled":           types.BoolType,
+		"as_override":           types.BoolType,
 		"export_policy":         types.StringType,
 		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
 		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
@@ -240,6 +241,7 @@ var (
 		"med_in":                types.Int64Type,
 		"med_out":               types.Int64Type,
 		"bfd_enabled":           types.BoolType,
+		"as_override":           types.BoolType,
 		"export_policy":         types.StringType,
 		"permit_export_to":      types.ListType{}.WithElementType(types.StringType),
 		"deny_export_to":        types.ListType{}.WithElementType(types.StringType),
@@ -485,6 +487,7 @@ type bgpConnectionConfigModel struct {
 	MedIn              types.Int64  `tfsdk:"med_in"`
 	MedOut             types.Int64  `tfsdk:"med_out"`
 	BfdEnabled         types.Bool   `tfsdk:"bfd_enabled"`
+	AsOverride         types.Bool   `tfsdk:"as_override"`
 	ExportPolicy       types.String `tfsdk:"export_policy"`
 	PermitExportTo     types.List   `tfsdk:"permit_export_to"`
 	DenyExportTo       types.List   `tfsdk:"deny_export_to"`
