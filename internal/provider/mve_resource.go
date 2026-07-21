@@ -175,15 +175,20 @@ type vmwareConfigModel struct {
 type mveVendorSpec struct {
 	name     string
 	attrName string
-	get      func(*mveResourceModel) types.Object
-	set      func(*mveResourceModel, types.Object)
-	toAPI    func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics)
+	// apiVendor is the value the API reports in the read response's vendor
+	// field. It is not always the uppercased block name: 6wind reads back as
+	// SIX_WIND, prisma as PALO_ALTO, and vmware as ARISTA. Used to compare an
+	// imported MVE's actual vendor against the configured block.
+	apiVendor string
+	get       func(*mveResourceModel) types.Object
+	set       func(*mveResourceModel, types.Object)
+	toAPI     func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics)
 }
 
 // mveVendors is the registry of all per-vendor MVE config blocks.
 var mveVendors = []mveVendorSpec{
 	{
-		name: "aruba", attrName: "aruba_config",
+		name: "aruba", attrName: "aruba_config", apiVendor: "ARUBA",
 		get: func(m *mveResourceModel) types.Object { return m.ArubaConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.ArubaConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -204,7 +209,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "aviatrix", attrName: "aviatrix_config",
+		name: "aviatrix", attrName: "aviatrix_config", apiVendor: "AVIATRIX",
 		get: func(m *mveResourceModel) types.Object { return m.AviatrixConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.AviatrixConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -223,7 +228,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "cisco", attrName: "cisco_config",
+		name: "cisco", attrName: "cisco_config", apiVendor: "CISCO",
 		get: func(m *mveResourceModel) types.Object { return m.CiscoConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.CiscoConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -249,7 +254,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "fortinet", attrName: "fortinet_config",
+		name: "fortinet", attrName: "fortinet_config", apiVendor: "FORTINET",
 		get: func(m *mveResourceModel) types.Object { return m.FortinetConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.FortinetConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -270,7 +275,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "meraki", attrName: "meraki_config",
+		name: "meraki", attrName: "meraki_config", apiVendor: "MERAKI",
 		get: func(m *mveResourceModel) types.Object { return m.MerakiConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.MerakiConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -289,7 +294,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "palo_alto", attrName: "palo_alto_config",
+		name: "palo_alto", attrName: "palo_alto_config", apiVendor: "PALO_ALTO",
 		get: func(m *mveResourceModel) types.Object { return m.PaloAltoConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.PaloAltoConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -310,7 +315,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "prisma", attrName: "prisma_config",
+		name: "prisma", attrName: "prisma_config", apiVendor: "PALO_ALTO",
 		get: func(m *mveResourceModel) types.Object { return m.PrismaConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.PrismaConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -330,7 +335,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "6wind", attrName: "sixwind_config",
+		name: "6wind", attrName: "sixwind_config", apiVendor: "SIX_WIND",
 		get: func(m *mveResourceModel) types.Object { return m.SixwindConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.SixwindConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -349,7 +354,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "versa", attrName: "versa_config",
+		name: "versa", attrName: "versa_config", apiVendor: "VERSA",
 		get: func(m *mveResourceModel) types.Object { return m.VersaConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.VersaConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -372,7 +377,7 @@ var mveVendors = []mveVendorSpec{
 		},
 	},
 	{
-		name: "vmware", attrName: "vmware_config",
+		name: "vmware", attrName: "vmware_config", apiVendor: "ARISTA",
 		get: func(m *mveResourceModel) types.Object { return m.VmwareConfig },
 		set: func(m *mveResourceModel, o types.Object) { m.VmwareConfig = o },
 		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
@@ -1178,14 +1183,16 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	if allVendorConfigsNull(state) {
 		// Import scenario: vendor config blocks are null in state. Compare the
 		// plan's vendor/size against the API-derived state values (which are
-		// uppercase), requiring replacement only when they differ. The compare is
-		// case-insensitive because the API normalizes vendor/size to uppercase.
+		// uppercase), requiring replacement only when they differ. The vendor is
+		// mapped to the value the API reports (e.g. 6wind -> SIX_WIND), and size
+		// is compared case-insensitively because the API normalizes to uppercase.
 		if allVendorConfigsNull(plan) {
 			return
 		}
 
-		if !state.Vendor.IsNull() && !state.Vendor.IsUnknown() &&
-			!strings.EqualFold(state.Vendor.ValueString(), planVendor) {
+		if spec, ok := specForVendor(planVendor); ok && spec.apiVendor != "" &&
+			!state.Vendor.IsNull() && !state.Vendor.IsUnknown() &&
+			!strings.EqualFold(state.Vendor.ValueString(), spec.apiVendor) {
 			resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
 		}
 
