@@ -8,7 +8,7 @@ description: |-
 
 Version 2.0 of the Megaport Terraform provider removes deprecated read-only attributes from the `megaport_port`, `megaport_lag_port`, `megaport_mcr`, `megaport_mve`, and `megaport_vxc` resources, and replaces the inline MCR `prefix_filter_lists` attribute with the standalone `megaport_mcr_prefix_filter_list` resource.
 
-State is migrated automatically. When you run your first plan with v2, the provider silently drops the removed attributes from state. No `terraform state` commands or manual state edits are needed.
+State is migrated automatically. The first time you run `terraform apply` with v2, the provider silently drops the removed attributes from state. No `terraform state` commands or manual state edits are needed.
 
 ## Before you upgrade
 
