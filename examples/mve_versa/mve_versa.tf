@@ -19,8 +19,7 @@ resource "megaport_mve" "mve" {
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 1
 
-  vendor_config = {
-    vendor             = "versa"
+  versa_config = {
     product_size       = "LARGE"
     image_id           = data.megaport_mve_images.versa.mve_images.0.id
     director_address   = "director1.versa.com"

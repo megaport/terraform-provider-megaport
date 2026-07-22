@@ -19,8 +19,7 @@ resource "megaport_mve" "mve_location_1" {
   location_id          = data.megaport_location.location_1.id
   contract_term_months = 1
   diversity_zone       = "blue"
-  vendor_config = {
-    vendor         = "fortinet"
+  fortinet_config = {
     product_size   = "SMALL"
     image_id       = data.megaport_mve_images.fortinet.mve_images.0.id
     ssh_public_key = "ssh-rsa <public key>"
@@ -49,8 +48,7 @@ resource "megaport_mve" "mve_location_2" {
   location_id          = data.megaport_location.location_2.id
   contract_term_months = 1
   diversity_zone       = "red"
-  vendor_config = {
-    vendor       = "fortinet"
+  fortinet_config = {
     product_size = "SMALL"
     image_id     = data.megaport_mve_images.fortinet.mve_images.0.id
 
