@@ -54,8 +54,7 @@ resource "megaport_mve" "mve_sixwind" {
   location_id          = data.megaport_location.sixwind_location.id
   contract_term_months = 1
 
-  vendor_config = {
-    vendor       = "6wind"
+  sixwind_config = {
     product_size = "SMALL"
     image_id     = data.megaport_mve_images.sixwind.mve_images[0].id
     # EXAMPLE RSA 2048-bit key - REPLACE WITH YOUR ACTUAL PUBLIC KEY
@@ -108,8 +107,7 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
   location_id          = data.megaport_location.sixwind_location.id
   contract_term_months = 1
 
-  vendor_config = {
-    vendor         = "6wind"
+  sixwind_config = {
     product_size   = "SMALL"
     image_id       = data.megaport_mve_images.sixwind.mve_images[0].id
     ssh_public_key = var.sixwind_ssh_public_key
