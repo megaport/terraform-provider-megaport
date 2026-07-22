@@ -47,8 +47,7 @@ locals {
 #   location_id          = 1234
 #   contract_term_months = 1
 #
-#   vendor_config {
-#     vendor       = "cisco"
+#   cisco_config = {
 #     image_id     = 123
 #     product_size = local.mve_size_32_core  # Dynamically resolves to "X_LARGE_32"
 #     # ... other vendor-specific config
