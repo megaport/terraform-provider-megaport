@@ -6,7 +6,7 @@ description: |-
 
 # Upgrading to v2
 
-Version 2.0 of the Megaport Terraform provider removes deprecated read-only attributes from the `megaport_port`, `megaport_lag_port`, `megaport_mcr`, `megaport_mve`, and `megaport_vxc` resources, and replaces the inline MCR `prefix_filter_lists` attribute with the standalone `megaport_mcr_prefix_filter_list` resource.
+Version 2.0 of the Megaport Terraform provider removes deprecated read-only attributes from the `megaport_port`, `megaport_lag_port`, `megaport_mcr`, `megaport_mve`, and `megaport_vxc` resources, replaces the inline MCR `prefix_filter_lists` attribute with the standalone `megaport_mcr_prefix_filter_list` resource, and splits the `megaport_mve` `vendor_config` block into a dedicated block per vendor.
 
 State is migrated automatically. The first time you run `terraform apply` with v2, the provider silently drops the removed attributes from state. No `terraform state` commands or manual state edits are needed.
 
@@ -36,6 +36,8 @@ If your MCR configurations use the inline `prefix_filter_lists` attribute, leave
 2. Run `terraform plan`. Any reference to a removed attribute (in an output, local, or expression) fails validation with an `Unsupported attribute` error. Remove those references.
 
 3. If you use MCR prefix filter lists, follow the section below.
+
+4. If you manage `megaport_mve` resources, convert each `vendor_config` block to the matching per-vendor block (see below).
 
 ## Removed read-only attributes
 
@@ -86,3 +88,47 @@ terraform import megaport_mcr_prefix_filter_list.example "11111111-1111-1111-111
 Importing preserves the prefix filter list IDs, so any BGP connection filters on your VXCs that reference those IDs keep working. See the `megaport_mcr_prefix_filter_list` resource documentation for details on the import format and finding list IDs.
 
 If you prefer the lists never to be unmanaged, you can run the same import while still on v1: the resource and import ID format are identical there. Add `lifecycle { ignore_changes = [prefix_filter_lists] }` to the `megaport_mcr` resource first so the inline attribute does not fight the standalone resources, import, then upgrade and remove the inline attribute and the `ignore_changes` entry together (v2 rejects `ignore_changes` entries for attributes that no longer exist).
+
+## MVE vendor configuration
+
+Version 2.0 replaces the single `vendor_config` block, which took a `vendor` selector, with a dedicated block per vendor. The vendor is now implied by which block you set, so the `vendor` argument no longer exists.
+
+Rename your `vendor_config` block to the matching per-vendor block and drop the `vendor` line. Every other argument stays the same. For an Aruba MVE:
+
+```hcl
+# v1
+vendor_config = {
+  vendor       = "aruba"
+  product_size = "MEDIUM"
+  image_id     = data.megaport_mve_images.aruba.mve_images.0.id
+  account_name = "Aruba Test Account"
+  account_key  = "12345678"
+  system_tag   = "Preconfiguration-aruba-test-1"
+}
+
+# v2
+aruba_config = {
+  product_size = "MEDIUM"
+  image_id     = data.megaport_mve_images.aruba.mve_images.0.id
+  account_name = "Aruba Test Account"
+  account_key  = "12345678"
+  system_tag   = "Preconfiguration-aruba-test-1"
+}
+```
+
+Use the block that matches your old `vendor` value:
+
+| `vendor` value | Block |
+|---|---|
+| `aruba` | `aruba_config` |
+| `aviatrix` | `aviatrix_config` |
+| `cisco` | `cisco_config` |
+| `fortinet` | `fortinet_config` |
+| `meraki` | `meraki_config` |
+| `palo_alto` | `palo_alto_config` |
+| `prisma` | `prisma_config` |
+| `6wind` | `sixwind_config` |
+| `versa` | `versa_config` |
+| `vmware` | `vmware_config` |
+
+State migrates automatically, so no state edits are needed. Converting to the per-vendor block for the same vendor and size is an in-place change, not a destroy and recreate. Run `terraform plan` and confirm it does not show `# forces replacement` before you apply.
