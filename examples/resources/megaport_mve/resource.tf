@@ -20,8 +20,7 @@ resource "megaport_mve" "mve_aruba" {
     }
   ]
 
-  vendor_config = {
-    vendor       = "aruba"
+  aruba_config = {
     product_size = "MEDIUM"
     image_id     = data.megaport_mve_images.aruba.mve_images.0.id
     account_name = "Aruba Test Account"
@@ -63,8 +62,7 @@ resource "megaport_mve" "mve_aviatrix" {
   location_id          = 6
   contract_term_months = 12
 
-  vendor_config = {
-    vendor       = "aviatrix"
+  aviatrix_config = {
     image_id     = data.megaport_mve_images.aviatrix.mve_images.0.id
     product_size = "SMALL"
     mve_label    = "MVE 2/8"
@@ -84,8 +82,7 @@ resource "megaport_mve" "mve_sixwind_static" {
   location_id          = 6
   contract_term_months = 1
 
-  vendor_config = {
-    vendor       = "6wind"
+  sixwind_config = {
     product_size = "SMALL"
     image_id     = data.megaport_mve_images.sixwind.mve_images[0].id
     # EXAMPLE RSA 2048-bit key - REPLACE WITH YOUR ACTUAL PUBLIC KEY
@@ -134,8 +131,7 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
   location_id          = 3 # DigiCo Sydney SYD1 (Global Switch)	
   contract_term_months = 1
 
-  vendor_config = {
-    vendor         = "6wind"
+  sixwind_config = {
     product_size   = "SMALL"
     image_id       = data.megaport_mve_images.sixwind.mve_images[0].id
     ssh_public_key = var.sixwind_ssh_public_key

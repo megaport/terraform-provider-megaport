@@ -42,8 +42,7 @@ resource "megaport_mve" "aviatrix_edge" {
   location_id          = data.megaport_location.bne_nxt1.id
   contract_term_months = 12
 
-  vendor_config = {
-    vendor       = "aviatrix"
+  aviatrix_config = {
     image_id     = data.megaport_mve_images.aviatrix.mve_images.0.id
     product_size = "SMALL"
     mve_label    = "MVE 2/8"
