@@ -692,8 +692,6 @@ To recover, do one of the following before re-applying:
 
 Setting `wait_time` high enough for your slowest-provisioning resources avoids this situation entirely.
 
-> **Note:** Internet Exchange (IX) resources use a fixed 10-minute provisioning wait and are not affected by `wait_time`.
-
 ## Resource Cancellation
 
 When Terraform deletes a Megaport resource, the provider issues an immediate cancellation or deletion request to the Megaport API. Resources are removed from Terraform state as soon as the API call returns successfully. For Ports and LAG Ports specifically, this is always a `CANCEL_NOW` action against the Megaport Products API.

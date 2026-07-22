@@ -288,7 +288,8 @@ func NewIXResource() resource.Resource {
 
 // ixResource is the resource implementation.
 type ixResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -571,7 +572,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Shutdown:           plan.Shutdown.ValueBool(),
 		PromoCode:          plan.PromoCode.ValueString(),
 		WaitForProvision:   true,
-		WaitForTime:        10 * time.Minute,
+		WaitForTime:        r.waitForTime,
 	}
 
 	// Create the IX
@@ -642,7 +643,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// Create update request with only fields that have changed
 	updateReq := &megaport.UpdateIXRequest{
 		WaitForUpdate: true,
-		WaitForTime:   10 * time.Minute,
+		WaitForTime:   r.waitForTime,
 	}
 
 	if !plan.ProductName.Equal(state.ProductName) {
@@ -737,4 +738,5 @@ func (r *ixResource) Configure(_ context.Context, req resource.ConfigureRequest,
 		return
 	}
 	r.client = data.client
+	r.waitForTime = data.waitForTime
 }

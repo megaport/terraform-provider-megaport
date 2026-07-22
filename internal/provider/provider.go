@@ -22,9 +22,6 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// Set by Provider Config, is 10 minutes by default.
-var waitForTime time.Duration
-
 // megaportProviderModel maps provider schema data to a Go type.
 type megaportProviderModel struct {
 	Environment   types.String `tfsdk:"environment"`
@@ -57,7 +54,8 @@ type megaportProvider struct {
 }
 
 type megaportProviderData struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the provider type name.
@@ -90,7 +88,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
 			"wait_time": schema.Int64Attribute{
-				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers. Does not apply to Internet Exchange (IX) resources, which use a fixed 10-minute wait.",
+				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
@@ -252,7 +250,6 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Build a useragent string with some useful information about the client
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-megaport/%s go/%s (%s %s)", req.TerraformVersion, p.version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
-	waitForTime = (time.Duration(waitTime) * time.Minute)
 	megaportClient, err := megaport.New(nil,
 		megaport.WithEnvironment(megaportGoEnv),
 		megaport.WithCredentials(accessKey, secretKey),
@@ -286,7 +283,8 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	// Make the Megaport client available during DataSource and Resource
 	// type Configure methods.
 	providerData := &megaportProviderData{
-		client: megaportClient,
+		client:      megaportClient,
+		waitForTime: time.Duration(waitTime) * time.Minute,
 	}
 
 	resp.DataSourceData = providerData

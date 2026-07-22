@@ -145,7 +145,8 @@ func NewLagPortResource() resource.Resource {
 
 // lagPortResource is the resource implementation.
 type lagPortResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -385,7 +386,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 		CostCentre:            plan.CostCentre.ValueString(),
 		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	}
 
 	if !plan.ResourceTags.IsNull() {
@@ -578,7 +579,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		CostCentre:            costCentre,
 		ContractTermMonths:    contractTermMonths,
 		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	})
 
 	if err != nil {
@@ -676,6 +677,7 @@ func (r *lagPortResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 	r.client = data.client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *lagPortResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
