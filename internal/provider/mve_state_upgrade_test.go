@@ -23,8 +23,8 @@ import (
 // (i.e. no kept attribute changed type).
 
 // v1MVEState returns a complete V1 MVE state JSON with all fields that existed
-// in V1, including the removed legacy fields and the removed vnics.vlan
-// attribute. The union vendor_config block is unchanged in V2.
+// in V1, including the removed legacy fields, the old union vendor_config block,
+// and the removed vnics.vlan attribute.
 func v1MVEState() []byte {
 	state := map[string]interface{}{
 		// Fields kept in V2
@@ -45,7 +45,7 @@ func v1MVEState() []byte {
 			{"description": "Data Plane", "vlan": 100},
 			{"description": "Management", "vlan": 200},
 		},
-		// Union vendor_config block (unchanged in V2)
+		// Old union vendor_config block (removed in V2, replaced by per-vendor blocks)
 		"vendor_config": map[string]interface{}{
 			"vendor":               "cisco",
 			"image_id":             42,
@@ -136,15 +136,8 @@ func TestMVEStateUpgrade_V1ToV2(t *testing.T) {
 	assert.Equal(t, "CISCO", model.Vendor.ValueString())
 	assert.Equal(t, "SMALL", model.Size.ValueString())
 
-	// The union vendor_config carries over unchanged.
-	require.False(t, model.VendorConfig.IsNull())
-	var vc vendorConfigModel
-	diags = model.VendorConfig.As(ctx, &vc, basetypes.ObjectAsOptions{})
-	require.False(t, diags.HasError(), "failed to read vendor_config: %v", diags)
-	assert.Equal(t, "cisco", vc.Vendor.ValueString())
-	assert.Equal(t, int64(42), vc.ImageID.ValueInt64())
-	assert.Equal(t, "SMALL", vc.ProductSize.ValueString())
-	assert.Equal(t, "10.0.0.1", vc.FMCIPAddress.ValueString())
+	// The old union vendor_config is dropped; per-vendor blocks decode to null.
+	assert.True(t, allVendorConfigsNull(model), "expected all per-vendor config blocks to be null after migration")
 
 	// vnics carry over, but the removed nested vlan attribute is dropped.
 	require.False(t, model.NetworkInterfaces.IsNull())
@@ -206,5 +199,5 @@ func TestMVEStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	assert.True(t, model.DiversityZone.IsNull())
 	assert.True(t, model.NetworkInterfaces.IsNull())
 	assert.True(t, model.ResourceTags.IsNull())
-	assert.True(t, model.VendorConfig.IsNull())
+	assert.True(t, allVendorConfigsNull(model))
 }

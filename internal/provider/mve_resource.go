@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -50,7 +52,17 @@ type mveResourceModel struct {
 	Vendor types.String `tfsdk:"vendor"`
 	Size   types.String `tfsdk:"mve_size"`
 
-	VendorConfig types.Object `tfsdk:"vendor_config"`
+	// Per-vendor config blocks. Exactly one must be set.
+	ArubaConfig    types.Object `tfsdk:"aruba_config"`
+	AviatrixConfig types.Object `tfsdk:"aviatrix_config"`
+	CiscoConfig    types.Object `tfsdk:"cisco_config"`
+	FortinetConfig types.Object `tfsdk:"fortinet_config"`
+	MerakiConfig   types.Object `tfsdk:"meraki_config"`
+	PaloAltoConfig types.Object `tfsdk:"palo_alto_config"`
+	PrismaConfig   types.Object `tfsdk:"prisma_config"`
+	SixwindConfig  types.Object `tfsdk:"sixwind_config"`
+	VersaConfig    types.Object `tfsdk:"versa_config"`
+	VmwareConfig   types.Object `tfsdk:"vmware_config"`
 
 	NetworkInterfaces types.List `tfsdk:"vnics"`
 	AttributeTags     types.Map  `tfsdk:"attribute_tags"`
@@ -63,41 +75,490 @@ type mveNetworkInterfaceModel struct {
 	Description types.String `tfsdk:"description"`
 }
 
+// Per-vendor config model structs.
+
+type arubaConfigModel struct {
+	ImageID     types.Int64  `tfsdk:"image_id"`
+	ProductSize types.String `tfsdk:"product_size"`
+	MVELabel    types.String `tfsdk:"mve_label"`
+	AccountName types.String `tfsdk:"account_name"`
+	AccountKey  types.String `tfsdk:"account_key"`
+	SystemTag   types.String `tfsdk:"system_tag"`
+}
+
+type aviatrixConfigModel struct {
+	ImageID     types.Int64  `tfsdk:"image_id"`
+	ProductSize types.String `tfsdk:"product_size"`
+	MVELabel    types.String `tfsdk:"mve_label"`
+	CloudInit   types.String `tfsdk:"cloud_init"`
+}
+
+type ciscoConfigModel struct {
+	ImageID            types.Int64  `tfsdk:"image_id"`
+	ProductSize        types.String `tfsdk:"product_size"`
+	MVELabel           types.String `tfsdk:"mve_label"`
+	AdminSSHPublicKey  types.String `tfsdk:"admin_ssh_public_key"`
+	SSHPublicKey       types.String `tfsdk:"ssh_public_key"`
+	AdminPassword      types.String `tfsdk:"admin_password"`
+	ManageLocally      types.Bool   `tfsdk:"manage_locally"`
+	CloudInit          types.String `tfsdk:"cloud_init"`
+	FMCIPAddress       types.String `tfsdk:"fmc_ip_address"`
+	FMCRegistrationKey types.String `tfsdk:"fmc_registration_key"`
+	FMCNatID           types.String `tfsdk:"fmc_nat_id"`
+}
+
+type fortinetConfigModel struct {
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	MVELabel          types.String `tfsdk:"mve_label"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	SSHPublicKey      types.String `tfsdk:"ssh_public_key"`
+	LicenseData       types.String `tfsdk:"license_data"`
+}
+
+type merakiConfigModel struct {
+	ImageID     types.Int64  `tfsdk:"image_id"`
+	ProductSize types.String `tfsdk:"product_size"`
+	MVELabel    types.String `tfsdk:"mve_label"`
+	Token       types.String `tfsdk:"token"`
+}
+
+type paloAltoConfigModel struct {
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	MVELabel          types.String `tfsdk:"mve_label"`
+	SSHPublicKey      types.String `tfsdk:"ssh_public_key"`
+	AdminPasswordHash types.String `tfsdk:"admin_password_hash"`
+	LicenseData       types.String `tfsdk:"license_data"`
+}
+
+type prismaConfigModel struct {
+	ImageID     types.Int64  `tfsdk:"image_id"`
+	ProductSize types.String `tfsdk:"product_size"`
+	MVELabel    types.String `tfsdk:"mve_label"`
+	IONKey      types.String `tfsdk:"ion_key"`
+	SecretKey   types.String `tfsdk:"secret_key"`
+}
+
+type sixwindConfigModel struct {
+	ImageID      types.Int64  `tfsdk:"image_id"`
+	ProductSize  types.String `tfsdk:"product_size"`
+	MVELabel     types.String `tfsdk:"mve_label"`
+	SSHPublicKey types.String `tfsdk:"ssh_public_key"`
+}
+
+type versaConfigModel struct {
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	MVELabel          types.String `tfsdk:"mve_label"`
+	DirectorAddress   types.String `tfsdk:"director_address"`
+	ControllerAddress types.String `tfsdk:"controller_address"`
+	LocalAuth         types.String `tfsdk:"local_auth"`
+	RemoteAuth        types.String `tfsdk:"remote_auth"`
+	SerialNumber      types.String `tfsdk:"serial_number"`
+}
+
+type vmwareConfigModel struct {
+	ImageID           types.Int64  `tfsdk:"image_id"`
+	ProductSize       types.String `tfsdk:"product_size"`
+	MVELabel          types.String `tfsdk:"mve_label"`
+	AdminSSHPublicKey types.String `tfsdk:"admin_ssh_public_key"`
+	SSHPublicKey      types.String `tfsdk:"ssh_public_key"`
+	VcoAddress        types.String `tfsdk:"vco_address"`
+	VcoActivationCode types.String `tfsdk:"vco_activation_code"`
+}
+
+// mveVendorSpec is the single source of truth for one per-vendor MVE config
+// block: its canonical vendor name, its schema attribute name, how to get/set
+// it on the model, and how to convert it to the API vendor config type.
+// Adding or removing a vendor only requires editing mveVendors below.
+type mveVendorSpec struct {
+	name     string
+	attrName string
+	// apiVendor is the value the API reports in the read response's vendor
+	// field. It is not always the uppercased block name: 6wind reads back as
+	// SIX_WIND, prisma as PALO_ALTO, and vmware as ARISTA. Used to compare an
+	// imported MVE's actual vendor against the configured block.
+	apiVendor string
+	get       func(*mveResourceModel) types.Object
+	set       func(*mveResourceModel, types.Object)
+	toAPI     func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics)
+}
+
+// mveVendors is the registry of all per-vendor MVE config blocks.
+var mveVendors = []mveVendorSpec{
+	{
+		name: "aruba", attrName: "aruba_config", apiVendor: "ARUBA",
+		get: func(m *mveResourceModel) types.Object { return m.ArubaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.ArubaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg arubaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.ArubaConfig{
+				Vendor:      "aruba",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				AccountName: cfg.AccountName.ValueString(),
+				AccountKey:  cfg.AccountKey.ValueString(),
+				SystemTag:   cfg.SystemTag.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "aviatrix", attrName: "aviatrix_config", apiVendor: "AVIATRIX",
+		get: func(m *mveResourceModel) types.Object { return m.AviatrixConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.AviatrixConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg aviatrixConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.AviatrixConfig{
+				Vendor:      "aviatrix",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				CloudInit:   cfg.CloudInit.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "cisco", attrName: "cisco_config", apiVendor: "CISCO",
+		get: func(m *mveResourceModel) types.Object { return m.CiscoConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.CiscoConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, adminPassword string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg ciscoConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.CiscoConfig{
+				Vendor:             "cisco",
+				ImageID:            int(cfg.ImageID.ValueInt64()),
+				ProductSize:        cfg.ProductSize.ValueString(),
+				MVELabel:           cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey:  cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:       cfg.SSHPublicKey.ValueString(),
+				AdminPassword:      adminPassword,
+				ManageLocally:      cfg.ManageLocally.ValueBool(),
+				CloudInit:          cfg.CloudInit.ValueString(),
+				FMCIPAddress:       cfg.FMCIPAddress.ValueString(),
+				FMCRegistrationKey: cfg.FMCRegistrationKey.ValueString(),
+				FMCNatID:           cfg.FMCNatID.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "fortinet", attrName: "fortinet_config", apiVendor: "FORTINET",
+		get: func(m *mveResourceModel) types.Object { return m.FortinetConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.FortinetConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg fortinetConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.FortinetConfig{
+				Vendor:            "fortinet",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				LicenseData:       cfg.LicenseData.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "meraki", attrName: "meraki_config", apiVendor: "MERAKI",
+		get: func(m *mveResourceModel) types.Object { return m.MerakiConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.MerakiConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg merakiConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.MerakiConfig{
+				Vendor:      "meraki",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				Token:       cfg.Token.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "palo_alto", attrName: "palo_alto_config", apiVendor: "PALO_ALTO",
+		get: func(m *mveResourceModel) types.Object { return m.PaloAltoConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.PaloAltoConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg paloAltoConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.PaloAltoConfig{
+				Vendor:            "palo_alto",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				AdminPasswordHash: cfg.AdminPasswordHash.ValueString(),
+				LicenseData:       cfg.LicenseData.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "prisma", attrName: "prisma_config", apiVendor: "PALO_ALTO",
+		get: func(m *mveResourceModel) types.Object { return m.PrismaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.PrismaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg prismaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.PrismaConfig{
+				Vendor:      "prisma",
+				ImageID:     int(cfg.ImageID.ValueInt64()),
+				ProductSize: cfg.ProductSize.ValueString(),
+				MVELabel:    cfg.MVELabel.ValueString(),
+				IONKey:      cfg.IONKey.ValueString(),
+				SecretKey:   cfg.SecretKey.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "6wind", attrName: "sixwind_config", apiVendor: "SIX_WIND",
+		get: func(m *mveResourceModel) types.Object { return m.SixwindConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.SixwindConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg sixwindConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.SixwindVSRConfig{
+				Vendor:       "6wind",
+				ImageID:      int(cfg.ImageID.ValueInt64()),
+				ProductSize:  cfg.ProductSize.ValueString(),
+				MVELabel:     cfg.MVELabel.ValueString(),
+				SSHPublicKey: cfg.SSHPublicKey.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "versa", attrName: "versa_config", apiVendor: "VERSA",
+		get: func(m *mveResourceModel) types.Object { return m.VersaConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.VersaConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg versaConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.VersaConfig{
+				Vendor:            "versa",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				DirectorAddress:   cfg.DirectorAddress.ValueString(),
+				ControllerAddress: cfg.ControllerAddress.ValueString(),
+				LocalAuth:         cfg.LocalAuth.ValueString(),
+				RemoteAuth:        cfg.RemoteAuth.ValueString(),
+				SerialNumber:      cfg.SerialNumber.ValueString(),
+			}, diags
+		},
+	},
+	{
+		name: "vmware", attrName: "vmware_config", apiVendor: "ARISTA",
+		get: func(m *mveResourceModel) types.Object { return m.VmwareConfig },
+		set: func(m *mveResourceModel, o types.Object) { m.VmwareConfig = o },
+		toAPI: func(ctx context.Context, o types.Object, _ string) (megaport.VendorConfig, diag.Diagnostics) {
+			var cfg vmwareConfigModel
+			diags := o.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			return &megaport.VmwareConfig{
+				Vendor:            "vmware",
+				ImageID:           int(cfg.ImageID.ValueInt64()),
+				ProductSize:       cfg.ProductSize.ValueString(),
+				MVELabel:          cfg.MVELabel.ValueString(),
+				AdminSSHPublicKey: cfg.AdminSSHPublicKey.ValueString(),
+				SSHPublicKey:      cfg.SSHPublicKey.ValueString(),
+				VcoAddress:        cfg.VcoAddress.ValueString(),
+				VcoActivationCode: cfg.VcoActivationCode.ValueString(),
+			}, diags
+		},
+	},
+}
+
+// specForVendor returns the registry entry for the given canonical vendor
+// name (case-insensitive), or false if no such vendor exists.
+func specForVendor(name string) (mveVendorSpec, bool) {
+	for _, v := range mveVendors {
+		if strings.EqualFold(v.name, name) {
+			return v, true
+		}
+	}
+	return mveVendorSpec{}, false
+}
+
+// mveVendorConfigPaths lists path expressions for all per-vendor config blocks,
+// used with ExactlyOneOf validators.
+var mveVendorConfigPaths = func() []path.Expression {
+	paths := make([]path.Expression, len(mveVendors))
+	for i, v := range mveVendors {
+		paths[i] = path.MatchRoot(v.attrName)
+	}
+	return paths
+}()
+
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
 	return &megaport.MVENetworkInterface{
 		Description: orm.Description.ValueString(),
 	}
 }
 
-// vendorConfigModel represents the vendor configuration for an MVE.
-type vendorConfigModel struct {
-	Vendor             types.String `tfsdk:"vendor"`
-	ImageID            types.Int64  `tfsdk:"image_id"`
-	ProductSize        types.String `tfsdk:"product_size"`
-	MVELabel           types.String `tfsdk:"mve_label"`
-	AccountName        types.String `tfsdk:"account_name"`
-	AccountKey         types.String `tfsdk:"account_key"`
-	AdminSSHPublicKey  types.String `tfsdk:"admin_ssh_public_key"`
-	CloudInit          types.String `tfsdk:"cloud_init"`
-	LicenseData        types.String `tfsdk:"license_data"`
-	AdminPasswordHash  types.String `tfsdk:"admin_password_hash"`
-	AdminPassword      types.String `tfsdk:"admin_password"`
-	DirectorAddress    types.String `tfsdk:"director_address"`
-	ControllerAddress  types.String `tfsdk:"controller_address"`
-	LocalAuth          types.String `tfsdk:"local_auth"`
-	RemoteAuth         types.String `tfsdk:"remote_auth"`
-	ManageLocally      types.Bool   `tfsdk:"manage_locally"`
-	SerialNumber       types.String `tfsdk:"serial_number"`
-	SSHPublicKey       types.String `tfsdk:"ssh_public_key"`
-	SystemTag          types.String `tfsdk:"system_tag"`
-	VcoAddress         types.String `tfsdk:"vco_address"`
-	VcoActivationCode  types.String `tfsdk:"vco_activation_code"`
-	Token              types.String `tfsdk:"token"`
-	FMCIPAddress       types.String `tfsdk:"fmc_ip_address"`
-	FMCRegistrationKey types.String `tfsdk:"fmc_registration_key"`
-	FMCNatID           types.String `tfsdk:"fmc_nat_id"`
-	IONKey             types.String `tfsdk:"ion_key"`
-	SecretKey          types.String `tfsdk:"secret_key"`
+// vendorObjects returns all vendor config blocks from the model.
+func (m *mveResourceModel) vendorObjects() []types.Object {
+	objs := make([]types.Object, len(mveVendors))
+	for i, v := range mveVendors {
+		objs[i] = v.get(m)
+	}
+	return objs
+}
+
+func objectSet(o types.Object) bool { return !o.IsNull() && !o.IsUnknown() }
+
+// allVendorConfigsNull reports whether all 10 vendor config blocks are null or unknown.
+func allVendorConfigsNull(m mveResourceModel) bool {
+	for _, o := range m.vendorObjects() {
+		if objectSet(o) {
+			return false
+		}
+	}
+	return true
+}
+
+// copyVendorConfigs copies all vendor config blocks from src to dst.
+func copyVendorConfigs(dst, src *mveResourceModel) {
+	for _, v := range mveVendors {
+		v.set(dst, v.get(src))
+	}
+}
+
+// vendorNameFromModel returns the canonical vendor name based on which config
+// block is set in the model, or "" if none is set.
+func vendorNameFromModel(m mveResourceModel) string {
+	for _, v := range mveVendors {
+		if objectSet(v.get(&m)) {
+			return v.name
+		}
+	}
+	return ""
+}
+
+// vendorConfigPath returns the root path for the config block matching the given
+// vendor name. Used for RequiresReplace in ModifyPlan.
+func vendorConfigPath(vendorName string) path.Path {
+	spec, ok := specForVendor(vendorName)
+	if !ok {
+		return path.Empty()
+	}
+	return path.Root(spec.attrName)
+}
+
+// blockForVendor returns the config block object for the given vendor name.
+func blockForVendor(m mveResourceModel, vendorName string) types.Object {
+	spec, ok := specForVendor(vendorName)
+	if !ok {
+		return types.ObjectNull(nil)
+	}
+	return spec.get(&m)
+}
+
+// vendorBlockEqualIgnoringSizeCase compares two vendor config objects, treating
+// product_size case-insensitively. The API normalizes product_size to uppercase,
+// so a case-only difference must not trigger a spurious replace.
+func vendorBlockEqualIgnoringSizeCase(a, b types.Object) bool {
+	if a.IsNull() != b.IsNull() {
+		return false
+	}
+	am := a.Attributes()
+	bm := b.Attributes()
+	if len(am) != len(bm) {
+		return false
+	}
+	for k, av := range am {
+		bv, ok := bm[k]
+		if !ok {
+			return false
+		}
+		if k == "product_size" {
+			as, aok := av.(types.String)
+			bs, bok := bv.(types.String)
+			if aok && bok {
+				if !strings.EqualFold(as.ValueString(), bs.ValueString()) {
+					return false
+				}
+				continue
+			}
+		}
+		if !av.Equal(bv) {
+			return false
+		}
+	}
+	return true
+}
+
+// toAPIVendorConfigFromModel converts the set per-vendor config block into a
+// megaport.VendorConfig. adminPassword is the write-only Cisco admin password
+// re-read from config in Create (it is never persisted to plan or state).
+func toAPIVendorConfigFromModel(ctx context.Context, m *mveResourceModel, adminPassword string) (megaport.VendorConfig, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	count := 0
+	for _, o := range m.vendorObjects() {
+		if objectSet(o) {
+			count++
+		}
+	}
+	if count != 1 {
+		diags.AddError(
+			"Invalid vendor configuration",
+			fmt.Sprintf("Exactly one vendor configuration block must be set, got %d.", count),
+		)
+		return nil, diags
+	}
+
+	spec, ok := specForVendor(vendorNameFromModel(*m))
+	if !ok {
+		diags.AddError("No vendor config set", "Exactly one vendor config block must be set")
+		return nil, diags
+	}
+	return spec.toAPI(ctx, spec.get(m), adminPassword)
+}
+
+// planProductSizeFromModel extracts product_size from whichever vendor config
+// block is set in the model.
+func planProductSizeFromModel(m mveResourceModel) string {
+	vendor := vendorNameFromModel(m)
+	obj := blockForVendor(m, vendor)
+	if !objectSet(obj) {
+		return ""
+	}
+	if ps, ok := obj.Attributes()["product_size"].(types.String); ok {
+		return ps.ValueString()
+	}
+	return ""
 }
 
 func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, tags map[string]string) diag.Diagnostics {
@@ -145,128 +606,7 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	return apiDiags
 }
 
-func toAPIVendorConfig(v *vendorConfigModel) (megaport.VendorConfig, diag.Diagnostics) {
-	apiDiags := diag.Diagnostics{}
-	vendor := strings.ToLower(v.Vendor.ValueString()) // Allow for uppercase vendor names for more flexibility.
-	switch vendor {
-	case "6wind":
-		vsrConfig := &megaport.SixwindVSRConfig{
-			Vendor:       v.Vendor.ValueString(),
-			ImageID:      int(v.ImageID.ValueInt64()),
-			ProductSize:  v.ProductSize.ValueString(),
-			MVELabel:     v.MVELabel.ValueString(),
-			SSHPublicKey: v.SSHPublicKey.ValueString(),
-		}
-		return vsrConfig, apiDiags
-	case "aruba":
-		arubaConfig := &megaport.ArubaConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			AccountName: v.AccountName.ValueString(),
-			AccountKey:  v.AccountKey.ValueString(),
-			SystemTag:   v.SystemTag.ValueString(),
-		}
-		return arubaConfig, apiDiags
-	case "aviatrix":
-		aviatrixConfig := &megaport.AviatrixConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			CloudInit:   v.CloudInit.ValueString(),
-		}
-		return aviatrixConfig, apiDiags
-	case "cisco":
-		ciscoConfig := &megaport.CiscoConfig{
-			Vendor:             v.Vendor.ValueString(),
-			ImageID:            int(v.ImageID.ValueInt64()),
-			ProductSize:        v.ProductSize.ValueString(),
-			MVELabel:           v.MVELabel.ValueString(),
-			AdminSSHPublicKey:  v.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:       v.SSHPublicKey.ValueString(),
-			AdminPassword:      v.AdminPassword.ValueString(),
-			ManageLocally:      v.ManageLocally.ValueBool(),
-			CloudInit:          v.CloudInit.ValueString(),
-			FMCIPAddress:       v.FMCIPAddress.ValueString(),
-			FMCNatID:           v.FMCNatID.ValueString(),
-			FMCRegistrationKey: v.FMCRegistrationKey.ValueString(),
-		}
-		return ciscoConfig, apiDiags
-	case "fortinet":
-		fortinetConfig := &megaport.FortinetConfig{
-			Vendor:            v.Vendor.ValueString(),
-			ImageID:           int(v.ImageID.ValueInt64()),
-			ProductSize:       v.ProductSize.ValueString(),
-			MVELabel:          v.MVELabel.ValueString(),
-			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:      v.SSHPublicKey.ValueString(),
-			LicenseData:       v.LicenseData.ValueString(),
-		}
-		return fortinetConfig, apiDiags
-	case "palo_alto":
-		paloAltoConfig := &megaport.PaloAltoConfig{
-			Vendor:            v.Vendor.ValueString(),
-			ImageID:           int(v.ImageID.ValueInt64()),
-			ProductSize:       v.ProductSize.ValueString(),
-			MVELabel:          v.MVELabel.ValueString(),
-			SSHPublicKey:      v.SSHPublicKey.ValueString(),
-			AdminPasswordHash: v.AdminPasswordHash.ValueString(),
-			LicenseData:       v.LicenseData.ValueString(),
-		}
-		return paloAltoConfig, apiDiags
-	case "prisma":
-		prismaConfig := &megaport.PrismaConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			IONKey:      v.IONKey.ValueString(),
-			SecretKey:   v.SecretKey.ValueString(),
-		}
-		return prismaConfig, apiDiags
-	case "versa":
-		versaConfig := &megaport.VersaConfig{
-			Vendor:            v.Vendor.ValueString(),
-			ImageID:           int(v.ImageID.ValueInt64()),
-			ProductSize:       v.ProductSize.ValueString(),
-			MVELabel:          v.MVELabel.ValueString(),
-			DirectorAddress:   v.DirectorAddress.ValueString(),
-			ControllerAddress: v.ControllerAddress.ValueString(),
-			LocalAuth:         v.LocalAuth.ValueString(),
-			RemoteAuth:        v.RemoteAuth.ValueString(),
-			SerialNumber:      v.SerialNumber.ValueString(),
-		}
-		return versaConfig, apiDiags
-	case "vmware":
-		vmwareConfig := &megaport.VmwareConfig{
-			Vendor:            v.Vendor.ValueString(),
-			ImageID:           int(v.ImageID.ValueInt64()),
-			ProductSize:       v.ProductSize.ValueString(),
-			MVELabel:          v.MVELabel.ValueString(),
-			AdminSSHPublicKey: v.AdminSSHPublicKey.ValueString(),
-			SSHPublicKey:      v.SSHPublicKey.ValueString(),
-			VcoAddress:        v.VcoAddress.ValueString(),
-			VcoActivationCode: v.VcoActivationCode.ValueString(),
-		}
-		return vmwareConfig, apiDiags
-	case "meraki":
-		merakiConfig := &megaport.MerakiConfig{
-			Vendor:      v.Vendor.ValueString(),
-			ImageID:     int(v.ImageID.ValueInt64()),
-			ProductSize: v.ProductSize.ValueString(),
-			MVELabel:    v.MVELabel.ValueString(),
-			Token:       v.Token.ValueString(),
-		}
-		return merakiConfig, apiDiags
-	}
-	apiDiags.AddError("vendor not supported",
-		"vendor not supported")
-	return nil, apiDiags
-}
-
-// NewPortResource is a helper function to simplify the provider implementation.
+// NewMVEResource is a helper function to simplify the provider implementation.
 func NewMVEResource() resource.Resource {
 	return &mveResource{}
 }
@@ -283,6 +623,13 @@ func (r *mveResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 // Schema defines the schema for the resource.
 func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	vendorConfigPlanModifiers := []planmodifier.Object{
+		objectplanmodifier.UseStateForUnknown(),
+	}
+	vendorConfigValidators := []validator.Object{
+		objectvalidator.ExactlyOneOf(mveVendorConfigPaths...),
+	}
+
 	resp.Schema = schema.Schema{
 		Description: "Megaport Virtual Edge (MVE) Resource for Megaport Terraform provider. This resource allows you to create, modify, and delete Megaport MVEs. Megaport Virtual Edge (MVE) is an on-demand, vendor-neutral Network Function Virtualization (NFV) platform that provides virtual infrastructure for network services at the edge of Megaport’s global software-defined network (SDN). Network technologies such as SD-WAN and NGFW are hosted directly on Megaport’s global network via Megaport Virtual Edge. Use the `megaport_mve_sizes` data source to query available MVE sizes and the `megaport_mve_images` data source to query available MVE images.",
 		Attributes: map[string]schema.Attribute{
@@ -390,133 +737,140 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"vendor_config": schema.SingleNestedAttribute{
-				Description: "The vendor configuration of the MVE. Vendor-specific information required to bootstrap the MVE. These values will be different for each vendor, and can include vendor name, size of VM, license/activation code, software version, and SSH keys. This field cannot be changed after the MVE is created and if it is modified, the MVE will be deleted and re-created. Imported MVEs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.",
-				Required:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.UseStateForUnknown(),
-				},
+			// Per-vendor config blocks. Exactly one must be set. The block that is
+			// populated implies the vendor; only image_id and product_size are
+			// required, all other fields remain optional because the API is the
+			// source of truth for what each vendor image needs.
+			"aruba_config": schema.SingleNestedAttribute{
+				Description:   "Aruba MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Validators:    vendorConfigValidators,
 				Attributes: map[string]schema.Attribute{
-					"vendor": schema.StringAttribute{
-						Description: `The name of vendor of the MVE. Currently supported values: "6wind", "aruba", "aviatrix", "cisco", "fortinet", "palo_alto", "prisma", "versa", "vmware", "meraki".`,
-						Required:    true,
-					},
-					"image_id": schema.Int64Attribute{
-						Description: "The image ID of the MVE. Indicates the software version.",
-						Required:    true,
-					},
-					"product_size": schema.StringAttribute{
-						Description: "The product size for the vendor config. The size defines the MVE specifications including number of cores, bandwidth, and number of connections. Use the `megaport_mve_sizes` data source to query available sizes dynamically. Common values include SMALL (2 cores), MEDIUM (4 cores), LARGE (8 cores), X_LARGE_16 (16 cores), and X_LARGE_32 (32 cores).",
-						Required:    true,
-					},
-					"mve_label": schema.StringAttribute{
-						Description: "The MVE label for the vendor config.",
-						Optional:    true,
-					},
-					"account_name": schema.StringAttribute{
-						Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator. To view your Account Name, log in to Orchestrator and choose Orchestrator > Licensing | Cloud Portal. Required for Aruba MVE.",
-						Optional:    true,
-					},
-					"account_key": schema.StringAttribute{
-						Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator. The key is linked to the Account Name. Required for Aruba MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"admin_ssh_public_key": schema.StringAttribute{
-						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.",
-						Optional:    true,
-					},
-					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'",
-						Optional:    true,
-					},
-					"cloud_init": schema.StringAttribute{
-						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
-						Optional:    true,
-					},
-					"license_data": schema.StringAttribute{
-						Description: "The license data for the vendor config. Required for Fortinet and Palo Alto MVEs.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"admin_password_hash": schema.StringAttribute{
-						Description: "The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE; not used by any other vendor. Must match the format `$5$<salt>$<hash>` (e.g. `$5$2833ea35$Pdyc6dKE8N/UBRge3QWDJJyotG3I59pxLJWVmcSQDdC`). On Linux/macOS you can generate this with `mkpasswd -m sha-256 'your_password'`. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the Palo Alto management interface (the provider does not read this value back from the API).",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"admin_password": schema.StringAttribute{
-						Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `\"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.",
-						Optional:    true,
-						Sensitive:   true,
-						WriteOnly:   true,
-					},
-					"director_address": schema.StringAttribute{
-						Description: "The director address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Director. Required for Versa MVE.",
-						Optional:    true,
-					},
-					"controller_address": schema.StringAttribute{
-						Description: "The controldler address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 address of your Versa Controller. Required for Versa MVE.",
-						Optional:    true,
-					},
-					"manage_locally": schema.BoolAttribute{
-						Description: "Whether to manage the MVE locally. Required for Cisco MVE.",
-						Optional:    true,
-					},
-					"local_auth": schema.StringAttribute{
-						Description: "The local auth for the vendor config. Enter the Local Auth string as configured in your Versa Director. Required for Versa MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"remote_auth": schema.StringAttribute{
-						Description: "The remote auth for the vendor config. Enter the Remote Auth string as configured in your Versa Director. Required for Versa MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"serial_number": schema.StringAttribute{
-						Description: "The serial number for the vendor config. Enter the serial number that you specified when creating the device in Versa Director. Required for Versa MVE.",
-						Optional:    true,
-					},
-					"system_tag": schema.StringAttribute{
-						Description: "The system tag for the vendor config. Aruba Orchestrator System Tags and preconfiguration templates register the EC-V with the Cloud Portal and Orchestrator, and enable Orchestrator to automatically accept and configure newly discovered EC-V appliances. If you created a preconfiguration template in Orchestrator, enter the System Tag you specified here. Required for Aruba MVE.",
-						Optional:    true,
-					},
-					"vco_address": schema.StringAttribute{
-						Description: "The VCO address for the vendor config. A FQDN (Fully Qualified Domain Name) or IPv4 or IPv6 address for the Orchestrator where you created the edge device. Required for VMware MVE.",
-						Optional:    true,
-					},
-					"vco_activation_code": schema.StringAttribute{
-						Description: "The VCO activation code for the vendor config. This is provided by Orchestrator after creating the edge device. Required for VMware MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"fmc_ip_address": schema.StringAttribute{
-						Description: "The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
-						Optional:    true,
-					},
-					"fmc_registration_key": schema.StringAttribute{
-						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"fmc_nat_id": schema.StringAttribute{
-						Description: "The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
-						Optional:    true,
-					},
-					"token": schema.StringAttribute{
-						Description: "The token for the vendor config. Required for Meraki MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"ion_key": schema.StringAttribute{
-						Description: "The vION key for the vendor config. Required for Prisma MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
-					"secret_key": schema.StringAttribute{
-						Description: "The secret key for the vendor config. Required for Prisma MVE.",
-						Sensitive:   true,
-						Optional:    true,
-					},
+					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":    schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"account_name": schema.StringAttribute{Description: "The account name for the vendor config. Enter the Account Name from Aruba Orchestrator.", Optional: true},
+					"account_key":  schema.StringAttribute{Description: "The account key for the vendor config. Enter the Account Key from Aruba Orchestrator.", Optional: true, Sensitive: true},
+					"system_tag":   schema.StringAttribute{Description: "The system tag for the vendor config. Aruba Orchestrator System Tags register the EC-V with the Cloud Portal and Orchestrator.", Optional: true},
+				},
+			},
+			"aviatrix_config": schema.SingleNestedAttribute{
+				Description:   "Aviatrix MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":    schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"cloud_init":   schema.StringAttribute{Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix.", Optional: true},
+				},
+			},
+			"cisco_config": schema.SingleNestedAttribute{
+				Description:   "Cisco MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":            schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"admin_ssh_public_key": schema.StringAttribute{Description: "The admin SSH public key for the vendor config.", Optional: true},
+					"ssh_public_key":       schema.StringAttribute{Description: "The SSH public key for the vendor config.", Optional: true},
+					"admin_password":       schema.StringAttribute{Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only. Must be 9–100 characters and may not contain `\"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.", Optional: true, Sensitive: true, WriteOnly: true},
+					"manage_locally":       schema.BoolAttribute{Description: "Whether to manage the MVE locally. Required for Cisco MVE.", Optional: true},
+					"cloud_init":           schema.StringAttribute{Description: "The Base64 encoded cloud init file for the vendor config. Required for Cisco C8000v.", Optional: true},
+					"fmc_ip_address":       schema.StringAttribute{Description: "The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.", Optional: true},
+					"fmc_registration_key": schema.StringAttribute{Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.", Optional: true, Sensitive: true},
+					"fmc_nat_id":           schema.StringAttribute{Description: "The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.", Optional: true},
+				},
+			},
+			"fortinet_config": schema.SingleNestedAttribute{
+				Description:   "Fortinet MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":            schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"admin_ssh_public_key": schema.StringAttribute{Description: "The admin SSH public key for the vendor config.", Optional: true},
+					"ssh_public_key":       schema.StringAttribute{Description: "The SSH public key for the vendor config. Must be a 2048-bit RSA key.", Optional: true},
+					"license_data":         schema.StringAttribute{Description: "The license data for the vendor config. Required for Fortinet.", Optional: true, Sensitive: true},
+				},
+			},
+			"meraki_config": schema.SingleNestedAttribute{
+				Description:   "Meraki MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":    schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"token":        schema.StringAttribute{Description: "The token for the vendor config. Required for Meraki.", Optional: true, Sensitive: true},
+				},
+			},
+			"palo_alto_config": schema.SingleNestedAttribute{
+				Description:   "Palo Alto MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":            schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":        schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":           schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"ssh_public_key":      schema.StringAttribute{Description: "The SSH public key for the vendor config. Must be a 2048-bit RSA key.", Optional: true},
+					"admin_password_hash": schema.StringAttribute{Description: "The sha256crypt-formatted admin password hash for the vendor config. Required for Palo Alto VM-Series MVE. Must match the format `$5$<salt>$<hash>`.", Optional: true, Sensitive: true},
+					"license_data":        schema.StringAttribute{Description: "The license data for the vendor config. Required for Palo Alto.", Optional: true, Sensitive: true},
+				},
+			},
+			"prisma_config": schema.SingleNestedAttribute{
+				Description:   "Prisma MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":     schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size": schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":    schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"ion_key":      schema.StringAttribute{Description: "The vION key for the vendor config. Required for Prisma.", Optional: true, Sensitive: true},
+					"secret_key":   schema.StringAttribute{Description: "The secret key for the vendor config. Required for Prisma.", Optional: true, Sensitive: true},
+				},
+			},
+			"sixwind_config": schema.SingleNestedAttribute{
+				Description:   "6WIND MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":       schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":   schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":      schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"ssh_public_key": schema.StringAttribute{Description: "The SSH public key for the vendor config. Must be a 2048-bit RSA key.", Optional: true},
+				},
+			},
+			"versa_config": schema.SingleNestedAttribute{
+				Description:   "Versa MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":           schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":       schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":          schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"director_address":   schema.StringAttribute{Description: "A FQDN or IPv4 address of your Versa Director. Required for Versa.", Optional: true},
+					"controller_address": schema.StringAttribute{Description: "A FQDN or IPv4 address of your Versa Controller. Required for Versa.", Optional: true},
+					"local_auth":         schema.StringAttribute{Description: "The local auth string as configured in your Versa Director. Required for Versa.", Optional: true, Sensitive: true},
+					"remote_auth":        schema.StringAttribute{Description: "The remote auth string as configured in your Versa Director. Required for Versa.", Optional: true, Sensitive: true},
+					"serial_number":      schema.StringAttribute{Description: "The serial number specified when creating the device in Versa Director. Required for Versa.", Optional: true},
+				},
+			},
+			"vmware_config": schema.SingleNestedAttribute{
+				Description:   "VMware MVE vendor configuration. Exactly one vendor config block must be set. The MVE is destroyed and re-created if this block changes.",
+				Optional:      true,
+				PlanModifiers: vendorConfigPlanModifiers,
+				Attributes: map[string]schema.Attribute{
+					"image_id":             schema.Int64Attribute{Description: "The image ID of the MVE. Indicates the software version.", Required: true},
+					"product_size":         schema.StringAttribute{Description: "The product size for the vendor config.", Required: true},
+					"mve_label":            schema.StringAttribute{Description: "The MVE label for the vendor config.", Optional: true},
+					"admin_ssh_public_key": schema.StringAttribute{Description: "The admin SSH public key for the vendor config.", Optional: true},
+					"ssh_public_key":       schema.StringAttribute{Description: "The SSH public key for the vendor config. Must be a 2048-bit RSA key.", Optional: true},
+					"vco_address":          schema.StringAttribute{Description: "A FQDN or IPv4/IPv6 address for the Orchestrator where you created the edge device. Required for VMware.", Optional: true},
+					"vco_activation_code":  schema.StringAttribute{Description: "The VCO activation code provided by Orchestrator after creating the edge device. Required for VMware.", Optional: true, Sensitive: true},
 				},
 			},
 		},
@@ -554,24 +908,17 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		mveReq.ResourceTags = tagMap
 	}
 
-	if plan.VendorConfig.IsNull() {
-		resp.Diagnostics.AddError(
-			"vendor config required", "vendor config required",
-		)
-	}
-	vcModel := &vendorConfigModel{}
-	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
-	resp.Diagnostics = append(resp.Diagnostics, vcDiags...)
-	// admin_password is a write-only attribute, so it is null in req.Plan.
-	// Pull it from req.Config and apply it to the vendor model before mapping
-	// to the API request.
+	// admin_password is a write-only attribute (Cisco FTDv), so it is null in
+	// req.Plan. Re-read it from req.Config and pass it through to the API request.
 	var configAdminPassword types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("vendor_config").AtName("admin_password"), &configAdminPassword)...)
-	if resp.Diagnostics.HasError() {
-		return
+	if objectSet(plan.CiscoConfig) {
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("cisco_config").AtName("admin_password"), &configAdminPassword)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
-	vcModel.AdminPassword = configAdminPassword
-	vendorConfig, apiVCDiags := toAPIVendorConfig(vcModel)
+
+	vendorConfig, apiVCDiags := toAPIVendorConfigFromModel(ctx, &plan, configAdminPassword.ValueString())
 	resp.Diagnostics = append(resp.Diagnostics, apiVCDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -667,6 +1014,7 @@ func (r *mveResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
+	// fromAPIMVE does not touch the vendor config blocks; they remain from state.
 	apiDiags := state.fromAPIMVE(ctx, mve, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
 
@@ -684,11 +1032,11 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	// Preserve the plan's VendorConfig in state. This handles two cases:
-	// 1. After Import, VendorConfig in state is null — adopt the plan value.
-	// 2. Case-only changes (e.g., "aruba" → "aRuBa") — adopt the plan's casing
-	//    so Terraform doesn't see an inconsistent result after apply.
-	state.VendorConfig = plan.VendorConfig
+	// Preserve the plan's vendor config blocks in state. This handles two cases:
+	// 1. After Import, the vendor config blocks in state are null — adopt the plan value.
+	// 2. Case-only changes (e.g., "small" → "SMALL") — adopt the plan's casing so
+	//    Terraform doesn't see an inconsistent result after apply.
+	copyVendorConfigs(&state, &plan)
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -805,14 +1153,16 @@ func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// Get the plan and state
+	if req.Plan.Raw.IsNull() {
+		// Destroy operation — nothing to do.
+		return
+	}
+
 	var plan, state mveResourceModel
-	if !req.Plan.Raw.IsNull() {
-		planDiags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(planDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	planDiags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(planDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	if !req.State.Raw.IsNull() {
 		stateDiags := req.State.Get(ctx, &state)
@@ -822,70 +1172,55 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		}
 	}
 
-	if !state.UID.IsNull() {
-		// If VendorConfig is null in the state, set it to the value from the plan
-		if state.VendorConfig.IsNull() {
-			// Add this check to avoid trying to convert a null value
-			if plan.VendorConfig.IsNull() {
-				// Both state and plan have null VendorConfig, nothing to do
-				return
-			}
-			var planVendorConfig vendorConfigModel
-			planVendorConfigDiags := plan.VendorConfig.As(ctx, &planVendorConfig, basetypes.ObjectAsOptions{})
-			resp.Diagnostics = append(resp.Diagnostics, planVendorConfigDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			// Check the computed vendor/size values from the API. If the vendor or size changes, require a replace - check with case insensitivity.
+	// Only evaluate immutability on an existing resource.
+	if state.UID.IsNull() {
+		return
+	}
 
-			if !strings.EqualFold(state.Size.ValueString(), planVendorConfig.ProductSize.ValueString()) {
-				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
-			}
+	planVendor := vendorNameFromModel(plan)
+	cfgPath := vendorConfigPath(planVendor)
 
-			if !strings.EqualFold(state.Vendor.ValueString(), planVendorConfig.Vendor.ValueString()) {
-				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
-			}
-			state.VendorConfig = plan.VendorConfig
-		} else if !plan.VendorConfig.Equal(state.VendorConfig) {
-			// During destroy, the plan's VendorConfig is null — nothing to compare.
-			if plan.VendorConfig.IsNull() || plan.VendorConfig.IsUnknown() {
-				// No replacement decision needed during destroy.
-			} else {
-				// vendor_config cannot be changed after creation — require replace on
-				// any change. However, the API normalizes vendor/size to uppercase
-				// (e.g., "aruba" → "ARUBA"), so Equal() can return false on casing
-				// differences alone. Compare vendor and size case-insensitively to
-				// avoid unnecessary destroy+recreate on case-only changes.
-				var planVC vendorConfigModel
-				planVCDiags := plan.VendorConfig.As(ctx, &planVC, basetypes.ObjectAsOptions{})
-				resp.Diagnostics.Append(planVCDiags...)
-				if resp.Diagnostics.HasError() {
-					return
-				}
-				if !strings.EqualFold(state.Vendor.ValueString(), planVC.Vendor.ValueString()) ||
-					!strings.EqualFold(state.Size.ValueString(), planVC.ProductSize.ValueString()) {
-					// Vendor or size changed (case-insensitive) — must replace.
-					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
-				} else {
-					// Vendor/size match case-insensitively. Normalize them in the
-					// plan to match state casing, then check remaining fields.
-					planVC.Vendor = types.StringValue(state.Vendor.ValueString())
-					planVC.ProductSize = types.StringValue(state.Size.ValueString())
-					normalized, normDiags := types.ObjectValueFrom(ctx, plan.VendorConfig.AttributeTypes(ctx), &planVC)
-					resp.Diagnostics.Append(normDiags...)
-					if resp.Diagnostics.HasError() {
-						return
-					}
-					if !normalized.Equal(state.VendorConfig) {
-						resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
-					}
-				}
-			}
-		}
-		diags := req.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
+	if allVendorConfigsNull(state) {
+		// Import scenario: vendor config blocks are null in state. Compare the
+		// plan's vendor/size against the API-derived state values (which are
+		// uppercase), requiring replacement only when they differ. The vendor is
+		// mapped to the value the API reports (e.g. 6wind -> SIX_WIND), and size
+		// is compared case-insensitively because the API normalizes to uppercase.
+		if allVendorConfigsNull(plan) {
 			return
 		}
+
+		if spec, ok := specForVendor(planVendor); ok && spec.apiVendor != "" &&
+			!state.Vendor.IsNull() && !state.Vendor.IsUnknown() &&
+			!strings.EqualFold(state.Vendor.ValueString(), spec.apiVendor) {
+			resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
+		}
+
+		if !state.Size.IsNull() && !state.Size.IsUnknown() {
+			planSize := planProductSizeFromModel(plan)
+			if planSize != "" && !strings.EqualFold(state.Size.ValueString(), planSize) {
+				resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
+			}
+		}
+		return
+	}
+
+	// Existing resource with a vendor config block in state. The vendor config is
+	// immutable, so any change requires replacement. A change of vendor (a
+	// different block being set) always requires replacement; otherwise compare
+	// the block contents, treating product_size case-insensitively.
+	stateVendor := vendorNameFromModel(state)
+	if !strings.EqualFold(stateVendor, planVendor) {
+		resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
+		return
+	}
+
+	planObj := blockForVendor(plan, planVendor)
+	stateObj := blockForVendor(state, stateVendor)
+	if planObj.IsNull() || planObj.IsUnknown() {
+		return
+	}
+	if !vendorBlockEqualIgnoringSizeCase(planObj, stateObj) {
+		resp.RequiresReplace = append(resp.RequiresReplace, cfgPath)
 	}
 }
