@@ -85,8 +85,7 @@ resource "megaport_mve" "mve" {
     },
   ]
 
-  vendor_config = {
-    vendor       = "aruba"
+  aruba_config = {
     product_size = "MEDIUM"
     image_id     = 23
     account_name = "Megaport Aruba MVE"
@@ -112,8 +111,7 @@ resource "megaport_mve" "mve" {
     }
   ]
 
-  vendor_config = {
-    vendor       = "aruba"
+  aruba_config = {
     product_size = "MEDIUM"
     image_id     = 23
     account_name = "Megaport Aruba MVE"
