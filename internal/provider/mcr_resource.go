@@ -23,9 +23,10 @@ import (
 
 var (
 	// Ensure the implementation satisfies the expected interfaces.
-	_ resource.Resource                = &mcrResource{}
-	_ resource.ResourceWithConfigure   = &mcrResource{}
-	_ resource.ResourceWithImportState = &mcrResource{}
+	_ resource.Resource                 = &mcrResource{}
+	_ resource.ResourceWithConfigure    = &mcrResource{}
+	_ resource.ResourceWithImportState  = &mcrResource{}
+	_ resource.ResourceWithUpgradeState = &mcrResource{}
 )
 
 // mcrResourceModel maps the resource schema data.
@@ -104,6 +105,7 @@ func (r *mcrResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Megaport Cloud Router (MCR) Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport MCRs. The MCR is a managed virtual router service that establishes Layer 3 connectivity on the worldwide Megaport software-defined network (SDN). MCR instances are preconfigured in data centers in key global routing zones. An MCR enables data transfer between multi-cloud or hybrid cloud networks, network service providers, and cloud service providers.",
 		Attributes: map[string]schema.Attribute{
 			"product_uid": schema.StringAttribute{
@@ -199,6 +201,73 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				PlanModifiers: []planmodifier.Map{
 					mapplanmodifier.UseStateForUnknown(),
 				},
+			},
+		},
+	}
+}
+
+// mcrResourceModelV0 mirrors the V0 schema, which additionally carried the
+// inline prefix_filter_lists attribute removed in V1.
+type mcrResourceModelV0 struct {
+	mcrResourceModel
+	PrefixFilterLists types.List `tfsdk:"prefix_filter_lists"`
+}
+
+// UpgradeState decodes V0 state (which may still have inline
+// prefix_filter_lists) against the V1 schema, warning when lists are being
+// silently dropped from Terraform management so they aren't mistaken for
+// having been deleted from the backend.
+func (r *mcrResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	v0Schema := schemaResp.Schema
+	v0Schema.Attributes["prefix_filter_lists"] = schema.ListNestedAttribute{
+		Description: "Prefix filter lists previously managed inline on the MCR.",
+		Optional:    true,
+		Computed:    true,
+		NestedObject: schema.NestedAttributeObject{
+			Attributes: map[string]schema.Attribute{
+				"id":             schema.Int64Attribute{Computed: true},
+				"description":    schema.StringAttribute{Required: true},
+				"address_family": schema.StringAttribute{Required: true},
+				"entries": schema.ListNestedAttribute{
+					Optional: true,
+					Computed: true,
+					NestedObject: schema.NestedAttributeObject{
+						Attributes: map[string]schema.Attribute{
+							"action": schema.StringAttribute{Required: true},
+							"prefix": schema.StringAttribute{Required: true},
+							"ge":     schema.Int64Attribute{Optional: true},
+							"le":     schema.Int64Attribute{Optional: true},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &v0Schema,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState mcrResourceModelV0
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				if !priorState.PrefixFilterLists.IsNull() && len(priorState.PrefixFilterLists.Elements()) > 0 {
+					resp.Diagnostics.AddWarning(
+						"Inline prefix_filter_lists no longer managed",
+						"This MCR had inline prefix_filter_lists configured. That attribute has been removed from "+
+							"the megaport_mcr resource, so Terraform will stop tracking these lists, though they remain "+
+							"active in the Megaport backend. Import each list into a standalone "+
+							"megaport_mcr_prefix_filter_list resource to keep managing them with Terraform; see the "+
+							"provider documentation for migration guidance.",
+					)
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, priorState.mcrResourceModel)...)
 			},
 		},
 	}
