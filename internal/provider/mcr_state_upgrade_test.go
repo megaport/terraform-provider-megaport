@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// State upgrade coverage for megaport_mcr (provider v1 to v2). The read-only
-// attributes removed in v2 are dropped by the framework's prior-schema decode
-// with IgnoreUndefinedAttributes; the first two tests replicate that decode to
-// prove real V1 state still reads against the V2 schema (no kept attribute
-// changed type). The user-configured prefix_filter_lists attribute instead
-// gets an explicit schema-version-0 StateUpgrader that drops it and warns; the
-// remaining tests exercise that upgrader directly.
+// State upgrade coverage for megaport_mcr (provider v1 to v2). Every test runs
+// real V1 state through the registered schema-version-0 StateUpgrader via
+// runMCRV0Upgrader, the same path the framework takes now that the schema
+// version is bumped. This proves kept attributes survive the upgrade (no kept
+// attribute changed type) and that the user-configured prefix_filter_lists
+// attribute is dropped with a warning.
 
 // v1MCRState returns a complete V1 MCR state JSON with all fields that
 // existed in V1 (including those removed in V2).
@@ -84,40 +83,14 @@ func v1MCRState() []byte {
 	return b
 }
 
-// decodeV1StateAgainstV2Schema mimics the framework's same-version
-// UpgradeResourceState passthrough (fwserver/server_upgraderesourcestate.go).
-func decodeV1StateAgainstV2Schema(t *testing.T, rawJSON []byte) tfsdk.State {
-	t.Helper()
-	ctx := context.Background()
-
-	schemaResp := &resource.SchemaResponse{}
-	(&mcrResource{}).Schema(ctx, resource.SchemaRequest{}, schemaResp)
-	require.False(t, schemaResp.Diagnostics.HasError())
-
-	rawState := &tfprotov6.RawState{JSON: rawJSON}
-	rawValue, err := rawState.UnmarshalWithOpts(
-		schemaResp.Schema.Type().TerraformType(ctx),
-		tfprotov6.UnmarshalOpts{
-			ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
-				IgnoreUndefinedAttributes: true,
-			},
-		},
-	)
-	require.NoError(t, err, "V1 state failed to decode against the V2 schema")
-
-	return tfsdk.State{
-		Raw:    rawValue,
-		Schema: schemaResp.Schema,
-	}
-}
-
 func TestMCRStateUpgrade_V1ToV2(t *testing.T) {
 	ctx := context.Background()
 
-	state := decodeV1StateAgainstV2Schema(t, v1MCRState())
+	resp := runMCRV0Upgrader(t, v1MCRState())
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
 
 	var model mcrResourceModel
-	diags := state.Get(ctx, &model)
+	diags := resp.State.Get(ctx, &model)
 	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	// Verify kept fields survive the upgrade.
@@ -167,10 +140,11 @@ func TestMCRStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	rawJSON, err := json.Marshal(state)
 	require.NoError(t, err)
 
-	upgraded := decodeV1StateAgainstV2Schema(t, rawJSON)
+	resp := runMCRV0Upgrader(t, rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
 
 	var model mcrResourceModel
-	diags := upgraded.Get(ctx, &model)
+	diags := resp.State.Get(ctx, &model)
 	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	assert.Equal(t, "mcr-nil-test", model.UID.ValueString())
