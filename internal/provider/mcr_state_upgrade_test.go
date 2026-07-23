@@ -89,6 +89,11 @@ func TestMCRStateUpgrade_V1ToV2(t *testing.T) {
 	resp := runMCRV0Upgrader(t, v1MCRState())
 	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
 
+	// v1MCRState() includes prefix_filter_lists, so the upgrader also warns here;
+	// TestMCRStateUpgrade_V0Upgrader_WarnsOnInlinePrefixFilterLists covers the warning
+	// itself, this just confirms it doesn't fail the upgrade.
+	assert.Len(t, resp.Diagnostics.Warnings(), 1)
+
 	var model mcrResourceModel
 	diags := resp.State.Get(ctx, &model)
 	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
