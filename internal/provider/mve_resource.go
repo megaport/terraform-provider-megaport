@@ -630,11 +630,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'",
+						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs, and for Cisco C8000v MVEs in autonomous (self-managed) mode, where `cloud_init` is omitted. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
+						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix, and for Cisco C8000v in SD-WAN (controller-managed) mode. For a Cisco C8000v in autonomous mode, omit this field and set `ssh_public_key` instead.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
