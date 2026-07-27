@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -1069,4 +1070,59 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 		vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
 	}
 	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
+}
+
+type vlanPreflightInput struct {
+	svc         megaport.PortService
+	end         string // "A-End" or "B-End", used in the error message
+	productUID  string
+	productType string
+	orderedVLAN types.Int64
+	// currentVLAN is what this end already holds, so pinning an API-allocated
+	// VLAN is not mistaken for requesting a taken one. Null on create.
+	currentVLAN types.Int64
+}
+
+// vlanAvailabilityPreflight turns a taken VLAN into a clear error naming the end
+// and the port, instead of the backend's "VLAN N not available on service <id>"
+// where the id is an internal service number the user cannot map to their config.
+//
+// The API answer is per-port, but VLANs are unique across a whole CSP capacity
+// group, so "available" does not guarantee the order will be accepted. Only the
+// negative answer is acted on, and a failed check never blocks the apply.
+func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if in.orderedVLAN.IsNull() || in.orderedVLAN.IsUnknown() {
+		return diags
+	}
+	vlan := int(in.orderedVLAN.ValueInt64())
+	// 0 auto-assigns and -1 is untagged, so neither pins a VLAN to check.
+	if vlan <= 0 {
+		return diags
+	}
+	// Asking to keep the VLAN this end already holds always reads as unavailable.
+	if !in.currentVLAN.IsNull() && !in.currentVLAN.IsUnknown() && int(in.currentVLAN.ValueInt64()) == vlan {
+		return diags
+	}
+	// MVE VLANs are scoped per vNIC and MCR/VRouter ends can dictate their own,
+	// so a per-service answer there could wrongly block a valid order.
+	if in.productUID == "" || !strings.EqualFold(in.productType, megaport.PRODUCT_MEGAPORT) {
+		return diags
+	}
+
+	available, err := in.svc.CheckPortVLANAvailability(ctx, in.productUID, vlan)
+	if err != nil {
+		tflog.Debug(ctx, "VLAN availability preflight skipped", map[string]any{
+			"end": in.end, "product_uid": in.productUID, "vlan": vlan, "error": err.Error(),
+		})
+		return diags
+	}
+	if !available {
+		diags.AddError(
+			fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end),
+			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
+		)
+	}
+	return diags
 }
