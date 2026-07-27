@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,15 +31,16 @@ func (s *stubPortService) CheckPortVLANAvailability(_ context.Context, portID st
 
 func TestVLANAvailabilityPreflight(t *testing.T) {
 	tests := []struct {
-		name        string
-		productUID  string
-		productType string
-		orderedVLAN types.Int64
-		currentVLAN types.Int64
-		available   bool
-		apiErr      error
-		wantCalls   int
-		wantError   bool
+		name             string
+		productUID       string
+		productType      string
+		orderedVLAN      types.Int64
+		currentVLAN      types.Int64
+		hasPartnerConfig bool
+		available        bool
+		apiErr           error
+		wantCalls        int
+		wantError        bool
 	}{
 		{
 			name:        "taken vlan errors",
@@ -76,6 +78,25 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 			orderedVLAN: types.Int64Value(730),
 			available:   true,
 			wantCalls:   1,
+		},
+		{
+			name:        "the requested vlan is the one checked",
+			productUID:  "port-uid-1",
+			productType: megaport.PRODUCT_MEGAPORT,
+			orderedVLAN: types.Int64Value(2049),
+			available:   false,
+			wantCalls:   1,
+			wantError:   true,
+		},
+		{
+			// Megaport may rotate a Partner Port to a sibling, so the requested
+			// port's answer can be about a port the order never lands on.
+			name:             "partner-configured end is not checked",
+			productUID:       "partner-uid-1",
+			productType:      megaport.PRODUCT_MEGAPORT,
+			orderedVLAN:      types.Int64Value(730),
+			hasPartnerConfig: true,
+			available:        false,
 		},
 		{
 			// A preflight that cannot answer must never block a valid apply.
@@ -161,12 +182,13 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 
 			// A zero-value types.Int64 is null, which is the create case.
 			diags := vlanAvailabilityPreflight(context.Background(), vlanPreflightInput{
-				svc:         svc,
-				end:         "A-End",
-				productUID:  tt.productUID,
-				productType: tt.productType,
-				orderedVLAN: tt.orderedVLAN,
-				currentVLAN: tt.currentVLAN,
+				svc:              svc,
+				end:              "A-End",
+				productUID:       tt.productUID,
+				productType:      tt.productType,
+				orderedVLAN:      tt.orderedVLAN,
+				currentVLAN:      tt.currentVLAN,
+				hasPartnerConfig: tt.hasPartnerConfig,
 			})
 
 			assert.Equal(t, tt.wantCalls, svc.calls, "unexpected number of availability calls")
@@ -175,16 +197,17 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 				return
 			}
 
+			vlan := int(tt.orderedVLAN.ValueInt64())
 			assert.True(t, diags.HasError(), "expected an error diagnostic")
 			summary := diags.Errors()[0].Summary()
 			detail := diags.Errors()[0].Detail()
-			assert.Contains(t, summary, "730", "error should name the VLAN")
+			assert.Contains(t, summary, strconv.Itoa(vlan), "error should name the VLAN")
 			assert.Contains(t, summary, "A-End", "error should name the end")
 			assert.Contains(t, detail, tt.productUID, "error should name the port")
 			assert.Contains(t, detail, "ordered_vlan", "error should name the attribute to change")
 
 			assert.Equal(t, tt.productUID, svc.gotPortID)
-			assert.Equal(t, 730, svc.gotVLAN)
+			assert.Equal(t, vlan, svc.gotVLAN, "the requested VLAN should be the one checked")
 		})
 	}
 }

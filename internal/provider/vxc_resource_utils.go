@@ -1081,15 +1081,16 @@ type vlanPreflightInput struct {
 	// currentVLAN is what this end already holds, so pinning an API-allocated
 	// VLAN is not mistaken for requesting a taken one. Null on create.
 	currentVLAN types.Int64
+	// hasPartnerConfig marks an end whose port Megaport picks, so the requested
+	// UID may not be the port the order lands on.
+	hasPartnerConfig bool
 }
 
 // vlanAvailabilityPreflight turns a taken VLAN into a clear error naming the end
-// and the port, instead of the backend's "VLAN N not available on service <id>"
-// where the id is an internal service number the user cannot map to their config.
-//
-// The API answer is per-port, but VLANs are unique across a whole CSP capacity
-// group, so "available" does not guarantee the order will be accepted. Only the
-// negative answer is acted on, and a failed check never blocks the apply.
+// and the port, instead of the backend's "VLAN N not available on service <id>",
+// an internal id the user cannot map to their config. Only an explicit "taken"
+// answer is acted on: the API answers per port but VLANs are unique across a CSP
+// capacity group, so "available" does not mean the order will be accepted.
 func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -1103,6 +1104,11 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	}
 	// Asking to keep the VLAN this end already holds always reads as unavailable.
 	if !in.currentVLAN.IsNull() && !in.currentVLAN.IsUnknown() && int(in.currentVLAN.ValueInt64()) == vlan {
+		return diags
+	}
+	// The API may rotate a Partner Port to a sibling in the same location and
+	// diversity zone, so the requested port's answer can be the wrong port's.
+	if in.hasPartnerConfig {
 		return diags
 	}
 	// MVE VLANs are scoped per vNIC and MCR/VRouter ends can dictate their own,
