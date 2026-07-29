@@ -1290,6 +1290,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 							  med_in            = 100
 							  med_out           = 100
 							  bfd_enabled       = true
+							  as_override       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
 							  import_whitelist = "%s"
@@ -1425,6 +1426,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 							  med_in            = 100
 							  med_out           = 100
 							  bfd_enabled       = true
+							  as_override       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
 							  import_whitelist = "%s"
