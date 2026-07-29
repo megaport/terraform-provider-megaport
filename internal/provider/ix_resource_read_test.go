@@ -18,15 +18,11 @@ import (
 
 // MockIXService is a mock of the IX service for testing
 type MockIXService struct {
-	GetIXResult *megaport.IX
-	GetIXErr    error
+	GetIXErr error
 }
 
 func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, error) {
-	if m.GetIXErr != nil {
-		return nil, m.GetIXErr
-	}
-	return m.GetIXResult, nil
+	return nil, m.GetIXErr
 }
 
 // Implement other required methods of the IXService interface with minimal stubs
