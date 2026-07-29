@@ -244,6 +244,7 @@ var (
 									"med_in":        optionalInt64("The MED in of the BGP connection."),
 									"med_out":       optionalInt64("The MED out of the BGP connection."),
 									"bfd_enabled":   optionalBool("Whether BFD is enabled for the BGP connection."),
+									"as_override":   optionalBool("Enables AS Override for this eBGP connection, replacing the peer ASN with the local ASN in the advertised AS path (eBGP connections only)."),
 									"export_policy": optionalString("The export policy of the BGP connection."),
 									"permit_export_to": schema.ListAttribute{
 										Description: "The permitted export to of the BGP connection.",
@@ -331,6 +332,7 @@ var (
 									"med_in":        optionalInt64("The MED in of the BGP connection."),
 									"med_out":       optionalInt64("The MED out of the BGP connection."),
 									"bfd_enabled":   optionalBool("Whether BFD is enabled for the BGP connection."),
+									"as_override":   optionalBool("Enables AS Override for this eBGP connection, replacing the peer ASN with the local ASN in the advertised AS path (eBGP connections only)."),
 									"export_policy": optionalString("The export policy of the BGP connection."),
 									"permit_export_to": schema.ListAttribute{
 										Description: "The permitted export to of the BGP connection.",
