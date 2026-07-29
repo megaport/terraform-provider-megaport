@@ -148,4 +148,33 @@ resource "megaport_mve" "mve_sixwind_dynamic" {
   }]
 }
 
+data "megaport_mve_images" "c8000v" {
+  vendor_filter  = "Cisco"
+  product_filter = "C8000"
+}
+
+# Cisco C8000v in autonomous (self-managed) mode.
+# The appliance mode is selected by which field you supply: set ssh_public_key and
+# omit cloud_init for autonomous mode, or set cloud_init (Base64 encoded bootstrap
+# file) instead for SD-WAN (controller-managed) mode.
+resource "megaport_mve" "mve_c8000v_autonomous" {
+  product_name         = "Cisco C8000v Autonomous MVE Example"
+  location_id          = 6
+  contract_term_months = 1
+
+  vendor_config = {
+    vendor       = "cisco"
+    product_size = "SMALL"
+    image_id     = data.megaport_mve_images.c8000v.mve_images[0].id
+    # EXAMPLE RSA 2048-bit key - REPLACE WITH YOUR ACTUAL PUBLIC KEY
+    ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDChMevHRnL3gDRXyGduArHROH8IkZhdVmVBLkR/0F6RhP7Jw6a8T3xGjFLvQj3jfvXDxKDfqRQvLLJ3CgqnLvHuQjVZ/vYGdFCCXSxYbg2fCj2VIUjPHOBqkBEG8a1HDx2P8qN6WD8nBHkLExampleKeyForDocumentationOnlyNotForUse example@example.com"
+  }
+
+  vnics = [
+    {
+      description = "Data Plane"
+    }
+  ]
+}
+
 
