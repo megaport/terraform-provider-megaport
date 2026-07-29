@@ -353,6 +353,10 @@ var (
 										Description: "Whether BFD is enabled for the BGP connection.",
 										Optional:    true,
 									},
+									"as_override": schema.BoolAttribute{
+										Description: "Enables AS Override for this eBGP connection, replacing the peer ASN with the local ASN in the advertised AS path (eBGP connections only).",
+										Optional:    true,
+									},
 									"export_policy": schema.StringAttribute{
 										Description: "The export policy of the BGP connection.",
 										Optional:    true,
@@ -498,6 +502,10 @@ var (
 									},
 									"bfd_enabled": schema.BoolAttribute{
 										Description: "Whether BFD is enabled for the BGP connection.",
+										Optional:    true,
+									},
+									"as_override": schema.BoolAttribute{
+										Description: "Enables AS Override for this eBGP connection, replacing the peer ASN with the local ASN in the advertised AS path (eBGP connections only).",
 										Optional:    true,
 									},
 									"export_policy": schema.StringAttribute{

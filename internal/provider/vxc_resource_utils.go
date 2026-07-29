@@ -629,6 +629,9 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 				if !bgpConnection.LocalAsn.IsNull() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
 				}
+				if !bgpConnection.AsOverride.IsNull() {
+					bgpToAppend.AsOverride = megaport.PtrTo(bgpConnection.AsOverride.ValueBool())
+				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
 					diags.Append(d...)
@@ -779,6 +782,9 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 				}
 				if !bgpConnection.LocalAsn.IsNull() {
 					bgpToAppend.LocalAsn = megaport.PtrTo(int(bgpConnection.LocalAsn.ValueInt64()))
+				}
+				if !bgpConnection.AsOverride.IsNull() {
+					bgpToAppend.AsOverride = megaport.PtrTo(bgpConnection.AsOverride.ValueBool())
 				}
 				if !bgpConnection.ImportWhitelist.IsNull() {
 					id, d := resolvePrefixListID(prefixFilterList, bgpConnection.ImportWhitelist.ValueString(), "import_whitelist")
