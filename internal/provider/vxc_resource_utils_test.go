@@ -110,6 +110,58 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	assert.Nil(t, vrouterConfig.Interfaces[2].IpSecTunnelOptions)
 }
 
+// TestCreateVrouterPartnerConfig_BgpAsOverride verifies the model -> SDK mapping
+// for the optional as_override BGP field: set true/false round-trips the value,
+// and unset (null) leaves the pointer nil so the API default applies.
+func TestCreateVrouterPartnerConfig_BgpAsOverride(t *testing.T) {
+	ctx := context.Background()
+
+	newBgp := func(asOverride types.Bool) bgpConnectionConfigModel {
+		return bgpConnectionConfigModel{
+			PeerAsn:        types.Int64Value(65000),
+			LocalIPAddress: types.StringValue("169.254.1.1"),
+			PeerIPAddress:  types.StringValue("169.254.1.2"),
+			AsOverride:     asOverride,
+			PermitExportTo: types.ListNull(types.StringType),
+			DenyExportTo:   types.ListNull(types.StringType),
+		}
+	}
+
+	bgpList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), []bgpConnectionConfigModel{
+		newBgp(types.BoolValue(true)),
+		newBgp(types.BoolValue(false)),
+		newBgp(types.BoolNull()),
+	})
+	require.False(t, diags.HasError(), "building bgp list: %v", diags)
+
+	iface := vxcPartnerConfigInterfaceModel{
+		IPAddresses:        types.ListNull(types.StringType),
+		IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		NatIPAddresses:     types.ListNull(types.StringType),
+		Bfd:                types.ObjectNull(bfdConfigAttrs),
+		BgpConnections:     bgpList,
+		IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+	}
+	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{iface})
+	require.False(t, diags.HasError(), "building interface list: %v", diags)
+
+	model := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
+
+	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil, nil)
+	require.False(t, diags.HasError(), "createVrouterPartnerConfig: %v", diags)
+	require.Len(t, vrouterConfig.Interfaces, 1)
+	conns := vrouterConfig.Interfaces[0].BgpConnections
+	require.Len(t, conns, 3)
+
+	require.NotNil(t, conns[0].AsOverride)
+	assert.True(t, *conns[0].AsOverride)
+
+	require.NotNil(t, conns[1].AsOverride)
+	assert.False(t, *conns[1].AsOverride)
+
+	assert.Nil(t, conns[2].AsOverride, "unset as_override must stay nil so the API default applies")
+}
+
 // TestIPSecPhaseLifetimeValidator covers the cross-field rule that phase2 must
 // be strictly less than phase1, and that the check is skipped when either side
 // is unset.
