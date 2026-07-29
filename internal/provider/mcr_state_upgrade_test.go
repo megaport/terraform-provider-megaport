@@ -13,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The V1 to V2 state upgrade needs no upgrader code: the framework's
-// UpgradeResourceState passthrough decodes prior state against the current
-// schema with IgnoreUndefinedAttributes, so removed attributes are dropped.
-// These tests replicate that passthrough to prove real V1 state still
-// decodes against the V2 schema (i.e. no kept attribute changed type).
+// State upgrade coverage for megaport_mcr (provider v1 to v2). Every test runs
+// real V1 state through the registered schema-version-0 StateUpgrader via
+// runMCRV0Upgrader, the same path the framework takes now that the schema
+// version is bumped. This proves kept attributes survive the upgrade (no kept
+// attribute changed type) and that the user-configured prefix_filter_lists
+// attribute is dropped with a warning.
 
 // v1MCRState returns a complete V1 MCR state JSON with all fields that
 // existed in V1 (including those removed in V2).
@@ -82,40 +83,19 @@ func v1MCRState() []byte {
 	return b
 }
 
-// decodeV1StateAgainstV2Schema mimics the framework's same-version
-// UpgradeResourceState passthrough (fwserver/server_upgraderesourcestate.go).
-func decodeV1StateAgainstV2Schema(t *testing.T, rawJSON []byte) tfsdk.State {
-	t.Helper()
-	ctx := context.Background()
-
-	schemaResp := &resource.SchemaResponse{}
-	(&mcrResource{}).Schema(ctx, resource.SchemaRequest{}, schemaResp)
-	require.False(t, schemaResp.Diagnostics.HasError())
-
-	rawState := &tfprotov6.RawState{JSON: rawJSON}
-	rawValue, err := rawState.UnmarshalWithOpts(
-		schemaResp.Schema.Type().TerraformType(ctx),
-		tfprotov6.UnmarshalOpts{
-			ValueFromJSONOpts: tftypes.ValueFromJSONOpts{
-				IgnoreUndefinedAttributes: true,
-			},
-		},
-	)
-	require.NoError(t, err, "V1 state failed to decode against the V2 schema")
-
-	return tfsdk.State{
-		Raw:    rawValue,
-		Schema: schemaResp.Schema,
-	}
-}
-
 func TestMCRStateUpgrade_V1ToV2(t *testing.T) {
 	ctx := context.Background()
 
-	state := decodeV1StateAgainstV2Schema(t, v1MCRState())
+	resp := runMCRV0Upgrader(t, v1MCRState())
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
+
+	// v1MCRState() includes prefix_filter_lists, so the upgrader also warns here;
+	// TestMCRStateUpgrade_V0Upgrader_WarnsOnInlinePrefixFilterLists covers the warning
+	// itself, this just confirms it doesn't fail the upgrade.
+	assert.Len(t, resp.Diagnostics.Warnings(), 1)
 
 	var model mcrResourceModel
-	diags := state.Get(ctx, &model)
+	diags := resp.State.Get(ctx, &model)
 	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	// Verify kept fields survive the upgrade.
@@ -165,10 +145,11 @@ func TestMCRStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	rawJSON, err := json.Marshal(state)
 	require.NoError(t, err)
 
-	upgraded := decodeV1StateAgainstV2Schema(t, rawJSON)
+	resp := runMCRV0Upgrader(t, rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
 
 	var model mcrResourceModel
-	diags := upgraded.Get(ctx, &model)
+	diags := resp.State.Get(ctx, &model)
 	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
 
 	assert.Equal(t, "mcr-nil-test", model.UID.ValueString())
@@ -182,4 +163,77 @@ func TestMCRStateUpgrade_V1ToV2_NilOptionals(t *testing.T) {
 	assert.True(t, model.CompanyUID.IsNull())
 	assert.True(t, model.AttributeTags.IsNull())
 	assert.True(t, model.ResourceTags.IsNull())
+}
+
+// runMCRV0Upgrader runs the resource's registered schema-version-0
+// StateUpgrader against prior state built from rawJSON, mirroring how the
+// framework populates UpgradeStateRequest.State from the prior schema.
+func runMCRV0Upgrader(t *testing.T, rawJSON []byte) *resource.UpgradeStateResponse {
+	t.Helper()
+	ctx := context.Background()
+
+	upgrader, ok := (&mcrResource{}).UpgradeState(ctx)[0]
+	require.True(t, ok, "expected a state upgrader for schema version 0")
+	require.NotNil(t, upgrader.PriorSchema, "upgrader must set PriorSchema")
+
+	priorRaw, err := (&tfprotov6.RawState{JSON: rawJSON}).UnmarshalWithOpts(
+		upgrader.PriorSchema.Type().TerraformType(ctx),
+		tfprotov6.UnmarshalOpts{
+			ValueFromJSONOpts: tftypes.ValueFromJSONOpts{IgnoreUndefinedAttributes: true},
+		},
+	)
+	require.NoError(t, err, "prior state failed to decode against the V0 schema")
+
+	curSchemaResp := &resource.SchemaResponse{}
+	(&mcrResource{}).Schema(ctx, resource.SchemaRequest{}, curSchemaResp)
+	require.False(t, curSchemaResp.Diagnostics.HasError())
+
+	req := resource.UpgradeStateRequest{
+		RawState: &tfprotov6.RawState{JSON: rawJSON},
+		State:    &tfsdk.State{Raw: priorRaw, Schema: *upgrader.PriorSchema},
+	}
+	resp := &resource.UpgradeStateResponse{State: tfsdk.State{Schema: curSchemaResp.Schema}}
+	upgrader.StateUpgrader(ctx, req, resp)
+	return resp
+}
+
+func TestMCRStateUpgrade_V0Upgrader_WarnsOnInlinePrefixFilterLists(t *testing.T) {
+	ctx := context.Background()
+
+	resp := runMCRV0Upgrader(t, v1MCRState())
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
+
+	warnings := resp.Diagnostics.Warnings()
+	require.Len(t, warnings, 1, "expected one warning about dropped prefix_filter_lists")
+	assert.Equal(t, "Inline prefix_filter_lists no longer managed", warnings[0].Summary())
+
+	var model mcrResourceModel
+	diags := resp.State.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
+	assert.Equal(t, "mcr-uid-123", model.UID.ValueString())
+	assert.Equal(t, int64(64512), model.ASN.ValueInt64())
+}
+
+func TestMCRStateUpgrade_V0Upgrader_NoWarnWithoutPrefixFilterLists(t *testing.T) {
+	ctx := context.Background()
+
+	state := map[string]interface{}{
+		"product_uid":            "mcr-no-pfl",
+		"product_name":           "No PFL MCR",
+		"port_speed":             5000,
+		"location_id":            3,
+		"marketplace_visibility": false,
+		"contract_term_months":   12,
+	}
+	rawJSON, err := json.Marshal(state)
+	require.NoError(t, err)
+
+	resp := runMCRV0Upgrader(t, rawJSON)
+	require.False(t, resp.Diagnostics.HasError(), "upgrader errored: %v", resp.Diagnostics)
+	assert.Empty(t, resp.Diagnostics.Warnings(), "no warning expected when prefix_filter_lists is absent")
+
+	var model mcrResourceModel
+	diags := resp.State.Get(ctx, &model)
+	require.False(t, diags.HasError(), "failed to read upgraded state: %v", diags)
+	assert.Equal(t, "mcr-no-pfl", model.UID.ValueString())
 }
