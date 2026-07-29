@@ -630,6 +630,12 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
+	// If the IX has been deleted
+	if ix.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Update the state with the IX info
 	state.fromAPI(ctx, ix)
 

@@ -18,11 +18,12 @@ import (
 
 // MockIXService is a mock of the IX service for testing
 type MockIXService struct {
-	GetIXErr error
+	GetIXResult *megaport.IX
+	GetIXErr    error
 }
 
 func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, error) {
-	return nil, m.GetIXErr
+	return m.GetIXResult, m.GetIXErr
 }
 
 // Implement other required methods of the IXService interface with minimal stubs
@@ -66,14 +67,14 @@ func ixAPIError(statusCode int, message string) *megaport.ErrorResponse {
 	}
 }
 
-// runIXRead drives ixResource.Read with a GetIX that fails, and returns the
+// runIXRead drives ixResource.Read against a stubbed GetIX, and returns the
 // response alongside the state it started from so callers can assert the state
 // was either cleared or left exactly as it was.
-func runIXRead(t *testing.T, getIXErr error) (*fwresource.ReadResponse, tftypes.Value) {
+func runIXRead(t *testing.T, ix *megaport.IX, getIXErr error) (*fwresource.ReadResponse, tftypes.Value) {
 	t.Helper()
 	ctx := context.Background()
 
-	r := &ixResource{client: &megaport.Client{IXService: &MockIXService{GetIXErr: getIXErr}}}
+	r := &ixResource{client: &megaport.Client{IXService: &MockIXService{GetIXResult: ix, GetIXErr: getIXErr}}}
 
 	schemaResp := fwresource.SchemaResponse{}
 	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
@@ -110,7 +111,7 @@ func TestIXReadClearsStateOnNotFound(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			resp, _ := runIXRead(t, tc.err)
+			resp, _ := runIXRead(t, nil, tc.err)
 
 			assert.False(t, resp.Diagnostics.HasError(), "expected no diagnostic, got: %v", resp.Diagnostics.Errors())
 			assert.True(t, resp.State.Raw.IsNull(), "expected the IX to be removed from state")
@@ -136,7 +137,7 @@ func TestIXReadKeepsStateOnOtherErrors(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			resp, stateVal := runIXRead(t, tc.err)
+			resp, stateVal := runIXRead(t, nil, tc.err)
 
 			require.True(t, resp.Diagnostics.HasError(), "expected a diagnostic")
 			require.Len(t, resp.Diagnostics.Errors(), 1)
@@ -144,6 +145,35 @@ func TestIXReadKeepsStateOnOtherErrors(t *testing.T) {
 			assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), ixReadTestUID)
 			assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), tc.err.Error())
 			assert.True(t, resp.State.Raw.Equal(stateVal), "expected state to be left untouched")
+		})
+	}
+}
+
+// TestIXReadClearsStateOnDecommissioned covers the other way the API reports a
+// gone IX: a 200 carrying a terminal provisioning status. CANCELLED is not
+// terminal, the IX stays live until the end of its term, so clearing state on
+// it would propose a duplicate against a service that is still billing.
+func TestIXReadClearsStateOnDecommissioned(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		status     string
+		wantAbsent bool
+	}{
+		{"decommissioned", megaport.STATUS_DECOMMISSIONED, true},
+		{"cancelled", megaport.STATUS_CANCELLED, false},
+		{"live", megaport.SERVICE_LIVE, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ix := &megaport.IX{ProductUID: ixReadTestUID, ProductName: "test-ix", ProvisioningStatus: tc.status}
+			resp, _ := runIXRead(t, ix, nil)
+
+			assert.False(t, resp.Diagnostics.HasError(), "expected no diagnostic, got: %v", resp.Diagnostics.Errors())
+			assert.Equal(t, tc.wantAbsent, resp.State.Raw.IsNull(), "unexpected state presence for status %q", tc.status)
 		})
 	}
 }
