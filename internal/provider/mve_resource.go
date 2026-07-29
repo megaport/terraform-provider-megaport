@@ -651,15 +651,15 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_ssh_public_key": schema.StringAttribute{
-						Description: "The admin SSH public key for the vendor config. Required for Cisco, Fortinet, and Vmware MVEs.",
+						Description: "The admin SSH public key for the vendor config. Not required by any vendor currently supported by this provider; Cisco, Fortinet, and VMware use `ssh_public_key` instead.",
 						Optional:    true,
 					},
 					"ssh_public_key": schema.StringAttribute{
-						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'",
+						Description: "The SSH public key for the vendor config. Required for 6WIND, VMWare, Palo Alto, and Fortinet MVEs, and for Cisco C8000v MVEs in autonomous (self-managed) mode, where `cloud_init` is omitted. Must be a 2048-bit RSA key (ed25519 and other key types are not supported). You can generate a compatible key using: ssh-keygen -t rsa -b 2048 -C 'your_email@example.com'",
 						Optional:    true,
 					},
 					"cloud_init": schema.StringAttribute{
-						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix and Cisco C8000v.",
+						Description: "The Base64 encoded cloud init file for the vendor config. The bootstrap configuration file. Required for Aviatrix, and for Cisco C8000v in SD-WAN (controller-managed) mode. For a Cisco C8000v in autonomous mode, omit this field and set `ssh_public_key` instead.",
 						Optional:    true,
 					},
 					"license_data": schema.StringAttribute{
@@ -687,7 +687,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"manage_locally": schema.BoolAttribute{
-						Description: "Whether to manage the MVE locally. Required for Cisco MVE.",
+						Description: "Whether the MVE is managed locally rather than phoning home to a Firewall Management Center. Required for Cisco FTDv (Firewall) MVE only; not used by Cisco C8000v.",
 						Optional:    true,
 					},
 					"local_auth": schema.StringAttribute{
@@ -718,16 +718,16 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"fmc_ip_address": schema.StringAttribute{
-						Description: "The FMC IP address for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Description: "The FMC IP address for the vendor config. An IPv4 address, IPv6 address, or FQDN of the Firewall Management Center. Required for Cisco FTDv (Firewall) MVE when `manage_locally` is false.",
 						Optional:    true,
 					},
 					"fmc_registration_key": schema.StringAttribute{
-						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Description: "The FMC registration key for the vendor config. Required for Cisco FTDv (Firewall) MVE when `manage_locally` is false.",
 						Sensitive:   true,
 						Optional:    true,
 					},
 					"fmc_nat_id": schema.StringAttribute{
-						Description: "The FMC NAT ID for the vendor config. Required for Cisco FTDv (Firewall) MVE.",
+						Description: "The FMC NAT ID for the vendor config. Optional for Cisco FTDv (Firewall) MVE when `manage_locally` is false; not applicable when it is true.",
 						Optional:    true,
 					},
 					"token": schema.StringAttribute{
