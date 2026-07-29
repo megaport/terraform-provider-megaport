@@ -128,33 +128,11 @@ resource "megaport_mcr_prefix_filter_list" "allow_private_ipv6" {
 }
 ```
 
-#### ⚠️ Deprecated Inline Approach
+#### ❌ Removed Inline Approach
 
-```terraform
-# ❌ DEPRECATED: Inline prefix filter lists (will be removed in future version)
-resource "megaport_mcr" "deprecated_example" {
-  product_name         = "my-mcr"
-  port_speed          = 1000
-  location_id         = 5
-  contract_term_months = 12
-  
-  # This approach is deprecated and will show warnings
-  prefix_filter_lists = [
-    {
-      description    = "Allow private networks"
-      address_family = "IPv4"
-      entries = [
-        {
-          action = "permit"
-          prefix = "10.0.0.0/8"
-          ge     = 16
-          le     = 24
-        }
-      ]
-    }
-  ]
-}
-```
+The inline `prefix_filter_lists` attribute on `megaport_mcr` has been removed. Configurations
+still using it will fail to validate. Migrate to standalone `megaport_mcr_prefix_filter_list`
+resources using the [Migration Guide](#migration-guide) below.
 
 ### Benefits of Standalone Resources
 
@@ -205,7 +183,8 @@ terraform import megaport_mcr_prefix_filter_list.migrated_list_1 mcr-uid:prefix-
 
 #### Step 4: Update MCR Resource
 
-Remove the `prefix_filter_lists` attribute from your MCR resource and add a lifecycle rule:
+Remove the `prefix_filter_lists` attribute from your MCR resource; it no longer exists on the
+resource schema, so no `lifecycle` rule is needed:
 
 ```terraform
 resource "megaport_mcr" "example" {
@@ -213,14 +192,9 @@ resource "megaport_mcr" "example" {
   port_speed          = 1000
   location_id         = 5
   contract_term_months = 12
-  
+
   # Remove or comment out the old prefix_filter_lists attribute
   # prefix_filter_lists = [...]
-  
-  # Add lifecycle rule to prevent drift warnings
-  lifecycle {
-    ignore_changes = [prefix_filter_lists]
-  }
 }
 ```
 
@@ -228,41 +202,14 @@ resource "megaport_mcr" "example" {
 
 Run `terraform plan` to ensure no unexpected changes are detected.
 
-### Mixed Usage Prevention
+### Removal Notice
 
-The provider includes validation to prevent managing the same prefix filter lists through both methods simultaneously. If you attempt to use both inline and standalone management for the same MCR, you'll receive warnings about potential conflicts.
-
-### Deprecation Notice
-
-The inline `prefix_filter_lists` attribute in the MCR resource is deprecated and will be removed in a future version. We recommend migrating to standalone `megaport_mcr_prefix_filter_list` resources for better lifecycle management and improved state handling.
+The inline `prefix_filter_lists` attribute has been removed from the MCR resource. Manage
+prefix filter lists exclusively through standalone `megaport_mcr_prefix_filter_list` resources.
 
 ### Troubleshooting and Best Practices
 
 #### Common Issues
-
-**MCR Resource Shows Drift with Standalone Resources**
-
-When using standalone `megaport_mcr_prefix_filter_list` resources, you should add a lifecycle rule to your MCR resource to prevent Terraform from detecting drift on the `prefix_filter_lists` attribute. This is necessary because:
-
-1. The standalone prefix filter list resources manage the lists independently
-2. The MCR resource still reads the lists from the API, which can cause Terraform to detect "changes" even though the lists are being managed by the standalone resources
-3. This applies to both newly created MCRs and existing ones - the lifecycle rule tells Terraform to ignore differences in this attribute since it's being managed elsewhere
-
-```terraform
-resource "megaport_mcr" "example" {
-  # ... configuration ...
-  
-  lifecycle {
-    ignore_changes = [prefix_filter_lists]
-  }
-}
-```
-
-**Why is this needed for new resources?** Even when creating a new MCR alongside standalone prefix filter list resources, Terraform's refresh cycle will detect that the MCR has prefix filter lists attached (via the standalone resources), and without the lifecycle rule, it may show these as unexpected changes on subsequent plan/apply operations.
-
-**Mixed Usage Warning**
-
-If you see warnings about mixed usage, ensure you're not managing the same prefix filter lists through both inline and standalone methods simultaneously.
 
 **Import Format**
 
@@ -295,10 +242,6 @@ resource "megaport_mcr" "production" {
     Environment = "production"
     Owner       = "network-team"
     Purpose     = "multi-cloud-connectivity"
-  }
-  
-  lifecycle {
-    ignore_changes = [prefix_filter_lists]
   }
 }
 
