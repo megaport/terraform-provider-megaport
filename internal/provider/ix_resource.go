@@ -619,8 +619,14 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	// Get refreshed IX value from API
 	ix, err := r.client.IXService.GetIX(ctx, state.ProductUID.ValueString())
 	if err != nil {
-		// IX has been deleted or is not found
-		resp.State.RemoveResource(ctx)
+		if megaport.IsServiceNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Reading IX",
+			"Could not read IX with ID "+state.ProductUID.ValueString()+": "+err.Error(),
+		)
 		return
 	}
 
