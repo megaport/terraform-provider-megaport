@@ -22,8 +22,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    # Worst case is two 5m lint attempts plus setup, so the retry still gets to
-    # finish and lint reports its own timeout before the job cap kills it.
+    # Two 5m lint attempts plus setup: the retry below has to fit under this cap.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
@@ -77,8 +76,7 @@ jobs:
     name: Terraform Provider Unit Tests
     needs: build
     runs-on: ubuntu-latest
-    # Sits above the 30m `go test -timeout` below, so Go's own timeout fires
-    # first and names the stuck test instead of the job dying anonymously.
+    # Go's 30m test timeout must fire first: it names the stuck test, a job kill doesn't.
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
