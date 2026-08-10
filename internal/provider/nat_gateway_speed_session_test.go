@@ -68,6 +68,21 @@ func TestNATGatewaySpeedSessionSupported(t *testing.T) {
 			wantOK:       false,
 			wantPath:     path.Root("speed"),
 		},
+		{
+			// The API is expected to return at most one entry per speed. If it
+			// ever returns duplicates, the SDK helper this delegates to takes
+			// the last matching entry's session counts, not the first.
+			name: "duplicate speed entries: last entry wins",
+			matrix: []*megaport.NATGatewaySession{
+				{SpeedMbps: 1000, SessionCount: []int{16000}},
+				{SpeedMbps: 1000, SessionCount: []int{32000}},
+			},
+			speed:           1000,
+			sessionCount:    16000,
+			wantOK:          false,
+			wantPath:        path.Root("session_count"),
+			wantMsgContains: []string{"16000", "32000"},
+		},
 	}
 
 	for _, tc := range cases {
