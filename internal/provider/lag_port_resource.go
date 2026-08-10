@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -13,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
@@ -33,31 +31,14 @@ var (
 
 // lagPortResourceModel maps the resource schema data.
 type lagPortResourceModel struct {
-	LastUpdated types.String `tfsdk:"last_updated"`
-
 	UID                   types.String `tfsdk:"product_uid"`
-	ID                    types.Int64  `tfsdk:"product_id"`
 	Name                  types.String `tfsdk:"product_name"`
-	ProvisioningStatus    types.String `tfsdk:"provisioning_status"`
-	CreateDate            types.String `tfsdk:"create_date"`
-	CreatedBy             types.String `tfsdk:"created_by"`
 	PortSpeed             types.Int64  `tfsdk:"port_speed"`
-	TerminateDate         types.String `tfsdk:"terminate_date"`
-	LiveDate              types.String `tfsdk:"live_date"`
-	Market                types.String `tfsdk:"market"`
 	LocationID            types.Int64  `tfsdk:"location_id"`
-	UsageAlgorithm        types.String `tfsdk:"usage_algorithm"`
 	MarketplaceVisibility types.Bool   `tfsdk:"marketplace_visibility"`
-	VXCPermitted          types.Bool   `tfsdk:"vxc_permitted"`
-	VXCAutoApproval       types.Bool   `tfsdk:"vxc_auto_approval"`
 	CompanyUID            types.String `tfsdk:"company_uid"`
 	CostCentre            types.String `tfsdk:"cost_centre"`
-	ContractStartDate     types.String `tfsdk:"contract_start_date"`
-	ContractEndDate       types.String `tfsdk:"contract_end_date"`
 	ContractTermMonths    types.Int64  `tfsdk:"contract_term_months"`
-	Virtual               types.Bool   `tfsdk:"virtual"`
-	Locked                types.Bool   `tfsdk:"locked"`
-	Cancelable            types.Bool   `tfsdk:"cancelable"`
 	DiversityZone         types.String `tfsdk:"diversity_zone"`
 	PromoCode             types.String `tfsdk:"promo_code"`
 
@@ -72,52 +53,15 @@ func (orm *lagPortResourceModel) fromAPIPort(ctx context.Context, p *megaport.Po
 	diags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(p.UID)
-	orm.ID = types.Int64Value(int64(p.ID))
-	orm.Cancelable = types.BoolValue(p.Cancelable)
 	orm.CompanyUID = types.StringValue(p.CompanyUID)
 	orm.ContractTermMonths = types.Int64Value(int64(p.ContractTermMonths))
 	orm.CostCentre = types.StringValue(p.CostCentre)
-	orm.CreatedBy = types.StringValue(p.CreatedBy)
 	orm.DiversityZone = diversityZoneFromAPI(orm.DiversityZone, p.DiversityZone, p.UID, &diags)
 	orm.LocationID = types.Int64Value(int64(p.LocationID))
-	orm.Locked = types.BoolValue(p.Locked)
-	orm.Market = types.StringValue(p.Market)
 	orm.MarketplaceVisibility = types.BoolValue(p.MarketplaceVisibility)
 	orm.Name = types.StringValue(p.Name)
 	orm.PortSpeed = types.Int64Value(int64(p.PortSpeed))
-	orm.ProvisioningStatus = types.StringValue(p.ProvisioningStatus)
-	orm.UsageAlgorithm = types.StringValue(p.UsageAlgorithm)
-	orm.VXCAutoApproval = types.BoolValue(p.VXCAutoApproval)
-	orm.VXCPermitted = types.BoolValue(p.VXCPermitted)
-	orm.Virtual = types.BoolValue(p.Virtual)
 	orm.LagCount = types.Int64Value(int64(p.LagCount))
-
-	if p.CreateDate != nil {
-		orm.CreateDate = types.StringValue(p.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-	if p.LiveDate != nil {
-		orm.LiveDate = types.StringValue(p.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
-	if p.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(p.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
-	if p.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(p.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
-
-	if p.TerminateDate != nil {
-		orm.TerminateDate = types.StringValue(p.TerminateDate.Format(time.RFC850))
-	} else {
-		orm.TerminateDate = types.StringNull()
-	}
 
 	resourcesModel := &portResourcesModel{}
 	interfaceObj, interfaceDiags := fromAPIPortInterface(ctx, &p.VXCResources.Interface)
@@ -158,10 +102,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Description: "Link Aggregation Group (LAG) Port Resource for the Megaport Terraform Provider. This can be used to create, modify, and delete Megaport LAG Ports. A LAG bundles physical ports to create a single data path, where the traffic load is distributed among the ports to increase overall connection reliability.",
 		Attributes: map[string]schema.Attribute{
-			"last_updated": schema.StringAttribute{
-				Description: "The last time the resource was updated.",
-				Computed:    true,
-			},
 			"product_uid": schema.StringAttribute{
 				Description: "The unique identifier for the resource.",
 				Computed:    true,
@@ -169,31 +109,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"product_id": schema.Int64Attribute{
-				Description: "The numeric ID of the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
-			},
 			"product_name": schema.StringAttribute{
 				Description: "The name of the product.",
 				Required:    true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
-				Computed:    true,
-			},
-			"create_date": schema.StringAttribute{
-				Description: "The date the product was created.",
-				Computed:    true,
-			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"port_speed": schema.Int64Attribute{
 				Description: "The speed of the port in Mbps. Can be 10000 (10 G), 10000 (10 G), 100000 (100 G), or 400000 (400G) where available..",
@@ -203,21 +121,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 				Validators: []validator.Int64{
 					int64validator.OneOf(10000, 100000, 400000),
-				},
-			},
-			"terminate_date": schema.StringAttribute{
-				Description: "The date the product will be terminated.",
-				Computed:    true,
-			},
-			"live_date": schema.StringAttribute{
-				Description: "The date the product went live.",
-				Computed:    true,
-			},
-			"market": schema.StringAttribute{
-				Description: "The market the product is in.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"location_id": schema.Int64Attribute{
@@ -241,10 +144,6 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"usage_algorithm": schema.StringAttribute{
-				Description: "The usage algorithm for the product.",
-				Computed:    true,
-			},
 			"company_uid": schema.StringAttribute{
 				Description: "The unique identifier of the company.",
 				Computed:    true,
@@ -260,52 +159,9 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"contract_start_date": schema.StringAttribute{
-				Description: "The date the contract started.",
-				Computed:    true,
-			},
-			"contract_end_date": schema.StringAttribute{
-				Description: "The date the contract ends.",
-				Computed:    true,
-			},
 			"marketplace_visibility": schema.BoolAttribute{
 				Description: "Whether the product is visible in the marketplace.",
 				Required:    true,
-			},
-			"vxc_permitted": schema.BoolAttribute{
-				Description: "Whether VXC is permitted on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"vxc_auto_approval": schema.BoolAttribute{
-				Description: "Whether VXC is auto-approved on this product.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"virtual": schema.BoolAttribute{
-				Description: "Whether the product is virtual. Always false for LAG orders.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"locked": schema.BoolAttribute{
-				Description: "Whether the product is locked.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"cancelable": schema.BoolAttribute{
-				Description: "Whether the product is cancelable.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"diversity_zone": schema.StringAttribute{
 				Description: "The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.",
@@ -455,7 +311,6 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(listDiags...)
 	plan.LagPortUIDs = lagPortUidList
 	plan.UID = types.StringValue(createdID)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -628,7 +483,6 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
 	// Set state to fully populated data
