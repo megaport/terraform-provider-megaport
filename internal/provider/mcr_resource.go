@@ -530,7 +530,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"asn": schema.Int64Attribute{
-				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections. Updating this attribute modifies the ASN in place; the MCR is not destroyed and recreated. Note that any BGP peers attached to VXCs on this MCR will renegotiate against the new ASN.",
+				Description: "Autonomous System Number (ASN) of the MCR in the MCR order configuration. Defaults to 133937 if not specified. For most configurations, the default ASN is appropriate. The ASN is used for BGP peering sessions on any VXCs connected to this MCR. See the documentation for your cloud providers before overriding the default value. For example, some public cloud services require the use of a public ASN and Microsoft blocks an ASN value of 65515 for Azure connections. Updating this attribute modifies the ASN in place; the MCR is not destroyed and recreated. **Known limitation:** the Megaport API rejects ASN updates on an MCR that has any live VXC connections. All attached VXCs must be deleted before the ASN can be changed. This is a platform-side constraint; see GitHub issue [#383](https://github.com/megaport/terraform-provider-megaport/issues/383). When the change is permitted, any BGP peers attached to VXCs on this MCR will renegotiate against the new ASN.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
@@ -997,10 +997,8 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating MCR",
-			"Could not update MCR, unexpected error: "+err.Error(),
-		)
+		summary, detail := mapMCRUpdateError(err, plan.UID.ValueString())
+		resp.Diagnostics.AddError(summary, detail)
 		return
 	}
 
