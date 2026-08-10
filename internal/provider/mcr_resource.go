@@ -523,7 +523,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the product is visible in the Marketplace.",
+				Description: "Whether the product is visible in the Marketplace. Defaults to the API's own default when not set.",
+				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -691,6 +692,13 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if !plan.DiversityZone.IsNull() {
 		buyReq.DiversityZone = plan.DiversityZone.ValueString()
+	}
+
+	// An unset value arrives as Unknown (no config, no prior state); only
+	// send it when the practitioner actually configured a value.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		buyReq.MarketplaceVisibility = &marketplaceVisibility
 	}
 
 	if !plan.ResourceTags.IsNull() {
