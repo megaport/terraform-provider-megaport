@@ -45,26 +45,10 @@ resource "megaport_lag_port" "lag_port" {
 
 ### Read-Only
 
-- `cancelable` (Boolean) Whether the product is cancelable.
 - `company_uid` (String) The unique identifier of the company.
-- `contract_end_date` (String) The date the contract ends.
-- `contract_start_date` (String) The date the contract started.
-- `create_date` (String) The date the product was created.
-- `created_by` (String) The user who created the product.
 - `lag_port_uids` (List of String) The unique identifiers of the LAG ports.
-- `last_updated` (String) The last time the resource was updated.
-- `live_date` (String) The date the product went live.
-- `locked` (Boolean) Whether the product is locked.
-- `market` (String) The market the product is in.
-- `product_id` (Number) The numeric ID of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the LAG port. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the port lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `resources` (Attributes) Resources attached to port. (see [below for nested schema](#nestedatt--resources))
-- `terminate_date` (String) The date the product will be terminated.
-- `usage_algorithm` (String) The usage algorithm for the product.
-- `virtual` (Boolean) Whether the product is virtual. Always false for LAG orders.
-- `vxc_auto_approval` (Boolean) Whether VXC is auto-approved on this product.
-- `vxc_permitted` (Boolean) Whether VXC is permitted on this product.
 
 <a id="nestedatt--resources"></a>
 ### Nested Schema for `resources`

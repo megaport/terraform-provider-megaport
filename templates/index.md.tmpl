@@ -72,6 +72,7 @@ provider "megaport" {
 | `secret_key` | Yes | — | API secret key. Can also be set with `MEGAPORT_SECRET_KEY`. |
 | `accept_purchase_terms` | Yes | `false` | Acceptance of the Megaport API terms. Can also be set with `MEGAPORT_ACCEPT_PURCHASE_TERMS`. |
 | `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
+| `managed_account_uid` | No | — | UID of a managed account to act on behalf of when provisioning resources with your own credentials. Can also be set with `MEGAPORT_MANAGED_ACCOUNT_UID`. |
 
 ## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
 
@@ -634,8 +635,6 @@ To recover, do one of the following before re-applying:
 2. **Cancel the resource** in the Megaport portal, then re-run `terraform apply`.
 
 Setting `wait_time` high enough for your slowest-provisioning resources avoids this situation entirely.
-
-> **Note:** Internet Exchange (IX) resources use a fixed 10-minute provisioning wait and are not affected by `wait_time`.
 
 ## Resource Cancellation
 
