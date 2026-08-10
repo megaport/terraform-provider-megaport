@@ -1237,25 +1237,26 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
+				  }
 
-					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
-						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 24
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					}]
+				  resource "megaport_mcr_prefix_filter_list" "prefix_list" {
+					mcr_id          = megaport_mcr.mcr.product_uid
+					description     = "%s"
+					address_family  = "IPv4"
+					entries = [
+					  {
+						action  = "permit"
+						prefix  = "10.0.1.0/24"
+						ge      = 24
+						le      = 24
+					  },
+					  {
+						action  = "deny"
+						prefix  = "10.0.2.0/24"
+						ge      = 24
+						le      = 24
+					  }
+					]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
@@ -1293,7 +1294,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 							  as_override       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
-							  import_whitelist = "%s"
+							  import_whitelist = megaport_mcr_prefix_filter_list.prefix_list.description
 							  as_path_prepend_count = 4
 							}
 						  ]
@@ -1322,7 +1323,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						"key2" = "value2"
 					}
 				  }
-                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
@@ -1373,25 +1374,26 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 					contract_term_months    = 1
 					port_speed              = 5000
 					asn                     = 64555
+				  }
 
-					prefix_filter_lists = [{
-					  description     = "%s"
-					  address_family  = "IPv4"
-					  entries = [
-						{
-						  action  = "permit"
-						  prefix  = "10.0.1.0/24"
-						  ge      = 24
-						  le      = 24
-						},
-						{
-						  action  = "deny"
-						  prefix  = "10.0.2.0/24"
-						  ge      = 24
-						  le      = 24
-						}
-					  ]
-					}]
+				  resource "megaport_mcr_prefix_filter_list" "prefix_list" {
+					mcr_id          = megaport_mcr.mcr.product_uid
+					description     = "%s"
+					address_family  = "IPv4"
+					entries = [
+					  {
+						action  = "permit"
+						prefix  = "10.0.1.0/24"
+						ge      = 24
+						le      = 24
+					  },
+					  {
+						action  = "deny"
+						prefix  = "10.0.2.0/24"
+						ge      = 24
+						le      = 24
+					  }
+					]
 				  }
 
 				  resource "megaport_vxc" "aws_vxc" {
@@ -1429,7 +1431,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 							  as_override       = true
 							  export_policy     = "deny"
 							  permit_export_to = ["10.0.1.2"]
-							  import_whitelist = "%s"
+							  import_whitelist = megaport_mcr_prefix_filter_list.prefix_list.description
 							  as_path_prepend_count = 4
 							}
 						  ]
@@ -1458,7 +1460,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 						"key2updated" = "value2updated"
 					}
 				  }
-                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, prefixFilterListName, vxcName1),
+                  `, locs[0], locs[1], mcrName, prefixFilterListName, vxcName1, vxcName1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_vxc.aws_vxc", "product_uid"),
 					resource.TestCheckResourceAttr("megaport_vxc.aws_vxc", "b_end_partner_config.aws_config.name", vxcName1),
