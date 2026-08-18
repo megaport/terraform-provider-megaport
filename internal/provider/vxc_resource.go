@@ -1998,6 +1998,50 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 	}
 }
 
+// waitForVXCDecommission polls the VXC until it reaches DECOMMISSIONED, so a
+// destroy cannot report success while the service is still up and holding its
+// VLAN. The API sets the terminal status inside the cancel call itself, so this
+// normally settles on the first poll. A VXC left in CANCELLED means the network
+// termination failed and the service is still live.
+func (r *vxcResource) waitForVXCDecommission(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
+	// The polls share this deadline so a stalled HTTP request can't hang
+	// the wait past the overall timeout.
+	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	lastStatus := "unknown"
+	for {
+		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
+		switch {
+		case err != nil:
+			// A VXC that no longer reads back at all is already gone.
+			if megaport.IsServiceNotFoundError(err) {
+				return nil
+			}
+			tflog.Warn(ctx, "error polling VXC decommission status, will retry", map[string]interface{}{
+				"vxc_uid": uid,
+				"error":   err.Error(),
+			})
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED:
+			return nil
+		default:
+			lastStatus = vxc.ProvisioningStatus
+		}
+
+		select {
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("time expired waiting for VXC %s to decommission (last status %q)", uid, lastStatus)
+		case <-ticker.C:
+		}
+	}
+}
+
 // Read resource information.
 func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
@@ -2590,6 +2634,15 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		resp.Diagnostics.AddError(
 			"Error Deleting VXC",
 			"Could not delete VXC, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	if err := r.waitForVXCDecommission(ctx, state.UID.ValueString(), waitForTime, 30*time.Second); err != nil {
+		resp.Diagnostics.AddError(
+			"VXC cancelled but not decommissioned",
+			"VXC "+state.UID.ValueString()+" was cancelled but did not reach DECOMMISSIONED: "+err.Error()+
+				". The service may still be live and holding its VLAN. Check it in the Megaport Portal before you retry.",
 		)
 		return
 	}
