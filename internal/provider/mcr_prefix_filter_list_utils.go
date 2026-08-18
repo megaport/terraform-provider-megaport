@@ -61,13 +61,6 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 	return apiList, diags
 }
 
-// fromAPI converts the API response to the Terraform model
-// This version does NOT apply exact match normalization - returns raw API values
-// Use this for import scenarios where we don't have prior configuration to compare
-func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList *megaport.MCRPrefixFilterList) diag.Diagnostics {
-	return m.fromAPIWithPlan(ctx, apiList, nil)
-}
-
 // fromAPIWithPlan converts the API response to the Terraform model with optional plan/state comparison
 // When plannedEntries is provided, it uses the plan/state to determine if exact match normalization should occur
 // When plannedEntries is nil (e.g., during import), NO normalization is applied - raw API values are returned
