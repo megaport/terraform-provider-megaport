@@ -1,11 +1,15 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
@@ -177,4 +181,56 @@ resource "megaport_mcr_ipsec_addon" "test" {
 	tunnel_count = %d
 }
 `, locationID, mcrName, costCentreName, tunnelCount)
+}
+
+// TestMCRIpsecAddonImportState checks that ImportState seeds the two
+// identifiers and nothing else, leaving the rest to Read. The nil client is the
+// assertion that it makes no API call: any call would panic.
+func TestMCRIpsecAddonImportState(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &mcrIpsecAddonResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	objType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	// The framework hands ImportState a wholly null state and rejects the
+	// response if it comes back unchanged.
+	emptyState := tftypes.NewValue(objType, nil)
+
+	resp := fwresource.ImportStateResponse{State: tfsdk.State{Schema: s, Raw: emptyState.Copy()}}
+	r.ImportState(ctx, fwresource.ImportStateRequest{ID: "mcr-uid-123:addon-uid-456"}, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics.Errors())
+	}
+	if resp.State.Raw.Equal(emptyState) {
+		t.Fatal("ImportState wrote no state, which the framework rejects")
+	}
+
+	var got mcrIpsecAddonResourceModel
+	if diags := resp.State.Get(ctx, &got); diags.HasError() {
+		t.Fatalf("reading imported state: %v", diags.Errors())
+	}
+	if got.MCRID.ValueString() != "mcr-uid-123" {
+		t.Errorf("mcr_id = %q, want %q", got.MCRID.ValueString(), "mcr-uid-123")
+	}
+	if got.AddOnUID.ValueString() != "addon-uid-456" {
+		t.Errorf("add_on_uid = %q, want %q", got.AddOnUID.ValueString(), "addon-uid-456")
+	}
+	if !got.TunnelCount.IsNull() {
+		t.Errorf("tunnel_count is set after import; Read populates it")
+	}
+
+	// A malformed ID still fails here, before Read runs.
+	bad := fwresource.ImportStateResponse{State: tfsdk.State{Schema: s, Raw: emptyState.Copy()}}
+	r.ImportState(ctx, fwresource.ImportStateRequest{ID: "no-separator"}, &bad)
+	if !bad.Diagnostics.HasError() {
+		t.Error("malformed import ID: want an error diagnostic, got none")
+	}
 }
