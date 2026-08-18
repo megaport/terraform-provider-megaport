@@ -4701,7 +4701,7 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 		}
 		return obj
 	}
-	cspPartner := func(t *testing.T) types.Object {
+	partnerObj := func(t *testing.T, partner tftypes.Value) types.Object {
 		t.Helper()
 		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
 		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
@@ -4709,7 +4709,7 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 			t.Fatal("partner config type is not tftypes.Object")
 		}
 		attrs := nullValueMap(raw)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+		attrs["partner"] = partner
 		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
 		if err != nil {
 			t.Fatalf("build partner config: %v", err)
@@ -4727,6 +4727,7 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 		stateRequested types.String
 		stateCurrent   types.String
 		csp            bool
+		unknownPartner bool
 		wantUnknown    bool
 		wantValue      string
 	}{
@@ -4778,15 +4779,25 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 			csp:            false,
 			wantValue:      "port-new",
 		},
+		{
+			name:           "unknown_partner_pins_to_state",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			unknownPartner: true,
+			wantValue:      "port-state",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
-			if tc.csp {
-				planPartner = cspPartner(t)
+			switch {
+			case tc.csp:
+				planPartner = partnerObj(t, tftypes.NewValue(tftypes.String, "aws"))
+			case tc.unknownPartner:
+				planPartner = partnerObj(t, tftypes.NewValue(tftypes.String, tftypes.UnknownValue))
 			}
-			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
 			diags := diag.Diagnostics{}
 
 			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
@@ -4795,7 +4806,6 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 				planEndObj:            mkEnd(t, tc.planRequested, types.StringNull()),
 				stateEndObj:           mkEnd(t, tc.stateRequested, tc.stateCurrent),
 				planPartnerConfig:     planPartner,
-				statePartnerConfig:    statePartner,
 				diags:                 &diags,
 			})
 			if diags.HasError() {
@@ -4821,9 +4831,9 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 }
 
 // assertOneDiag asserts diags holds exactly one diagnostic, with the wanted
-// summary, attribute path, and an end named in the detail. An empty want
-// asserts diags is empty.
-func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.Path, endLabel string) {
+// summary, attribute path, and every mustContain string in the detail. An
+// empty want asserts diags is empty.
+func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.Path, mustContain ...string) {
 	t.Helper()
 	if want == "" {
 		if len(diags) != 0 {
@@ -4837,8 +4847,10 @@ func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.P
 	if diags[0].Summary() != want {
 		t.Errorf("summary = %q, want %q", diags[0].Summary(), want)
 	}
-	if !strings.Contains(diags[0].Detail(), endLabel) {
-		t.Errorf("detail does not name %s: %q", endLabel, diags[0].Detail())
+	for _, want := range mustContain {
+		if !strings.Contains(diags[0].Detail(), want) {
+			t.Errorf("detail does not name %s: %q", want, diags[0].Detail())
+		}
 	}
 	withPath, ok := diags[0].(diag.DiagnosticWithPath)
 	if !ok {
@@ -4927,23 +4939,27 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		state     tftypes.Value
-		plan      tftypes.Value
-		wantError string
-		wantWarn  string
+		name        string
+		state       tftypes.Value
+		plan        tftypes.Value
+		unknownEnd  bool
+		wantError   string
+		wantWarn    string
+		wantPartner string
 	}{
 		{
-			name:      "csp_auth_key_change_errors",
-			state:     awsVal("old-key"),
-			plan:      awsVal("new-key"),
-			wantError: "Cloud partner configuration cannot be changed",
+			name:        "csp_auth_key_change_errors",
+			state:       awsVal("old-key"),
+			plan:        awsVal("new-key"),
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
 		},
 		{
-			name:      "csp_partner_swap_errors",
-			state:     awsVal("old-key"),
-			plan:      partnerVal("azure"),
-			wantError: "Cloud partner configuration cannot be changed",
+			name:        "csp_partner_swap_errors",
+			state:       awsVal("old-key"),
+			plan:        partnerVal("azure"),
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
 		},
 		{
 			name:  "csp_unchanged_is_clean",
@@ -4951,22 +4967,25 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 			plan:  awsVal("same-key"),
 		},
 		{
-			name:     "null_state_warns",
-			state:    tftypes.NewValue(partnerObjType, nil),
-			plan:     awsVal("new-key"),
-			wantWarn: "Partner configuration is recorded in state only",
+			name:        "null_state_warns",
+			state:       tftypes.NewValue(partnerObjType, nil),
+			plan:        awsVal("new-key"),
+			wantWarn:    "Partner configuration is recorded in state only",
+			wantPartner: "aws",
 		},
 		{
-			name:      "csp_state_to_vrouter_errors",
-			state:     awsVal("old-key"),
-			plan:      vrouterVal(true),
-			wantError: "Cloud partner configuration cannot be changed",
+			name:        "csp_state_to_vrouter_errors",
+			state:       awsVal("old-key"),
+			plan:        vrouterVal(true),
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
 		},
 		{
-			name:      "csp_block_removed_errors",
-			state:     awsVal("old-key"),
-			plan:      tftypes.NewValue(partnerObjType, nil),
-			wantError: "Cloud partner configuration cannot be changed",
+			name:        "csp_block_removed_errors",
+			state:       awsVal("old-key"),
+			plan:        tftypes.NewValue(partnerObjType, nil),
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
 		},
 		{
 			name:  "unknown_partner_is_clean",
@@ -4995,6 +5014,33 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 			state: partnerVal("transit"),
 			plan:  vrouterVal(true),
 		},
+		{
+			name:  "a_end_sentinel_to_vrouter_is_clean",
+			state: partnerVal("a-end"),
+			plan:  vrouterVal(true),
+		},
+		{
+			name:        "vrouter_state_to_csp_errors",
+			state:       vrouterVal(true),
+			plan:        awsVal("new-key"),
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
+		},
+		{
+			// A wholly unknown partner-config object decides nothing at plan time.
+			name:  "unknown_partner_object_is_clean",
+			state: awsVal("old-key"),
+			plan:  tftypes.NewValue(partnerObjType, tftypes.UnknownValue),
+		},
+		{
+			// The end-config guard returns early, but the gate has already run.
+			name:        "csp_change_with_unknown_end_errors",
+			state:       awsVal("old-key"),
+			plan:        awsVal("new-key"),
+			unknownEnd:  true,
+			wantError:   "Cloud partner configuration cannot be changed",
+			wantPartner: "aws",
+		},
 	}
 
 	for _, root := range []string{"a_end_partner_config", "b_end_partner_config"} {
@@ -5014,8 +5060,12 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 				planAttrs := nullValueMap(schemaObjType)
 				planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
 				planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
-				planAttrs["a_end"] = endVal
-				planAttrs["b_end"] = endVal
+				planEndVal := endVal
+				if tc.unknownEnd {
+					planEndVal = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+				}
+				planAttrs["a_end"] = planEndVal
+				planAttrs["b_end"] = planEndVal
 				planAttrs[root] = tc.plan
 				planVal := tftypes.NewValue(schemaObjType, planAttrs)
 
@@ -5031,8 +5081,12 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 				if len(resp.RequiresReplace) != 0 {
 					t.Errorf("expected no RequiresReplace, got %v", resp.RequiresReplace)
 				}
-				assertOneDiag(t, resp.Diagnostics.Errors(), tc.wantError, path.Root(root), endLabel)
-				assertOneDiag(t, resp.Diagnostics.Warnings(), tc.wantWarn, path.Root(root), endLabel)
+				mustContain := []string{endLabel}
+				if tc.wantPartner != "" {
+					mustContain = append(mustContain, fmt.Sprintf("%q", tc.wantPartner))
+				}
+				assertOneDiag(t, resp.Diagnostics.Errors(), tc.wantError, path.Root(root), mustContain...)
+				assertOneDiag(t, resp.Diagnostics.Warnings(), tc.wantWarn, path.Root(root), mustContain...)
 			})
 		}
 	}
