@@ -71,7 +71,7 @@ provider "megaport" {
 | `access_key` | Yes | — | API access key. Can also be set with `MEGAPORT_ACCESS_KEY`. |
 | `secret_key` | Yes | — | API secret key. Can also be set with `MEGAPORT_SECRET_KEY`. |
 | `accept_purchase_terms` | Yes | `false` | Acceptance of the Megaport API terms. Can also be set with `MEGAPORT_ACCEPT_PURCHASE_TERMS`. |
-| `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
+| `wait_time` | No | `10` | Minutes to wait for resources to finish provisioning during create and update, and for a VXC to decommission during destroy. Minimum `1`. See [Provisioning Wait Time](#provisioning-wait-time). |
 | `managed_account_uid` | No | — | UID of a managed account to act on behalf of when provisioning resources with your own credentials. Can also be set with `MEGAPORT_MANAGED_ACCOUNT_UID`. |
 
 ## 🚨 NEW FEATURE: MCR Prefix Filter List Resources
