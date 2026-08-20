@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -297,7 +298,13 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	if managedAccountUID != "" {
 		clientOpts = append(clientOpts, megaport.WithCallContext(managedAccountUID))
 	}
-	clientOpts = append(clientOpts, clientURLOverrides()...)
+	urlOverrides, err := clientURLOverrides()
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Megaport API URL override", err.Error())
+		return
+	}
+	clientOpts = append(clientOpts, urlOverrides...)
+
 	megaportClient, err := megaport.New(nil, clientOpts...)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -333,17 +340,25 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 }
 
 // clientURLOverrides points the client at an API host outside the three named environments, so
-// acceptance tests can run against an ephemeral stack. Set both vars: megaportgo derives the token
-// URL from a fixed host switch, so an unknown base URL cannot authenticate on its own.
-func clientURLOverrides() []megaport.ClientOpt {
-	var opts []megaport.ClientOpt
-	if baseURL := os.Getenv("MEGAPORT_BASE_URL"); baseURL != "" {
-		opts = append(opts, megaport.WithBaseURL(baseURL))
+// acceptance tests can run against an ephemeral stack. Both vars are required together. A token URL
+// on its own authenticates against the override while the API calls stay on the named environment,
+// and a base URL on its own cannot authenticate at all, because megaportgo derives the token URL
+// from a fixed host switch that rejects unknown hosts.
+func clientURLOverrides() ([]megaport.ClientOpt, error) {
+	baseURL := os.Getenv("MEGAPORT_BASE_URL")
+	tokenURL := os.Getenv("MEGAPORT_TOKEN_URL")
+
+	switch {
+	case baseURL == "" && tokenURL == "":
+		return nil, nil
+	case baseURL == "" || tokenURL == "":
+		return nil, errors.New("MEGAPORT_BASE_URL and MEGAPORT_TOKEN_URL must be set together")
 	}
-	if tokenURL := os.Getenv("MEGAPORT_TOKEN_URL"); tokenURL != "" {
-		opts = append(opts, megaport.WithTokenURL(tokenURL))
-	}
-	return opts
+
+	return []megaport.ClientOpt{
+		megaport.WithBaseURL(baseURL),
+		megaport.WithTokenURL(tokenURL),
+	}, nil
 }
 
 // DataSources defines the data sources implemented in the provider.

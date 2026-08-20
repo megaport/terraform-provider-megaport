@@ -16,8 +16,30 @@ func TestClientURLOverridesUnsetLeavesDefaults(t *testing.T) {
 	t.Setenv("MEGAPORT_BASE_URL", "")
 	t.Setenv("MEGAPORT_TOKEN_URL", "")
 
-	if opts := clientURLOverrides(); len(opts) != 0 {
+	opts, err := clientURLOverrides()
+	if err != nil {
+		t.Fatalf("clientURLOverrides: %v", err)
+	}
+	if len(opts) != 0 {
 		t.Fatalf("expected no options when both vars are unset, got %d", len(opts))
+	}
+}
+
+// Setting one var without the other splits authentication from the API calls, so both directions
+// have to be rejected before a client is built.
+func TestClientURLOverridesRejectAnUnpairedVar(t *testing.T) {
+	for name, env := range map[string][2]string{
+		"base URL only":  {"https://api-ci.megaport.com", ""},
+		"token URL only": {"", "https://api-ci.megaport.com/oauth2/token"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("MEGAPORT_BASE_URL", env[0])
+			t.Setenv("MEGAPORT_TOKEN_URL", env[1])
+
+			if _, err := clientURLOverrides(); err == nil {
+				t.Fatal("expected an error, got nil")
+			}
+		})
 	}
 }
 
@@ -35,11 +57,16 @@ func TestClientURLOverridesRetargetTheClient(t *testing.T) {
 	t.Setenv("MEGAPORT_BASE_URL", server.URL)
 	t.Setenv("MEGAPORT_TOKEN_URL", server.URL+"/oauth2/token")
 
+	urlOverrides, err := clientURLOverrides()
+	if err != nil {
+		t.Fatalf("clientURLOverrides: %v", err)
+	}
+
 	// Mirrors the ordering in Configure: the overrides are appended last.
 	clientOpts := append([]megaport.ClientOpt{
 		megaport.WithEnvironment(megaport.EnvironmentStaging),
 		megaport.WithCredentials("test-key", "test-secret"),
-	}, clientURLOverrides()...)
+	}, urlOverrides...)
 
 	client, err := megaport.New(nil, clientOpts...)
 	if err != nil {
@@ -56,37 +83,5 @@ func TestClientURLOverridesRetargetTheClient(t *testing.T) {
 
 	if got := <-paths; got != "/oauth2/token" {
 		t.Errorf("token request path = %q, want %q", got, "/oauth2/token")
-	}
-}
-
-// Without a token URL the host switch rejects a non-standard base URL, so the pair is not optional.
-func TestClientURLOverridesBaseURLAloneCannotAuthorize(t *testing.T) {
-	requests := make(chan string, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests <- r.URL.Path
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(server.Close)
-
-	t.Setenv("MEGAPORT_BASE_URL", server.URL)
-	t.Setenv("MEGAPORT_TOKEN_URL", "")
-
-	clientOpts := append([]megaport.ClientOpt{
-		megaport.WithCredentials("test-key", "test-secret"),
-	}, clientURLOverrides()...)
-
-	client, err := megaport.New(nil, clientOpts...)
-	if err != nil {
-		t.Fatalf("megaport.New: %v", err)
-	}
-
-	if _, err := client.Authorize(context.Background()); err == nil {
-		t.Fatal("expected an error when only the base URL is overridden")
-	}
-
-	select {
-	case path := <-requests:
-		t.Errorf("token request reached %q; the host switch should reject it before any request", path)
-	default:
 	}
 }
