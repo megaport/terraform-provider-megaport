@@ -2818,8 +2818,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
 
-			checkPartnerConfigChange(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &diags)
-			checkPartnerConfigChange(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &diags)
+			checkPartnerConfigChange(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &resp.Diagnostics)
+			checkPartnerConfigChange(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &resp.Diagnostics)
 
 			// Skip the UID reconciliation below if any end-config object is wholly
 			// unknown or null. Unknown objects arise from conditional expressions
@@ -2828,25 +2828,22 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			// Conversion Error" rather than a useful diagnostic. (a_end/b_end are
 			// Required, so null is defensive.)
 			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
-				resp.Diagnostics.Append(diags...)
 				return
 			}
 
 			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            aEndPlanObj,
-				stateEndObj:           aEndStateObj,
-				planPartnerConfig:     plan.AEndPartnerConfig,
-				diags:                 &diags,
+				endLabel:          "A-End",
+				planEndObj:        aEndPlanObj,
+				stateEndObj:       aEndStateObj,
+				planPartnerConfig: plan.AEndPartnerConfig,
+				diags:             &diags,
 			})
 			plan.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "B-End",
-				partnerConfigPathRoot: "b_end_partner_config",
-				planEndObj:            bEndPlanObj,
-				stateEndObj:           bEndStateObj,
-				planPartnerConfig:     plan.BEndPartnerConfig,
-				diags:                 &diags,
+				endLabel:          "B-End",
+				planEndObj:        bEndPlanObj,
+				stateEndObj:       bEndStateObj,
+				planPartnerConfig: plan.BEndPartnerConfig,
+				diags:             &diags,
 			})
 			resp.Diagnostics.Append(diags...)
 			if !resp.Diagnostics.HasError() {
@@ -2857,12 +2854,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 }
 
 type vxcEndReconcileInput struct {
-	endLabel              string
-	partnerConfigPathRoot string
-	planEndObj            types.Object
-	stateEndObj           types.Object
-	planPartnerConfig     types.Object
-	diags                 *diag.Diagnostics
+	endLabel          string
+	planEndObj        types.Object
+	stateEndObj       types.Object
+	planPartnerConfig types.Object
+	diags             *diag.Diagnostics
 }
 
 // anyVXCEndObjectUnknownOrNull reports whether any of the given end-config
@@ -2892,7 +2888,7 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 		planConfig.OrderedVLAN = stateConfig.VLAN
 	}
 
-	planPartner, planCSP := classifyPartner(ctx, in.planPartnerConfig, in.diags)
+	_, planCSP := classifyPartner(ctx, in.planPartnerConfig, in.diags)
 
 	switch {
 	case planConfig.RequestedProductUID.IsUnknown():
@@ -2904,10 +2900,7 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	case stateConfig.RequestedProductUID.IsNull():
 		// Plan carries an explicit UID and state has none yet; keep the plan value
 		// (and skip the CSP branch, which would otherwise overwrite it with null).
-	// An unknown partner may still resolve to a cloud provider, so pin the UID as
-	// if it had. Leaving the plan value in place makes Update overwrite it with
-	// the current UID, which Terraform rejects as an inconsistent result.
-	case planCSP || planPartner.IsUnknown():
+	case planCSP:
 		if !planConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.ValueString() != "" && !planConfig.RequestedProductUID.Equal(stateConfig.RequestedProductUID) {
 			tflog.Info(ctx, fmt.Sprintf("Cloud provider port mapping detected for %s", in.endLabel),
 				map[string]any{
@@ -2934,11 +2927,11 @@ func checkPartnerConfigChange(ctx context.Context, planPartnerConfig, statePartn
 	statePartner, stateCSP := classifyPartner(ctx, statePartnerConfig, diags)
 
 	switch {
-	case planCSP && statePartnerConfig.IsNull():
+	case planCSP && !planPartner.IsUnknown() && statePartnerConfig.IsNull():
 		diags.AddAttributeWarning(
 			path.Root(partnerConfigPathRoot),
 			"Partner configuration is recorded in state only",
-			fmt.Sprintf("The provider does not send a cloud partner configuration on update. Terraform records the %s partner configuration (partner %q) in state, but the live VXC keeps the configuration it already has.", endLabel, planPartner.ValueString()),
+			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC.", endLabel, planPartner.ValueString()),
 		)
 	case (planCSP || stateCSP) && objectFullyKnown(ctx, planPartnerConfig) && !planPartnerConfig.Equal(statePartnerConfig):
 		partner := planPartner
@@ -2948,14 +2941,13 @@ func checkPartnerConfigChange(ctx context.Context, planPartnerConfig, statePartn
 		diags.AddAttributeError(
 			path.Root(partnerConfigPathRoot),
 			"Cloud partner configuration cannot be changed",
-			fmt.Sprintf("The provider does not send a cloud partner configuration on update. This change to the %s partner configuration (partner %q) never reaches the live VXC. Revert it to the configuration held in state.", endLabel, partner.ValueString()),
+			fmt.Sprintf("The provider does not send a cloud partner configuration on update. This change to the %s partner configuration (partner %q) never reaches the live VXC. Revert it to the configuration held in state. To record a different configuration, remove the VXC from Terraform state and import it again.", endLabel, partner.ValueString()),
 		)
 	}
 }
 
-// objectFullyKnown reports whether obj and every value nested in it is known.
-// An unknown may still resolve to the value already in state, so a plan holding
-// one cannot be called a change.
+// objectFullyKnown reports whether obj is fully known. An unknown value may
+// still resolve to what state holds, so a plan holding one is not yet a change.
 func objectFullyKnown(ctx context.Context, obj types.Object) bool {
 	v, err := obj.ToTerraformValue(ctx)
 	if err != nil {
@@ -2965,17 +2957,16 @@ func objectFullyKnown(ctx context.Context, obj types.Object) bool {
 }
 
 // classifyPartner returns the partner held in a partner-config object, and
-// whether that partner is a cloud provider. The internal "transit", "vrouter",
-// and "a-end" sentinel partners are not. Callers that must tell an undecided
-// partner from a non-cloud one check IsUnknown on the returned partner, since
-// ValueString reads an unknown back as "".
+// whether that partner is a cloud partner. The internal "transit", "vrouter",
+// and "a-end" sentinel partners are not. An unknown partner counts as a cloud
+// partner, since it may still resolve to one.
 func classifyPartner(ctx context.Context, partnerConfig types.Object, diags *diag.Diagnostics) (types.String, bool) {
 	if partnerConfig.IsNull() || partnerConfig.IsUnknown() {
 		return types.StringNull(), false
 	}
 	var partnerConfigModel vxcPartnerConfigurationModel
 	*diags = append(*diags, partnerConfig.As(ctx, &partnerConfigModel, basetypes.ObjectAsOptions{})...)
-	if partnerConfigModel.Partner.IsNull() || partnerConfigModel.Partner.IsUnknown() {
+	if partnerConfigModel.Partner.IsNull() {
 		return partnerConfigModel.Partner, false
 	}
 	switch partnerConfigModel.Partner.ValueString() {

@@ -4801,12 +4801,11 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 			diags := diag.Diagnostics{}
 
 			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            mkEnd(t, tc.planRequested, types.StringNull()),
-				stateEndObj:           mkEnd(t, tc.stateRequested, tc.stateCurrent),
-				planPartnerConfig:     planPartner,
-				diags:                 &diags,
+				endLabel:          "A-End",
+				planEndObj:        mkEnd(t, tc.planRequested, types.StringNull()),
+				stateEndObj:       mkEnd(t, tc.stateRequested, tc.stateCurrent),
+				planPartnerConfig: planPartner,
+				diags:             &diags,
 			})
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
@@ -5033,7 +5032,7 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 			plan:  tftypes.NewValue(partnerObjType, tftypes.UnknownValue),
 		},
 		{
-			// The end-config guard returns early, but the gate has already run.
+			// The end-config guard returns early, but checkPartnerConfigChange has already run.
 			name:        "csp_change_with_unknown_end_errors",
 			state:       awsVal("old-key"),
 			plan:        awsVal("new-key"),
@@ -5140,7 +5139,7 @@ func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 	// A null plan config leaves the state value alone. ModifyPlan now rejects a
 	// removed cloud partner config before it reaches here, so this only holds the
 	// line on the write itself.
-	kept := orm.BEndPartnerConfig
+	keptAEnd, keptBEnd := orm.AEndPartnerConfig, orm.BEndPartnerConfig
 	nullPlan := &vxcResourceModel{
 		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
 		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
@@ -5148,8 +5147,11 @@ func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 	if diags := orm.fromAPIVXC(ctx, &megaport.VXC{UID: "vxc-uid-123"}, nil, nullPlan); diags.HasError() {
 		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
 	}
-	if !orm.BEndPartnerConfig.Equal(kept) {
-		t.Errorf("b_end_partner_config = %v, want it kept as %v", orm.BEndPartnerConfig, kept)
+	if !orm.AEndPartnerConfig.Equal(keptAEnd) {
+		t.Errorf("a_end_partner_config = %v, want it kept as %v", orm.AEndPartnerConfig, keptAEnd)
+	}
+	if !orm.BEndPartnerConfig.Equal(keptBEnd) {
+		t.Errorf("b_end_partner_config = %v, want it kept as %v", orm.BEndPartnerConfig, keptBEnd)
 	}
 }
 
@@ -5252,4 +5254,84 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestVXCModifyPlan_PartnerConfigGateSkipsCreateAndDestroy pins the two guards
+// that keep checkPartnerConfigChange off the create and destroy walks. Without
+// them a first apply warns about a config it is about to send, and every
+// destroy of a cloud-partner VXC fails.
+func TestVXCModifyPlan_PartnerConfigGateSkipsCreateAndDestroy(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+	partnerObjType, ok := schemaObjType.AttributeTypes["b_end_partner_config"].(tftypes.Object)
+	if !ok {
+		t.Fatal("b_end_partner_config type is not tftypes.Object")
+	}
+
+	endAttrs := nullValueMap(endObjType)
+	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	endVal := tftypes.NewValue(endObjType, endAttrs)
+
+	partnerAttrs := nullValueMap(partnerObjType)
+	partnerAttrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+	partnerVal := tftypes.NewValue(partnerObjType, partnerAttrs)
+
+	vxcVal := func(withUID bool) tftypes.Value {
+		attrs := nullValueMap(schemaObjType)
+		attrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+		attrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+		attrs["a_end"] = endVal
+		attrs["b_end"] = endVal
+		attrs["b_end_partner_config"] = partnerVal
+		if withUID {
+			attrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+		}
+		return tftypes.NewValue(schemaObjType, attrs)
+	}
+	nullVal := tftypes.NewValue(schemaObjType, nil)
+
+	tests := []struct {
+		name  string
+		state tftypes.Value
+		plan  tftypes.Value
+	}{
+		// No state UID yet, so the VXC does not exist and Create sends the config.
+		{name: "create", state: nullVal, plan: vxcVal(false)},
+		// A null plan is a destroy; the partner config is going away with the VXC.
+		{name: "destroy", state: vxcVal(true), plan: nullVal},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := tfsdk.Plan{Schema: s, Raw: tc.plan}
+			req := fwresource.ModifyPlanRequest{
+				State: tfsdk.State{Schema: s, Raw: tc.state},
+				Plan:  plan,
+			}
+			resp := fwresource.ModifyPlanResponse{Plan: plan}
+
+			r.ModifyPlan(ctx, req, &resp)
+
+			if diags := resp.Diagnostics.Errors(); len(diags) != 0 {
+				t.Errorf("expected no errors, got: %v", diags)
+			}
+			if diags := resp.Diagnostics.Warnings(); len(diags) != 0 {
+				t.Errorf("expected no warnings, got: %v", diags)
+			}
+		})
+	}
 }
