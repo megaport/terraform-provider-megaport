@@ -297,6 +297,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	if managedAccountUID != "" {
 		clientOpts = append(clientOpts, megaport.WithCallContext(managedAccountUID))
 	}
+	clientOpts = append(clientOpts, clientURLOverrides()...)
 	megaportClient, err := megaport.New(nil, clientOpts...)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -329,6 +330,20 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	resp.ResourceData = providerData
 
 	tflog.Info(ctx, "Configured Megaport API client", map[string]any{"success": true})
+}
+
+// clientURLOverrides points the client at an API host outside the three named environments, so
+// acceptance tests can run against an ephemeral stack. Set both vars: megaportgo derives the token
+// URL from a fixed host switch, so an unknown base URL cannot authenticate on its own.
+func clientURLOverrides() []megaport.ClientOpt {
+	var opts []megaport.ClientOpt
+	if baseURL := os.Getenv("MEGAPORT_BASE_URL"); baseURL != "" {
+		opts = append(opts, megaport.WithBaseURL(baseURL))
+	}
+	if tokenURL := os.Getenv("MEGAPORT_TOKEN_URL"); tokenURL != "" {
+		opts = append(opts, megaport.WithTokenURL(tokenURL))
+	}
+	return opts
 }
 
 // DataSources defines the data sources implemented in the provider.
