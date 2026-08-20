@@ -303,6 +303,7 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 		resp.Diagnostics.AddError("Invalid Megaport API URL override", err.Error())
 		return
 	}
+	// Appended last on purpose: WithEnvironment above also sets the base URL, and the last write wins.
 	clientOpts = append(clientOpts, urlOverrides...)
 
 	megaportClient, err := megaport.New(nil, clientOpts...)
