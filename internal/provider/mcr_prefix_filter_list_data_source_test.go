@@ -56,6 +56,12 @@ func TestAccMegaportMCRPrefixFilterListDataSource_Basic(t *testing.T) {
 							prefix = "10.0.2.0/24"
 							ge     = 25
 							le     = 27
+						},
+						{
+							action = "permit"
+							prefix = "10.0.3.0/24"
+							ge     = 24
+							le     = 24
 						}
 					]
 				}
@@ -87,9 +93,14 @@ func TestAccMegaportMCRPrefixFilterListDataSource_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("data.megaport_mcr_prefix_filter_lists.all_lists", "prefix_filter_lists.#", "2"),
 
 					// Check that we can find our created prefix filter lists
+					// The exact match entry comes back with ge and le absent, so this is
+					// what covers the data source read resolving them.
 					resource.TestCheckTypeSetElemNestedAttrs("data.megaport_mcr_prefix_filter_lists.all_lists", "prefix_filter_lists.*", map[string]string{
-						"description":    prefixFilterName,
-						"address_family": "IPv4",
+						"description":      prefixFilterName,
+						"address_family":   "IPv4",
+						"entries.2.prefix": "10.0.3.0/24",
+						"entries.2.ge":     "24",
+						"entries.2.le":     "24",
 					}),
 					resource.TestCheckTypeSetElemNestedAttrs("data.megaport_mcr_prefix_filter_lists.all_lists", "prefix_filter_lists.*", map[string]string{
 						"description":    prefixFilterName2,

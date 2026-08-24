@@ -402,10 +402,9 @@ func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 	})
 }
 
-// TestAccMegaportMCRPrefixFilterList_ExactMatch tests the exact match prefix filter entries
-// This specifically tests the normalization fix for when the Megaport API returns le=32 (IPv4)
-// or le=128 (IPv6) instead of the exact match value configured by the user.
-// See PR #308 for details on the bug fix.
+// TestAccMegaportMCRPrefixFilterList_ExactMatch covers entries whose ge and le are
+// equal. The API leaves both fields out of the response for those, so the read has to
+// resolve them back to the prefix length.
 func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
@@ -531,7 +530,6 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 				),
 			},
 			// Step 2: Run plan again to ensure no drift is detected (idempotency check)
-			// This is the critical test - if normalization doesn't work, this step will fail
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -612,11 +610,9 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.le", "64"),
 				),
 			},
-			// Step 3: Test import of exact match prefix filter lists
-			// Note: During import, we return raw API values (le=32 for IPv4).
-			// This is intentional - import shows actual API state, and users can
-			// adjust their HCL to match their desired configuration (exact match or range).
-			// After the first apply with user's config, normalization works correctly.
+			// Step 3: Test import of exact match prefix filter lists.
+			// Import has no plan to compare against, so it is the step that catches a
+			// wrong default for an absent ge or le.
 			{
 				ResourceName:      "megaport_mcr_prefix_filter_list.ipv4_exact",
 				ImportState:       true,
@@ -781,8 +777,7 @@ func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.le", "28"),
 
-					// Entry 2: Full range to max - user explicitly configured le=32
-					// With the fix, this should NOT be normalized since the plan has le=32
+					// Entry 2: an explicit le at the family maximum has to survive the read
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.ge", "16"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.le", "32"),
 
@@ -1196,11 +1191,11 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 	})
 }
 
-// TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch covers issue #450:
-// an exact match list created through the deprecated inline prefix_filter_lists
-// attribute, then imported into the standalone resource. The API omits le when it
-// equals the prefix length, so a read that defaults an absent le to 32 turns a
-// /24-only filter into /24 through /32 and every later plan wants it back.
+// TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch migrates an exact
+// match list from the deprecated inline prefix_filter_lists attribute to the
+// standalone resource. The API leaves le out of the response when it equals the
+// prefix length, so a read that defaults an absent le to 32 turns a /24-only filter
+// into /24 through /32, and every later plan wants it back.
 func TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
@@ -1317,12 +1312,9 @@ func TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch(t *testing.T) 
 					return fmt.Errorf("no imported megaport_mcr_prefix_filter_list state found")
 				},
 			},
-			// Step 3: The imported state matches the config, so this plan is empty
-			{
-				Config:   migratedConfig,
-				PlanOnly: true,
-			},
-			// Step 4: And a second refresh does not reintroduce the drift
+			// Step 3: the imported state matches the config, so the plan is empty.
+			// PlanOnly plans twice, the second time after a refresh, which is the
+			// read that reintroduced the drift.
 			{
 				Config:   migratedConfig,
 				PlanOnly: true,

@@ -644,10 +644,22 @@ func TestResolveGeLe(t *testing.T) {
 			wantLe: 24,
 		},
 		{
-			name:   "ge returned, le absent",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Ge: 8},
-			wantGe: 8,
-			wantLe: 8,
+			name:   "ge returned above the prefix length, le absent",
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/24", Ge: 26},
+			wantGe: 26,
+			wantLe: 32,
+		},
+		{
+			name:   "IPv6 ge returned above the prefix length, le absent",
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "2001:db8::/32", Ge: 48},
+			wantGe: 48,
+			wantLe: 128,
+		},
+		{
+			name:   "default route with an explicit le",
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "0.0.0.0/0", Le: 32},
+			wantGe: 0,
+			wantLe: 32,
 		},
 		{
 			name:   "both returned are passed through",
@@ -1178,7 +1190,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 			expectedGeLe: []struct{ ge, le int }{{32, 32}},
 		},
 		{
-			name: "IPv4 exact match on a /31 (issue #317)",
+			name: "IPv4 exact match on a /31",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            3,
 				Description:   "Test",
@@ -1226,7 +1238,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 			expectedGeLe: []struct{ ge, le int }{{48, 128}},
 		},
 		{
-			name: "default route: a zero ge is the prefix length, not a missing field",
+			name: "default route: an absent ge resolves to a prefix length of zero",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            7,
 				Description:   "Test",
@@ -1238,6 +1250,18 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 			expectedGeLe: []struct{ ge, le int }{{0, 32}},
 		},
 		{
+			name: "ge returned, le absent: le resolves to the family maximum",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            8,
+				Description:   "Test",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 26},
+				},
+			},
+			expectedGeLe: []struct{ ge, le int }{{26, 32}},
+		},
+		{
 			name: "mixed entries: exact matches and ranges in one list",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            8,
@@ -1247,12 +1271,14 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 					{Action: "permit", Prefix: "10.0.0.0/24"},
 					{Action: "deny", Prefix: "192.168.0.0/16", Le: 24},
 					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32},
+					{Action: "permit", Prefix: "203.0.113.0/24", Ge: 28},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{
 				{24, 24},
 				{16, 24},
 				{16, 32},
+				{28, 32},
 			},
 		},
 	}

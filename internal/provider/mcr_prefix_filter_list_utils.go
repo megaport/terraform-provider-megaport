@@ -62,9 +62,6 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 }
 
 // fromAPI converts the API response to the Terraform model.
-//
-// The API omits ge or le from a response when that field equals the prefix
-// length, so an absent field means "the prefix length" and never zero.
 func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList *megaport.MCRPrefixFilterList) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
@@ -193,9 +190,10 @@ func generateImportID(mcrUID string, prefixListID int64) string {
 	return fmt.Sprintf("%s:%d", mcrUID, prefixListID)
 }
 
-// resolveGeLe returns the ge and le of an API entry. The API omits either field
-// from a response when it equals the prefix length, so an absent field resolves
-// to the prefix length and never to zero.
+// resolveGeLe returns the ge and le of an API entry. The API leaves a bound out when
+// nothing set it, and when it equals the prefix length.
+// An absent ge is the prefix length. An absent le is the family maximum when ge is
+// set, and the prefix length when it is not.
 func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
@@ -211,14 +209,17 @@ func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics
 		)
 		return 0, 0, diags
 	}
-	prefixLength, _ := network.Mask.Size()
+	prefixLength, maxLength := network.Mask.Size()
 
 	ge, le := entry.Ge, entry.Le
-	if ge == 0 {
+	switch {
+	case ge == 0 && le == 0:
+		// An entry with neither bound matches the prefix length only.
+		ge, le = prefixLength, prefixLength
+	case ge == 0:
 		ge = prefixLength
-	}
-	if le == 0 {
-		le = prefixLength
+	case le == 0:
+		le = maxLength
 	}
 	return ge, le, diags
 }

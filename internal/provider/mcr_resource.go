@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -238,29 +237,10 @@ func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(ctx context.Cont
 	orm.AddressFamily = types.StringValue(m.AddressFamily)
 	entriesList := []types.Object{}
 	for _, entry := range m.Entries {
-		var le, ge int
-		// Get Mask Length if not provided by API
-		if entry.Le == 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			le = length
-			ge = length
-		} else if entry.Le != 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			ge = length
-			le = entry.Le
-		} else {
-			le = entry.Le
-			ge = entry.Ge
+		ge, le, geLeDiags := resolveGeLe(entry)
+		diags.Append(geLeDiags...)
+		if geLeDiags.HasError() {
+			return diags
 		}
 		entryModel := &mcrPrefixListEntryModel{
 			Action: types.StringValue(entry.Action),
