@@ -67,10 +67,18 @@ func getTestClient() (*megaport.Client, error) {
 			return
 		}
 
-		testClient, testClientErr = megaport.New(nil,
+		clientOpts := []megaport.ClientOpt{
 			megaport.WithEnvironment(megaport.EnvironmentStaging),
 			megaport.WithCredentials(accessKey, secretKey),
-		)
+		}
+		urlOverrides, err := clientURLOverrides()
+		if err != nil {
+			testClientErr = err
+			return
+		}
+		clientOpts = append(clientOpts, urlOverrides...)
+
+		testClient, testClientErr = megaport.New(nil, clientOpts...)
 		if testClientErr != nil {
 			return
 		}
