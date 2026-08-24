@@ -294,7 +294,8 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 	}
 }
 
-// ImportState imports the resource state.
+// ImportState seeds the identifiers. The framework calls Read next, which
+// populates the rest and removes the resource if the product is gone.
 func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Parse the import ID (format: mcr_uid:prefix_list_id)
 	mcrUID, prefixListID, err := parseImportID(req.ID)
@@ -309,44 +310,6 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Set the parsed values in the state
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("mcr_id"), mcrUID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), prefixListID)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Verify the resource exists by attempting to read it
-	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
-	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
-				)
-				return
-			}
-		}
-		resp.Diagnostics.AddError(
-			"Error verifying resource during import",
-			fmt.Sprintf("Could not verify prefix filter list %d for MCR %s: %s", prefixListID, mcrUID, err.Error()),
-		)
-		return
-	}
-
-	// Set the imported resource state
-	var state mcrPrefixFilterListResourceModel
-	state.MCRID = types.StringValue(mcrUID)
-	fromAPIDiags := state.fromAPI(ctx, prefixFilterList)
-	resp.Diagnostics.Append(fromAPIDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Set last updated timestamp for imported resource
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Save the imported state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // validatePrefixListEntry validates a single prefix list entry

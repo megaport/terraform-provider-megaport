@@ -893,7 +893,7 @@ func TestFromAPI(t *testing.T) {
 			},
 			wantError: false,
 		},
-		// These tests verify that fromAPI() (without plan) returns raw API values
+		// These tests verify that fromAPIWithPlan with a nil plan returns raw API values
 		// NO normalization is applied - the values are returned as-is from the API
 		// This is the correct behavior for import scenarios where we don't have prior config
 		{
@@ -964,7 +964,7 @@ func TestFromAPI(t *testing.T) {
 			},
 			wantError: false,
 		},
-		// Range tests - values returned as-is (no normalization in fromAPI)
+		// Range tests - values returned as-is (no normalization with a nil plan)
 		{
 			name: "IPv4 range with le=32 - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
@@ -1051,7 +1051,7 @@ func TestFromAPI(t *testing.T) {
 			},
 			wantError: false,
 		},
-		// Multiple entries - all returned as-is from API (no normalization in fromAPI)
+		// Multiple entries - all returned as-is from API (no normalization with a nil plan)
 		{
 			name: "mixed entries - returns raw API values",
 			apiList: &megaport.MCRPrefixFilterList{
@@ -1086,11 +1086,11 @@ func TestFromAPI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			model := &mcrPrefixFilterListResourceModel{}
-			diags := model.fromAPI(context.Background(), tt.apiList)
+			diags := model.fromAPIWithPlan(context.Background(), tt.apiList, nil)
 			hasError := diags.HasError()
 
 			if hasError != tt.wantError {
-				t.Errorf("fromAPI() hasError = %v, want %v", hasError, tt.wantError)
+				t.Errorf("fromAPIWithPlan() hasError = %v, want %v", hasError, tt.wantError)
 				if hasError {
 					t.Errorf("Diagnostics: %v", diags)
 				}
@@ -1100,13 +1100,13 @@ func TestFromAPI(t *testing.T) {
 			if !tt.wantError {
 				// Verify basic fields are populated
 				if model.ID.ValueInt64() != int64(tt.apiList.ID) {
-					t.Errorf("fromAPI() ID = %v, want %v", model.ID.ValueInt64(), tt.apiList.ID)
+					t.Errorf("fromAPIWithPlan() ID = %v, want %v", model.ID.ValueInt64(), tt.apiList.ID)
 				}
 				if model.Description.ValueString() != tt.apiList.Description {
-					t.Errorf("fromAPI() Description = %v, want %v", model.Description.ValueString(), tt.apiList.Description)
+					t.Errorf("fromAPIWithPlan() Description = %v, want %v", model.Description.ValueString(), tt.apiList.Description)
 				}
 				if model.AddressFamily.ValueString() != tt.apiList.AddressFamily {
-					t.Errorf("fromAPI() AddressFamily = %v, want %v", model.AddressFamily.ValueString(), tt.apiList.AddressFamily)
+					t.Errorf("fromAPIWithPlan() AddressFamily = %v, want %v", model.AddressFamily.ValueString(), tt.apiList.AddressFamily)
 				}
 			}
 
@@ -1119,7 +1119,7 @@ func TestFromAPI(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("fromAPI() error should contain %v, got diagnostics: %v", tt.errorContains, diags)
+					t.Errorf("fromAPIWithPlan() error should contain %v, got diagnostics: %v", tt.errorContains, diags)
 				}
 			}
 		})
