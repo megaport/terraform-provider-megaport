@@ -638,11 +638,7 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				// Ignore 'le' fields during import verify because the API returns le=32 (max)
-				// for exact match entries. During normal operation, we normalize this back to
-				// the user's configured value (ge=le). But during import, we can't know the
-				// user's intention, so we return raw API values.
-				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})
@@ -1194,6 +1190,141 @@ func TestAccMegaportMCRPrefixFilterList_ImportMultipleNoVXCDrift(t *testing.T) {
 			// This validates that importing prefix filter lists doesn't trigger an update loop
 			{
 				Config:   sharedConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch covers issue #450:
+// an exact match list created through the deprecated inline prefix_filter_lists
+// attribute, then imported into the standalone resource. The API omits le when it
+// equals the prefix length, so a read that defaults an absent le to 32 turns a
+// /24-only filter into /24 through /32 and every later plan wants it back.
+func TestAccMegaportMCRPrefixFilterList_InlineMigrationExactMatch(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	prefixFilterListName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	inlineConfig := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed           = 1000
+			location_id          = data.megaport_location.loc.id
+			contract_term_months = 1
+			cost_centre          = "%s"
+
+			prefix_filter_lists = [
+				{
+					description    = "%s"
+					address_family = "IPv4"
+					entries = [
+						{
+							action = "permit"
+							prefix = "10.0.0.0/24"
+							ge     = 24
+							le     = 24
+						}
+					]
+				}
+			]
+		}
+	`, locationID, mcrName, costCentreName, prefixFilterListName)
+
+	migratedConfig := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			port_speed           = 1000
+			location_id          = data.megaport_location.loc.id
+			contract_term_months = 1
+			cost_centre          = "%s"
+
+			# The list below now owns what the inline attribute created.
+			prefix_filter_lists = []
+
+			lifecycle {
+				ignore_changes = [prefix_filter_lists]
+			}
+		}
+
+		resource "megaport_mcr_prefix_filter_list" "pfl" {
+			mcr_id         = megaport_mcr.mcr.product_uid
+			description    = "%s"
+			address_family = "IPv4"
+			entries = [
+				{
+					action = "permit"
+					prefix = "10.0.0.0/24"
+					ge     = 24
+					le     = 24
+				}
+			]
+		}
+	`, locationID, mcrName, costCentreName, prefixFilterListName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create the list through the deprecated inline attribute
+			{
+				Config: inlineConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.ge", "24"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.entries.0.le", "24"),
+				),
+			},
+			// Step 2: Hand the list to the standalone resource by importing it
+			{
+				Config:             migratedConfig,
+				ResourceName:       "megaport_mcr_prefix_filter_list.pfl",
+				ImportState:        true,
+				ImportStatePersist: true,
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					for _, m := range state.Modules {
+						if v, ok := m.Resources["megaport_mcr.mcr"]; ok {
+							return fmt.Sprintf("%s:%s",
+								v.Primary.Attributes["product_uid"],
+								v.Primary.Attributes["prefix_filter_lists.0.id"]), nil
+						}
+					}
+					return "", fmt.Errorf("megaport_mcr.mcr not found in state")
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					for _, is := range states {
+						if is.Ephemeral.Type != "megaport_mcr_prefix_filter_list" {
+							continue
+						}
+						if got := is.Attributes["entries.0.ge"]; got != "24" {
+							return fmt.Errorf("imported entries.0.ge = %q, want 24", got)
+						}
+						if got := is.Attributes["entries.0.le"]; got != "24" {
+							return fmt.Errorf("imported entries.0.le = %q, want 24", got)
+						}
+						return nil
+					}
+					return fmt.Errorf("no imported megaport_mcr_prefix_filter_list state found")
+				},
+			},
+			// Step 3: The imported state matches the config, so this plan is empty
+			{
+				Config:   migratedConfig,
+				PlanOnly: true,
+			},
+			// Step 4: And a second refresh does not reintroduce the drift
+			{
+				Config:   migratedConfig,
 				PlanOnly: true,
 			},
 		},
