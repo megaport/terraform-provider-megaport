@@ -4844,6 +4844,7 @@ type vxcPartnerTestTypes struct {
 	partner tftypes.Object
 	aws     tftypes.Object
 	vrouter tftypes.Object
+	aEnd    tftypes.Object
 	// endVal is a minimal valid a_end/b_end value.
 	endVal tftypes.Value
 }
@@ -4879,6 +4880,7 @@ func newVXCPartnerTestTypes(ctx context.Context, t *testing.T) vxcPartnerTestTyp
 		partner: partnerType,
 		aws:     nested(partnerType, "aws_config"),
 		vrouter: nested(partnerType, "vrouter_config"),
+		aEnd:    nested(partnerType, "partner_a_end_config"),
 		endVal:  tftypes.NewValue(endType, endAttrs),
 	}
 }
@@ -4905,6 +4907,14 @@ func (ty vxcPartnerTestTypes) awsVal(authKey tftypes.Value) tftypes.Value {
 func (ty vxcPartnerTestTypes) unknownPartnerVal() tftypes.Value {
 	attrs := nullValueMap(ty.partner)
 	attrs["partner"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// aEndVal builds an "a-end" partner config carrying a nested config block.
+func (ty vxcPartnerTestTypes) aEndVal() tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "a-end")
+	attrs["partner_a_end_config"] = tftypes.NewValue(ty.aEnd, nullValueMap(ty.aEnd))
 	return tftypes.NewValue(ty.partner, attrs)
 }
 
@@ -4982,6 +4992,13 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 			name:  "unknown_partner_null_state",
 			state: nullPartner,
 			plan:  ty.unknownPartnerVal(),
+		},
+		{
+			// A wholly unknown config classifies as no partner at all, so the
+			// import-path warning stays quiet until it resolves.
+			name:  "unknown_partner_object_null_state",
+			state: nullPartner,
+			plan:  tftypes.NewValue(ty.partner, tftypes.UnknownValue),
 		},
 		{
 			// The end-config guard returns early, but the warning has already run.
@@ -5123,6 +5140,21 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			plan:  ty.vrouterVal(true),
 		},
 		{
+			// The A-End sends "a-end"; the B-End cannot. The B-End cell is
+			// defensive: its schema validator already rejects "a-end".
+			name:     "a_end_config_change",
+			state:    ty.partnerVal("a-end"),
+			plan:     ty.aEndVal(),
+			wantBEnd: "a-end",
+		},
+		{
+			// Nothing can be sent for a removal, whatever the partner.
+			name:     "vrouter_removed",
+			state:    ty.vrouterVal(true),
+			plan:     nullPartner,
+			wantAEnd: "vrouter", wantBEnd: "vrouter",
+		},
+		{
 			// An imported VXC has no partner config in state. Adding a cloud
 			// one records it; ModifyPlan warns.
 			name:  "null_state_csp_is_recorded",
@@ -5141,6 +5173,12 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			name:  "null_state_vrouter",
 			state: nullPartner,
 			plan:  ty.vrouterVal(true),
+		},
+		{
+			name:     "null_state_a_end",
+			state:    nullPartner,
+			plan:     ty.partnerVal("a-end"),
+			wantBEnd: "a-end",
 		},
 	}
 
@@ -5222,9 +5260,9 @@ func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 		t.Errorf("b_end_partner_config = %v, want the plan value %v", orm.BEndPartnerConfig, plan.BEndPartnerConfig)
 	}
 
-	// A null plan config leaves the state value alone. ModifyPlan now rejects a
-	// removed cloud partner config before it reaches here, so this only holds the
-	// line on the write itself.
+	// A null plan config leaves the state value alone. The gate in Update rejects
+	// any removed partner config before this runs, so this only holds the line
+	// on the write itself.
 	keptAEnd, keptBEnd := orm.AEndPartnerConfig, orm.BEndPartnerConfig
 	nullPlan := &vxcResourceModel{
 		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
