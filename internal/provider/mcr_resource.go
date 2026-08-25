@@ -898,10 +898,10 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)
@@ -1197,10 +1197,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)

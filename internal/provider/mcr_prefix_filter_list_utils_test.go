@@ -853,7 +853,6 @@ func TestFromAPI(t *testing.T) {
 	tests := []struct {
 		name          string
 		apiList       *megaport.MCRPrefixFilterList
-		wantModel     *mcrPrefixFilterListResourceModel
 		wantError     bool
 		errorContains string
 	}{
@@ -881,7 +880,7 @@ func TestFromAPI(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "API response with zero ge/le values (should calculate)",
+			name: "API response with absent ge/le values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            456,
 				Description:   "Test prefix list with zero values",
@@ -890,8 +889,8 @@ func TestFromAPI(t *testing.T) {
 					{
 						Action: "permit",
 						Prefix: "10.0.0.0/8",
-						Ge:     0, // Absent, resolves to 8
-						Le:     0, // Absent, resolves to 8
+						Ge:     0,
+						Le:     0,
 					},
 				},
 			},
@@ -904,192 +903,6 @@ func TestFromAPI(t *testing.T) {
 				Description:   "Empty list",
 				AddressFamily: "IPv6",
 				Entries:       []*megaport.MCRPrefixListEntry{},
-			},
-			wantError: false,
-		},
-		// fromAPI keeps every ge and le the API returns.
-		{
-			name: "IPv4 with le=32 (max) - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1001,
-				Description:   "IPv4 exact match test",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "10.0.0.0/24",
-						Ge:     24, // Explicit ge, kept as sent
-						Le:     32, // Explicit le, kept as sent
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv4 with le=32 (max) for /16 prefix - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1002,
-				Description:   "IPv4 exact match test /16",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "deny",
-						Prefix: "172.16.0.0/16",
-						Ge:     16, // Explicit ge, kept as sent
-						Le:     32, // Explicit le, kept as sent
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv6 with le=128 (max) - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1003,
-				Description:   "IPv6 exact match test",
-				AddressFamily: "IPv6",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "2001:db8::/64",
-						Ge:     64,  // Explicit ge, kept as sent
-						Le:     128, // Explicit le, kept as sent
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv6 with le=128 (max) for /48 prefix - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1004,
-				Description:   "IPv6 exact match test /48",
-				AddressFamily: "IPv6",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "deny",
-						Prefix: "2001:db8::/48",
-						Ge:     48,  // Explicit ge, kept as sent
-						Le:     128, // Explicit le, kept as sent
-					},
-				},
-			},
-			wantError: false,
-		},
-		// Range tests - values returned as-is (no normalization in fromAPI)
-		{
-			name: "IPv4 range with le=32 - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1005,
-				Description:   "IPv4 range to max",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "10.0.0.0/8",
-						Ge:     8,  // Range from /8 to /32
-						Le:     32, // Returns as-is
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv4 range with intermediate le - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1006,
-				Description:   "IPv4 range",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "10.0.0.0/24",
-						Ge:     24,
-						Le:     28, // Not max, should remain 28
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv6 range with le=128 - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1007,
-				Description:   "IPv6 range to max",
-				AddressFamily: "IPv6",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "2001:db8::/32",
-						Ge:     32,  // Range from /32 to /128
-						Le:     128, // Intentionally set to max - NOT an exact match
-					},
-				},
-			},
-			wantError: false,
-		},
-		// Edge case: ge == le == max (true exact match at max length)
-		{
-			name: "IPv4 exact match at /32 - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1008,
-				Description:   "IPv4 exact /32",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "10.0.0.1/32",
-						Ge:     32,
-						Le:     32, // ge == le == max, this is a true exact match
-					},
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "IPv6 exact match at /128 - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1009,
-				Description:   "IPv6 exact /128",
-				AddressFamily: "IPv6",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "2001:db8::1/128",
-						Ge:     128,
-						Le:     128, // ge == le == max, this is a true exact match
-					},
-				},
-			},
-			wantError: false,
-		},
-		// Multiple entries - all returned as-is from API (no normalization in fromAPI)
-		{
-			name: "mixed entries - returns raw API values",
-			apiList: &megaport.MCRPrefixFilterList{
-				ID:            1010,
-				Description:   "Mixed entries test",
-				AddressFamily: "IPv4",
-				Entries: []*megaport.MCRPrefixListEntry{
-					{
-						Action: "permit",
-						Prefix: "10.0.0.0/24",
-						Ge:     24,
-						Le:     32, // Explicit le, kept as sent
-					},
-					{
-						Action: "deny",
-						Prefix: "192.168.0.0/16",
-						Ge:     16,
-						Le:     24, // Returned as-is
-					},
-					{
-						Action: "permit",
-						Prefix: "172.16.0.0/12",
-						Ge:     12,
-						Le:     32, // Returned as-is
-					},
-				},
 			},
 			wantError: false,
 		},
@@ -1264,7 +1077,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 		{
 			name: "mixed entries: exact matches and ranges in one list",
 			apiList: &megaport.MCRPrefixFilterList{
-				ID:            8,
+				ID:            9,
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
@@ -1312,6 +1125,75 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				if actualLe != expected.le {
 					t.Errorf("Entry[%d] le: expected %d, got %d", i, expected.le, actualLe)
 				}
+			}
+		})
+	}
+}
+
+// The deprecated inline attribute writes ge and le straight from the plan, so it can
+// put a ge on the wire with no le. That shape only reaches this decoder.
+func TestFromAPIMCRPrefixFilterListDecode(t *testing.T) {
+	tests := []struct {
+		name   string
+		entry  *megaport.MCRPrefixListEntry
+		wantGe int
+		wantLe int
+	}{
+		{
+			name:   "both bounds absent",
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/24"},
+			wantGe: 24,
+			wantLe: 24,
+		},
+		{
+			name:   "ge above the prefix length, le absent",
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/24", Ge: 26},
+			wantGe: 26,
+			wantLe: 32,
+		},
+		{
+			name:   "ge absent, le present",
+			entry:  &megaport.MCRPrefixListEntry{Action: "deny", Prefix: "10.0.0.0/8", Le: 24},
+			wantGe: 8,
+			wantLe: 24,
+		},
+		{
+			name:   "both bounds present",
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/8", Ge: 16, Le: 32},
+			wantGe: 16,
+			wantLe: 32,
+		},
+		{
+			name:   "IPv6 ge above the prefix length, le absent",
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "2001:db8::/32", Ge: 48},
+			wantGe: 48,
+			wantLe: 128,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &mcrPrefixFilterListModel{}
+			diags := model.fromAPIMCRPrefixFilterList(context.Background(), &megaport.MCRPrefixFilterList{
+				Entries: []*megaport.MCRPrefixListEntry{tt.entry},
+			})
+			if diags.HasError() {
+				t.Fatalf("fromAPIMCRPrefixFilterList() returned unexpected error: %v", diags)
+			}
+
+			var entries []*mcrPrefixListEntryModel
+			entriesDiags := model.Entries.ElementsAs(context.Background(), &entries, false)
+			if entriesDiags.HasError() {
+				t.Fatalf("Failed to extract entries: %v", entriesDiags)
+			}
+			if len(entries) != 1 {
+				t.Fatalf("Expected 1 entry, got %d", len(entries))
+			}
+
+			gotGe := int(entries[0].Ge.ValueInt64())
+			gotLe := int(entries[0].Le.ValueInt64())
+			if gotGe != tt.wantGe || gotLe != tt.wantLe {
+				t.Errorf("fromAPIMCRPrefixFilterList() = (%d, %d), want (%d, %d)", gotGe, gotLe, tt.wantGe, tt.wantLe)
 			}
 		})
 	}
