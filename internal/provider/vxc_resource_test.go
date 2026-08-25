@@ -5086,10 +5086,12 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantAEnd: "aws", wantBEnd: "aws",
 		},
 		{
+			// The recorded cloud partner blocks the change, so the error
+			// names the live partner, not the planned one.
 			name:     "csp_partner_swap",
 			state:    ty.awsVal(knownKey("old-key")),
 			plan:     ty.partnerVal("azure"),
-			wantAEnd: "azure", wantBEnd: "azure",
+			wantAEnd: "aws", wantBEnd: "aws",
 		},
 		{
 			name:  "csp_unchanged",

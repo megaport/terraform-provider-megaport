@@ -1179,7 +1179,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. It does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. It does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -2938,9 +2938,9 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 
 // checkPartnerConfigUpdatable rejects a partner-config change the provider
 // cannot carry out, so the apply fails instead of reporting a success that
-// never reached the live VXC. Three changes qualify: removing the block, a
-// partner the provider does not send for that end, and any change to an end
-// whose live config is a cloud partner.
+// never reached the live VXC. Three changes qualify: removing the block, any
+// change to an end whose live config is a cloud partner, and a partner the
+// provider does not send for that end.
 func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
@@ -2962,19 +2962,19 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 		diags.AddAttributeError(
 			path.Root(partnerConfigPathRoot),
 			summary,
-			fmt.Sprintf("The provider cannot remove a partner configuration from a live VXC, so the %s keeps its %q configuration. Restore the configuration that \"terraform state show <resource address>\" prints, or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
+			fmt.Sprintf("The provider cannot remove a partner configuration from a live VXC, so the %s keeps its %q configuration. Restore the removed block. \"terraform state pull\" prints the recorded block, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
+		)
+	case stateCSP:
+		diags.AddAttributeError(
+			path.Root(partnerConfigPathRoot),
+			summary,
+			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. To correct a recorded value, remove the VXC from state, import it again, and apply the corrected block. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case !partnerSendableOnUpdate(endLabel, planPartner):
 		diags.AddAttributeError(
 			path.Root(partnerConfigPathRoot),
 			summary,
 			fmt.Sprintf("The provider does not send partner %q on the %s when it updates a VXC, so this change never reaches the live service. Revert the change, or replace the VXC with \"terraform apply -replace=<resource address>\" to build it with the new configuration. %s", planPartner.ValueString(), endLabel, replaceHint),
-		)
-	case stateCSP:
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
-			summary,
-			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the configuration that \"terraform state show <resource address>\" prints, or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	}
 }
