@@ -403,8 +403,8 @@ func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 }
 
 // TestAccMegaportMCRPrefixFilterList_ExactMatch covers entries whose ge and le are
-// equal. The API leaves both fields out of the response for those, so the read has to
-// resolve them back to the prefix length.
+// equal. The API leaves a bound out when it equals the prefix length, so the entries
+// that match on their own prefix length come back with both fields absent.
 func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
@@ -611,8 +611,6 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 				),
 			},
 			// Step 3: Test import of exact match prefix filter lists.
-			// Import has no plan to compare against, so it is the step that catches a
-			// wrong default for an absent ge or le.
 			{
 				ResourceName:      "megaport_mcr_prefix_filter_list.ipv4_exact",
 				ImportState:       true,

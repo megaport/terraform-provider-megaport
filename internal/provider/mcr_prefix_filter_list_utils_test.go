@@ -455,7 +455,6 @@ func TestCalculateGeLe(t *testing.T) {
 	tests := []struct {
 		name          string
 		entry         mcrPrefixFilterListEntryResourceModel
-		addressFamily string
 		wantGe        int
 		wantLe        int
 		wantError     bool
@@ -468,10 +467,9 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(16),
 				Le:     types.Int64Value(24),
 			},
-			addressFamily: "IPv4",
-			wantGe:        16,
-			wantLe:        24,
-			wantError:     false,
+			wantGe:    16,
+			wantLe:    24,
+			wantError: false,
 		},
 		{
 			name: "default ge and le values - IPv4",
@@ -480,10 +478,9 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Null(),
 				Le:     types.Int64Null(),
 			},
-			addressFamily: "IPv4",
-			wantGe:        16, // Default to prefix length
-			wantLe:        32, // Default to max for IPv4
-			wantError:     false,
+			wantGe:    16, // Default to prefix length
+			wantLe:    32, // Default to max for IPv4
+			wantError: false,
 		},
 		{
 			name: "explicit ge and le values - IPv6",
@@ -492,10 +489,9 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(48),
 				Le:     types.Int64Value(64),
 			},
-			addressFamily: "IPv6",
-			wantGe:        48,
-			wantLe:        64,
-			wantError:     false,
+			wantGe:    48,
+			wantLe:    64,
+			wantError: false,
 		},
 		{
 			name: "default ge and le values - IPv6",
@@ -504,10 +500,9 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Null(),
 				Le:     types.Int64Null(),
 			},
-			addressFamily: "IPv6",
-			wantGe:        8,   // Default to prefix length
-			wantLe:        128, // Default to max for IPv6
-			wantError:     false,
+			wantGe:    8,   // Default to prefix length
+			wantLe:    128, // Default to max for IPv6
+			wantError: false,
 		},
 		{
 			name: "ge greater than le",
@@ -516,7 +511,6 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(24),
 				Le:     types.Int64Value(16),
 			},
-			addressFamily: "IPv4",
 			wantError:     true,
 			errorContains: "ge (24) cannot be greater than le (16)",
 		},
@@ -527,7 +521,6 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(8),
 				Le:     types.Int64Value(24),
 			},
-			addressFamily: "IPv4",
 			wantError:     true,
 			errorContains: "ge (8) cannot be less than the prefix length (16)",
 		},
@@ -538,9 +531,8 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(16),
 				Le:     types.Int64Value(40),
 			},
-			addressFamily: "IPv4",
 			wantError:     true,
-			errorContains: "le (40) cannot be greater than 32 for IPv4",
+			errorContains: "le (40) cannot be greater than 32",
 		},
 		{
 			name: "le greater than max length IPv6",
@@ -549,9 +541,8 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(48),
 				Le:     types.Int64Value(200),
 			},
-			addressFamily: "IPv6",
 			wantError:     true,
-			errorContains: "le (200) cannot be greater than 128 for IPv6",
+			errorContains: "le (200) cannot be greater than 128",
 		},
 		{
 			name: "invalid prefix format",
@@ -560,7 +551,6 @@ func TestCalculateGeLe(t *testing.T) {
 				Ge:     types.Int64Value(16),
 				Le:     types.Int64Value(24),
 			},
-			addressFamily: "IPv4",
 			wantError:     true,
 			errorContains: "Invalid prefix format",
 		},
@@ -568,7 +558,7 @@ func TestCalculateGeLe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ge, le, diags := calculateGeLe(&tt.entry, tt.addressFamily)
+			ge, le, diags := calculateGeLe(&tt.entry)
 			hasError := diags.HasError()
 
 			if hasError != tt.wantError {
@@ -718,7 +708,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 	tests := []struct {
 		name          string
 		entry         mcrPrefixFilterListEntryResourceModel
-		addressFamily string
 		wantEntry     *megaport.MCRPrefixListEntry
 		wantError     bool
 		errorContains string
@@ -731,7 +720,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 				Ge:     types.Int64Value(16),
 				Le:     types.Int64Value(24),
 			},
-			addressFamily: "IPv4",
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "10.0.0.0/8",
@@ -748,7 +736,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 				Ge:     types.Int64Value(48),
 				Le:     types.Int64Value(64),
 			},
-			addressFamily: "IPv6",
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "deny",
 				Prefix: "2001:db8::/32",
@@ -765,7 +752,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 				Ge:     types.Int64Null(),
 				Le:     types.Int64Null(),
 			},
-			addressFamily: "IPv4",
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "192.168.0.0/16",
@@ -782,7 +768,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 				Ge:     types.Int64Value(31),
 				Le:     types.Int64Value(31),
 			},
-			addressFamily: "IPv4",
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "162.43.146.92/31",
@@ -799,7 +784,6 @@ func TestConvertEntryToAPI(t *testing.T) {
 				Ge:     types.Int64Value(16),
 				Le:     types.Int64Value(24),
 			},
-			addressFamily: "IPv4",
 			wantError:     true,
 			errorContains: "Invalid prefix format",
 		},
@@ -807,7 +791,7 @@ func TestConvertEntryToAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			apiEntry, diags := convertEntryToAPI(&tt.entry, tt.addressFamily)
+			apiEntry, diags := convertEntryToAPI(&tt.entry)
 			hasError := diags.HasError()
 
 			if hasError != tt.wantError {
@@ -905,6 +889,22 @@ func TestFromAPI(t *testing.T) {
 				Entries:       []*megaport.MCRPrefixListEntry{},
 			},
 			wantError: false,
+		},
+		{
+			name: "unparseable prefix surfaces the entry diagnostic",
+			apiList: &megaport.MCRPrefixFilterList{
+				ID:            999,
+				Description:   "List with a prefix the resolver cannot parse",
+				AddressFamily: "IPv4",
+				Entries: []*megaport.MCRPrefixListEntry{
+					{
+						Action: "permit",
+						Prefix: "not-a-prefix",
+					},
+				},
+			},
+			wantError:     true,
+			errorContains: "Invalid prefix format",
 		},
 	}
 
@@ -1131,7 +1131,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 }
 
 // The deprecated inline attribute writes ge and le straight from the plan, so it can
-// put a ge on the wire with no le. That shape only reaches this decoder.
+// put a ge on the wire with no le.
 func TestFromAPIMCRPrefixFilterListDecode(t *testing.T) {
 	tests := []struct {
 		name   string

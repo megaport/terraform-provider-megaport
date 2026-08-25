@@ -48,7 +48,7 @@ func (m *mcrPrefixFilterListResourceModel) planToAPI(ctx context.Context) (*mega
 		}
 
 		for _, entry := range entries {
-			apiEntry, convertDiags := convertEntryToAPI(entry, m.AddressFamily.ValueString())
+			apiEntry, convertDiags := convertEntryToAPI(entry)
 			diags.Append(convertDiags...)
 			if diags.HasError() {
 				continue
@@ -100,7 +100,7 @@ func (m *mcrPrefixFilterListResourceModel) fromAPI(ctx context.Context, apiList 
 }
 
 // convertEntryToAPI converts a single entry from Terraform model to API model
-func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string) (*megaport.MCRPrefixListEntry, diag.Diagnostics) {
+func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel) (*megaport.MCRPrefixListEntry, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
 	apiEntry := &megaport.MCRPrefixListEntry{
@@ -109,7 +109,7 @@ func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel, addressFami
 	}
 
 	// Handle ge/le values with appropriate defaults
-	ge, le, convertDiags := calculateGeLe(entry, addressFamily)
+	ge, le, convertDiags := calculateGeLe(entry)
 	diags.Append(convertDiags...)
 	if diags.HasError() {
 		return nil, diags
@@ -121,8 +121,8 @@ func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel, addressFami
 	return apiEntry, diags
 }
 
-// calculateGeLe calculates appropriate ge/le values based on the prefix and address family
-func calculateGeLe(entry *mcrPrefixFilterListEntryResourceModel, addressFamily string) (int, int, diag.Diagnostics) {
+// calculateGeLe calculates appropriate ge/le values based on the prefix
+func calculateGeLe(entry *mcrPrefixFilterListEntryResourceModel) (int, int, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
 	// Parse the prefix to get the network length
@@ -135,11 +135,7 @@ func calculateGeLe(entry *mcrPrefixFilterListEntryResourceModel, addressFamily s
 		return 0, 0, diags
 	}
 
-	prefixLength, _ := network.Mask.Size()
-	maxLength := 32
-	if addressFamily == "IPv6" {
-		maxLength = 128
-	}
+	prefixLength, maxLength := network.Mask.Size()
 
 	var ge, le int
 
@@ -177,7 +173,7 @@ func calculateGeLe(entry *mcrPrefixFilterListEntryResourceModel, addressFamily s
 	if le > maxLength {
 		diags.AddError(
 			"Invalid le value",
-			fmt.Sprintf("le (%d) cannot be greater than %d for %s", le, maxLength, addressFamily),
+			fmt.Sprintf("le (%d) cannot be greater than %d", le, maxLength),
 		)
 		return 0, 0, diags
 	}
@@ -192,8 +188,6 @@ func generateImportID(mcrUID string, prefixListID int64) string {
 
 // resolveGeLe returns the ge and le of an API entry. The API leaves a bound out when
 // nothing set it, and when it equals the prefix length.
-// An absent ge is the prefix length. An absent le is the family maximum when ge is
-// set, and the prefix length when it is not.
 func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
@@ -214,7 +208,6 @@ func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics
 	ge, le := entry.Ge, entry.Le
 	switch {
 	case ge == 0 && le == 0:
-		// An entry with neither bound matches the prefix length only.
 		ge, le = prefixLength, prefixLength
 	case ge == 0:
 		ge = prefixLength
