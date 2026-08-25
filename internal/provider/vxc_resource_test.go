@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	fwschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -4701,26 +4702,6 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 		}
 		return obj
 	}
-	partnerObj := func(t *testing.T, partner tftypes.Value) types.Object {
-		t.Helper()
-		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
-		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
-		if !ok {
-			t.Fatal("partner config type is not tftypes.Object")
-		}
-		attrs := nullValueMap(raw)
-		attrs["partner"] = partner
-		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
-		if err != nil {
-			t.Fatalf("build partner config: %v", err)
-		}
-		obj, ok := val.(types.Object)
-		if !ok {
-			t.Fatal("partner config value is not types.Object")
-		}
-		return obj
-	}
-
 	tests := []struct {
 		name           string
 		planRequested  types.String
@@ -4791,21 +4772,15 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
-			switch {
-			case tc.csp:
-				planPartner = partnerObj(t, tftypes.NewValue(tftypes.String, "aws"))
-			case tc.unknownPartner:
-				planPartner = partnerObj(t, tftypes.NewValue(tftypes.String, tftypes.UnknownValue))
-			}
 			diags := diag.Diagnostics{}
 
 			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:          "A-End",
-				planEndObj:        mkEnd(t, tc.planRequested, types.StringNull()),
-				stateEndObj:       mkEnd(t, tc.stateRequested, tc.stateCurrent),
-				planPartnerConfig: planPartner,
-				diags:             &diags,
+				endLabel:    "A-End",
+				planEndObj:  mkEnd(t, tc.planRequested, types.StringNull()),
+				stateEndObj: mkEnd(t, tc.stateRequested, tc.stateCurrent),
+				// An unknown partner counts as a cloud partner.
+				planCSP: tc.csp || tc.unknownPartner,
+				diags:   &diags,
 			})
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
@@ -4860,184 +4835,161 @@ func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.P
 	}
 }
 
-// TestVXCModifyPlan_PartnerConfigChange covers the partner-config branch of
-// ModifyPlan, over both ends. A change to a cloud partner config must fail the
-// plan and propose no replacement: the replacement this branch used to propose
-// decommissioned two live AWS VXCs. A null state config, which is what an
-// import leaves behind, warns instead. The non-CSP partners are untouched.
-func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	r := &vxcResource{}
+// vxcPartnerTestTypes holds the VXC schema and the tftypes the partner-config
+// tests build values against.
+type vxcPartnerTestTypes struct {
+	schema  fwschema.Schema
+	obj     tftypes.Object
+	end     tftypes.Object
+	partner tftypes.Object
+	aws     tftypes.Object
+	vrouter tftypes.Object
+	// endVal is a minimal valid a_end/b_end value.
+	endVal tftypes.Value
+}
 
+func newVXCPartnerTestTypes(ctx context.Context, t *testing.T) vxcPartnerTestTypes {
+	t.Helper()
+	r := &vxcResource{}
 	schemaResp := fwresource.SchemaResponse{}
 	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
-	s := schemaResp.Schema
 
-	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	objType, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
 	if !ok {
 		t.Fatal("schema type is not tftypes.Object")
 	}
-	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
-	if !ok {
-		t.Fatal("a_end type is not tftypes.Object")
+	nested := func(parent tftypes.Object, name string) tftypes.Object {
+		child, ok := parent.AttributeTypes[name].(tftypes.Object)
+		if !ok {
+			t.Fatalf("%s type is not tftypes.Object", name)
+		}
+		return child
 	}
 	// Both ends carry the same partner-config attribute set.
-	partnerObjType, ok := schemaObjType.AttributeTypes["a_end_partner_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("a_end_partner_config type is not tftypes.Object")
-	}
-	awsObjType, ok := partnerObjType.AttributeTypes["aws_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("aws_config type is not tftypes.Object")
-	}
-	vrouterObjType, ok := partnerObjType.AttributeTypes["vrouter_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("vrouter_config type is not tftypes.Object")
-	}
+	partnerType := nested(objType, "a_end_partner_config")
+	endType := nested(objType, "a_end")
 
-	endAttrs := nullValueMap(endObjType)
+	endAttrs := nullValueMap(endType)
 	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
-	endVal := tftypes.NewValue(endObjType, endAttrs)
 
-	partnerVal := func(name string) tftypes.Value {
-		attrs := nullValueMap(partnerObjType)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
-		return tftypes.NewValue(partnerObjType, attrs)
+	return vxcPartnerTestTypes{
+		schema:  schemaResp.Schema,
+		obj:     objType,
+		end:     endType,
+		partner: partnerType,
+		aws:     nested(partnerType, "aws_config"),
+		vrouter: nested(partnerType, "vrouter_config"),
+		endVal:  tftypes.NewValue(endType, endAttrs),
 	}
-	// The reported outage was a BGP auth key edit inside an aws_config block.
-	awsVal := func(authKey string) tftypes.Value {
-		aws := nullValueMap(awsObjType)
-		aws["auth_key"] = tftypes.NewValue(tftypes.String, authKey)
-		attrs := nullValueMap(partnerObjType)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
-		attrs["aws_config"] = tftypes.NewValue(awsObjType, aws)
-		return tftypes.NewValue(partnerObjType, attrs)
+}
+
+// partnerVal builds a partner config naming only the partner.
+func (ty vxcPartnerTestTypes) partnerVal(name string) tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// awsVal builds the shape behind the reported outage: a BGP auth key edit
+// inside an aws_config block.
+func (ty vxcPartnerTestTypes) awsVal(authKey tftypes.Value) tftypes.Value {
+	aws := nullValueMap(ty.aws)
+	aws["auth_key"] = authKey
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+	attrs["aws_config"] = tftypes.NewValue(ty.aws, aws)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// unknownPartnerVal builds a partner config whose partner has not resolved yet.
+func (ty vxcPartnerTestTypes) unknownPartnerVal() tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+func (ty vxcPartnerTestTypes) vrouterVal(withConfig bool) tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "vrouter")
+	if withConfig {
+		attrs["vrouter_config"] = tftypes.NewValue(ty.vrouter, nullValueMap(ty.vrouter))
 	}
-	unknownPartnerVal := func() tftypes.Value {
-		attrs := nullValueMap(partnerObjType)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
-		return tftypes.NewValue(partnerObjType, attrs)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// objectValue converts a raw partner-config value into the types.Object the
+// gate takes.
+func (ty vxcPartnerTestTypes) objectValue(ctx context.Context, t *testing.T, raw tftypes.Value) types.Object {
+	t.Helper()
+	val, err := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}.ValueFromTerraform(ctx, raw)
+	if err != nil {
+		t.Fatalf("build partner config: %v", err)
 	}
-	// An auth key sourced from a resource that has not applied yet.
-	awsUnknownKeyVal := func() tftypes.Value {
-		aws := nullValueMap(awsObjType)
-		aws["auth_key"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
-		attrs := nullValueMap(partnerObjType)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
-		attrs["aws_config"] = tftypes.NewValue(awsObjType, aws)
-		return tftypes.NewValue(partnerObjType, attrs)
+	obj, ok := val.(types.Object)
+	if !ok {
+		t.Fatal("partner config value is not types.Object")
 	}
-	vrouterVal := func(withConfig bool) tftypes.Value {
-		attrs := nullValueMap(partnerObjType)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, "vrouter")
-		if withConfig {
-			attrs["vrouter_config"] = tftypes.NewValue(vrouterObjType, nullValueMap(vrouterObjType))
-		}
-		return tftypes.NewValue(partnerObjType, attrs)
-	}
+	return obj
+}
+
+// TestVXCModifyPlan_PartnerConfigNeverReplaces pins the fix for the reported
+// outage: no partner-config shape may make ModifyPlan propose a replacement,
+// because the replacement it used to propose decommissioned two live AWS VXCs.
+// ModifyPlan also must not fail the plan, so an explicit replacement still
+// works. The one diagnostic it raises is the post-import warning.
+func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+	ty := newVXCPartnerTestTypes(ctx, t)
+
+	nullPartner := tftypes.NewValue(ty.partner, nil)
+	knownKey := func(k string) tftypes.Value { return tftypes.NewValue(tftypes.String, k) }
+	unknownKey := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
 
 	tests := []struct {
 		name        string
 		state       tftypes.Value
 		plan        tftypes.Value
 		unknownEnd  bool
-		wantError   string
 		wantWarn    string
 		wantPartner string
 	}{
+		{name: "csp_auth_key_change", state: ty.awsVal(knownKey("old-key")), plan: ty.awsVal(knownKey("new-key"))},
+		{name: "csp_partner_swap", state: ty.awsVal(knownKey("old-key")), plan: ty.partnerVal("azure")},
+		{name: "csp_unchanged", state: ty.awsVal(knownKey("same")), plan: ty.awsVal(knownKey("same"))},
+		{name: "csp_state_to_vrouter", state: ty.awsVal(knownKey("old-key")), plan: ty.vrouterVal(true)},
+		{name: "csp_block_removed", state: ty.awsVal(knownKey("old-key")), plan: nullPartner},
+		{name: "nested_unknown", state: ty.awsVal(knownKey("old-key")), plan: ty.awsVal(unknownKey)},
+		{name: "vrouter_change", state: ty.vrouterVal(false), plan: ty.vrouterVal(true)},
+		{name: "transit_to_vrouter", state: ty.partnerVal("transit"), plan: ty.vrouterVal(true)},
+		{name: "a_end_sentinel_to_vrouter", state: ty.partnerVal("a-end"), plan: ty.vrouterVal(true)},
+		{name: "vrouter_state_to_csp", state: ty.vrouterVal(true), plan: ty.awsVal(knownKey("new-key"))},
+		{name: "unknown_partner", state: ty.awsVal(knownKey("old-key")), plan: ty.unknownPartnerVal()},
+		{name: "unknown_partner_object", state: ty.awsVal(knownKey("old-key")), plan: tftypes.NewValue(ty.partner, tftypes.UnknownValue)},
 		{
-			name:        "csp_auth_key_change_errors",
-			state:       awsVal("old-key"),
-			plan:        awsVal("new-key"),
-			wantError:   "Cloud partner configuration cannot be changed",
-			wantPartner: "aws",
-		},
-		{
-			name:        "csp_partner_swap_errors",
-			state:       awsVal("old-key"),
-			plan:        partnerVal("azure"),
-			wantError:   "Cloud partner configuration cannot be changed",
-			wantPartner: "aws",
-		},
-		{
-			name:  "csp_unchanged_is_clean",
-			state: awsVal("same-key"),
-			plan:  awsVal("same-key"),
-		},
-		{
+			// An imported VXC has no partner config in state, so adding one is
+			// recorded rather than sent.
 			name:        "null_state_warns",
-			state:       tftypes.NewValue(partnerObjType, nil),
-			plan:        awsVal("new-key"),
+			state:       nullPartner,
+			plan:        ty.awsVal(knownKey("new-key")),
 			wantWarn:    "Partner configuration is recorded in state only",
 			wantPartner: "aws",
 		},
 		{
-			name:        "csp_state_to_vrouter_errors",
-			state:       awsVal("old-key"),
-			plan:        vrouterVal(true),
-			wantError:   "Cloud partner configuration cannot be changed",
-			wantPartner: "aws",
-		},
-		{
-			name:        "csp_block_removed_errors",
-			state:       awsVal("old-key"),
-			plan:        tftypes.NewValue(partnerObjType, nil),
-			wantError:   "Cloud partner configuration cannot be changed",
-			wantPartner: "aws",
-		},
-		{
-			name:  "unknown_partner_is_clean",
-			state: awsVal("old-key"),
-			plan:  unknownPartnerVal(),
-		},
-		{
 			// An unknown partner reads back as "", which must not be taken for a
 			// cloud partner and warned about on the import path.
-			name:  "unknown_partner_null_state_is_clean",
-			state: tftypes.NewValue(partnerObjType, nil),
-			plan:  unknownPartnerVal(),
+			name:  "unknown_partner_null_state",
+			state: nullPartner,
+			plan:  ty.unknownPartnerVal(),
 		},
 		{
-			name:  "nested_unknown_is_clean",
-			state: awsVal("old-key"),
-			plan:  awsUnknownKeyVal(),
-		},
-		{
-			name:  "vrouter_change_is_clean",
-			state: vrouterVal(false),
-			plan:  vrouterVal(true),
-		},
-		{
-			name:  "transit_to_vrouter_is_clean",
-			state: partnerVal("transit"),
-			plan:  vrouterVal(true),
-		},
-		{
-			name:  "a_end_sentinel_to_vrouter_is_clean",
-			state: partnerVal("a-end"),
-			plan:  vrouterVal(true),
-		},
-		{
-			name:        "vrouter_state_to_csp_errors",
-			state:       vrouterVal(true),
-			plan:        awsVal("new-key"),
-			wantError:   "Cloud partner configuration cannot be changed",
-			wantPartner: "aws",
-		},
-		{
-			// A wholly unknown partner-config object decides nothing at plan time.
-			name:  "unknown_partner_object_is_clean",
-			state: awsVal("old-key"),
-			plan:  tftypes.NewValue(partnerObjType, tftypes.UnknownValue),
-		},
-		{
-			// The end-config guard returns early, but checkPartnerConfigChange has already run.
-			name:        "csp_change_with_unknown_end_errors",
-			state:       awsVal("old-key"),
-			plan:        awsVal("new-key"),
+			// The end-config guard returns early, but the warning has already run.
+			name:        "null_state_warns_with_unknown_end",
+			state:       nullPartner,
+			plan:        ty.awsVal(knownKey("new-key")),
 			unknownEnd:  true,
-			wantError:   "Cloud partner configuration cannot be changed",
+			wantWarn:    "Partner configuration is recorded in state only",
 			wantPartner: "aws",
 		},
 	}
@@ -5049,28 +5001,26 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 		}
 		for _, tc := range tests {
 			t.Run(root+"/"+tc.name, func(t *testing.T) {
-				stateAttrs := nullValueMap(schemaObjType)
+				stateAttrs := nullValueMap(ty.obj)
 				stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
-				stateAttrs["a_end"] = endVal
-				stateAttrs["b_end"] = endVal
+				stateAttrs["a_end"] = ty.endVal
+				stateAttrs["b_end"] = ty.endVal
 				stateAttrs[root] = tc.state
-				stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
 
-				planAttrs := nullValueMap(schemaObjType)
+				planAttrs := nullValueMap(ty.obj)
 				planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
 				planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
-				planEndVal := endVal
+				planEndVal := ty.endVal
 				if tc.unknownEnd {
-					planEndVal = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+					planEndVal = tftypes.NewValue(ty.end, tftypes.UnknownValue)
 				}
 				planAttrs["a_end"] = planEndVal
 				planAttrs["b_end"] = planEndVal
 				planAttrs[root] = tc.plan
-				planVal := tftypes.NewValue(schemaObjType, planAttrs)
 
-				plan := tfsdk.Plan{Schema: s, Raw: planVal}
+				plan := tfsdk.Plan{Schema: ty.schema, Raw: tftypes.NewValue(ty.obj, planAttrs)}
 				req := fwresource.ModifyPlanRequest{
-					State: tfsdk.State{Schema: s, Raw: stateVal},
+					State: tfsdk.State{Schema: ty.schema, Raw: tftypes.NewValue(ty.obj, stateAttrs)},
 					Plan:  plan,
 				}
 				resp := fwresource.ModifyPlanResponse{Plan: plan}
@@ -5084,8 +5034,144 @@ func TestVXCModifyPlan_PartnerConfigChange(t *testing.T) {
 				if tc.wantPartner != "" {
 					mustContain = append(mustContain, fmt.Sprintf("%q", tc.wantPartner))
 				}
-				assertOneDiag(t, resp.Diagnostics.Errors(), tc.wantError, path.Root(root), mustContain...)
+				assertOneDiag(t, resp.Diagnostics.Errors(), "", path.Root(root))
 				assertOneDiag(t, resp.Diagnostics.Warnings(), tc.wantWarn, path.Root(root), mustContain...)
+			})
+		}
+	}
+}
+
+// TestCheckPartnerConfigUpdatable covers the gate Update runs before it sends
+// anything. The provider never sends a cloud partner config, and UpdateVXC
+// rejects any B-End config that is not "vrouter", so both have to fail the
+// apply rather than report a success the live VXC never saw.
+func TestCheckPartnerConfigUpdatable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ty := newVXCPartnerTestTypes(ctx, t)
+
+	nullPartner := tftypes.NewValue(ty.partner, nil)
+	knownKey := func(k string) tftypes.Value { return tftypes.NewValue(tftypes.String, k) }
+
+	// wantAEnd and wantBEnd name the partner the error must quote, or are empty
+	// when that end accepts the change.
+	tests := []struct {
+		name     string
+		state    tftypes.Value
+		plan     tftypes.Value
+		wantAEnd string
+		wantBEnd string
+	}{
+		{
+			name:     "csp_auth_key_change",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.awsVal(knownKey("new-key")),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "csp_partner_swap",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.partnerVal("azure"),
+			wantAEnd: "azure", wantBEnd: "azure",
+		},
+		{
+			name:  "csp_unchanged",
+			state: ty.awsVal(knownKey("same")),
+			plan:  ty.awsVal(knownKey("same")),
+		},
+		{
+			// The provider can send vrouter, but it never sent the live aws
+			// config and cannot unset it.
+			name:     "csp_state_to_vrouter",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.vrouterVal(true),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "csp_block_removed",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     nullPartner,
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "vrouter_state_to_csp",
+			state:    ty.vrouterVal(true),
+			plan:     ty.awsVal(knownKey("new-key")),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:  "vrouter_change",
+			state: ty.vrouterVal(false),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			// UpdateVXC returns ErrInvalidVXCBEndPartnerConfig for a B-End
+			// config that is not vrouter, so only the A-End may send transit.
+			name:     "vrouter_to_transit",
+			state:    ty.vrouterVal(true),
+			plan:     ty.partnerVal("transit"),
+			wantBEnd: "transit",
+		},
+		{
+			name:  "transit_to_vrouter",
+			state: ty.partnerVal("transit"),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			name:  "a_end_sentinel_to_vrouter",
+			state: ty.partnerVal("a-end"),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			// An imported VXC has no partner config in state. Adding a cloud
+			// one records it; ModifyPlan warns.
+			name:  "null_state_csp_is_recorded",
+			state: nullPartner,
+			plan:  ty.awsVal(knownKey("new-key")),
+		},
+		{
+			// Not the recorded-only case: the provider does try to send this,
+			// and the B-End cannot.
+			name:     "null_state_transit",
+			state:    nullPartner,
+			plan:     ty.partnerVal("transit"),
+			wantBEnd: "transit",
+		},
+		{
+			name:  "null_state_vrouter",
+			state: nullPartner,
+			plan:  ty.vrouterVal(true),
+		},
+	}
+
+	for _, root := range []string{"a_end_partner_config", "b_end_partner_config"} {
+		endLabel := "A-End"
+		if root == "b_end_partner_config" {
+			endLabel = "B-End"
+		}
+		for _, tc := range tests {
+			t.Run(root+"/"+tc.name, func(t *testing.T) {
+				wantPartner := tc.wantAEnd
+				if root == "b_end_partner_config" {
+					wantPartner = tc.wantBEnd
+				}
+
+				diags := diag.Diagnostics{}
+				checkPartnerConfigUpdatable(ctx,
+					ty.objectValue(ctx, t, tc.plan),
+					ty.objectValue(ctx, t, tc.state),
+					endLabel, root, &diags)
+
+				wantError := ""
+				mustContain := []string{endLabel}
+				if wantPartner != "" {
+					wantError = "Partner configuration cannot be changed on a live VXC"
+					mustContain = append(mustContain, fmt.Sprintf("%q", wantPartner))
+				}
+				assertOneDiag(t, diags.Errors(), wantError, path.Root(root), mustContain...)
+				if warns := diags.Warnings(); len(warns) != 0 {
+					t.Errorf("expected no warnings, got %v", warns)
+				}
 			})
 		}
 	}
@@ -5256,53 +5342,30 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	})
 }
 
-// TestVXCModifyPlan_PartnerConfigGateSkipsCreateAndDestroy pins the two guards
-// that keep checkPartnerConfigChange off the create and destroy walks. Without
-// them a first apply warns about a config it is about to send, and every
-// destroy of a cloud-partner VXC fails.
-func TestVXCModifyPlan_PartnerConfigGateSkipsCreateAndDestroy(t *testing.T) {
+// TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy pins the two
+// guards that keep the partner-config warning off the create and destroy
+// walks. Without them a first apply warns about a config it is about to send,
+// and every destroy of a cloud-partner VXC warns too.
+func TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := &vxcResource{}
-
-	schemaResp := fwresource.SchemaResponse{}
-	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
-	s := schemaResp.Schema
-
-	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
-	if !ok {
-		t.Fatal("schema type is not tftypes.Object")
-	}
-	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
-	if !ok {
-		t.Fatal("a_end type is not tftypes.Object")
-	}
-	partnerObjType, ok := schemaObjType.AttributeTypes["b_end_partner_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("b_end_partner_config type is not tftypes.Object")
-	}
-
-	endAttrs := nullValueMap(endObjType)
-	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
-	endVal := tftypes.NewValue(endObjType, endAttrs)
-
-	partnerAttrs := nullValueMap(partnerObjType)
-	partnerAttrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
-	partnerVal := tftypes.NewValue(partnerObjType, partnerAttrs)
+	ty := newVXCPartnerTestTypes(ctx, t)
+	s := ty.schema
 
 	vxcVal := func(withUID bool) tftypes.Value {
-		attrs := nullValueMap(schemaObjType)
+		attrs := nullValueMap(ty.obj)
 		attrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
 		attrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
-		attrs["a_end"] = endVal
-		attrs["b_end"] = endVal
-		attrs["b_end_partner_config"] = partnerVal
+		attrs["a_end"] = ty.endVal
+		attrs["b_end"] = ty.endVal
+		attrs["b_end_partner_config"] = ty.partnerVal("aws")
 		if withUID {
 			attrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
 		}
-		return tftypes.NewValue(schemaObjType, attrs)
+		return tftypes.NewValue(ty.obj, attrs)
 	}
-	nullVal := tftypes.NewValue(schemaObjType, nil)
+	nullVal := tftypes.NewValue(ty.obj, nil)
 
 	tests := []struct {
 		name  string
