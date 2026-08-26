@@ -308,7 +308,8 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	// or an update takes them from the plan. A null plan value is a removal the
 	// state has to follow: both attributes are Optional and not Computed, so
 	// keeping the old object would not match what Terraform planned. Read
-	// passes no plan and leaves state alone.
+	// passes no plan and leaves state alone. ModifyPlan rejects a removal the
+	// API cannot honor before it reaches here.
 	if plan != nil {
 		orm.AEndPartnerConfig = plan.AEndPartnerConfig
 		orm.BEndPartnerConfig = plan.BEndPartnerConfig

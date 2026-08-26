@@ -3066,6 +3066,16 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 
 	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
 
+	// A cloud partner config is ordered with the VXC and the API cannot unset
+	// it. Following the removal would clear state and leave the live
+	// configuration attached, with nothing left to replace on the next change.
+	if in.planPartnerConfig.IsNull() && isCSPPartnerConfig(ctx, *in.statePartnerConfig, in.diags) {
+		in.diags.AddError(
+			fmt.Sprintf("Cannot remove %s", in.partnerConfigPathRoot),
+			fmt.Sprintf("The %s block holds a cloud partner configuration. Megaport sets it when the VXC is ordered and cannot remove it. Put the block back in the configuration, or run terraform state rm to stop managing this VXC.", in.partnerConfigPathRoot),
+		)
+	}
+
 	// A changed CSP partner-config forces replacement.
 	if !in.statePartnerConfig.IsNull() && csp && !in.planPartnerConfig.Equal(*in.statePartnerConfig) {
 		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))

@@ -5136,6 +5136,100 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 	}
 }
 
+// TestReconcileVXCEnd_PartnerConfigRemoval covers dropping the partner config
+// block from a configuration. A cloud config is ordered with the VXC and the
+// API cannot unset it, so the plan has to fail rather than clear state over a
+// live configuration. The internal partner types carry no cloud state and are
+// removed without complaint.
+func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partnerWith := func(t *testing.T, name string) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+	end := func(t *testing.T) types.Object {
+		t.Helper()
+		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
+			RequestedProductUID: types.StringValue("port-x"),
+			CurrentProductUID:   types.StringValue("port-x"),
+		})
+		if d.HasError() {
+			t.Fatalf("build end object: %v", d.Errors())
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name         string
+		nullState    bool
+		statePartner string
+		wantError    bool
+	}{
+		{name: "removing_aws_errors", statePartner: "aws", wantError: true},
+		{name: "removing_azure_errors", statePartner: "azure", wantError: true},
+		{name: "removing_vrouter_is_allowed", statePartner: "vrouter", wantError: false},
+		{name: "removing_transit_is_allowed", statePartner: "transit", wantError: false},
+		{name: "null_state_is_allowed", nullState: true, wantError: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if !tc.nullState {
+				statePartner = partnerWith(t, tc.statePartner)
+			}
+			diags := diag.Diagnostics{}
+			var rr path.Paths
+
+			reconcileVXCEnd(ctx, vxcEndReconcileInput{
+				endLabel:              "A-End",
+				partnerConfigPathRoot: "a_end_partner_config",
+				planEndObj:            end(t),
+				stateEndObj:           end(t),
+				planPartnerConfig:     types.ObjectNull(vxcPartnerConfigAttrs),
+				statePartnerConfig:    &statePartner,
+				requiresReplace:       &rr,
+				diags:                 &diags,
+			})
+
+			if !tc.wantError {
+				if diags.HasError() {
+					t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+				}
+				return
+			}
+			if !diags.HasError() {
+				t.Fatal("expected an error removing a cloud partner config, got none")
+			}
+			if summary := diags.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
+				t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
+			}
+			// Removal must not also queue a replace: destroying a live cloud
+			// circuit over a deleted block is worse than refusing the plan.
+			if len(rr) != 0 {
+				t.Errorf("expected no requiresReplace, got %v", rr)
+			}
+		})
+	}
+}
+
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
 // whose A-End vrouter config declares two interfaces: a subInterface carrying
 // the tunnel source IP, and an ipSecTunnel interface with a single
