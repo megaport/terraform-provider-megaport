@@ -452,10 +452,10 @@ func TestBuildVrouterPartnerConfigFromAPI_OmittedScalarsStayNull(t *testing.T) {
 	assert.True(t, routes[0].Description.IsNull(), "an IP route description the API omitted must stay absent")
 }
 
-// TestBuildVrouterPartnerConfigFromAPI_PasswordWarning checks the user is told
-// about an MD5 password Terraform will not carry into state, because the first
-// apply after import would otherwise look complete when it is not.
-func TestBuildVrouterPartnerConfigFromAPI_PasswordWarning(t *testing.T) {
+// TestBuildVrouterPartnerConfigFromAPI_PasswordNotInState checks the read
+// password never reaches state. The caller warns about it, so the rebuild that
+// drops it stays silent.
+func TestBuildVrouterPartnerConfigFromAPI_PasswordNotInState(t *testing.T) {
 	ctx := context.Background()
 
 	conn := mcrVrouterConn("a_csp_connection")
@@ -464,9 +464,7 @@ func TestBuildVrouterPartnerConfigFromAPI_PasswordWarning(t *testing.T) {
 	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, conn, map[int]string{12345: "allow-in"})
 	require.False(t, diags.HasError())
 	require.False(t, obj.IsNull())
-	require.Equal(t, 1, diags.WarningsCount(), "the password warning; the interface warning is emitted by the caller")
-	assert.Contains(t, diags.Warnings()[0].Detail(), "169.254.145.217")
-	assert.NotContains(t, diags.Warnings()[0].Detail(), "liveMD5Key", "the warning must not echo the password")
+	assert.Equal(t, 0, diags.WarningsCount(), "the password warning belongs to the caller, which sees the skipped ends too")
 
 	bgps := vrouterBGPFromObject(t, ctx, obj)
 	require.Len(t, bgps, 1)
@@ -598,7 +596,7 @@ func TestFillVrouterPartnerConfigsOnImport_MatchesEndsByResourceName(t *testing.
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(bConn, aConn))
 	require.False(t, diags.HasError())
 	require.Equal(t, 1, diags.WarningsCount(), "the unreadable-field warning is emitted once for the VXC, not once per end")
-	assert.Equal(t, "Some interface settings cannot be imported", diags.Warnings()[0].Summary())
+	assert.Equal(t, "Some settings cannot be imported", diags.Warnings()[0].Summary())
 
 	require.False(t, state.AEndPartnerConfig.IsNull())
 	require.False(t, state.BEndPartnerConfig.IsNull())
@@ -630,12 +628,46 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	assert.Contains(t, diags.Warnings()[0].Detail(), "a_end_partner_config")
 	// A user writing this end by hand cannot see these either, so the warning
 	// has to reach a skipped end as well as a rebuilt one.
-	assert.Equal(t, "Some interface settings cannot be imported", diags.Warnings()[1].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel"} {
+	assert.Equal(t, "Some settings cannot be imported", diags.Warnings()[1].Summary())
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
 		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")
 	assert.True(t, state.BEndPartnerConfig.IsNull())
+}
+
+// TestFillVrouterPartnerConfigsOnImport_PasswordWarningReachesSkippedEnd covers
+// an end Terraform cannot rebuild. The user has to write that end by hand, and
+// a live MD5 password is the one setting the portal will not show them.
+func TestFillVrouterPartnerConfigsOnImport_PasswordWarningReachesSkippedEnd(t *testing.T) {
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	first := mcrVrouterConn("a_csp_connection")
+	first.Interfaces[0].BGPConnections[0].Password = "liveMD5Key"
+	second := mcrVrouterConn("a_csp_connection")
+	second.Interfaces[0].BGPConnections[0].PeerIpAddress = "169.254.200.1"
+	second.Interfaces[0].BGPConnections[0].Password = "otherMD5Key"
+
+	state := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(first, second))
+	require.False(t, diags.HasError())
+	require.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end is never rebuilt, so no builder warning can reach the user")
+
+	details := []string{}
+	for _, w := range diags.Warnings() {
+		if w.Summary() != "A BGP connection has a password Terraform did not import" {
+			continue
+		}
+		assert.NotContains(t, w.Detail(), "MD5Key", "the warning must not echo the password")
+		details = append(details, w.Detail())
+	}
+	require.Len(t, details, 2, "every connection is scanned, matched or not")
+	assert.Contains(t, details[0], "169.254.145.217")
+	assert.Contains(t, details[1], "169.254.200.1")
 }
 
 // TestFillVrouterPartnerConfigsOnImport_NoVrouterConnections covers a VXC with

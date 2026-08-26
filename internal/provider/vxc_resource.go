@@ -1179,7 +1179,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild and warns when the API returns one, so add the password to the configuration before the next apply. Other partner types are not populated on import.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild and warns when the API returns one, so add the password to the configuration before the next apply. Other partner types are not populated on import.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -2090,6 +2090,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 			if !ok {
 				continue
 			}
+			warnImportedBGPPasswords(vr, &diags)
 			switch vr.ResourceName {
 			case "a_csp_connection":
 				byEnd["a"] = append(byEnd["a"], vr)
@@ -2143,17 +2144,34 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 		}
 	}
 
-	// megalith replaces a_csp_request wholesale on an update, so an interface
-	// setting Terraform never read is dropped by the next apply. A skipped end
-	// needs the same warning: the user writing it by hand cannot see them either.
+	// megalith replaces a_csp_request wholesale on an update, so a setting
+	// Terraform never read is dropped by the next apply. A skipped end needs the
+	// same warning: the user writing it by hand cannot see them either.
 	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
 		diags.AddWarning(
-			"Some interface settings cannot be imported",
-			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. They are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces in the Megaport portal and add any setting they use to the configuration before the next apply.",
+			"Some settings cannot be imported",
+			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply.",
 		)
 	}
 
 	return diags
+}
+
+// warnImportedBGPPasswords names every peer whose session uses an MD5 password.
+// It runs before the end matching, so a connection Terraform cannot place warns
+// too: the user reconstructing that end by hand cannot see the password either.
+func warnImportedBGPPasswords(conn megaport.CSPConnectionVirtualRouter, diags *diag.Diagnostics) {
+	for _, iface := range conn.Interfaces {
+		for _, bgp := range iface.BGPConnections {
+			if bgp.Password == "" {
+				continue
+			}
+			diags.AddWarning(
+				"A BGP connection has a password Terraform did not import",
+				fmt.Sprintf("The BGP connection to peer %s authenticates with an MD5 password. Terraform leaves passwords out of state, so add it to the configuration by hand before the next apply.", bgp.PeerIpAddress),
+			)
+		}
+	}
 }
 
 // prefixFilterMapForVrouterConn returns an ID to description map for the prefix

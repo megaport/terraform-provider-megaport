@@ -1088,13 +1088,13 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // the CSP VirtualRouter data on a VXC read. It returns a null object when the
 // API data cannot produce a faithful config, so the caller leaves state alone.
 //
-// Three groups of attributes stay null. The BGP password is deliberate: the API
+// Some attributes always stay null. The BGP password is deliberate: the API
 // does return it, and writing it would persist a live MD5 key in plain text in
-// state, so this warns instead. megaportgo does not model the interface-level
-// ip_mtu, vlan, description, interface_type, packet filters or IPsec tunnel
-// options; the caller warns about those, because they are missing whether or
-// not this rebuild runs. megalith does not re-serialize the interface bfd
-// block at all.
+// state. megaportgo does not model the interface-level ip_mtu, vlan,
+// description, interface_type, packet filters or IPsec tunnel options, and the
+// read never echoes permit_export_to or deny_export_to. megalith does not
+// re-serialize the interface bfd block at all. The caller warns about all of
+// these, because they are missing whether or not this rebuild runs.
 func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 	if len(vrConn.Interfaces) == 0 {
@@ -1207,13 +1207,6 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 						return types.ObjectNull(vxcPartnerConfigAttrs), diags
 					}
 					*pfl.dst = name
-				}
-
-				if apiBgp.Password != "" {
-					diags.AddWarning(
-						"A BGP connection has a password Terraform did not import",
-						fmt.Sprintf("The BGP connection to peer %s authenticates with an MD5 password. Terraform leaves passwords out of state, so add it to the configuration by hand before the next apply.", apiBgp.PeerIpAddress),
-					)
 				}
 
 				bgpModels = append(bgpModels, bgpModel)
