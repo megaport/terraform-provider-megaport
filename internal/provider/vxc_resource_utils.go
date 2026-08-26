@@ -1070,3 +1070,195 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 	}
 	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
 }
+
+// prefixFilterIDToName resolves a prefix filter list ID to its description.
+// The second return is false when a set ID is missing from the map, which means
+// the caller cannot rebuild the config faithfully.
+func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue, bool) {
+	if id == 0 {
+		return types.StringNull(), true
+	}
+	if name, ok := pflMap[id]; ok {
+		return types.StringValue(name), true
+	}
+	return types.StringNull(), false
+}
+
+// buildVrouterPartnerConfigFromAPI builds a vrouter partner config object from
+// the CSP VirtualRouter data on a VXC read. It returns a null object when the
+// API data cannot produce a faithful config, so the caller leaves state alone.
+//
+// Three groups of attributes stay null. The BGP password is deliberate: the API
+// does return it, and writing it would persist a live MD5 key in plain text in
+// state, so this warns instead. megaportgo does not model the interface-level
+// ip_mtu, vlan, description, interface_type or packet filters. megalith does not
+// re-serialize the interface bfd block at all.
+func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
+	diags := diag.Diagnostics{}
+	if len(vrConn.Interfaces) == 0 {
+		return types.ObjectNull(vxcPartnerConfigAttrs), diags
+	}
+
+	interfaceModels := make([]vxcPartnerConfigInterfaceModel, 0, len(vrConn.Interfaces))
+	for _, apiIface := range vrConn.Interfaces {
+		ifaceModel := vxcPartnerConfigInterfaceModel{
+			IpMtu:              types.Int64Null(),
+			VLAN:               types.Int64Null(),
+			Description:        types.StringNull(),
+			InterfaceType:      types.StringNull(),
+			PacketFilterIn:     types.Int64Null(),
+			PacketFilterOut:    types.Int64Null(),
+			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			IPAddresses:        types.ListNull(types.StringType),
+			NatIPAddresses:     types.ListNull(types.StringType),
+			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+			Bfd:                types.ObjectNull(bfdConfigAttrs),
+			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		}
+
+		if len(apiIface.IPAddresses) > 0 {
+			ipList, ipDiags := types.ListValueFrom(ctx, types.StringType, apiIface.IPAddresses)
+			diags.Append(ipDiags...)
+			ifaceModel.IPAddresses = ipList
+		}
+
+		if len(apiIface.NatIPAddresses) > 0 {
+			natList, natDiags := types.ListValueFrom(ctx, types.StringType, apiIface.NatIPAddresses)
+			diags.Append(natDiags...)
+			ifaceModel.NatIPAddresses = natList
+		}
+
+		if len(apiIface.IPRoutes) > 0 {
+			routeModels := make([]ipRouteModel, 0, len(apiIface.IPRoutes))
+			for _, r := range apiIface.IPRoutes {
+				routeModels = append(routeModels, ipRouteModel{
+					Prefix:      types.StringValue(r.Prefix),
+					Description: stringOrNull(r.Description),
+					NextHop:     types.StringValue(r.NextHop),
+				})
+			}
+			routeList, routeDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), routeModels)
+			diags.Append(routeDiags...)
+			ifaceModel.IPRoutes = routeList
+		}
+
+		if len(apiIface.BGPConnections) > 0 {
+			bgpModels := make([]bgpConnectionConfigModel, 0, len(apiIface.BGPConnections))
+			for _, apiBgp := range apiIface.BGPConnections {
+				// The API omits every optional BGP attribute it has no value
+				// for, and megaportgo decodes those to zero values. Writing a
+				// zero value would make the user restate it in the
+				// configuration, and peer_type "" fails its own validator.
+				bgpModel := bgpConnectionConfigModel{
+					PeerAsn:            types.Int64Value(int64(apiBgp.PeerAsn)),
+					PeerType:           stringOrNull(apiBgp.PeerType),
+					LocalIPAddress:     types.StringValue(apiBgp.LocalIpAddress),
+					PeerIPAddress:      types.StringValue(apiBgp.PeerIpAddress),
+					Password:           types.StringNull(),
+					Shutdown:           boolOrNull(apiBgp.Shutdown),
+					Description:        stringOrNull(apiBgp.Description),
+					MedIn:              int64OrNull(apiBgp.MedIn),
+					MedOut:             int64OrNull(apiBgp.MedOut),
+					BfdEnabled:         boolOrNull(apiBgp.BfdEnabled),
+					ExportPolicy:       stringOrNull(apiBgp.ExportPolicy),
+					AsPathPrependCount: int64OrNull(apiBgp.AsPathPrependCount),
+					LocalAsn:           types.Int64Null(),
+					AsOverride:         types.BoolNull(),
+					PermitExportTo:     types.ListNull(types.StringType),
+					DenyExportTo:       types.ListNull(types.StringType),
+				}
+				if apiBgp.LocalAsn != nil {
+					bgpModel.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))
+				}
+				if apiBgp.AsOverride != nil {
+					bgpModel.AsOverride = types.BoolValue(*apiBgp.AsOverride)
+				}
+				if len(apiBgp.PermitExportTo) > 0 {
+					permitList, permitDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.PermitExportTo)
+					diags.Append(permitDiags...)
+					bgpModel.PermitExportTo = permitList
+				}
+				if len(apiBgp.DenyExportTo) > 0 {
+					denyList, denyDiags := types.ListValueFrom(ctx, types.StringType, apiBgp.DenyExportTo)
+					diags.Append(denyDiags...)
+					bgpModel.DenyExportTo = denyList
+				}
+
+				// An unresolved ID would write a null filter over a live one, so
+				// abandon the whole config rather than report a partial one.
+				for _, pfl := range []struct {
+					id   int
+					name string
+					dst  *basetypes.StringValue
+				}{
+					{apiBgp.ImportWhitelist, "import_whitelist", &bgpModel.ImportWhitelist},
+					{apiBgp.ImportBlacklist, "import_blacklist", &bgpModel.ImportBlacklist},
+					{apiBgp.ExportWhitelist, "export_whitelist", &bgpModel.ExportWhitelist},
+					{apiBgp.ExportBlacklist, "export_blacklist", &bgpModel.ExportBlacklist},
+				} {
+					name, ok := prefixFilterIDToName(pfl.id, pflMap)
+					if !ok {
+						diags.AddWarning(
+							"Could not resolve a BGP prefix filter list",
+							fmt.Sprintf("The BGP connection to peer %s uses prefix filter list ID %d for %s, but no list with that ID exists on the endpoint. Terraform left the partner configuration out of state. Add it to the configuration by hand.", apiBgp.PeerIpAddress, pfl.id, pfl.name),
+						)
+						return types.ObjectNull(vxcPartnerConfigAttrs), diags
+					}
+					*pfl.dst = name
+				}
+
+				if apiBgp.Password != "" {
+					diags.AddWarning(
+						"A BGP connection has a password Terraform did not import",
+						fmt.Sprintf("The BGP connection to peer %s authenticates with an MD5 password. Terraform leaves passwords out of state, so add it to the configuration by hand before the next apply.", apiBgp.PeerIpAddress),
+					)
+				}
+
+				bgpModels = append(bgpModels, bgpModel)
+			}
+			bgpList, bgpDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig), bgpModels)
+			diags.Append(bgpDiags...)
+			ifaceModel.BgpConnections = bgpList
+		}
+
+		interfaceModels = append(interfaceModels, ifaceModel)
+	}
+
+	ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), interfaceModels)
+	diags.Append(ifaceDiags...)
+	vrouterObj, vrouterDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vxcPartnerConfigVrouterModel{Interfaces: ifaceList})
+	diags.Append(vrouterDiags...)
+
+	obj, objDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, &vxcPartnerConfigurationModel{
+		Partner:              types.StringValue("vrouter"),
+		VrouterPartnerConfig: vrouterObj,
+		AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
+		AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
+		GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
+		OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
+		IBMPartnerConfig:     types.ObjectNull(vxcPartnerConfigIbmAttrs),
+		PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
+	})
+	diags.Append(objDiags...)
+	if diags.HasError() {
+		return types.ObjectNull(vxcPartnerConfigAttrs), diags
+	}
+	return obj, diags
+}
+
+// boolOrNull and int64OrNull are stringOrNull for the other two scalar kinds: a
+// zero value maps back to null, so an attribute the API omitted stays absent
+// instead of arriving as a default.
+func boolOrNull(v bool) basetypes.BoolValue {
+	if !v {
+		return types.BoolNull()
+	}
+	return types.BoolValue(v)
+}
+
+func int64OrNull(v int) basetypes.Int64Value {
+	if v == 0 {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(v))
+}

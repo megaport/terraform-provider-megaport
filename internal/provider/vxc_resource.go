@@ -1179,7 +1179,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It never writes a BGP password to state and warns when one is set, so add it to the configuration before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It never writes a BGP password to state and warns when one is set, so add it to the configuration before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -2043,20 +2043,137 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
+	// ImportState writes product_uid and nothing else, so a null product_name,
+	// which the schema marks Required, means this is the read after an import.
+	imported := state.Name.IsNull()
+
 	// In Read, state should preserve its own values, so pass nil
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, nil)
 	resp.Diagnostics.Append(apiDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if imported {
+		resp.Diagnostics.Append(r.fillVrouterPartnerConfigsOnImport(ctx, &state, vxc)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
+}
 
-	aEndConfig := &vxcEndConfigurationModel{}
-	bEndConfig := &vxcEndConfigurationModel{}
-	aEndConfigDiags := state.AEndConfiguration.As(ctx, aEndConfig, basetypes.ObjectAsOptions{})
-	bEndConfigDiags := state.BEndConfiguration.As(ctx, bEndConfig, basetypes.ObjectAsOptions{})
-	resp.Diagnostics.Append(aEndConfigDiags...)
-	resp.Diagnostics.Append(bEndConfigDiags...)
+// fillVrouterPartnerConfigsOnImport rebuilds the vrouter partner config for both
+// ends of a freshly imported VXC. ImportState writes only product_uid, so Read
+// has no plan to copy a config from and both ends would stay null forever.
+//
+// This runs on the read after an import and nowhere else. a_end_partner_config
+// is Optional and not Computed, so a config written on a normal refresh, where
+// the user's configuration has none, would plan its own removal on every apply.
+func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, state *vxcResourceModel, v *megaport.VXC) diag.Diagnostics {
+	diags := diag.Diagnostics{}
+
+	// megalith names every CSP connection after the end it belongs to,
+	// a_csp_connection or b_csp_connection, and pairs the two ends on that
+	// prefix. The VLAN on the connection is a NetAuto passthrough that does not
+	// have to match the end, so the name is the only reliable link.
+	byEnd := map[string][]megaport.CSPConnectionVirtualRouter{}
+	unlabeled := 0
+	if v.Resources != nil && v.Resources.CSPConnection != nil {
+		for _, c := range v.Resources.CSPConnection.CSPConnection {
+			vr, ok := c.(megaport.CSPConnectionVirtualRouter)
+			if !ok {
+				continue
+			}
+			label, _, found := strings.Cut(vr.ResourceName, "_")
+			if !found {
+				unlabeled++
+				continue
+			}
+			byEnd[label] = append(byEnd[label], vr)
+		}
+	}
+	// Without the label there is no safe way to pick an end, and staying silent
+	// would look like a VXC that has no router configuration at all.
+	if unlabeled > 0 {
+		diags.AddWarning(
+			"Could not match a VXC end to its router configuration",
+			fmt.Sprintf("The API returned %d virtual router connections with no end name, so Terraform could not tell which end they belong to. Add the partner configuration by hand.", unlabeled),
+		)
+	}
+
+	for _, end := range []struct {
+		label  string
+		uid    string
+		name   string
+		target *types.Object
+	}{
+		{label: "a", uid: v.AEndConfiguration.UID, name: "a_end_partner_config", target: &state.AEndPartnerConfig},
+		{label: "b", uid: v.BEndConfiguration.UID, name: "b_end_partner_config", target: &state.BEndPartnerConfig},
+	} {
+		matched := byEnd[end.label]
+		if len(matched) == 0 {
+			continue
+		}
+		// Attaching the wrong end's BGP config would rewrite a live session on
+		// the next apply, so an ambiguous match reports nothing.
+		if len(matched) > 1 {
+			diags.AddWarning(
+				"Could not match a VXC end to its router configuration",
+				fmt.Sprintf("The API reported %d virtual router connections for the %s end of this VXC, so Terraform could not tell which one belongs to %s. Add the configuration by hand.", len(matched), end.label, end.name),
+			)
+			continue
+		}
+
+		pflMap, ok := r.prefixFilterMapForVrouterConn(ctx, matched[0], end.uid, end.name, &diags)
+		if !ok {
+			continue
+		}
+		obj, buildDiags := buildVrouterPartnerConfigFromAPI(ctx, matched[0], pflMap)
+		diags.Append(buildDiags...)
+		if !obj.IsNull() {
+			*end.target = obj
+		}
+	}
+
+	return diags
+}
+
+// prefixFilterMapForVrouterConn returns an ID to description map for the prefix
+// filter lists on an endpoint. It skips the API call when no BGP connection
+// references a list. The bool is false when the lookup failed, which means the
+// caller must not rebuild the config.
+func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn megaport.CSPConnectionVirtualRouter, uid, name string, diags *diag.Diagnostics) (map[int]string, bool) {
+	referenced := false
+	for _, iface := range conn.Interfaces {
+		for _, bgp := range iface.BGPConnections {
+			if bgp.ImportWhitelist != 0 || bgp.ImportBlacklist != 0 || bgp.ExportWhitelist != 0 || bgp.ExportBlacklist != 0 {
+				referenced = true
+			}
+		}
+	}
+	if !referenced {
+		return nil, true
+	}
+
+	lists, err := r.vrouterPrefixFilterListsForEndpoint(ctx, uid)
+	if err != nil {
+		diags.AddWarning(
+			"Could not read the prefix filter lists for a VXC end",
+			fmt.Sprintf("Terraform could not list the prefix filter lists on %s, so it left %s out of state: %s", uid, name, err.Error()),
+		)
+		return nil, false
+	}
+	pflMap := make(map[int]string, len(lists))
+	for _, pfl := range lists {
+		if pfl != nil {
+			pflMap[pfl.Id] = pfl.Description
+		}
+	}
+	return pflMap, true
 }
 
 func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {

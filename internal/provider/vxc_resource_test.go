@@ -3960,11 +3960,13 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
-			// Step 2: Import the VXC
+			// Step 2: Import the VXC. The read returns the BGP session, so the
+			// vrouter partner config must land in state. Full verification is
+			// not possible because the provider leaves the BGP password out.
 			{
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
-				ImportStateVerify:                    false, // We expect differences initially
+				ImportStateVerify:                    false,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					resourceName := "megaport_vxc.vxc"
@@ -3977,6 +3979,46 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 						}
 					}
 					return rawState["product_uid"], nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					if len(states) != 1 {
+						return fmt.Errorf("expected 1 imported state, got %d", len(states))
+					}
+					attrs := states[0].Attributes
+					const bgp = "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0."
+					want := map[string]string{
+						"a_end_partner_config.partner":                                    "vrouter",
+						"a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.0": "10.0.0.1/30",
+						bgp + "peer_asn":         "64512",
+						bgp + "local_ip_address": "10.0.0.1",
+						bgp + "peer_ip_address":  "10.0.0.2",
+					}
+					for k, v := range want {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					// One interface with one session, not a duplicate or an
+					// empty shell.
+					counts := map[string]string{
+						"a_end_partner_config.vrouter_config.interfaces.#":                   "1",
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.#": "1",
+						"a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.#":    "1",
+					}
+					for k, v := range counts {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					if got := attrs[bgp+"password"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", bgp+"password", got)
+					}
+					// The b end is a port, so it has no vrouter config to
+					// rebuild and must stay absent.
+					if got := attrs["b_end_partner_config.partner"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", "b_end_partner_config.partner", got)
+					}
+					return nil
 				},
 			},
 			// Step 3: Apply the same config - this reconciles state after import
