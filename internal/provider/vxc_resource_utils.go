@@ -316,8 +316,8 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 func (orm *vxcResourceModel) reconcilePartnerConfigs(ctx context.Context, v *megaport.VXC, plan *vxcResourceModel, client *megaport.Client) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
-	// Partner configs are user-only values the API does not return, so the plan
-	// wins on Create and Update.
+	// The API echoes only part of a partner config, so the plan wins on Create
+	// and Update. Read has no plan and merges instead.
 	if plan != nil {
 		if !plan.AEndPartnerConfig.IsNull() {
 			orm.AEndPartnerConfig = plan.AEndPartnerConfig
@@ -497,9 +497,16 @@ func mergeVrouterPartnerConfigFromAPI(
 					}
 				}
 			}
-			// Second pass: fill remaining unmatched entries positionally.
+			// Second pass: fill entries that carry no peer IP positionally.
+			// A state peer IP with no API match means the Portal edited or
+			// removed that peer, and both are out of scope, so state wins.
+			// Pairing it with a leftover API slot would copy another peer's
+			// settings onto it.
 			for bgpIdx := range existingBgps {
-				if matchedIdx[bgpIdx] == -1 && bgpIdx < len(apiIface.BGPConnections) && !apiUsed[bgpIdx] {
+				if matchedIdx[bgpIdx] != -1 || existingBgps[bgpIdx].PeerIPAddress.ValueString() != "" {
+					continue
+				}
+				if bgpIdx < len(apiIface.BGPConnections) && !apiUsed[bgpIdx] {
 					matchedIdx[bgpIdx] = bgpIdx
 					apiUsed[bgpIdx] = true
 				}

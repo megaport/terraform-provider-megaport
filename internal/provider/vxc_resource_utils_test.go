@@ -643,6 +643,54 @@ func TestMergeVrouterPartnerConfigFromAPI_MatchesByPeerIP(t *testing.T) {
 	assertInt64(t, "bgp1 peer_asn", bgps[1].PeerAsn, 65013)
 }
 
+// TestMergeVrouterPartnerConfigFromAPI_NoPositionalFallbackWithPeerIP checks
+// that a state peer whose IP the API no longer reports keeps its own settings.
+// The positional fallback must not hand it the leftover API slot, which belongs
+// to a different peer.
+func TestMergeVrouterPartnerConfigFromAPI_NoPositionalFallbackWithPeerIP(t *testing.T) {
+	ctx := context.Background()
+
+	bgpA := nullBGPModel()
+	bgpA.PeerAsn = types.Int64Value(64512)
+	bgpA.PeerIPAddress = types.StringValue("10.0.0.2")
+
+	bgpB := nullBGPModel()
+	bgpB.PeerAsn = types.Int64Value(64513)
+	bgpB.PeerIPAddress = types.StringValue("10.0.1.2")
+
+	existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{bgpA, bgpB})
+
+	// The API no longer reports 10.0.1.2 and reports 10.0.9.9 in its slot.
+	vrConn := megaport.CSPConnectionVirtualRouter{
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
+			{
+				BGPConnections: []megaport.BgpConnectionConfig{
+					{PeerAsn: 65012, PeerIpAddress: "10.0.0.2"},
+					{PeerAsn: 65099, PeerIpAddress: "10.0.9.9"},
+				},
+			},
+		},
+	}
+
+	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+
+	iface := extractInterfaceFromResult(t, ctx, result)
+	bgps := []*bgpConnectionConfigModel{}
+	if d := iface.BgpConnections.ElementsAs(ctx, &bgps, false); d.HasError() {
+		t.Fatalf("failed to extract BGP connections: %s", d.Errors())
+	}
+	if len(bgps) != 2 {
+		t.Fatalf("expected 2 BGP connections, got %d", len(bgps))
+	}
+
+	assertInt64(t, "bgp0 peer_asn", bgps[0].PeerAsn, 65012)
+	assertString(t, "bgp1 peer_ip", bgps[1].PeerIPAddress, "10.0.1.2")
+	assertInt64(t, "bgp1 peer_asn", bgps[1].PeerAsn, 64513)
+}
+
 // TestMergeVrouterPartnerConfigFromAPI_PreservesUnresolvedPrefixFilter verifies
 // that when the API returns a non-zero prefix filter ID the provider can't
 // resolve to a name (no client to look it up), the existing state name is kept

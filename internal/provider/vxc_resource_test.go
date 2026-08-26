@@ -3994,7 +3994,9 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
-					// Verify BGP attributes are readable from state after import reconciliation
+					// ImportStatePersist is off in step 2, so this resumes from
+					// step 1's state. It checks that a refresh keeps every BGP
+					// field the config set.
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_asn", "64512"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.local_ip_address", "10.0.0.1"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.peer_ip_address", "10.0.0.2"),
