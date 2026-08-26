@@ -1179,7 +1179,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It never writes a BGP password to state and warns when one is set, so add it to the configuration before the next apply. Other partner types are not populated on import.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild and warns when the API returns one, so add the password to the configuration before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It never writes a BGP password to state and warns when one is set, so add it to the configuration before the next apply. Other partner types are not populated on import.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild and warns when the API returns one, so add the password to the configuration before the next apply. Other partner types are not populated on import.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
