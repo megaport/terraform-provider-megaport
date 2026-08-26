@@ -150,8 +150,12 @@ var (
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly.
-	// The a-end schema exposes only these 5 of the 11 interface attributes.
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
+	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
+	// shape; on decode into the model, unmatched attrs remain null, and on
+	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
+	// this map to match the struct breaks encoding with a Value Conversion
+	// Error because the framework requires attr.Type ↔ schema equality.
 	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
