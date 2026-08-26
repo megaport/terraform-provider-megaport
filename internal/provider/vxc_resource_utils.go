@@ -1092,9 +1092,11 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // does return it, and writing it would persist a live MD5 key in plain text in
 // state. megaportgo does not model the interface-level ip_mtu, vlan,
 // description, interface_type, packet filters or IPsec tunnel options, and the
-// read never echoes permit_export_to or deny_export_to. megalith does not
-// re-serialize the interface bfd block at all. The caller warns about all of
-// these, because they are missing whether or not this rebuild runs.
+// read never echoes permit_export_to or deny_export_to. The caller warns about
+// those, because they are missing whether or not this rebuild runs. The
+// interface bfd block is the one exception. megalith does not re-serialize it
+// and NetAuto discards it. A warning would name a setting the API cannot
+// accept.
 func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 	if len(vrConn.Interfaces) == 0 {
