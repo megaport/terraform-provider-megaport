@@ -4946,7 +4946,9 @@ func (ty vxcPartnerTestTypes) objectValue(ctx context.Context, t *testing.T, raw
 // outage: no partner-config shape may make ModifyPlan propose a replacement,
 // because the replacement it used to propose decommissioned two live AWS VXCs.
 // ModifyPlan also must not fail the plan, so an explicit replacement still
-// works. The one diagnostic it raises is the post-import warning.
+// works. It raises no partner-config diagnostic at all: Terraform runs
+// ModifyPlan on both the plan walk and the apply walk, so the post-import
+// warning lives in the Update gate instead.
 func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -4958,12 +4960,10 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 	unknownKey := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
 
 	tests := []struct {
-		name        string
-		state       tftypes.Value
-		plan        tftypes.Value
-		unknownEnd  bool
-		wantWarn    string
-		wantPartner string
+		name       string
+		state      tftypes.Value
+		plan       tftypes.Value
+		unknownEnd bool
 	}{
 		{name: "csp_auth_key_change", state: ty.awsVal(knownKey("old-key")), plan: ty.awsVal(knownKey("new-key"))},
 		{name: "csp_partner_swap", state: ty.awsVal(knownKey("old-key")), plan: ty.partnerVal("azure")},
@@ -4978,44 +4978,32 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 		{name: "unknown_partner", state: ty.awsVal(knownKey("old-key")), plan: ty.unknownPartnerVal()},
 		{name: "unknown_partner_object", state: ty.awsVal(knownKey("old-key")), plan: tftypes.NewValue(ty.partner, tftypes.UnknownValue)},
 		{
-			// An imported VXC has no partner config in state, so adding one is
-			// recorded rather than sent.
-			name:        "null_state_warns",
-			state:       nullPartner,
-			plan:        ty.awsVal(knownKey("new-key")),
-			wantWarn:    "Partner configuration is recorded in state only",
-			wantPartner: "aws",
+			// An imported VXC has no partner config in state. Adding one is the
+			// case the Update gate warns about; the plan stays silent.
+			name:  "null_state",
+			state: nullPartner,
+			plan:  ty.awsVal(knownKey("new-key")),
 		},
 		{
-			// An unknown partner reads back as "", which must not be taken for a
-			// cloud partner and warned about on the import path.
 			name:  "unknown_partner_null_state",
 			state: nullPartner,
 			plan:  ty.unknownPartnerVal(),
 		},
 		{
-			// A wholly unknown config classifies as no partner at all, so the
-			// import-path warning stays quiet until it resolves.
 			name:  "unknown_partner_object_null_state",
 			state: nullPartner,
 			plan:  tftypes.NewValue(ty.partner, tftypes.UnknownValue),
 		},
 		{
-			// The end-config guard returns early, but the warning has already run.
-			name:        "null_state_warns_with_unknown_end",
-			state:       nullPartner,
-			plan:        ty.awsVal(knownKey("new-key")),
-			unknownEnd:  true,
-			wantWarn:    "Partner configuration is recorded in state only",
-			wantPartner: "aws",
+			// The end-config guard returns before the partner classifier runs.
+			name:       "null_state_with_unknown_end",
+			state:      nullPartner,
+			plan:       ty.awsVal(knownKey("new-key")),
+			unknownEnd: true,
 		},
 	}
 
 	for _, root := range []string{"a_end_partner_config", "b_end_partner_config"} {
-		endLabel := "A-End"
-		if root == "b_end_partner_config" {
-			endLabel = "B-End"
-		}
 		for _, tc := range tests {
 			t.Run(root+"/"+tc.name, func(t *testing.T) {
 				stateAttrs := nullValueMap(ty.obj)
@@ -5047,12 +5035,8 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 				if len(resp.RequiresReplace) != 0 {
 					t.Errorf("expected no RequiresReplace, got %v", resp.RequiresReplace)
 				}
-				mustContain := []string{endLabel}
-				if tc.wantPartner != "" {
-					mustContain = append(mustContain, fmt.Sprintf("%q", tc.wantPartner))
-				}
 				assertOneDiag(t, resp.Diagnostics.Errors(), "", path.Root(root))
-				assertOneDiag(t, resp.Diagnostics.Warnings(), tc.wantWarn, path.Root(root), mustContain...)
+				assertOneDiag(t, resp.Diagnostics.Warnings(), "", path.Root(root))
 			})
 		}
 	}
@@ -5061,7 +5045,8 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 // TestCheckPartnerConfigUpdatable covers the gate Update runs before it sends
 // anything. The provider never sends a cloud partner config, and UpdateVXC
 // rejects any B-End config that is not "vrouter", so both have to fail the
-// apply rather than report a success the live VXC never saw.
+// apply rather than report a success the live VXC never saw. The gate also
+// owns the post-import warning, so Update emits it once per apply.
 func TestCheckPartnerConfigUpdatable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -5071,13 +5056,15 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 	knownKey := func(k string) tftypes.Value { return tftypes.NewValue(tftypes.String, k) }
 
 	// wantAEnd and wantBEnd name the partner the error must quote, or are empty
-	// when that end accepts the change.
+	// when that end accepts the change. wantWarnPartner names the partner the
+	// post-import warning must quote, on both ends.
 	tests := []struct {
-		name     string
-		state    tftypes.Value
-		plan     tftypes.Value
-		wantAEnd string
-		wantBEnd string
+		name            string
+		state           tftypes.Value
+		plan            tftypes.Value
+		wantAEnd        string
+		wantBEnd        string
+		wantWarnPartner string
 	}{
 		{
 			name:     "csp_auth_key_change",
@@ -5158,10 +5145,11 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 		},
 		{
 			// An imported VXC has no partner config in state. Adding a cloud
-			// one records it; ModifyPlan warns.
-			name:  "null_state_csp_is_recorded",
-			state: nullPartner,
-			plan:  ty.awsVal(knownKey("new-key")),
+			// one records it and warns.
+			name:            "null_state_csp_is_recorded",
+			state:           nullPartner,
+			plan:            ty.awsVal(knownKey("new-key")),
+			wantWarnPartner: "aws",
 		},
 		{
 			// Not the recorded-only case: the provider does try to send this,
@@ -5209,9 +5197,14 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 					mustContain = append(mustContain, fmt.Sprintf("%q", wantPartner))
 				}
 				assertOneDiag(t, diags.Errors(), wantError, path.Root(root), mustContain...)
-				if warns := diags.Warnings(); len(warns) != 0 {
-					t.Errorf("expected no warnings, got %v", warns)
+
+				wantWarn := ""
+				warnContain := []string{endLabel}
+				if tc.wantWarnPartner != "" {
+					wantWarn = "Partner configuration is recorded in state only"
+					warnContain = append(warnContain, fmt.Sprintf("%q", tc.wantWarnPartner))
 				}
+				assertOneDiag(t, diags.Warnings(), wantWarn, path.Root(root), warnContain...)
 			})
 		}
 	}

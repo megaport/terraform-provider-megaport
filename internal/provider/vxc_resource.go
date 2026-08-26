@@ -2806,14 +2806,6 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
 
-			// Classify before the guard below returns on an unknown end, so an
-			// unknown end does not skip the warning.
-			aEndPartner, aEndPlanCSP := classifyPartner(ctx, plan.AEndPartnerConfig, &resp.Diagnostics)
-			bEndPartner, bEndPlanCSP := classifyPartner(ctx, plan.BEndPartnerConfig, &resp.Diagnostics)
-
-			warnPartnerConfigRecordedOnly(aEndPartner, aEndPlanCSP, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &resp.Diagnostics)
-			warnPartnerConfigRecordedOnly(bEndPartner, bEndPlanCSP, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &resp.Diagnostics)
-
 			// Skip the UID reconciliation below if any end-config object is wholly
 			// unknown or null. Unknown objects arise from conditional expressions
 			// referencing resources not yet applied; both unknown and null objects
@@ -2823,6 +2815,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
 				return
 			}
+
+			_, aEndPlanCSP := classifyPartner(ctx, plan.AEndPartnerConfig, &resp.Diagnostics)
+			_, bEndPlanCSP := classifyPartner(ctx, plan.BEndPartnerConfig, &resp.Diagnostics)
 
 			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
 				endLabel:    "A-End",
@@ -2908,20 +2903,6 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	return newPlanObj
 }
 
-// warnPartnerConfigRecordedOnly tells the user that a cloud partner config
-// added to a VXC with none in state is recorded, not sent. The API does not
-// return a partner config, so this is the state after an import.
-func warnPartnerConfigRecordedOnly(planPartner types.String, planCSP bool, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
-	if !planCSP || planPartner.IsUnknown() || !statePartnerConfig.IsNull() {
-		return
-	}
-	diags.AddAttributeWarning(
-		path.Root(partnerConfigPathRoot),
-		"Partner configuration is recorded in state only",
-		fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC.", endLabel, planPartner.ValueString()),
-	)
-}
-
 // vxcPartnersSendableOnUpdate lists the partner configurations the provider
 // sends for each end on update. UpdateVXC rejects any B-End configuration that
 // is not "vrouter". Cloud partners appear on neither end.
@@ -2940,7 +2921,8 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 // cannot carry out, so the apply fails instead of reporting a success that
 // never reached the live VXC. Three changes qualify: removing the block, any
 // change to an end whose live config is a cloud partner, and a partner the
-// provider does not send for that end.
+// provider does not send for that end. A cloud partner added to an end that
+// has none in state is recorded instead, and warns.
 func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
@@ -2948,9 +2930,15 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 	planPartner, planCSP := classifyPartner(ctx, planPartnerConfig, diags)
 	statePartner, stateCSP := classifyPartner(ctx, statePartnerConfig, diags)
 
-	// A null state with a cloud partner in the plan is the post-import case.
-	// Record it and warn, as ModifyPlan already did.
+	// A null state with a cloud partner in the plan is the post-import case:
+	// the config is recorded, not sent. Warn here rather than in ModifyPlan,
+	// which Terraform runs on both the plan walk and the apply walk.
 	if statePartnerConfig.IsNull() && planCSP {
+		diags.AddAttributeWarning(
+			path.Root(partnerConfigPathRoot),
+			"Partner configuration is recorded in state only",
+			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC.", endLabel, planPartner.ValueString()),
+		)
 		return
 	}
 
