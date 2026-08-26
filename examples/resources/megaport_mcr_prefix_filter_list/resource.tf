@@ -14,7 +14,8 @@ resource "megaport_mcr_prefix_filter_list" "ipv4_example" {
     {
       action = "permit"
       prefix = "172.16.0.0/12"
-      # ge and le are optional - if not specified, exact match on prefix length
+      # ge and le are optional. An omitted ge defaults to the prefix length.
+      # An omitted le defaults to 32 (IPv4) or 128 (IPv6), so this entry permits /12 through /32.
     },
     {
       action = "deny"

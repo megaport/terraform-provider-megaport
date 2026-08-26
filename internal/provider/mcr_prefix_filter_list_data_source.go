@@ -170,11 +170,17 @@ func (d *mcrPrefixFilterListDataSource) Read(ctx context.Context, req datasource
 		// Convert entries
 		entryObjects := []types.Object{}
 		for _, entry := range detailedList.Entries {
+			ge, le, geLeDiags := resolveGeLe(entry)
+			resp.Diagnostics.Append(geLeDiags...)
+			if geLeDiags.HasError() {
+				continue
+			}
+
 			entryModel := &mcrPrefixFilterListEntryResourceModel{
 				Action: types.StringValue(entry.Action),
 				Prefix: types.StringValue(entry.Prefix),
-				Ge:     types.Int64Value(int64(entry.Ge)),
-				Le:     types.Int64Value(int64(entry.Le)),
+				Ge:     types.Int64Value(int64(ge)),
+				Le:     types.Int64Value(int64(le)),
 			}
 
 			entryObj, entryDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListEntryAttributes, entryModel)

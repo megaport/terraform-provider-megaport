@@ -402,10 +402,9 @@ func TestAccMegaportMCRPrefixFilterList_IPv6(t *testing.T) {
 	})
 }
 
-// TestAccMegaportMCRPrefixFilterList_ExactMatch tests the exact match prefix filter entries
-// This specifically tests the normalization fix for when the Megaport API returns le=32 (IPv4)
-// or le=128 (IPv6) instead of the exact match value configured by the user.
-// See PR #308 for details on the bug fix.
+// TestAccMegaportMCRPrefixFilterList_ExactMatch covers entries whose ge and le are
+// equal. The API leaves a bound out when it equals the prefix length, so the entries
+// that match on their own prefix length come back with both fields absent.
 func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
@@ -531,7 +530,6 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 				),
 			},
 			// Step 2: Run plan again to ensure no drift is detected (idempotency check)
-			// This is the critical test - if normalization doesn't work, this step will fail
 			{
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "test_location" {
@@ -612,11 +610,7 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.ipv6_exact", "entries.1.le", "64"),
 				),
 			},
-			// Step 3: Test import of exact match prefix filter lists
-			// Note: During import, we return raw API values (le=32 for IPv4).
-			// This is intentional - import shows actual API state, and users can
-			// adjust their HCL to match their desired configuration (exact match or range).
-			// After the first apply with user's config, normalization works correctly.
+			// Step 3: Test import of exact match prefix filter lists.
 			{
 				ResourceName:      "megaport_mcr_prefix_filter_list.ipv4_exact",
 				ImportState:       true,
@@ -638,11 +632,7 @@ func TestAccMegaportMCRPrefixFilterList_ExactMatch(t *testing.T) {
 					}
 					return fmt.Sprintf("%s:%s", mcrUID, prefixListID), nil
 				},
-				// Ignore 'le' fields during import verify because the API returns le=32 (max)
-				// for exact match entries. During normal operation, we normalize this back to
-				// the user's configured value (ge=le). But during import, we can't know the
-				// user's intention, so we return raw API values.
-				ImportStateVerifyIgnore: []string{"last_updated", "entries.0.le", "entries.1.le", "entries.2.le"},
+				ImportStateVerifyIgnore: []string{"last_updated"},
 			},
 		},
 	})
@@ -785,8 +775,7 @@ func TestAccMegaportMCRPrefixFilterList_MixedExactAndRange(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.ge", "24"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.1.le", "28"),
 
-					// Entry 2: Full range to max - user explicitly configured le=32
-					// With the fix, this should NOT be normalized since the plan has le=32
+					// Entry 2: an explicit le at the family maximum has to survive the read
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.ge", "16"),
 					resource.TestCheckResourceAttr("megaport_mcr_prefix_filter_list.mixed", "entries.2.le", "32"),
 
