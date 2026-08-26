@@ -720,7 +720,60 @@ func TestFillVrouterPartnerConfigsOnImport_UnlabeledConnection(t *testing.T) {
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("")))
 	assert.False(t, diags.HasError())
 	require.Equal(t, 1, diags.WarningsCount())
-	assert.Contains(t, diags.Warnings()[0].Detail(), "no end name")
+	assert.Contains(t, diags.Warnings()[0].Detail(), "neither a_csp_connection nor b_csp_connection")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
+}
+
+// TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName covers names
+// that are not the two megalith uses. Reading "a_unrelated" as the a end would
+// attach a stranger's BGP session to a live circuit.
+func TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName(t *testing.T) {
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	state := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+
+	vxc := importVXC(mcrVrouterConn("a_unrelated"), mcrVrouterConn("c_csp_connection"))
+	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
+	assert.False(t, diags.HasError())
+	require.Equal(t, 1, diags.WarningsCount())
+	// Both are reported, so a name megalith stops sending cannot go silent.
+	assert.Contains(t, diags.Warnings()[0].Detail(), "2 virtual router connections")
+	assert.True(t, state.AEndPartnerConfig.IsNull())
+	assert.True(t, state.BEndPartnerConfig.IsNull())
+}
+
+// TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription covers a
+// referenced list whose description another list shares. Writing the shared
+// description would import a config that the next update rejects as ambiguous.
+func TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription(t *testing.T) {
+	ctx := context.Background()
+	products := &MockProductService{
+		GetProductTypeFunc: func(_ context.Context, uid string) (string, error) {
+			return megaport.PRODUCT_MCR, nil
+		},
+	}
+	mcrs := &MockMCRService{
+		ListMCRPrefixFilterListsResult: []*megaport.PrefixFilterList{
+			{Id: 12345, Description: "allow-in"},
+			{Id: 67890, Description: "allow-in"},
+		},
+	}
+	r := &vxcResource{client: &megaport.Client{ProductService: products, MCRService: mcrs}}
+
+	state := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+
+	// mcrVrouterConn references list 12345 on its BGP connection.
+	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("a_csp_connection")))
+	assert.False(t, diags.HasError())
+	require.Equal(t, 1, diags.WarningsCount())
+	assert.Contains(t, diags.Warnings()[0].Detail(), "shares the description")
+	assert.True(t, state.AEndPartnerConfig.IsNull())
 }

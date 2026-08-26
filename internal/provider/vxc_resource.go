@@ -2076,32 +2076,36 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, state *vxcResourceModel, v *megaport.VXC) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
-	// megalith names every CSP connection after the end it belongs to,
-	// a_csp_connection or b_csp_connection, and pairs the two ends on that
-	// prefix. The VLAN on the connection is a NetAuto passthrough that does not
-	// have to match the end, so the name is the only reliable link.
+	// megalith names every CSP connection after the end it belongs to, and
+	// pairs the two ends on that name. Only those two names pick an end: any
+	// other value is a name Terraform cannot place, and guessing at it would
+	// attach the wrong end's BGP config. The VLAN on the connection is a
+	// NetAuto passthrough that does not have to match the end, so the name is
+	// the only reliable link.
 	byEnd := map[string][]megaport.CSPConnectionVirtualRouter{}
-	unlabeled := 0
+	unmatched := 0
 	if v.Resources != nil && v.Resources.CSPConnection != nil {
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
 			vr, ok := c.(megaport.CSPConnectionVirtualRouter)
 			if !ok {
 				continue
 			}
-			label, _, found := strings.Cut(vr.ResourceName, "_")
-			if !found {
-				unlabeled++
-				continue
+			switch vr.ResourceName {
+			case "a_csp_connection":
+				byEnd["a"] = append(byEnd["a"], vr)
+			case "b_csp_connection":
+				byEnd["b"] = append(byEnd["b"], vr)
+			default:
+				unmatched++
 			}
-			byEnd[label] = append(byEnd[label], vr)
 		}
 	}
 	// Without the label there is no safe way to pick an end, and staying silent
 	// would look like a VXC that has no router configuration at all.
-	if unlabeled > 0 {
+	if unmatched > 0 {
 		diags.AddWarning(
 			"Could not match a VXC end to its router configuration",
-			fmt.Sprintf("The API returned %d virtual router connections with no end name, so Terraform could not tell which end they belong to. Add the partner configuration by hand.", unlabeled),
+			fmt.Sprintf("The API returned %d virtual router connections named neither a_csp_connection nor b_csp_connection, so Terraform could not tell which end they belong to. Add the partner configuration by hand.", unmatched),
 		)
 	}
 
@@ -2147,15 +2151,17 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 // references a list. The bool is false when the lookup failed, which means the
 // caller must not rebuild the config.
 func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn megaport.CSPConnectionVirtualRouter, uid, name string, diags *diag.Diagnostics) (map[int]string, bool) {
-	referenced := false
+	referenced := map[int]bool{}
 	for _, iface := range conn.Interfaces {
 		for _, bgp := range iface.BGPConnections {
-			if bgp.ImportWhitelist != 0 || bgp.ImportBlacklist != 0 || bgp.ExportWhitelist != 0 || bgp.ExportBlacklist != 0 {
-				referenced = true
+			for _, id := range []int{bgp.ImportWhitelist, bgp.ImportBlacklist, bgp.ExportWhitelist, bgp.ExportBlacklist} {
+				if id != 0 {
+					referenced[id] = true
+				}
 			}
 		}
 	}
-	if !referenced {
+	if len(referenced) == 0 {
 		return nil, true
 	}
 
@@ -2168,9 +2174,23 @@ func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn me
 		return nil, false
 	}
 	pflMap := make(map[int]string, len(lists))
+	perDescription := map[string]int{}
 	for _, pfl := range lists {
 		if pfl != nil {
 			pflMap[pfl.Id] = pfl.Description
+			perDescription[pfl.Description]++
+		}
+	}
+	// State holds the description, and an update resolves it back to an ID. A
+	// description two lists share resolves to neither, so writing it would
+	// import a config that no later apply can send.
+	for id := range referenced {
+		if desc, ok := pflMap[id]; ok && perDescription[desc] > 1 {
+			diags.AddWarning(
+				"Could not name a prefix filter list for a VXC end",
+				fmt.Sprintf("Prefix filter list %d on %s shares the description %q with another list, so Terraform left %s out of state. Give the lists unique descriptions, then import again.", id, uid, desc, name),
+			)
+			return nil, false
 		}
 	}
 	return pflMap, true
