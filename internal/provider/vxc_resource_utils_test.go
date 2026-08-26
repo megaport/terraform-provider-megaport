@@ -463,7 +463,7 @@ func TestBuildVrouterPartnerConfigFromAPI_PasswordWarning(t *testing.T) {
 	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, conn, map[int]string{12345: "allow-in"})
 	require.False(t, diags.HasError())
 	require.False(t, obj.IsNull())
-	require.Equal(t, 1, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount(), "the password warning and the interface warning")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "169.254.145.217")
 	assert.NotContains(t, diags.Warnings()[0].Detail(), "liveMD5Key", "the warning must not echo the password")
 
@@ -479,6 +479,14 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 
 	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, mcrVrouterConn("a_csp_connection"), map[int]string{12345: "allow-in"})
 	require.False(t, diags.HasError())
+
+	// An update replaces the whole interface, so a setting Terraform never
+	// read is dropped by the next apply. Only the user can see them.
+	require.Equal(t, 1, diags.WarningsCount())
+	assert.Equal(t, "Some interface settings were not imported", diags.Warnings()[0].Summary())
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel"} {
+		assert.Contains(t, diags.Warnings()[0].Detail(), attr)
+	}
 
 	partner := &vxcPartnerConfigurationModel{}
 	require.False(t, obj.As(ctx, partner, basetypes.ObjectAsOptions{}).HasError())
@@ -594,7 +602,8 @@ func TestFillVrouterPartnerConfigsOnImport_MatchesEndsByResourceName(t *testing.
 	}
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(bConn, aConn))
 	require.False(t, diags.HasError())
-	assert.Equal(t, 0, diags.WarningsCount(), "unexpected warnings: %v", diags.Warnings())
+	require.Equal(t, 1, diags.WarningsCount(), "both ends warn the same way, and Append drops the duplicate")
+	assert.Equal(t, "Some interface settings were not imported", diags.Warnings()[0].Summary())
 
 	require.False(t, state.AEndPartnerConfig.IsNull())
 	require.False(t, state.BEndPartnerConfig.IsNull())

@@ -1091,8 +1091,9 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // Three groups of attributes stay null. The BGP password is deliberate: the API
 // does return it, and writing it would persist a live MD5 key in plain text in
 // state, so this warns instead. megaportgo does not model the interface-level
-// ip_mtu, vlan, description, interface_type or packet filters. megalith does not
-// re-serialize the interface bfd block at all.
+// ip_mtu, vlan, description, interface_type, packet filters or IPsec tunnel
+// options, which warns too, because an apply drops what it cannot see.
+// megalith does not re-serialize the interface bfd block at all.
 func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 	if len(vrConn.Interfaces) == 0 {
@@ -1223,6 +1224,14 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 
 		interfaceModels = append(interfaceModels, ifaceModel)
 	}
+
+	// megalith replaces a_csp_request wholesale on an update rather than
+	// merging it, so an interface setting Terraform never read is dropped by
+	// the next apply that touches this config. Only the user can see these.
+	diags.AddWarning(
+		"Some interface settings were not imported",
+		"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. They are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces in the Megaport portal and add any setting they use to the configuration before the next apply.",
+	)
 
 	ifaceList, ifaceDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), interfaceModels)
 	diags.Append(ifaceDiags...)
