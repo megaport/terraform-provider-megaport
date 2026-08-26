@@ -2143,6 +2143,16 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 		}
 	}
 
+	// megalith replaces a_csp_request wholesale on an update, so an interface
+	// setting Terraform never read is dropped by the next apply. A skipped end
+	// needs the same warning: the user writing it by hand cannot see them either.
+	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
+		diags.AddWarning(
+			"Some interface settings cannot be imported",
+			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. They are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces in the Megaport portal and add any setting they use to the configuration before the next apply.",
+		)
+	}
+
 	return diags
 }
 

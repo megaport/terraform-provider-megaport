@@ -464,7 +464,7 @@ func TestBuildVrouterPartnerConfigFromAPI_PasswordWarning(t *testing.T) {
 	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, conn, map[int]string{12345: "allow-in"})
 	require.False(t, diags.HasError())
 	require.False(t, obj.IsNull())
-	require.Equal(t, 2, diags.WarningsCount(), "the password warning and the interface warning")
+	require.Equal(t, 1, diags.WarningsCount(), "the password warning; the interface warning is emitted by the caller")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "169.254.145.217")
 	assert.NotContains(t, diags.Warnings()[0].Detail(), "liveMD5Key", "the warning must not echo the password")
 
@@ -481,13 +481,7 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, mcrVrouterConn("a_csp_connection"), map[int]string{12345: "allow-in"})
 	require.False(t, diags.HasError())
 
-	// An update replaces the whole interface, so a setting Terraform never
-	// read is dropped by the next apply. Only the user can see them.
-	require.Equal(t, 1, diags.WarningsCount())
-	assert.Equal(t, "Some interface settings were not imported", diags.Warnings()[0].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel"} {
-		assert.Contains(t, diags.Warnings()[0].Detail(), attr)
-	}
+	require.Equal(t, 0, diags.WarningsCount(), "the unreadable-field warning belongs to the caller, which sees the skipped ends too")
 
 	partner := &vxcPartnerConfigurationModel{}
 	require.False(t, obj.As(ctx, partner, basetypes.ObjectAsOptions{}).HasError())
@@ -603,8 +597,8 @@ func TestFillVrouterPartnerConfigsOnImport_MatchesEndsByResourceName(t *testing.
 	}
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(bConn, aConn))
 	require.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount(), "both ends warn the same way, and Append drops the duplicate")
-	assert.Equal(t, "Some interface settings were not imported", diags.Warnings()[0].Summary())
+	require.Equal(t, 1, diags.WarningsCount(), "the unreadable-field warning is emitted once for the VXC, not once per end")
+	assert.Equal(t, "Some interface settings cannot be imported", diags.Warnings()[0].Summary())
 
 	require.False(t, state.AEndPartnerConfig.IsNull())
 	require.False(t, state.BEndPartnerConfig.IsNull())
@@ -632,8 +626,14 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount())
 	assert.Contains(t, diags.Warnings()[0].Detail(), "a_end_partner_config")
+	// A user writing this end by hand cannot see these either, so the warning
+	// has to reach a skipped end as well as a rebuilt one.
+	assert.Equal(t, "Some interface settings cannot be imported", diags.Warnings()[1].Summary())
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel"} {
+		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
+	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")
 	assert.True(t, state.BEndPartnerConfig.IsNull())
 }
@@ -652,6 +652,7 @@ func TestFillVrouterPartnerConfigsOnImport_NoVrouterConnections(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, &megaport.VXC{})
 	assert.False(t, diags.HasError())
+	assert.Equal(t, 0, diags.WarningsCount(), "a VXC with no router end has no unreadable interface to warn about")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
 }
@@ -729,7 +730,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnlabeledConnection(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount(), "the unmatched end, and what no end can read")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "neither a_csp_connection nor b_csp_connection")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
@@ -750,7 +751,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName(t *testing.T) 
 	vxc := importVXC(mcrVrouterConn("a_unrelated"), mcrVrouterConn("c_csp_connection"))
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount(), "the unmatched ends, and what no end can read")
 	// Both are reported, so a name megalith stops sending cannot go silent.
 	assert.Contains(t, diags.Warnings()[0].Detail(), "2 virtual router connections")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
@@ -806,7 +807,7 @@ func TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription(t *tes
 	// mcrVrouterConn references list 12345 on its BGP connection.
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("a_csp_connection")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount(), "the shared description, and what the end cannot read")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "shares the description")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 }
