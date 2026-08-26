@@ -2202,7 +2202,7 @@ func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn me
 		if desc, ok := pflMap[id]; ok && perDescription[desc] > 1 {
 			diags.AddWarning(
 				"Could not name a prefix filter list for a VXC end",
-				fmt.Sprintf("Prefix filter list %d on %s shares the description %q with another list, so Terraform left %s out of state. Give the lists unique descriptions, then import again.", id, uid, desc, name),
+				fmt.Sprintf("Prefix filter list %d on %s shares the description %q with another list, so Terraform left %s out of state. Give the lists unique descriptions, then run terraform state rm on this VXC and import it again.", id, uid, desc, name),
 			)
 			return nil, false
 		}
