@@ -29,11 +29,11 @@ func TestPrefixFilterIDToName(t *testing.T) {
 		wantVal  string
 	}{
 		{
-			name:     "zero ID returns null even when existing is set",
+			name:     "zero ID preserves existing value",
 			id:       0,
 			pflMap:   pflMap,
 			existing: types.StringValue("old-filter"),
-			wantNull: true,
+			wantVal:  "old-filter",
 		},
 		{
 			name:    "known ID returns name",
@@ -676,8 +676,9 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesUnresolvedPrefixFilter(t *tes
 	assertString(t, "import_whitelist", bgp.ImportWhitelist, "my-import-filter")
 }
 
-// TestPickVrouterCSPConn covers selection by the API resource name, the single
-// unlabeled connection fallback, and no match.
+// TestPickVrouterCSPConn covers selection by the API resource name and no
+// match. An unlabeled connection must not match either end: claiming it would
+// merge the same connection into both.
 func TestPickVrouterCSPConn(t *testing.T) {
 	labeled := []megaport.CSPConnectionVirtualRouter{
 		{ResourceName: "a_csp_connection"},
@@ -686,8 +687,8 @@ func TestPickVrouterCSPConn(t *testing.T) {
 	if got := pickVrouterCSPConn(labeled, "b_csp_connection"); got != 1 {
 		t.Errorf("expected index 1 for b_csp_connection, got %d", got)
 	}
-	if got := pickVrouterCSPConn([]megaport.CSPConnectionVirtualRouter{{}}, "a_csp_connection"); got != 0 {
-		t.Errorf("expected index 0 for a single unlabeled connection, got %d", got)
+	if got := pickVrouterCSPConn([]megaport.CSPConnectionVirtualRouter{{}}, "a_csp_connection"); got != -1 {
+		t.Errorf("expected -1 for an unlabeled connection, got %d", got)
 	}
 	if got := pickVrouterCSPConn(labeled, "unknown"); got != -1 {
 		t.Errorf("expected -1 when no connection matches, got %d", got)
@@ -744,7 +745,7 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesEchoOmittedFields(t *testing.
 // the API.
 func TestMergeVrouterPartnerConfigFromAPI_PointerFields(t *testing.T) {
 	ctx := context.Background()
-	apiLocalAsn, apiAsOverride := 65001, true
+	apiLocalAsn, apiAsOverride := 65001, false
 
 	tests := []struct {
 		name           string
@@ -756,13 +757,13 @@ func TestMergeVrouterPartnerConfigFromAPI_PointerFields(t *testing.T) {
 			name:           "API omits both, state wins",
 			apiBGP:         megaport.BgpConnectionConfig{PeerIpAddress: "10.0.0.2"},
 			wantLocalAsn:   65000,
-			wantAsOverride: false,
+			wantAsOverride: true,
 		},
 		{
 			name:           "API returns both, API wins",
 			apiBGP:         megaport.BgpConnectionConfig{PeerIpAddress: "10.0.0.2", LocalAsn: &apiLocalAsn, AsOverride: &apiAsOverride},
 			wantLocalAsn:   65001,
-			wantAsOverride: true,
+			wantAsOverride: false,
 		},
 	}
 
@@ -771,7 +772,7 @@ func TestMergeVrouterPartnerConfigFromAPI_PointerFields(t *testing.T) {
 			stateBGP := nullBGPModel()
 			stateBGP.PeerIPAddress = types.StringValue("10.0.0.2")
 			stateBGP.LocalAsn = types.Int64Value(65000)
-			stateBGP.AsOverride = types.BoolValue(false)
+			stateBGP.AsOverride = types.BoolValue(true)
 
 			existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP})
 			vrConn := megaport.CSPConnectionVirtualRouter{
@@ -819,98 +820,6 @@ func TestAnyPrefixFilterListsConfigured(t *testing.T) {
 			t.Error("expected true when import_whitelist is configured")
 		}
 	})
-}
-
-// buildVrouterConfigWithRoutes builds a vrouter partner config object with a single
-// interface carrying the given IP routes (and no BGP connections).
-func buildVrouterConfigWithRoutes(t *testing.T, ctx context.Context, routes []ipRouteModel) basetypes.ObjectValue {
-	t.Helper()
-
-	routeList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), routes)
-	if diags.HasError() {
-		t.Fatalf("failed to create route list: %s", diags.Errors())
-	}
-
-	ifaceModel := vxcPartnerConfigInterfaceModel{
-		IPAddresses:        types.ListNull(types.StringType),
-		IPRoutes:           routeList,
-		NatIPAddresses:     types.ListNull(types.StringType),
-		Bfd:                types.ObjectNull(bfdConfigAttrs),
-		BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
-		VLAN:               types.Int64Null(),
-		IpMtu:              types.Int64Null(),
-		IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
-	}
-
-	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{ifaceModel})
-	if diags.HasError() {
-		t.Fatalf("failed to create interface list: %s", diags.Errors())
-	}
-
-	vrouterModel := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
-	vrouterObj, diags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterModel)
-	if diags.HasError() {
-		t.Fatalf("failed to create vrouter object: %s", diags.Errors())
-	}
-
-	partnerConfigModel := &vxcPartnerConfigurationModel{
-		Partner:              types.StringValue("vrouter"),
-		AWSPartnerConfig:     types.ObjectNull(vxcPartnerConfigAWSAttrs),
-		AzurePartnerConfig:   types.ObjectNull(vxcPartnerConfigAzureAttrs),
-		GooglePartnerConfig:  types.ObjectNull(vxcPartnerConfigGoogleAttrs),
-		OraclePartnerConfig:  types.ObjectNull(vxcPartnerConfigOracleAttrs),
-		IBMPartnerConfig:     types.ObjectNull(vxcPartnerConfigIbmAttrs),
-		VrouterPartnerConfig: vrouterObj,
-		PartnerAEndConfig:    types.ObjectNull(vxcPartnerConfigAEndAttrs),
-	}
-
-	obj, diags := types.ObjectValueFrom(ctx, vxcPartnerConfigAttrs, partnerConfigModel)
-	if diags.HasError() {
-		t.Fatalf("failed to create partner config object: %s", diags.Errors())
-	}
-	return obj
-}
-
-func TestMergeVrouterPartnerConfigFromAPI_PreservesIPRouteDescription(t *testing.T) {
-	ctx := context.Background()
-
-	// User configured one route with no description and one with a description.
-	existing := buildVrouterConfigWithRoutes(t, ctx, []ipRouteModel{
-		{Prefix: types.StringValue("10.0.0.0/24"), Description: types.StringNull(), NextHop: types.StringValue("10.0.0.1")},
-		{Prefix: types.StringValue("10.0.1.0/24"), Description: types.StringValue("kept"), NextHop: types.StringValue("10.0.0.1")},
-	})
-
-	// API echoes both routes but omits both descriptions (omitempty -> "").
-	vrConn := megaport.CSPConnectionVirtualRouter{
-		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
-			{
-				IPRoutes: []megaport.IpRoute{
-					{Prefix: "10.0.0.0/24", NextHop: "10.0.0.1"},
-					{Prefix: "10.0.1.0/24", NextHop: "10.0.0.1"},
-				},
-			},
-		},
-	}
-
-	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
-	if diags.HasError() {
-		t.Fatalf("unexpected error: %s", diags.Errors())
-	}
-
-	iface := extractInterfaceFromResult(t, ctx, result)
-	var routes []ipRouteModel
-	if d := iface.IPRoutes.ElementsAs(ctx, &routes, false); d.HasError() {
-		t.Fatalf("failed to extract routes: %s", d.Errors())
-	}
-	require.Len(t, routes, 2)
-
-	byPrefix := map[string]ipRouteModel{}
-	for _, r := range routes {
-		byPrefix[r.Prefix.ValueString()] = r
-	}
-	// Unset description stays null (no false drift); configured one is preserved.
-	assert.True(t, byPrefix["10.0.0.0/24"].Description.IsNull(), "expected null description preserved as null")
-	assertString(t, "description", byPrefix["10.0.1.0/24"].Description, "kept")
 }
 
 // TestVerifyUpdateApplied covers the -1 (requested untagged) / 0 (API
@@ -1004,5 +913,109 @@ func TestVerifyUpdateApplied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, r.verifyUpdateApplied(tc.vxc, tc.updateReq))
 		})
+	}
+}
+
+// TestReconcilePartnerConfigs_NullPlanConfigPreservesState covers the guard on
+// the plan copy. Nothing clears a partner config API-side, so letting a null
+// plan value reach state reports success while the BGP peers stay live on the
+// device with no record in Terraform.
+func TestReconcilePartnerConfigs_NullPlanConfigPreservesState(t *testing.T) {
+	ctx := context.Background()
+
+	stateBGP := nullBGPModel()
+	stateBGP.PeerIPAddress = types.StringValue("10.0.0.2")
+	stateBGP.PeerAsn = types.Int64Value(64512)
+
+	orm := &vxcResourceModel{
+		AEndPartnerConfig: buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP}),
+	}
+
+	diags := orm.reconcilePartnerConfigs(ctx, &megaport.VXC{}, &vxcResourceModel{}, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+	if orm.AEndPartnerConfig.IsNull() {
+		t.Error("a null plan config wiped the state config; the plan copy must stay null-guarded")
+	}
+}
+
+// TestMergeVrouterPartnerConfigFromAPI_PreservesOmittedScalars covers peer_asn,
+// local_ip_address and peer_ip_address. megalith types all three nullable, so an
+// omitted key decodes to the Go zero value. Writing that back wipes state, and
+// losing peer_ip_address also destroys the key later reads match on.
+func TestMergeVrouterPartnerConfigFromAPI_PreservesOmittedScalars(t *testing.T) {
+	ctx := context.Background()
+
+	stateBGP := nullBGPModel()
+	stateBGP.PeerAsn = types.Int64Value(64512)
+	stateBGP.LocalIPAddress = types.StringValue("10.0.0.1/30")
+	stateBGP.PeerIPAddress = types.StringValue("10.0.0.2")
+
+	existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP})
+	vrConn := megaport.CSPConnectionVirtualRouter{
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
+			{BGPConnections: []megaport.BgpConnectionConfig{{}}},
+		},
+	}
+
+	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+
+	bgp := extractBGPFromResult(t, ctx, result)
+	assertInt64(t, "peer_asn", bgp.PeerAsn, 64512)
+	assertString(t, "local_ip_address", bgp.LocalIPAddress, "10.0.0.1/30")
+	assertString(t, "peer_ip_address", bgp.PeerIPAddress, "10.0.0.2")
+}
+
+// mockProductService and mockNATGatewayService implement only the method the
+// dispatch test calls. The embedded interface satisfies the rest and panics if
+// anything else is reached.
+type mockProductService struct {
+	megaport.ProductService
+	productType string
+}
+
+func (m *mockProductService) GetProductType(_ context.Context, _ string) (string, error) {
+	return m.productType, nil
+}
+
+type mockNATGatewayService struct {
+	megaport.NATGatewayService
+	calledWith string
+	lists      []*megaport.NATGatewayPrefixListSummary
+}
+
+func (m *mockNATGatewayService) ListNATGatewayPrefixLists(_ context.Context, productUID string) ([]*megaport.NATGatewayPrefixListSummary, error) {
+	m.calledWith = productUID
+	return m.lists, nil
+}
+
+// TestVrouterPrefixFilterListsForEndpoint_NATGateway covers the product-type
+// dispatch. A NAT Gateway serves its prefix lists from a different endpoint, so
+// resolving one through the MCR service fails on every refresh.
+func TestVrouterPrefixFilterListsForEndpoint_NATGateway(t *testing.T) {
+	ctx := context.Background()
+	ngw := &mockNATGatewayService{
+		lists: []*megaport.NATGatewayPrefixListSummary{
+			{ID: 42, Description: "ngw-list", AddressFamily: "IPv4"},
+		},
+	}
+	client := &megaport.Client{
+		ProductService:    &mockProductService{productType: megaport.PRODUCT_NAT_GATEWAY},
+		NATGatewayService: ngw,
+	}
+
+	got, err := vrouterPrefixFilterListsForEndpoint(ctx, client, "ngw-uid")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if ngw.calledWith != "ngw-uid" {
+		t.Errorf("expected the NAT Gateway service to receive ngw-uid, got %q", ngw.calledWith)
+	}
+	if len(got) != 1 || got[0].Id != 42 || got[0].Description != "ngw-list" {
+		t.Fatalf("unexpected prefix filter lists: %+v", got)
 	}
 }

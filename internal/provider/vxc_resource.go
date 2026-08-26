@@ -530,16 +530,16 @@ func (r *vxcResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Any other endpoint type (Port, MVE, etc.) has no prefix-list collection,
 // so we return nil — the lookup loops then become no-ops, which is the
 // correct behaviour for non-vrouter endpoints.
-func (r *vxcResource) vrouterPrefixFilterListsForEndpoint(ctx context.Context, productUID string) ([]*megaport.PrefixFilterList, error) {
-	productType, err := r.client.ProductService.GetProductType(ctx, productUID)
+func vrouterPrefixFilterListsForEndpoint(ctx context.Context, client *megaport.Client, productUID string) ([]*megaport.PrefixFilterList, error) {
+	productType, err := client.ProductService.GetProductType(ctx, productUID)
 	if err != nil {
 		return nil, err
 	}
 	switch {
 	case strings.EqualFold(productType, megaport.PRODUCT_MCR):
-		return r.client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
+		return client.MCRService.ListMCRPrefixFilterLists(ctx, productUID)
 	case strings.EqualFold(productType, megaport.PRODUCT_NAT_GATEWAY):
-		summaries, err := r.client.NATGatewayService.ListNATGatewayPrefixLists(ctx, productUID)
+		summaries, err := client.NATGatewayService.ListNATGatewayPrefixLists(ctx, productUID)
 		if err != nil {
 			return nil, err
 		}
@@ -1526,7 +1526,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1561,7 +1561,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(aEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, a.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, a.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -1856,7 +1856,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				resp.Diagnostics.Append(bEndDiags...)
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, b.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, b.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating VXC",
@@ -2330,7 +2330,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndPlan.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, aEndPlan.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2359,7 +2359,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, aEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, aEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
@@ -2412,7 +2412,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			prefixFilterList, err := r.vrouterPrefixFilterListsForEndpoint(ctx, bEndState.RequestedProductUID.ValueString())
+			prefixFilterList, err := vrouterPrefixFilterListsForEndpoint(ctx, r.client, bEndState.RequestedProductUID.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating VXC",
