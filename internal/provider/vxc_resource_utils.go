@@ -514,9 +514,13 @@ func mergeVrouterPartnerConfigFromAPI(
 
 				// Update a field only when state has it and the API echoed a
 				// real value: megalith types these nullable, so an omitted key
-				// decodes to the Go zero value. shutdown and bfd_enabled are
-				// plain bools, so omitted and false are indistinguishable and
-				// state alone gates them.
+				// decodes to the Go zero value.
+				//
+				// shutdown and bfd_enabled are absent here on purpose. The SDK
+				// models both as plain bool, and megalith sends bfdEnabled as
+				// JSON null, so a null and a real false are the same value by
+				// the time the merge sees them. Merging one would write false
+				// over a configured true. Needs pointer bools in megaportgo.
 				if !existingBgp.PeerAsn.IsNull() && apiBgp.PeerAsn > 0 {
 					existingBgp.PeerAsn = types.Int64Value(int64(apiBgp.PeerAsn))
 				}
@@ -525,12 +529,6 @@ func mergeVrouterPartnerConfigFromAPI(
 				}
 				if !existingBgp.PeerIPAddress.IsNull() && apiBgp.PeerIpAddress != "" {
 					existingBgp.PeerIPAddress = types.StringValue(apiBgp.PeerIpAddress)
-				}
-				if !existingBgp.Shutdown.IsNull() {
-					existingBgp.Shutdown = types.BoolValue(apiBgp.Shutdown)
-				}
-				if !existingBgp.BfdEnabled.IsNull() {
-					existingBgp.BfdEnabled = types.BoolValue(apiBgp.BfdEnabled)
 				}
 				if !existingBgp.LocalAsn.IsNull() && apiBgp.LocalAsn != nil {
 					existingBgp.LocalAsn = types.Int64Value(int64(*apiBgp.LocalAsn))

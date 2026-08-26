@@ -970,6 +970,38 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesOmittedScalars(t *testing.T) 
 	assertString(t, "peer_ip_address", bgp.PeerIPAddress, "10.0.0.2")
 }
 
+// TestMergeVrouterPartnerConfigFromAPI_KeepsConfiguredBools guards the two
+// fields the merge deliberately skips. megalith sends bfdEnabled as JSON null
+// and the SDK decodes it into a plain bool, so a merged null is a false. A
+// configured true must survive a read that reports false.
+func TestMergeVrouterPartnerConfigFromAPI_KeepsConfiguredBools(t *testing.T) {
+	ctx := context.Background()
+
+	stateBGP := nullBGPModel()
+	stateBGP.Shutdown = types.BoolValue(true)
+	stateBGP.BfdEnabled = types.BoolValue(true)
+
+	existing := buildVrouterPartnerConfigObject(t, ctx, []bgpConnectionConfigModel{stateBGP})
+	vrConn := megaport.CSPConnectionVirtualRouter{
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{
+			{BGPConnections: []megaport.BgpConnectionConfig{{Shutdown: false, BfdEnabled: false}}},
+		},
+	}
+
+	result, diags := mergeVrouterPartnerConfigFromAPI(ctx, vrConn, existing, "", nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected error: %s", diags.Errors())
+	}
+
+	bgp := extractBGPFromResult(t, ctx, result)
+	if !bgp.Shutdown.ValueBool() {
+		t.Error("shutdown: a decoded-zero API value overwrote the configured true")
+	}
+	if !bgp.BfdEnabled.ValueBool() {
+		t.Error("bfd_enabled: a decoded-zero API value overwrote the configured true")
+	}
+}
+
 // mockProductService and mockNATGatewayService implement only the method the
 // dispatch test calls. The embedded interface satisfies the rest and panics if
 // anything else is reached.
