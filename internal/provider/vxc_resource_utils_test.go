@@ -636,6 +636,36 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	assert.True(t, state.BEndPartnerConfig.IsNull())
 }
 
+// TestFromAPIVXC_PlanDrivesPartnerConfig covers the transition an import
+// creates: state holds a partner config the configuration does not, so the next
+// plan removes it. Both attributes are Optional and not Computed, so leaving the
+// old object in state fails the apply as an inconsistent result.
+func TestFromAPIVXC_PlanDrivesPartnerConfig(t *testing.T) {
+	ctx := context.Background()
+
+	built, diags := buildVrouterPartnerConfigFromAPI(ctx, mcrVrouterConn("a_csp_connection"), map[int]string{12345: "allow-in"})
+	require.False(t, diags.HasError())
+	require.False(t, built.IsNull())
+
+	t.Run("a null plan value clears state", func(t *testing.T) {
+		state := &vxcResourceModel{AEndPartnerConfig: built, BEndPartnerConfig: built}
+		plan := &vxcResourceModel{
+			AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+			BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		}
+		require.False(t, state.fromAPIVXC(ctx, importVXC(), nil, plan).HasError())
+		assert.True(t, state.AEndPartnerConfig.IsNull())
+		assert.True(t, state.BEndPartnerConfig.IsNull())
+	})
+
+	t.Run("no plan leaves state alone", func(t *testing.T) {
+		state := &vxcResourceModel{AEndPartnerConfig: built, BEndPartnerConfig: built}
+		require.False(t, state.fromAPIVXC(ctx, importVXC(), nil, nil).HasError())
+		assert.False(t, state.AEndPartnerConfig.IsNull(), "a refresh must not drop an imported config")
+		assert.False(t, state.BEndPartnerConfig.IsNull())
+	})
+}
+
 // TestFillVrouterPartnerConfigsOnImport_PasswordWarningReachesSkippedEnd covers
 // an end Terraform cannot rebuild. The user has to write that end by hand, and
 // a live MD5 password is the one setting the portal will not show them.

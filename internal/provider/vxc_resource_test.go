@@ -3969,6 +3969,28 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 		`, vxcName, whitelist)
 	}
 
+	// noPartnerConfig is the same VXC with the partner block gone. An import
+	// writes a config the user's configuration does not have, so the next plan
+	// removes it. a_end_partner_config is Optional and not Computed, so the
+	// apply has to follow that plan or Terraform reports an inconsistent result.
+	noPartnerConfig := baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, vxcName)
+
 	// forgetConfig drops the VXC from state and leaves the live service alone,
 	// so the import step below has an unmanaged VXC to import. That is the
 	// customer's situation, and it is also the only way to reach it here:
@@ -4186,6 +4208,21 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 			// Step 7: the plan is empty once the prefix filter list is attached.
 			{
 				Config:   vxcConfig(true),
+				PlanOnly: true,
+			},
+			// Step 8: drop the partner block from the configuration. State
+			// follows the plan, the apply reports no inconsistent result, and
+			// the live BGP session is left running.
+			{
+				Config: noPartnerConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "a_end_partner_config"),
+					checkLiveBGP(true),
+				),
+			},
+			// Step 9: the plan settles once the partner config is out of state.
+			{
+				Config:   noPartnerConfig,
 				PlanOnly: true,
 			},
 		},

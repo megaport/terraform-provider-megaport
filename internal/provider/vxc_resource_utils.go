@@ -304,15 +304,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 
-	// Preserve partner configs from plan if provided.
-	// Partner configs are user-only values not returned by the API.
+	// Partner configs are user-only values the API does not return, so a create
+	// or an update takes them from the plan. A null plan value is a removal the
+	// state has to follow: both attributes are Optional and not Computed, so
+	// keeping the old object would not match what Terraform planned. Read
+	// passes no plan and leaves state alone.
 	if plan != nil {
-		if !plan.AEndPartnerConfig.IsNull() {
-			orm.AEndPartnerConfig = plan.AEndPartnerConfig
-		}
-		if !plan.BEndPartnerConfig.IsNull() {
-			orm.BEndPartnerConfig = plan.BEndPartnerConfig
-		}
+		orm.AEndPartnerConfig = plan.AEndPartnerConfig
+		orm.BEndPartnerConfig = plan.BEndPartnerConfig
 	}
 
 	return apiDiags
