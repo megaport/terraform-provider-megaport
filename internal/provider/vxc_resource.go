@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,24 +62,46 @@ func (e *vxcPendingApprovalError) Error() string {
 	return fmt.Sprintf("VXC is pending approval (%s)", e.approval.Status)
 }
 
+// vxcOrderPendingApproval reports whether the API says a party still has to
+// approve this VXC order.
+func vxcOrderPendingApproval(approval *megaport.VXCApproval) bool {
+	return approval != nil &&
+		(approval.Status == vxcApprovalPendingInternal || approval.Status == vxcApprovalPendingExternal)
+}
+
+// approvingParty renders the trading name the API reports on a new-order
+// approval. The name belongs to another organization, which chooses its own
+// text, so quote it rather than pass control characters to the terminal.
+func approvingParty(approval megaport.VXCApproval) string {
+	const maxLen = 120
+	if approval.Message == "" {
+		return ""
+	}
+	name := approval.Message
+	// Cut on runes, not bytes, so a multi-byte name does not end mid-character.
+	if runes := []rune(name); len(runes) > maxLen {
+		name = string(runes[:maxLen]) + "..."
+	}
+	return strconv.Quote(name)
+}
+
 // vxcPendingApprovalWarning builds the create-time warning detail for a VXC
-// that was ordered but still needs approval. For a new order the API sets
-// Message to the approving party's trading name. PENDING_INTERNAL means the
-// caller's own organization must approve (self-service), whereas
-// PENDING_EXTERNAL means the counterparty must approve.
+// that was ordered but still needs approval. PENDING_INTERNAL means the
+// caller's own organization must approve, PENDING_EXTERNAL the counterparty.
 func vxcPendingApprovalWarning(name, uid string, approval megaport.VXCApproval) string {
+	party := approvingParty(approval)
 	if approval.Status == vxcApprovalPendingInternal {
 		detail := "VXC " + name + " (" + uid + ") was ordered successfully but requires approval from your own organization"
-		if approval.Message != "" {
-			detail += " (" + approval.Message + ")"
+		if party != "" {
+			detail += " (" + party + ")"
 		}
-		return detail + " before it can deploy. Approve the order (for example, in the Megaport portal), then refresh or apply again to see it go live. Unapproved orders expire after 60 days."
+		return detail + " before it can deploy. Approve the order in the Megaport portal. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
 	}
-	detail := "VXC " + name + " (" + uid + ") was ordered successfully and is waiting for the connection to be approved"
-	if approval.Message != "" {
-		detail += " by " + approval.Message
+	detail := "VXC " + name + " (" + uid + ") was ordered successfully and is waiting for approval"
+	if party != "" {
+		detail += " by " + party
 	}
-	return detail + ". It will deploy once the order is approved; refresh or apply again afterwards to see it go live. Unapproved orders expire after 60 days."
+	return detail + ". It deploys once the order is approved. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -671,7 +694,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pre-deployment state; the apply completes with a warning and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pending-approval state. The provider waits for wait_time. If the order is still pending, the apply completes with a warning, and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"secondary_name": schema.StringAttribute{
@@ -2015,9 +2038,10 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 }
 
 // waitForVXCProvision polls the VXC until it reaches a ready state, hits a
-// terminal state, is found pending order approval (returned as
-// *vxcPendingApprovalError), or the timeout elapses. Transient read errors are retried
+// terminal state, or the timeout elapses. Transient read errors are retried
 // rather than aborting the wait, since the order has already been placed.
+// An order still awaiting approval when the timeout elapses returns
+// *vxcPendingApprovalError, so the caller can warn instead of failing.
 func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
 	// The polls share this deadline so a stalled HTTP request can't hang
 	// the wait past the overall timeout.
@@ -2026,6 +2050,10 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
+
+	// Set while a party still has to approve the order. The wait continues so an
+	// approval granted inside the timeout still yields a deployed VXC.
+	var pendingApproval *megaport.VXCApproval
 
 	for {
 		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
@@ -2044,14 +2072,20 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 			return fmt.Errorf("VXC %s failed to provision (status %q); the order may have been rejected or expired unapproved", uid, vxc.ProvisioningStatus)
 		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED || vxc.ProvisioningStatus == vxcStatusCancelledParent:
 			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
-		case vxc.VXCApproval != nil && (vxc.VXCApproval.Status == vxcApprovalPendingExternal || vxc.VXCApproval.Status == vxcApprovalPendingInternal):
-			return &vxcPendingApprovalError{approval: *vxc.VXCApproval}
+		case vxcOrderPendingApproval(vxc.VXCApproval):
+			pendingApproval = vxc.VXCApproval
+		default:
+			// Approved, or never needed approval; it is provisioning normally.
+			pendingApproval = nil
 		}
 
 		select {
 		case <-pollCtx.Done():
 			if ctx.Err() != nil {
 				return ctx.Err()
+			}
+			if pendingApproval != nil {
+				return &vxcPendingApprovalError{approval: *pendingApproval}
 			}
 			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
 		case <-ticker.C:
@@ -2097,7 +2131,7 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if vxc.ProvisioningStatus == vxcStatusFailed {
 		resp.Diagnostics.AddWarning(
 			"VXC failed to provision",
-			"VXC "+state.UID.ValueString()+" reports status FAILED; the order may have been rejected or expired unapproved. Megaport will decommission it; remove or replace the resource.",
+			"VXC "+state.UID.ValueString()+" reports status FAILED. The order may have been rejected, or expired unapproved. It stays in this state until you act, and it will never carry traffic. Remove it from your configuration or replace it.",
 		)
 	}
 
@@ -2530,9 +2564,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			detail := "Could not update VXC with ID " + state.UID.ValueString() + ": " + err.Error()
 			// The API rejects network-attribute changes while the order awaits
 			// approval; point at the approval workflow instead of the bare 400.
-			if vxc, getErr := r.client.VXCService.GetVXC(ctx, state.UID.ValueString()); getErr == nil && vxc.VXCApproval != nil &&
-				vxc.VXCApproval.Type == vxcApprovalTypeNew &&
-				(vxc.VXCApproval.Status == vxcApprovalPendingExternal || vxc.VXCApproval.Status == vxcApprovalPendingInternal) {
+			if vxc, getErr := r.client.VXCService.GetVXC(ctx, state.UID.ValueString()); getErr == nil &&
+				vxcOrderPendingApproval(vxc.VXCApproval) && vxc.VXCApproval.Type == vxcApprovalTypeNew {
 				detail += ". The VXC order is still pending approval (" + vxc.VXCApproval.Status + "), and its network attributes cannot be changed until the order is approved."
 			}
 			resp.Diagnostics.AddError(

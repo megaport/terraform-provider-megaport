@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func TestWaitForVXCProvision_PendingExternalApproval(t *testing.T) {
 		},
 	})
 
-	err := r.waitForVXCProvision(context.Background(), "test-uid", time.Second, time.Millisecond)
+	err := r.waitForVXCProvision(context.Background(), "test-uid", 20*time.Millisecond, time.Millisecond)
 	require.Error(t, err)
 	var pending *vxcPendingApprovalError
 	require.ErrorAs(t, err, &pending)
@@ -107,7 +108,7 @@ func TestWaitForVXCProvision_PendingInternalApproval(t *testing.T) {
 		},
 	})
 
-	err := r.waitForVXCProvision(context.Background(), "test-uid", time.Second, time.Millisecond)
+	err := r.waitForVXCProvision(context.Background(), "test-uid", 20*time.Millisecond, time.Millisecond)
 	var pending *vxcPendingApprovalError
 	require.ErrorAs(t, err, &pending)
 	assert.Equal(t, vxcApprovalPendingInternal, pending.approval.Status)
@@ -207,10 +208,56 @@ func TestWaitForVXCProvision_PendingAppearsOnLaterPoll(t *testing.T) {
 		},
 	})
 
-	err := r.waitForVXCProvision(context.Background(), "test-uid", time.Second, time.Millisecond)
+	err := r.waitForVXCProvision(context.Background(), "test-uid", 20*time.Millisecond, time.Millisecond)
 	var pending *vxcPendingApprovalError
 	require.ErrorAs(t, err, &pending)
 	assert.GreaterOrEqual(t, calls.Load(), int32(3))
+}
+
+// TestWaitForVXCProvision_ApprovalGrantedDuringWait covers the case the wait
+// exists for: the counterparty approves inside wait_time, so the caller gets a
+// deployed VXC and no warning.
+func TestWaitForVXCProvision_ApprovalGrantedDuringWait(t *testing.T) {
+	var calls atomic.Int32
+	r := waitTestResource(&MockVXCService{
+		GetVXCFunc: func(ctx context.Context, id string) (*megaport.VXC, error) {
+			if calls.Add(1) < 3 {
+				return &megaport.VXC{
+					ProvisioningStatus: "DEPLOYABLE",
+					VXCApproval:        &megaport.VXCApproval{Status: vxcApprovalPendingExternal, Type: "NEW"},
+				}, nil
+			}
+			return &megaport.VXC{ProvisioningStatus: megaport.SERVICE_LIVE}, nil
+		},
+	})
+
+	err := r.waitForVXCProvision(context.Background(), "test-uid", time.Second, time.Millisecond)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, calls.Load(), int32(3))
+}
+
+// TestWaitForVXCProvision_StalePendingClearedBeforeTimeout guards the reset of
+// the tracked approval: once the order is approved, a later timeout must report
+// the plain timeout, not a pending approval the caller would only warn about.
+func TestWaitForVXCProvision_StalePendingClearedBeforeTimeout(t *testing.T) {
+	var calls atomic.Int32
+	r := waitTestResource(&MockVXCService{
+		GetVXCFunc: func(ctx context.Context, id string) (*megaport.VXC, error) {
+			if calls.Add(1) == 1 {
+				return &megaport.VXC{
+					ProvisioningStatus: "DEPLOYABLE",
+					VXCApproval:        &megaport.VXCApproval{Status: vxcApprovalPendingExternal, Type: "NEW"},
+				}, nil
+			}
+			return &megaport.VXC{ProvisioningStatus: "DEPLOYABLE", VXCApproval: &megaport.VXCApproval{}}, nil
+		},
+	})
+
+	err := r.waitForVXCProvision(context.Background(), "test-uid", 20*time.Millisecond, time.Millisecond)
+	require.Error(t, err)
+	var pending *vxcPendingApprovalError
+	assert.False(t, errors.As(err, &pending), "an approved order must not report as pending")
+	assert.Contains(t, err.Error(), "time expired")
 }
 
 // stubProductService answers GetProductType for Create's product-type probe.
@@ -235,7 +282,7 @@ func TestVXCCreate_PendingApprovalCompletesWithWarning(t *testing.T) {
 			UID:                "vxc-uid-123",
 			Name:               "pending-vxc",
 			RateLimit:          1000,
-			ContractTermMonths: 12,
+			ContractTermMonths: 1, // megalith defers billing, so a pending order reads back as 1
 			ProvisioningStatus: "DEPLOYABLE",
 			VXCApproval: &megaport.VXCApproval{
 				Status:  vxcApprovalPendingExternal,
@@ -285,13 +332,19 @@ func TestVXCCreate_PendingApprovalCompletesWithWarning(t *testing.T) {
 		}
 	}
 	require.Len(t, pendingWarnings, 1)
-	assert.Contains(t, pendingWarnings[0], "approved by Partner Org")
+	assert.Contains(t, pendingWarnings[0], `waiting for approval by "Partner Org"`)
 
 	var uid, status string
 	require.False(t, resp.State.GetAttribute(ctx, path.Root("product_uid"), &uid).HasError())
 	assert.Equal(t, "vxc-uid-123", uid)
 	require.False(t, resp.State.GetAttribute(ctx, path.Root("provisioning_status"), &status).HasError())
 	assert.Equal(t, "DEPLOYABLE", status)
+
+	// The configured term must survive the pending read. Taking the API's
+	// placeholder here fails the apply with "inconsistent result after apply".
+	var term int64
+	require.False(t, resp.State.GetAttribute(ctx, path.Root("contract_term_months"), &term).HasError())
+	assert.Equal(t, int64(12), term, "pending create must keep the configured contract term")
 }
 
 func TestVXCPendingApprovalWarning_ExternalVsInternal(t *testing.T) {
@@ -299,7 +352,7 @@ func TestVXCPendingApprovalWarning_ExternalVsInternal(t *testing.T) {
 		Status:  vxcApprovalPendingExternal,
 		Message: "Partner Org",
 	})
-	assert.Contains(t, external, "waiting for the connection to be approved by Partner Org")
+	assert.Contains(t, external, `waiting for approval by "Partner Org"`)
 
 	// PENDING_INTERNAL must tell the user their own org approves, not imply a
 	// third party will, otherwise they wait on something only they can do.
@@ -309,7 +362,48 @@ func TestVXCPendingApprovalWarning_ExternalVsInternal(t *testing.T) {
 	})
 	assert.Contains(t, internal, "requires approval from your own organization")
 	assert.Contains(t, internal, "My Own Org")
-	assert.NotContains(t, internal, "waiting for the connection to be approved by")
+	assert.NotContains(t, internal, "waiting for approval by")
+}
+
+// TestVXCPendingApprovalWarning_QuotesPartyName checks the trading name is
+// quoted. Another organization chooses that text, so it must not put raw
+// control characters into the practitioner's terminal.
+func TestVXCPendingApprovalWarning_QuotesPartyName(t *testing.T) {
+	detail := vxcPendingApprovalWarning("vxc-name", "vxc-uid", megaport.VXCApproval{
+		Status:  vxcApprovalPendingExternal,
+		Message: "nobody.\n\nApply complete! Resources: 1 added.\x1b[2K",
+	})
+
+	assert.NotContains(t, detail, "\n")
+	assert.NotContains(t, detail, "\x1b")
+	assert.Contains(t, detail, `\n`)
+}
+
+// TestVXCPendingApprovalWarning_EmptyPartyName covers the API omitting the
+// trading name: the sentence must still read cleanly.
+func TestVXCPendingApprovalWarning_EmptyPartyName(t *testing.T) {
+	external := vxcPendingApprovalWarning("vxc-name", "vxc-uid", megaport.VXCApproval{
+		Status: vxcApprovalPendingExternal,
+	})
+	assert.Contains(t, external, "waiting for approval.")
+	assert.NotContains(t, external, `""`)
+
+	internal := vxcPendingApprovalWarning("vxc-name", "vxc-uid", megaport.VXCApproval{
+		Status: vxcApprovalPendingInternal,
+	})
+	assert.Contains(t, internal, "your own organization before it can deploy")
+	assert.NotContains(t, internal, "()")
+}
+
+// TestVXCPendingApprovalWarning_TruncatesLongPartyName bounds the name so a
+// long one cannot flood the terminal.
+func TestVXCPendingApprovalWarning_TruncatesLongPartyName(t *testing.T) {
+	detail := vxcPendingApprovalWarning("vxc-name", "vxc-uid", megaport.VXCApproval{
+		Status:  vxcApprovalPendingExternal,
+		Message: strings.Repeat("A", 500),
+	})
+	assert.Less(t, len(detail), 400)
+	assert.Contains(t, detail, "...")
 }
 
 // TestVXCRead_FailedStatusWarns checks that a Read of a VXC reporting FAILED
