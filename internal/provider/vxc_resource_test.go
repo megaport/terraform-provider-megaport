@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
 )
 
 const (
@@ -3887,9 +3888,12 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
+	pflName := RandomTestName()
 
-	vxcConfig := func() string {
-		return providerConfig + fmt.Sprintf(`
+	// baseConfig is everything except the VXC. The prefix filter list exists
+	// from the first apply, so the step that attaches it changes the VXC and
+	// nothing else.
+	baseConfig := providerConfig + fmt.Sprintf(`
 			data "megaport_location" "loc" {
 				id = %d
 			}
@@ -3907,6 +3911,25 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 				contract_term_months   = 1
 				marketplace_visibility = false
 			}
+			resource "megaport_mcr_prefix_filter_list" "pfl" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [{
+					action = "permit"
+					prefix = "10.10.0.0/24"
+					ge     = 24
+					le     = 32
+				}]
+			}
+		`, locs[0], mcrName, portName, pflName)
+
+	vxcConfig := func(withWhitelist bool) string {
+		whitelist := ""
+		if withWhitelist {
+			whitelist = "\n\t\t\t\t\t\t\t\t\timport_whitelist = megaport_mcr_prefix_filter_list.pfl.description"
+		}
+		return baseConfig + fmt.Sprintf(`
 			resource "megaport_vxc" "vxc" {
 				product_name         = "%s"
 				rate_limit           = 500
@@ -3932,7 +3955,7 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 								med_in           = 100
 								med_out          = 100
 								bfd_enabled      = false
-								export_policy    = "permit"
+								export_policy    = "permit"%s
 							}]
 						}]
 					}
@@ -3943,48 +3966,158 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 					ordered_vlan          = 200
 				}
 			}
-		`, locs[0], mcrName, portName, vxcName)
+		`, vxcName, whitelist)
+	}
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import. That is the
+	// customer's situation, and it is also the only way to reach it here:
+	// ImportStatePersist cannot import over a resource the same test case
+	// already created, and the framework rejects it for import blocks.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	// checkLiveBGP reads the session back off the API instead of out of state.
+	// Update writes the partner config from the plan, so a state assertion
+	// would only prove Terraform echoed the HCL back to itself.
+	checkLiveBGP := func(wantWhitelist bool) resource.TestCheckFunc {
+		return func(_ *terraform.State) error {
+			client, err := getTestClient()
+			if err != nil {
+				return err
+			}
+			uid := vxcUID
+			if uid == "" {
+				return fmt.Errorf("no VXC UID captured")
+			}
+			vxc, err := client.VXCService.GetVXC(context.Background(), uid)
+			if err != nil {
+				return err
+			}
+			var bgp *megaport.BgpConnectionConfig
+			if vxc.Resources != nil && vxc.Resources.CSPConnection != nil {
+				for _, c := range vxc.Resources.CSPConnection.CSPConnection {
+					vr, isVrouter := c.(megaport.CSPConnectionVirtualRouter)
+					if !isVrouter || vr.ResourceName != "a_csp_connection" {
+						continue
+					}
+					for _, iface := range vr.Interfaces {
+						if len(iface.BGPConnections) > 0 {
+							bgp = &iface.BGPConnections[0]
+						}
+					}
+				}
+			}
+			if bgp == nil {
+				return fmt.Errorf("no BGP connection on the a end of %s", uid)
+			}
+			// The settings the prefix filter list edit must leave alone.
+			for _, want := range []struct {
+				field    string
+				got, exp any
+			}{
+				{"peer_asn", bgp.PeerAsn, 64512},
+				{"local_ip_address", bgp.LocalIpAddress, "10.0.0.1"},
+				{"peer_ip_address", bgp.PeerIpAddress, "10.0.0.2"},
+				{"med_in", bgp.MedIn, 100},
+				{"med_out", bgp.MedOut, 100},
+				{"export_policy", bgp.ExportPolicy, "permit"},
+				{"description", bgp.Description, "Test BGP Connection"},
+			} {
+				if want.got != want.exp {
+					return fmt.Errorf("live BGP %s = %v, want %v", want.field, want.got, want.exp)
+				}
+			}
+			if wantWhitelist && bgp.ImportWhitelist == 0 {
+				return fmt.Errorf("live BGP importWhitelist = 0, want a prefix filter list ID")
+			}
+			if !wantWhitelist && bgp.ImportWhitelist != 0 {
+				return fmt.Errorf("live BGP importWhitelist = %d, want it unset", bgp.ImportWhitelist)
+			}
+			return nil
+		}
 	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Step 1: Create VXC with MCR and vrouter partner config
+			// Step 1: create the VXC, the MCR, the port and an unattached
+			// prefix filter list.
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig(false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					captureUID,
+					checkLiveBGP(false),
 				),
 			},
-			// Step 2: Import the VXC. The read returns the BGP session, so the
+			// Step 2: forget the VXC. The live service stays up, Terraform
+			// stops managing it, and step 3 can then import it for real.
+			{
+				Config: forgetConfig,
+				Check:  checkLiveBGP(false),
+			},
+			// Step 3: import the VXC. The read returns the BGP session, so the
 			// vrouter partner config must land in state. Full verification is
 			// not possible because the provider leaves the BGP password out.
+			// ImportStatePersist keeps the imported state for the steps below,
+			// which is what makes them test the imported VXC rather than the
+			// one step 1 applied.
 			{
+				// Without an explicit config the framework reuses the prior
+				// step's, which is forgetConfig and declares no VXC to import
+				// into.
+				Config:                               vxcConfig(false),
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
+				ImportStatePersist:                   true,
 				ImportStateVerify:                    false,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_vxc.vxc"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
-						}
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
 					}
-					return rawState["product_uid"], nil
+					return vxcUID, nil
 				},
 				ImportStateCheck: func(states []*terraform.InstanceState) error {
-					if len(states) != 1 {
-						return fmt.Errorf("expected 1 imported state, got %d", len(states))
+					// ImportStatePersist runs the import in the test case's own
+					// working directory, so the check gets every resource in
+					// that state, not only the imported VXC.
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
+						}
 					}
-					attrs := states[0].Attributes
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
 					const bgp = "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0."
 					want := map[string]string{
 						"a_end_partner_config.partner":                                    "vrouter",
@@ -4021,19 +4154,38 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 					return nil
 				},
 			},
-			// Step 3: Apply the same config - this reconciles state after import
+			// Step 4: apply the same config over the imported state. The
+			// password is deliberately not imported, so this is a real in-place
+			// update rather than a no-op.
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig(false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					checkLiveBGP(false),
 				),
 			},
-			// Step 4: Plan-only to verify NO drift - this validates the fix
+			// Step 5: the plan over the imported and reconciled state is empty.
 			{
-				Config:   vxcConfig(),
+				Config:   vxcConfig(false),
+				PlanOnly: true,
+			},
+			// Step 6: attach a prefix filter list to the imported BGP session.
+			// The live check is the point: the whitelist must land and every
+			// other BGP setting must survive the update.
+			{
+				Config: vxcConfig(true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc",
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.import_whitelist", pflName),
+					checkLiveBGP(true),
+				),
+			},
+			// Step 7: the plan is empty once the prefix filter list is attached.
+			{
+				Config:   vxcConfig(true),
 				PlanOnly: true,
 			},
 		},
