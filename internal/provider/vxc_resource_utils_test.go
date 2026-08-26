@@ -576,7 +576,7 @@ func TestMergeVrouterPartnerConfigFromAPI_PreservesUnconfiguredOptionals(t *test
 	// Configured fields track the API.
 	assertInt64(t, "peer_asn", bgp.PeerAsn, 64512)
 	assertInt64(t, "med_in", bgp.MedIn, 150)
-	assertString(t, "password", bgp.Password, "secret") // preserved; API never returns it
+	assertString(t, "password", bgp.Password, "secret") // preserved; the merge never takes the API value
 
 	// Unconfigured Optional-only fields must remain null.
 	if !bgp.Shutdown.IsNull() {

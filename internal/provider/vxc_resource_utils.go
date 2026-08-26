@@ -556,7 +556,9 @@ func mergeVrouterPartnerConfigFromAPI(
 				if !existingBgp.AsPathPrependCount.IsNull() && apiBgp.AsPathPrependCount > 0 {
 					existingBgp.AsPathPrependCount = types.Int64Value(int64(apiBgp.AsPathPrependCount))
 				}
-				// password is never echoed, so state always wins.
+				// The API does echo password, in plain text. State still wins:
+				// the field is Sensitive but not write-only, so merging the API
+				// value would persist a live MD5 key in the state file.
 
 				// The CSP-connection read does not echo these two at all, so an
 				// empty API value means unknown, not removed.
