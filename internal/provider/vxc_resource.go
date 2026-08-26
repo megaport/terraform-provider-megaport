@@ -2982,6 +2982,13 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
 		if !req.Plan.Raw.IsNull() {
+			rejectCSPPartnerConfigRemoval(ctx, "a_end_partner_config", plan.AEndPartnerConfig, state.AEndPartnerConfig, &diags)
+			rejectCSPPartnerConfigRemoval(ctx, "b_end_partner_config", plan.BEndPartnerConfig, state.BEndPartnerConfig, &diags)
+			if diags.HasError() {
+				resp.Diagnostics.Append(diags...)
+				return
+			}
+
 			aEndStateObj := state.AEndConfiguration
 			bEndStateObj := state.BEndConfiguration
 			aEndPlanObj := plan.AEndConfiguration
@@ -3066,16 +3073,6 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 
 	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
 
-	// A cloud partner config is ordered with the VXC and the API cannot unset
-	// it. Following the removal would clear state and leave the live
-	// configuration attached, with nothing left to replace on the next change.
-	if in.planPartnerConfig.IsNull() && isCSPPartnerConfig(ctx, *in.statePartnerConfig, in.diags) {
-		in.diags.AddError(
-			fmt.Sprintf("Cannot remove %s", in.partnerConfigPathRoot),
-			fmt.Sprintf("The %s block holds a cloud partner configuration. Megaport sets it when the VXC is ordered and cannot remove it. Put the block back in the configuration, or run terraform state rm to stop managing this VXC.", in.partnerConfigPathRoot),
-		)
-	}
-
 	// A changed CSP partner-config forces replacement.
 	if !in.statePartnerConfig.IsNull() && csp && !in.planPartnerConfig.Equal(*in.statePartnerConfig) {
 		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))
@@ -3106,6 +3103,22 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	newPlanObj, planObjDiags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, planConfig)
 	*in.diags = append(*in.diags, planObjDiags...)
 	return newPlanObj
+}
+
+// rejectCSPPartnerConfigRemoval fails the plan when a cloud partner config
+// block leaves the configuration. Megaport orders that config with the VXC and
+// cannot unset it, so following the removal would clear state and leave the
+// live configuration attached, with nothing left to replace on the next
+// change. It reads the partner config objects alone, so ModifyPlan runs it
+// ahead of the end-object guard.
+func rejectCSPPartnerConfigRemoval(ctx context.Context, pathRoot string, planPartnerConfig, statePartnerConfig types.Object, diags *diag.Diagnostics) {
+	if !planPartnerConfig.IsNull() || !isCSPPartnerConfig(ctx, statePartnerConfig, diags) {
+		return
+	}
+	diags.AddError(
+		fmt.Sprintf("Cannot remove %s", pathRoot),
+		fmt.Sprintf("The %s block holds a cloud partner configuration. Megaport sets it when the VXC is ordered and cannot remove it. Put the block back in the configuration, or run terraform state rm to stop managing this VXC.", pathRoot),
+	)
 }
 
 // isCSPPartnerConfig reports whether the plan partner-config object is a

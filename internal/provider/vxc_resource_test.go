@@ -5136,12 +5136,12 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 	}
 }
 
-// TestReconcileVXCEnd_PartnerConfigRemoval covers dropping the partner config
-// block from a configuration. A cloud config is ordered with the VXC and the
-// API cannot unset it, so the plan has to fail rather than clear state over a
-// live configuration. The internal partner types carry no cloud state and are
+// TestRejectCSPPartnerConfigRemoval covers dropping the partner config block
+// from a configuration. A cloud config is ordered with the VXC and the API
+// cannot unset it, so the plan has to fail rather than clear state over a live
+// configuration. The internal partner types carry no cloud state and are
 // removed without complaint.
-func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
+func TestRejectCSPPartnerConfigRemoval(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -5164,22 +5164,12 @@ func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
 		}
 		return obj
 	}
-	end := func(t *testing.T) types.Object {
-		t.Helper()
-		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
-			RequestedProductUID: types.StringValue("port-x"),
-			CurrentProductUID:   types.StringValue("port-x"),
-		})
-		if d.HasError() {
-			t.Fatalf("build end object: %v", d.Errors())
-		}
-		return obj
-	}
 
 	tests := []struct {
 		name         string
 		nullState    bool
 		statePartner string
+		keepInPlan   bool // plan still carries the block
 		wantError    bool
 	}{
 		{name: "removing_aws_errors", statePartner: "aws", wantError: true},
@@ -5187,6 +5177,7 @@ func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
 		{name: "removing_vrouter_is_allowed", statePartner: "vrouter", wantError: false},
 		{name: "removing_transit_is_allowed", statePartner: "transit", wantError: false},
 		{name: "null_state_is_allowed", nullState: true, wantError: false},
+		{name: "keeping_aws_is_allowed", statePartner: "aws", keepInPlan: true, wantError: false},
 	}
 
 	for _, tc := range tests {
@@ -5195,19 +5186,13 @@ func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
 			if !tc.nullState {
 				statePartner = partnerWith(t, tc.statePartner)
 			}
+			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if tc.keepInPlan {
+				planPartner = partnerWith(t, tc.statePartner)
+			}
 			diags := diag.Diagnostics{}
-			var rr path.Paths
 
-			reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            end(t),
-				stateEndObj:           end(t),
-				planPartnerConfig:     types.ObjectNull(vxcPartnerConfigAttrs),
-				statePartnerConfig:    &statePartner,
-				requiresReplace:       &rr,
-				diags:                 &diags,
-			})
+			rejectCSPPartnerConfigRemoval(ctx, "a_end_partner_config", planPartner, statePartner, &diags)
 
 			if !tc.wantError {
 				if diags.HasError() {
@@ -5221,12 +5206,70 @@ func TestReconcileVXCEnd_PartnerConfigRemoval(t *testing.T) {
 			if summary := diags.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
 				t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
 			}
-			// Removal must not also queue a replace: destroying a live cloud
-			// circuit over a deleted block is worse than refusing the plan.
-			if len(rr) != 0 {
-				t.Errorf("expected no requiresReplace, got %v", rr)
-			}
 		})
+	}
+}
+
+// TestVXCModifyPlan_PartnerConfigRemovalWithUnknownEnd pins where the removal
+// check runs. An unknown end object sends ModifyPlan down an early return, so a
+// check placed after that return would let a cloud config removal through.
+func TestVXCModifyPlan_PartnerConfigRemovalWithUnknownEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+	partnerObjType, ok := schemaObjType.AttributeTypes["a_end_partner_config"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end_partner_config type is not tftypes.Object")
+	}
+
+	endAttrs := nullValueMap(endObjType)
+	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	endVal := tftypes.NewValue(endObjType, endAttrs)
+
+	partnerAttrs := nullValueMap(partnerObjType)
+	partnerAttrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = endVal
+	stateAttrs["b_end"] = endVal
+	stateAttrs["a_end_partner_config"] = tftypes.NewValue(partnerObjType, partnerAttrs)
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	// The plan drops a_end_partner_config and leaves b_end unknown, the shape a
+	// reference to a not-yet-applied resource produces.
+	planAttrs := nullValueMap(schemaObjType)
+	planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+	planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+	planAttrs["a_end"] = endVal
+	planAttrs["b_end"] = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+	planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+	plan := tfsdk.Plan{Schema: s, Raw: planVal}
+	resp := fwresource.ModifyPlanResponse{Plan: plan}
+	r.ModifyPlan(ctx, fwresource.ModifyPlanRequest{
+		State: tfsdk.State{Schema: s, Raw: stateVal},
+		Plan:  plan,
+	}, &resp)
+
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("expected removing the AWS partner config to fail the plan, got no error")
+	}
+	if summary := resp.Diagnostics.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
+		t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
 	}
 }
 
