@@ -2148,8 +2148,12 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 
 // prefixFilterMapForVrouterConn returns an ID to description map for the prefix
 // filter lists on an endpoint. It skips the API call when no BGP connection
-// references a list. The bool is false when the lookup failed, which means the
-// caller must not rebuild the config.
+// references a list. The bool is false when the caller must not rebuild the
+// config.
+//
+// A failed API call errors rather than warns. The rebuild runs on the import
+// read alone, so a warning would commit a null config that no later refresh
+// retries. An error keeps the import atomic and the user can run it again.
 func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn megaport.CSPConnectionVirtualRouter, uid, name string, diags *diag.Diagnostics) (map[int]string, bool) {
 	referenced := map[int]bool{}
 	for _, iface := range conn.Interfaces {
@@ -2167,9 +2171,9 @@ func (r *vxcResource) prefixFilterMapForVrouterConn(ctx context.Context, conn me
 
 	lists, err := r.vrouterPrefixFilterListsForEndpoint(ctx, uid)
 	if err != nil {
-		diags.AddWarning(
+		diags.AddError(
 			"Could not read the prefix filter lists for a VXC end",
-			fmt.Sprintf("Terraform could not list the prefix filter lists on %s, so it left %s out of state: %s", uid, name, err.Error()),
+			fmt.Sprintf("Terraform could not list the prefix filter lists on %s, so it cannot name the lists %s uses: %s. Nothing was written to state. Run the import again.", uid, name, err.Error()),
 		)
 		return nil, false
 	}

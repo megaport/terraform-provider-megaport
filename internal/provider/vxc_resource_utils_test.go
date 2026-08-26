@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -754,6 +755,29 @@ func TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName(t *testing.T) 
 	assert.Contains(t, diags.Warnings()[0].Detail(), "2 virtual router connections")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
+}
+
+// TestFillVrouterPartnerConfigsOnImport_PrefixListLookupFails covers a failed
+// API call. The rebuild runs on the import read alone, so a warning here would
+// commit a null config that no later refresh retries.
+func TestFillVrouterPartnerConfigsOnImport_PrefixListLookupFails(t *testing.T) {
+	ctx := context.Background()
+	products := &MockProductService{
+		GetProductTypeFunc: func(_ context.Context, uid string) (string, error) {
+			return "", errors.New("503 service unavailable")
+		},
+	}
+	r := &vxcResource{client: &megaport.Client{ProductService: products}}
+
+	state := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+
+	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("a_csp_connection")))
+	require.True(t, diags.HasError(), "a transient failure must fail the import, not commit a partial one")
+	assert.Contains(t, diags.Errors()[0].Detail(), "503 service unavailable")
+	assert.True(t, state.AEndPartnerConfig.IsNull())
 }
 
 // TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription covers a
