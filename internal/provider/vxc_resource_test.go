@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
 )
 
 const (
@@ -3887,9 +3888,12 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 	mcrName := RandomTestName()
 	portName := RandomTestName()
 	vxcName := RandomTestName()
+	pflName := RandomTestName()
 
-	vxcConfig := func() string {
-		return providerConfig + fmt.Sprintf(`
+	// baseConfig is everything except the VXC. The prefix filter list exists
+	// from the first apply, so the step that attaches it changes the VXC and
+	// nothing else.
+	baseConfig := providerConfig + fmt.Sprintf(`
 			data "megaport_location" "loc" {
 				id = %d
 			}
@@ -3907,6 +3911,25 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 				contract_term_months   = 1
 				marketplace_visibility = false
 			}
+			resource "megaport_mcr_prefix_filter_list" "pfl" {
+				mcr_id         = megaport_mcr.mcr.product_uid
+				description    = "%s"
+				address_family = "IPv4"
+				entries = [{
+					action = "permit"
+					prefix = "10.10.0.0/24"
+					ge     = 24
+					le     = 32
+				}]
+			}
+		`, locs[0], mcrName, portName, pflName)
+
+	vxcConfig := func(withWhitelist bool) string {
+		whitelist := ""
+		if withWhitelist {
+			whitelist = "\n\t\t\t\t\t\t\t\t\timport_whitelist = megaport_mcr_prefix_filter_list.pfl.description"
+		}
+		return baseConfig + fmt.Sprintf(`
 			resource "megaport_vxc" "vxc" {
 				product_name         = "%s"
 				rate_limit           = 500
@@ -3932,7 +3955,7 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 								med_in           = 100
 								med_out          = 100
 								bfd_enabled      = false
-								export_policy    = "permit"
+								export_policy    = "permit"%s
 							}]
 						}]
 					}
@@ -3943,55 +3966,263 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 					ordered_vlan          = 200
 				}
 			}
-		`, locs[0], mcrName, portName, vxcName)
+		`, vxcName, whitelist)
+	}
+
+	// noPartnerConfig is the same VXC with the partner block gone. An import
+	// writes a config the user's configuration does not have, so the next plan
+	// removes it. a_end_partner_config is Optional and not Computed, so the
+	// apply has to follow that plan or Terraform reports an inconsistent result.
+	noPartnerConfig := baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {
+					requested_product_uid = megaport_port.port.product_uid
+					ordered_vlan          = 200
+				}
+			}
+		`, vxcName)
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import. That is the
+	// customer's situation, and it is also the only way to reach it here:
+	// ImportStatePersist cannot import over a resource the same test case
+	// already created, and the framework rejects it for import blocks.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	// checkLiveBGP reads the session back off the API instead of out of state.
+	// Update writes the partner config from the plan, so a state assertion
+	// would only prove Terraform echoed the HCL back to itself.
+	checkLiveBGP := func(wantWhitelist bool) resource.TestCheckFunc {
+		return func(_ *terraform.State) error {
+			client, err := getTestClient()
+			if err != nil {
+				return err
+			}
+			uid := vxcUID
+			if uid == "" {
+				return fmt.Errorf("no VXC UID captured")
+			}
+			vxc, err := client.VXCService.GetVXC(context.Background(), uid)
+			if err != nil {
+				return err
+			}
+			var bgp *megaport.BgpConnectionConfig
+			if vxc.Resources != nil && vxc.Resources.CSPConnection != nil {
+				for _, c := range vxc.Resources.CSPConnection.CSPConnection {
+					vr, isVrouter := c.(megaport.CSPConnectionVirtualRouter)
+					if !isVrouter || vr.ResourceName != "a_csp_connection" {
+						continue
+					}
+					for _, iface := range vr.Interfaces {
+						if len(iface.BGPConnections) > 0 {
+							bgp = &iface.BGPConnections[0]
+						}
+					}
+				}
+			}
+			if bgp == nil {
+				return fmt.Errorf("no BGP connection on the a end of %s", uid)
+			}
+			// The settings the prefix filter list edit must leave alone.
+			for _, want := range []struct {
+				field    string
+				got, exp any
+			}{
+				{"peer_asn", bgp.PeerAsn, 64512},
+				{"local_ip_address", bgp.LocalIpAddress, "10.0.0.1"},
+				{"peer_ip_address", bgp.PeerIpAddress, "10.0.0.2"},
+				{"med_in", bgp.MedIn, 100},
+				{"med_out", bgp.MedOut, 100},
+				{"export_policy", bgp.ExportPolicy, "permit"},
+				{"description", bgp.Description, "Test BGP Connection"},
+			} {
+				if want.got != want.exp {
+					return fmt.Errorf("live BGP %s = %v, want %v", want.field, want.got, want.exp)
+				}
+			}
+			if wantWhitelist && bgp.ImportWhitelist == 0 {
+				return fmt.Errorf("live BGP importWhitelist = 0, want a prefix filter list ID")
+			}
+			if !wantWhitelist && bgp.ImportWhitelist != 0 {
+				return fmt.Errorf("live BGP importWhitelist = %d, want it unset", bgp.ImportWhitelist)
+			}
+			return nil
+		}
 	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Step 1: Create VXC with MCR and vrouter partner config
+			// Step 1: create the VXC, the MCR, the port and an unattached
+			// prefix filter list.
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig(false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					captureUID,
+					checkLiveBGP(false),
 				),
 			},
-			// Step 2: Import the VXC
+			// Step 2: forget the VXC. The live service stays up, Terraform
+			// stops managing it, and step 3 can then import it for real.
 			{
+				Config: forgetConfig,
+				Check:  checkLiveBGP(false),
+			},
+			// Step 3: import the VXC. The read returns the BGP session, so the
+			// vrouter partner config must land in state. Full verification is
+			// not possible because the provider leaves the BGP password out.
+			// ImportStatePersist keeps the imported state for the steps below,
+			// which is what makes them test the imported VXC rather than the
+			// one step 1 applied.
+			{
+				// Without an explicit config the framework reuses the prior
+				// step's, which is forgetConfig and declares no VXC to import
+				// into.
+				Config:                               vxcConfig(false),
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
-				ImportStateVerify:                    false, // We expect differences initially
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_vxc.vxc"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					// ImportStatePersist runs the import in the test case's own
+					// working directory, so the check gets every resource in
+					// that state, not only the imported VXC.
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
 						}
 					}
-					return rawState["product_uid"], nil
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
+					const bgp = "a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0."
+					want := map[string]string{
+						"a_end_partner_config.partner":                                    "vrouter",
+						"a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.0": "10.0.0.1/30",
+						bgp + "peer_asn":         "64512",
+						bgp + "local_ip_address": "10.0.0.1",
+						bgp + "peer_ip_address":  "10.0.0.2",
+					}
+					for k, v := range want {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					// One interface with one session, not a duplicate or an
+					// empty shell.
+					counts := map[string]string{
+						"a_end_partner_config.vrouter_config.interfaces.#":                   "1",
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.#": "1",
+						"a_end_partner_config.vrouter_config.interfaces.0.ip_addresses.#":    "1",
+					}
+					for k, v := range counts {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					if got := attrs[bgp+"password"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", bgp+"password", got)
+					}
+					// The b end is a port, so it has no vrouter config to
+					// rebuild and must stay absent.
+					if got := attrs["b_end_partner_config.partner"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", "b_end_partner_config.partner", got)
+					}
+					return nil
 				},
 			},
-			// Step 3: Apply the same config - this reconciles state after import
+			// Step 4: apply the same config over the imported state. The
+			// password is deliberately not imported, so this is a real in-place
+			// update rather than a no-op.
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig(false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.partner", "vrouter"),
+					checkLiveBGP(false),
 				),
 			},
-			// Step 4: Plan-only to verify NO drift - this validates the fix
+			// Step 5: the plan over the imported and reconciled state is empty.
 			{
-				Config:   vxcConfig(),
+				Config:   vxcConfig(false),
+				PlanOnly: true,
+			},
+			// Step 6: attach a prefix filter list to the imported BGP session.
+			// The live check is the point: the whitelist must land and every
+			// other BGP setting must survive the update.
+			{
+				Config: vxcConfig(true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc",
+						"a_end_partner_config.vrouter_config.interfaces.0.bgp_connections.0.import_whitelist", pflName),
+					checkLiveBGP(true),
+				),
+			},
+			// Step 7: the plan is empty once the prefix filter list is attached.
+			{
+				Config:   vxcConfig(true),
+				PlanOnly: true,
+			},
+			// Step 8: drop the partner block from the configuration. State
+			// follows the plan, the apply reports no inconsistent result, and
+			// the live BGP session is left running.
+			{
+				Config: noPartnerConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "a_end_partner_config"),
+					checkLiveBGP(true),
+				),
+			},
+			// Step 9: the plan settles once the partner config is out of state.
+			{
+				Config:   noPartnerConfig,
 				PlanOnly: true,
 			},
 		},
@@ -4900,6 +5131,236 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 				}
 			} else if len(rr) != 0 {
 				t.Errorf("expected no requiresReplace, got %v", rr)
+			}
+		})
+	}
+}
+
+// TestCheckPartnerConfigRemoval covers dropping the partner config block from a
+// configuration. A cloud config is ordered with the VXC and the API cannot unset
+// it, so the plan has to fail rather than clear state over a live configuration.
+// Removing an internal partner type is allowed, but it only clears state and
+// leaves the live service running, so it has to warn rather than pass silently.
+func TestCheckPartnerConfigRemoval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partnerWith := func(t *testing.T, name string) types.Object {
+		t.Helper()
+		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
+		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
+		if !ok {
+			t.Fatal("partner config type is not tftypes.Object")
+		}
+		attrs := nullValueMap(raw)
+		attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
+		if err != nil {
+			t.Fatalf("build partner config: %v", err)
+		}
+		obj, ok := val.(types.Object)
+		if !ok {
+			t.Fatal("partner config value is not types.Object")
+		}
+		return obj
+	}
+
+	tests := []struct {
+		name         string
+		nullState    bool
+		statePartner string
+		keepInPlan   bool // plan still carries the block
+		wantError    bool
+		wantWarning  bool
+	}{
+		{name: "removing_aws_errors", statePartner: "aws", wantError: true},
+		{name: "removing_azure_errors", statePartner: "azure", wantError: true},
+		{name: "removing_vrouter_warns", statePartner: "vrouter", wantWarning: true},
+		{name: "removing_transit_warns", statePartner: "transit", wantWarning: true},
+		{name: "removing_a_end_warns", statePartner: "a-end", wantWarning: true},
+		{name: "null_state_is_silent", nullState: true},
+		{name: "keeping_aws_is_silent", statePartner: "aws", keepInPlan: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if !tc.nullState {
+				statePartner = partnerWith(t, tc.statePartner)
+			}
+			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
+			if tc.keepInPlan {
+				planPartner = partnerWith(t, tc.statePartner)
+			}
+			diags := diag.Diagnostics{}
+
+			checkPartnerConfigRemoval(ctx, "a_end_partner_config", planPartner, statePartner, &diags)
+
+			if tc.wantError {
+				if !diags.HasError() {
+					t.Fatal("expected an error removing a cloud partner config, got none")
+				}
+				if summary := diags.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
+					t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
+				}
+				return
+			}
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			}
+
+			// An allowed removal clears state while the live service keeps
+			// running, so silence here would report a teardown that never
+			// happened.
+			if !tc.wantWarning {
+				if diags.WarningsCount() != 0 {
+					t.Fatalf("expected no warnings, got %v", diags.Warnings())
+				}
+				return
+			}
+			if diags.WarningsCount() != 1 {
+				t.Fatalf("expected exactly one warning, got %v", diags.Warnings())
+			}
+			if summary := diags.Warnings()[0].Summary(); summary != "Removing a_end_partner_config only clears it from state" {
+				t.Errorf("warning summary = %q, want the state-only removal warning", summary)
+			}
+		})
+	}
+}
+
+// TestVXCModifyPlan_PartnerConfigRemovalWithUnknownEnd pins where the removal
+// check runs. An unknown end object sends ModifyPlan down an early return, so a
+// check placed after that return would let a cloud config removal through.
+func TestVXCModifyPlan_PartnerConfigRemovalWithUnknownEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	endObjType, ok := schemaObjType.AttributeTypes["a_end"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end type is not tftypes.Object")
+	}
+	partnerObjType, ok := schemaObjType.AttributeTypes["a_end_partner_config"].(tftypes.Object)
+	if !ok {
+		t.Fatal("a_end_partner_config type is not tftypes.Object")
+	}
+
+	endAttrs := nullValueMap(endObjType)
+	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+	endVal := tftypes.NewValue(endObjType, endAttrs)
+
+	partnerAttrs := nullValueMap(partnerObjType)
+	partnerAttrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+
+	stateAttrs := nullValueMap(schemaObjType)
+	stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	stateAttrs["a_end"] = endVal
+	stateAttrs["b_end"] = endVal
+	stateAttrs["a_end_partner_config"] = tftypes.NewValue(partnerObjType, partnerAttrs)
+	stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+	// The plan drops a_end_partner_config and leaves b_end unknown, the shape a
+	// reference to a not-yet-applied resource produces.
+	planAttrs := nullValueMap(schemaObjType)
+	planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+	planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+	planAttrs["a_end"] = endVal
+	planAttrs["b_end"] = tftypes.NewValue(endObjType, tftypes.UnknownValue)
+	planVal := tftypes.NewValue(schemaObjType, planAttrs)
+
+	plan := tfsdk.Plan{Schema: s, Raw: planVal}
+	resp := fwresource.ModifyPlanResponse{Plan: plan}
+	r.ModifyPlan(ctx, fwresource.ModifyPlanRequest{
+		State: tfsdk.State{Schema: s, Raw: stateVal},
+		Plan:  plan,
+	}, &resp)
+
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("expected removing the AWS partner config to fail the plan, got no error")
+	}
+	if summary := resp.Diagnostics.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
+		t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
+	}
+}
+
+// TestVXCRead_RebuildsPartnerConfigOnlyOnImport pins the gate that decides when
+// Read rebuilds a vrouter partner config. Rebuilding it on a managed refresh
+// would put a config in state that the user's configuration does not have,
+// which then plans its own removal on every apply, so both directions need a
+// case.
+func TestVXCRead_RebuildsPartnerConfigOnlyOnImport(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		// ImportState writes product_uid and nothing else, so a null
+		// product_name is what marks a read as the one after an import.
+		stateName  string
+		wantFilled bool
+	}{
+		{name: "after_import_rebuilds_both_ends", wantFilled: true},
+		{name: "managed_refresh_leaves_both_ends_null", stateName: "test-vxc"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &vxcResource{client: &megaport.Client{
+				VXCService: &MockVXCService{
+					GetVXCResult: importVXC(mcrVrouterConn("a_csp_connection"), mcrVrouterConn("b_csp_connection")),
+				},
+				ProductService: &MockProductService{
+					GetProductTypeFunc: func(_ context.Context, _ string) (string, error) {
+						return megaport.PRODUCT_MCR, nil
+					},
+				},
+				MCRService: &MockMCRService{
+					ListMCRPrefixFilterListsResult: []*megaport.PrefixFilterList{{Id: 12345, Description: "allow-in"}},
+				},
+			}}
+
+			schemaResp := fwresource.SchemaResponse{}
+			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+			s := schemaResp.Schema
+
+			schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+			if !ok {
+				t.Fatal("schema type is not tftypes.Object")
+			}
+			stateAttrs := nullValueMap(schemaObjType)
+			stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+			if tc.stateName != "" {
+				stateAttrs["product_name"] = tftypes.NewValue(tftypes.String, tc.stateName)
+			}
+			state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, stateAttrs)}
+
+			resp := fwresource.ReadResponse{State: state}
+			r.Read(ctx, fwresource.ReadRequest{State: state}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics.Errors())
+			}
+
+			var got vxcResourceModel
+			if diags := resp.State.Get(ctx, &got); diags.HasError() {
+				t.Fatalf("reading state back: %v", diags.Errors())
+			}
+			if tc.wantFilled {
+				if got.AEndPartnerConfig.IsNull() || got.BEndPartnerConfig.IsNull() {
+					t.Fatalf("expected both partner configs rebuilt, got a_end null=%t, b_end null=%t",
+						got.AEndPartnerConfig.IsNull(), got.BEndPartnerConfig.IsNull())
+				}
+				return
+			}
+			if !got.AEndPartnerConfig.IsNull() || !got.BEndPartnerConfig.IsNull() {
+				t.Error("a managed refresh must leave both partner configs as state had them")
 			}
 		})
 	}
