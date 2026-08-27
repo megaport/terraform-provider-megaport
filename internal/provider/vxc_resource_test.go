@@ -5291,6 +5291,81 @@ func TestVXCModifyPlan_PartnerConfigRemovalWithUnknownEnd(t *testing.T) {
 	}
 }
 
+// TestVXCRead_RebuildsPartnerConfigOnlyOnImport pins the gate that decides when
+// Read rebuilds a vrouter partner config. Rebuilding it on a managed refresh
+// would put a config in state that the user's configuration does not have,
+// which then plans its own removal on every apply, so both directions need a
+// case.
+func TestVXCRead_RebuildsPartnerConfigOnlyOnImport(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		// ImportState writes product_uid and nothing else, so a null
+		// product_name is what marks a read as the one after an import.
+		stateName  string
+		wantFilled bool
+	}{
+		{name: "after_import_rebuilds_both_ends", wantFilled: true},
+		{name: "managed_refresh_leaves_both_ends_null", stateName: "test-vxc"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &vxcResource{client: &megaport.Client{
+				VXCService: &MockVXCService{
+					GetVXCResult: importVXC(mcrVrouterConn("a_csp_connection"), mcrVrouterConn("b_csp_connection")),
+				},
+				ProductService: &MockProductService{
+					GetProductTypeFunc: func(_ context.Context, _ string) (string, error) {
+						return megaport.PRODUCT_MCR, nil
+					},
+				},
+				MCRService: &MockMCRService{
+					ListMCRPrefixFilterListsResult: []*megaport.PrefixFilterList{{Id: 12345, Description: "allow-in"}},
+				},
+			}}
+
+			schemaResp := fwresource.SchemaResponse{}
+			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+			s := schemaResp.Schema
+
+			schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+			if !ok {
+				t.Fatal("schema type is not tftypes.Object")
+			}
+			stateAttrs := nullValueMap(schemaObjType)
+			stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+			if tc.stateName != "" {
+				stateAttrs["product_name"] = tftypes.NewValue(tftypes.String, tc.stateName)
+			}
+			state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, stateAttrs)}
+
+			resp := fwresource.ReadResponse{State: state}
+			r.Read(ctx, fwresource.ReadRequest{State: state}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics.Errors())
+			}
+
+			var got vxcResourceModel
+			if diags := resp.State.Get(ctx, &got); diags.HasError() {
+				t.Fatalf("reading state back: %v", diags.Errors())
+			}
+			if tc.wantFilled {
+				if got.AEndPartnerConfig.IsNull() || got.BEndPartnerConfig.IsNull() {
+					t.Fatalf("expected both partner configs rebuilt, got a_end null=%t, b_end null=%t",
+						got.AEndPartnerConfig.IsNull(), got.BEndPartnerConfig.IsNull())
+				}
+				return
+			}
+			if !got.AEndPartnerConfig.IsNull() || !got.BEndPartnerConfig.IsNull() {
+				t.Error("a managed refresh must leave both partner configs as state had them")
+			}
+		})
+	}
+}
+
 // TestAccMegaportVXC_IPsecTunnel orders an MCR with an IPsec add-on and a VXC
 // whose A-End vrouter config declares two interfaces: a subInterface carrying
 // the tunnel source IP, and an ipSecTunnel interface with a single
