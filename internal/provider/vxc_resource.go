@@ -2982,8 +2982,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	// If VXC is not yet created, return
 	if !state.UID.IsNull() {
 		if !req.Plan.Raw.IsNull() {
-			rejectCSPPartnerConfigRemoval(ctx, "a_end_partner_config", plan.AEndPartnerConfig, state.AEndPartnerConfig, &diags)
-			rejectCSPPartnerConfigRemoval(ctx, "b_end_partner_config", plan.BEndPartnerConfig, state.BEndPartnerConfig, &diags)
+			checkPartnerConfigRemoval(ctx, "a_end_partner_config", plan.AEndPartnerConfig, state.AEndPartnerConfig, &diags)
+			checkPartnerConfigRemoval(ctx, "b_end_partner_config", plan.BEndPartnerConfig, state.BEndPartnerConfig, &diags)
 			if diags.HasError() {
 				resp.Diagnostics.Append(diags...)
 				return
@@ -3105,19 +3105,26 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	return newPlanObj
 }
 
-// rejectCSPPartnerConfigRemoval fails the plan when a cloud partner config
-// block leaves the configuration. Megaport orders that config with the VXC and
-// cannot unset it, so following the removal would clear state and leave the
-// live configuration attached, with nothing left to replace on the next
-// change. It reads the partner config objects alone, so ModifyPlan runs it
-// ahead of the end-object guard.
-func rejectCSPPartnerConfigRemoval(ctx context.Context, pathRoot string, planPartnerConfig, statePartnerConfig types.Object, diags *diag.Diagnostics) {
-	if !planPartnerConfig.IsNull() || !isCSPPartnerConfig(ctx, statePartnerConfig, diags) {
+// checkPartnerConfigRemoval polices a partner config block that leaves the
+// configuration. Megaport orders a cloud config with the VXC and cannot unset
+// it, so that removal fails the plan. Dropping a vrouter, transit or a-end
+// config is allowed and only clears state, which is what a reconciled import
+// needs, so it warns instead. It reads the partner config objects alone, so
+// ModifyPlan runs it before the anyVXCEndObjectUnknownOrNull early return.
+func checkPartnerConfigRemoval(ctx context.Context, pathRoot string, planPartnerConfig, statePartnerConfig types.Object, diags *diag.Diagnostics) {
+	if !planPartnerConfig.IsNull() || statePartnerConfig.IsNull() {
 		return
 	}
-	diags.AddError(
-		fmt.Sprintf("Cannot remove %s", pathRoot),
-		fmt.Sprintf("The %s block holds a cloud partner configuration. Megaport sets it when the VXC is ordered and cannot remove it. Put the block back in the configuration, or run terraform state rm to stop managing this VXC.", pathRoot),
+	if isCSPPartnerConfig(ctx, statePartnerConfig, diags) {
+		diags.AddError(
+			fmt.Sprintf("Cannot remove %s", pathRoot),
+			fmt.Sprintf("The %s block holds a cloud partner configuration. Megaport sets it when the VXC is ordered and cannot remove it. Put the block back in the configuration, or stop managing this VXC with a removed block or terraform state rm.", pathRoot),
+		)
+		return
+	}
+	diags.AddWarning(
+		fmt.Sprintf("Removing %s only clears it from state", pathRoot),
+		fmt.Sprintf("Terraform drops the %s block from state and sends no change to Megaport, so the live service keeps the settings it has. This apply does not shut down BGP or alter the interface. Edit the block instead of removing it to change the service, or destroy the VXC to tear it down.", pathRoot),
 	)
 }
 

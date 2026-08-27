@@ -5136,12 +5136,12 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 	}
 }
 
-// TestRejectCSPPartnerConfigRemoval covers dropping the partner config block
-// from a configuration. A cloud config is ordered with the VXC and the API
-// cannot unset it, so the plan has to fail rather than clear state over a live
-// configuration. The internal partner types carry no cloud state and are
-// removed without complaint.
-func TestRejectCSPPartnerConfigRemoval(t *testing.T) {
+// TestCheckPartnerConfigRemoval covers dropping the partner config block from a
+// configuration. A cloud config is ordered with the VXC and the API cannot unset
+// it, so the plan has to fail rather than clear state over a live configuration.
+// Removing an internal partner type is allowed, but it only clears state and
+// leaves the live service running, so it has to warn rather than pass silently.
+func TestCheckPartnerConfigRemoval(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -5171,13 +5171,15 @@ func TestRejectCSPPartnerConfigRemoval(t *testing.T) {
 		statePartner string
 		keepInPlan   bool // plan still carries the block
 		wantError    bool
+		wantWarning  bool
 	}{
 		{name: "removing_aws_errors", statePartner: "aws", wantError: true},
 		{name: "removing_azure_errors", statePartner: "azure", wantError: true},
-		{name: "removing_vrouter_is_allowed", statePartner: "vrouter", wantError: false},
-		{name: "removing_transit_is_allowed", statePartner: "transit", wantError: false},
-		{name: "null_state_is_allowed", nullState: true, wantError: false},
-		{name: "keeping_aws_is_allowed", statePartner: "aws", keepInPlan: true, wantError: false},
+		{name: "removing_vrouter_warns", statePartner: "vrouter", wantWarning: true},
+		{name: "removing_transit_warns", statePartner: "transit", wantWarning: true},
+		{name: "removing_a_end_warns", statePartner: "a-end", wantWarning: true},
+		{name: "null_state_is_silent", nullState: true},
+		{name: "keeping_aws_is_silent", statePartner: "aws", keepInPlan: true},
 	}
 
 	for _, tc := range tests {
@@ -5192,19 +5194,35 @@ func TestRejectCSPPartnerConfigRemoval(t *testing.T) {
 			}
 			diags := diag.Diagnostics{}
 
-			rejectCSPPartnerConfigRemoval(ctx, "a_end_partner_config", planPartner, statePartner, &diags)
+			checkPartnerConfigRemoval(ctx, "a_end_partner_config", planPartner, statePartner, &diags)
 
-			if !tc.wantError {
-				if diags.HasError() {
-					t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+			if tc.wantError {
+				if !diags.HasError() {
+					t.Fatal("expected an error removing a cloud partner config, got none")
+				}
+				if summary := diags.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
+					t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
 				}
 				return
 			}
-			if !diags.HasError() {
-				t.Fatal("expected an error removing a cloud partner config, got none")
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
 			}
-			if summary := diags.Errors()[0].Summary(); summary != "Cannot remove a_end_partner_config" {
-				t.Errorf("error summary = %q, want %q", summary, "Cannot remove a_end_partner_config")
+
+			// An allowed removal clears state while the live service keeps
+			// running, so silence here would report a teardown that never
+			// happened.
+			if !tc.wantWarning {
+				if diags.WarningsCount() != 0 {
+					t.Fatalf("expected no warnings, got %v", diags.Warnings())
+				}
+				return
+			}
+			if diags.WarningsCount() != 1 {
+				t.Fatalf("expected exactly one warning, got %v", diags.Warnings())
+			}
+			if summary := diags.Warnings()[0].Summary(); summary != "Removing a_end_partner_config only clears it from state" {
+				t.Errorf("warning summary = %q, want the state-only removal warning", summary)
 			}
 		})
 	}
