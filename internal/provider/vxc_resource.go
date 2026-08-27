@@ -2150,7 +2150,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
 		diags.AddWarning(
 			"Some settings cannot be imported",
-			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply.",
+			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Three more settings have no attribute at all: a DHCP pool, eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
 		)
 	}
 
