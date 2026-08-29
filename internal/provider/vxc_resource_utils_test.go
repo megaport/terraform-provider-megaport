@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -302,6 +303,69 @@ func TestVerifyUpdateApplied(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, r.verifyUpdateApplied(tc.vxc, tc.updateReq))
+		})
+	}
+}
+
+// TestFromAPICSPConnection covers the VROUTER case of fromAPICSPConnection:
+// ip_addresses must reflect the API-returned addresses, be an empty (non-null)
+// list when the API returns none, and the scalar fields must map through.
+func TestFromAPICSPConnection(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name    string
+		conn    megaport.CSPConnectionVirtualRouter
+		wantIPs []string
+	}{
+		{
+			name: "populated ip_addresses",
+			conn: megaport.CSPConnectionVirtualRouter{
+				ConnectType:       "VROUTER",
+				ResourceName:      "vrouter-a",
+				ResourceType:      "vrouter",
+				VLAN:              200,
+				VirtualRouterName: "mcr-vrouter",
+				IPAddresses:       []string{"10.0.0.1/30", "10.0.0.2/30"},
+			},
+			wantIPs: []string{"10.0.0.1/30", "10.0.0.2/30"},
+		},
+		{
+			name: "empty ip_addresses",
+			conn: megaport.CSPConnectionVirtualRouter{
+				ConnectType:       "VROUTER",
+				ResourceName:      "vrouter-b",
+				ResourceType:      "vrouter",
+				VLAN:              201,
+				VirtualRouterName: "mcr-vrouter-2",
+				IPAddresses:       nil,
+			},
+			wantIPs: []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj, diags := fromAPICSPConnection(ctx, tc.conn)
+			require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+
+			var model cspConnectionModel
+			diags = obj.As(ctx, &model, basetypes.ObjectAsOptions{})
+			require.False(t, diags.HasError(), "decoding object: %v", diags)
+
+			assert.Equal(t, tc.conn.ConnectType, model.ConnectType.ValueString())
+			assert.Equal(t, int64(tc.conn.VLAN), model.VLAN.ValueInt64())
+			assert.Equal(t, tc.conn.VirtualRouterName, model.VirtualRouterName.ValueString())
+
+			assert.False(t, model.IPAddresses.IsNull(), "ip_addresses should be an empty list, not null")
+			var gotIPs []string
+			diags = model.IPAddresses.ElementsAs(ctx, &gotIPs, false)
+			require.False(t, diags.HasError(), "reading ip_addresses: %v", diags)
+			if len(tc.wantIPs) == 0 {
+				assert.Empty(t, gotIPs)
+			} else {
+				assert.Equal(t, tc.wantIPs, gotIPs)
+			}
 		})
 	}
 }
