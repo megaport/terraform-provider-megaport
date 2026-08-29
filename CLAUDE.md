@@ -21,7 +21,7 @@ go test -v -timeout=30m -run TestFunctionName ./internal/provider/
 TF_ACC=1 MEGAPORT_ACCESS_KEY=xxx MEGAPORT_SECRET_KEY=xxx go test -v -timeout=30m -cover ./internal/provider/
 
 # Lint (uses golangci-lint v2)
-golangci-lint run --timeout=10m
+golangci-lint run --timeout=5m
 
 # Generate docs and format examples
 go generate ./...
@@ -96,7 +96,7 @@ MVE resources support multiple vendors (Aruba, Aviatrix, Cisco, Fortinet, Palo A
 ## CI Pipeline
 
 CI runs on PRs to `main` (`.github/workflows/test.yaml`):
-1. **Build** + **golangci-lint v2.3.1**
+1. **Build** + **golangci-lint v2.11.4**
 2. **Generate** — verifies `go generate ./...` produces no diff
 3. **Unit tests** — `go test` with 30min timeout
 4. **OpenTofu 1.6.0 compatibility** test
