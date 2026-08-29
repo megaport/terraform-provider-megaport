@@ -1056,7 +1056,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the A-End port. That check is skipped for cloud partner connections, and it is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1140,7 +1140,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check is skipped for cloud partner connections, and it is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1311,6 +1311,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			)
 			return
 		}
+	}
+
+	resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+		svc:              r.client.PortService,
+		end:              "A-End",
+		productUID:       a.RequestedProductUID.ValueString(),
+		productType:      productType,
+		orderedVLAN:      a.OrderedVLAN,
+		currentVLAN:      types.Int64Null(),
+		hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+	})...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
@@ -1630,6 +1643,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 				"Error creating VXC",
 				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
 			)
+			return
+		}
+	}
+
+	// Skip when a service key redirected the order to a different B-End, since
+	// the product type above was resolved for the port the user named, not the
+	// one being ordered.
+	if serviceKeyBEndUID == "" {
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       b.RequestedProductUID.ValueString(),
+			productType:      productType,
+			orderedVLAN:      b.OrderedVLAN,
+			currentVLAN:      types.Int64Null(),
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
@@ -2180,6 +2211,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
 		supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "A-End",
+			productUID:       aEndPlan.RequestedProductUID.ValueString(),
+			productType:      aEndProductType,
+			orderedVLAN:      aEndPlan.OrderedVLAN,
+			currentVLAN:      aEndState.VLAN,
+			hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
@@ -2217,6 +2261,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
 		supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       bEndPlan.RequestedProductUID.ValueString(),
+			productType:      bEndProductType,
+			orderedVLAN:      bEndPlan.OrderedVLAN,
+			currentVLAN:      bEndState.VLAN,
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
