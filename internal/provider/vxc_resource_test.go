@@ -5119,6 +5119,12 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantBEnd: "transit",
 		},
 		{
+			// An imported transit VXC whose configuration restates the block.
+			name:  "transit_unchanged",
+			state: ty.partnerVal("transit"),
+			plan:  ty.partnerVal("transit"),
+		},
+		{
 			name:  "transit_to_vrouter",
 			state: ty.partnerVal("transit"),
 			plan:  ty.vrouterVal(true),
