@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider records a "transit" configuration when the B-End is a transit connection. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -2043,9 +2043,18 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
+	// ImportState writes product_uid alone, so a null product_name marks the
+	// read that follows an import. Only that read may fill a partner config:
+	// the attribute is Optional and not Computed, so a value written on a
+	// managed refresh would plan its own removal on every apply.
+	imported := state.Name.IsNull()
+
 	// In Read, state should preserve its own values, so pass nil
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, nil)
 	resp.Diagnostics.Append(apiDiags...)
+	if imported {
+		resp.Diagnostics.Append(state.fillTransitPartnerConfigOnImport(ctx, vxc)...)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
