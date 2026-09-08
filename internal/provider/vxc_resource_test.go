@@ -3971,10 +3971,9 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 		`, vxcName, whitelist)
 	}
 
-	// noPartnerConfig is the same VXC with the partner block gone. An import
-	// writes a config the user's configuration does not have, so the next plan
-	// removes it. a_end_partner_config is Optional and not Computed, so the
-	// apply has to follow that plan or Terraform reports an inconsistent result.
+	// noPartnerConfig is the same VXC with the partner block gone. The
+	// provider refuses to remove a partner config from a live VXC, so the
+	// apply must fail and leave the recorded block in state.
 	noPartnerConfig := baseConfig + fmt.Sprintf(`
 			resource "megaport_vxc" "vxc" {
 				product_name         = "%s"
@@ -4212,20 +4211,18 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 				Config:   vxcConfig(true),
 				PlanOnly: true,
 			},
-			// Step 8: drop the partner block from the configuration. State
-			// follows the plan, the apply reports no inconsistent result, and
-			// the live BGP session is left running.
+			// Step 8: drop the partner block from the configuration. The
+			// update refuses the removal before any API call.
 			{
-				Config: noPartnerConfig,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckNoResourceAttr("megaport_vxc.vxc", "a_end_partner_config"),
-					checkLiveBGP(true),
-				),
+				Config:      noPartnerConfig,
+				ExpectError: regexp.MustCompile(`Partner configuration cannot be changed on a live VXC`),
 			},
-			// Step 9: the plan settles once the partner config is out of state.
+			// Step 9: the refused apply left state and the live BGP session
+			// as they were, so restoring the block plans nothing.
 			{
-				Config:   noPartnerConfig,
+				Config:   vxcConfig(true),
 				PlanOnly: true,
+				Check:    checkLiveBGP(true),
 			},
 		},
 	})
