@@ -24,6 +24,7 @@ provider "megaport" {
   access_key = "%s"
   secret_key     = "%s"
   accept_purchase_terms = true
+  wait_time = 20
 }
 `, os.Getenv("MEGAPORT_ACCESS_KEY"), os.Getenv("MEGAPORT_SECRET_KEY"))
 
@@ -37,6 +38,7 @@ provider "megaport" {
   secret_key             = "%s"
   accept_purchase_terms  = true
   managed_account_uid    = "%s"
+  wait_time              = 20
 }
 `, os.Getenv("MEGAPORT_ACCESS_KEY"), os.Getenv("MEGAPORT_SECRET_KEY"), managedAccountUID)
 }
