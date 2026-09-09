@@ -15,23 +15,15 @@ jobs:
     if: github.event.label.name == 'acceptance'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Two labels in quick succession would otherwise both read the run list
+    # before either dispatch exists, and neither would cancel the other.
+    concurrency:
+      group: acceptance-label-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     env:
       HARNESS: megaport/terraform-provider-acceptance-ci
       PR: ${{ github.event.pull_request.number }}
     steps:
-      # Anyone with triage access can add a label. Only write access may
-      # spend a run on the shared stack.
-      - name: Require write access for whoever added the label
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SENDER: ${{ github.event.sender.login }}
-        run: |
-          permission=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$SENDER/permission" --jq .permission || echo none)
-          case "$permission" in
-            admin|write) ;;
-            *) echo "::error::$SENDER has '$permission' access to this repository; write access is required to run the acceptance tests"; exit 1 ;;
-          esac
-
       - name: Mint a token for the acceptance harness
         id: harness-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
@@ -41,18 +33,38 @@ jobs:
           owner: megaport
           repositories: terraform-provider-acceptance-ci
           permission-actions: write
+          permission-metadata: read
 
-      # The harness names each run "PR #<n> at <sha>"; a newer push supersedes
-      # any run still queued or in progress for the same pull request.
+      # The harness checks the pull request out and runs its code beside live
+      # credentials, so the label must not grant more than the labeler already
+      # has. Triage access is enough to label; only write access on the harness
+      # may spend a run.
+      - name: Require write access to the harness
+        env:
+          GH_TOKEN: ${{ steps.harness-token.outputs.token }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          permission=$(gh api "repos/$HARNESS/collaborators/$SENDER/permission" --jq .permission) || {
+            echo "::error::could not read $SENDER's access to $HARNESS"
+            exit 1
+          }
+          case "$permission" in
+            admin|write) ;;
+            *) echo "::error::$SENDER has '$permission' access to $HARNESS; write access is required to run the acceptance tests"; exit 1 ;;
+          esac
+
+      # Labeling again cancels any run still queued or in progress for this
+      # pull request. The harness names its runs "PR #<n> at <sha>".
       - name: Cancel earlier runs for this pull request
         env:
           GH_TOKEN: ${{ steps.harness-token.outputs.token }}
         run: |
-          gh api "repos/$HARNESS/actions/workflows/acceptance.yml/runs?event=workflow_dispatch&per_page=100" \
-            --jq ".workflow_runs[] | select(.status != \"completed\" and (.display_title | startswith(\"PR #$PR \"))) | .id" |
-          while read -r id; do
+          # shellcheck disable=SC2016  # $ENV.PR is jq's, not the shell's
+          ids=$(gh api "repos/$HARNESS/actions/workflows/acceptance.yml/runs?event=workflow_dispatch&per_page=100" \
+            --jq '.workflow_runs[] | select(.status != "completed" and (.display_title | startswith("PR #" + $ENV.PR + " "))) | .id')
+          for id in $ids; do
             echo "cancelling run $id"
-            gh api -X POST "repos/$HARNESS/actions/runs/$id/cancel" || true
+            gh api -X POST "repos/$HARNESS/actions/runs/$id/cancel" || echo "::warning::could not cancel run $id"
           done
 
       - name: Dispatch the acceptance run
@@ -61,9 +73,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: gh workflow run acceptance.yml -R "$HARNESS" -f provider_ref="$HEAD_SHA" -f pr_number="$PR"
 
-      # Removing the label turns it back into a button for the next push.
+      # Removing the label turns it back into a button for the next push. The
+      # label may already be gone by hand, and that answers 404.
       - name: Remove the label
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/acceptance"
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/acceptance" || true
