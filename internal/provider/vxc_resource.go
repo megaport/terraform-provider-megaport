@@ -1179,7 +1179,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. It does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1199,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. For any partner configuration besides "vrouter", this configuration cannot be changed after the VXC is created and if it is modified, the VXC will be deleted and re-created. Imported VXCs do not have this field populated by the API, so the initially provided configuration will be ignored as it can't be verified to be correct. If the user wants to change the configuration after importing the resource, they can then do so by changing the field after importing the resource and running terraform apply.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -2080,6 +2080,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerChange = true
 	}
 
+	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// If imported, partner config will be null in state. Copy plan values
 	// so downstream deserialization (.As()) does not fail on null objects.
 	if state.AEndPartnerConfig.IsNull() {
@@ -2123,12 +2129,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 	if !plan.AEndPartnerConfig.IsNull() {
-		if !aEndPartnerPlan.Partner.IsNull() {
-			// Check if the partner is a CSP Partner
-			if aEndPartnerPlan.Partner.ValueString() != "a-end" && aEndPartnerPlan.Partner.ValueString() != "vrouter" && aEndPartnerPlan.Partner.ValueString() != "transit" {
-				aEndCSP = true
-			}
-		}
+		aEndCSP = cspPartner(aEndPartnerPlan.Partner)
 	}
 	bEndPartnerPlanDiags := plan.BEndPartnerConfig.As(ctx, &bEndPartnerPlan, basetypes.ObjectAsOptions{})
 	resp.Diagnostics.Append(bEndPartnerPlanDiags...)
@@ -2136,12 +2137,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 	if !plan.BEndPartnerConfig.IsNull() {
-		if !bEndPartnerPlan.Partner.IsNull() {
-			// Check if the partner is a CSP Partner
-			if bEndPartnerPlan.Partner.ValueString() != "a-end" && bEndPartnerPlan.Partner.ValueString() != "vrouter" && bEndPartnerPlan.Partner.ValueString() != "transit" {
-				bEndCSP = true
-			}
-		}
+		bEndCSP = cspPartner(bEndPartnerPlan.Partner)
 	}
 
 	aEndPartnerStateDiags := state.AEndPartnerConfig.As(ctx, &aEndPartnerState, basetypes.ObjectAsOptions{})
@@ -2390,14 +2386,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerChange && !bEndCSP {
 		switch bEndPartnerPlan.Partner.ValueString() {
-		case "transit":
-			transitDiags, transitPartnerConfig, partnerConfigObj := createTransitPartnerConfig(ctx)
-			if transitDiags.HasError() {
-				resp.Diagnostics.Append(transitDiags...)
-				return
-			}
-			state.BEndPartnerConfig = partnerConfigObj
-			updateReq.BEndPartnerConfig = transitPartnerConfig
 		case "vrouter":
 			if bEndPartnerPlan.VrouterPartnerConfig.IsNull() {
 				resp.Diagnostics.AddError(
@@ -2818,35 +2806,32 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
 
-			// Skip the partner-config / UID reconciliation below if any end-config
-			// object is wholly unknown or null. Unknown objects arise from
-			// conditional expressions referencing resources not yet applied; both
-			// unknown and null objects would fail to decode into a struct and
-			// produce a confusing "Value Conversion Error" rather than a useful
-			// diagnostic. (a_end/b_end are Required, so null is defensive.)
+			// Skip the UID reconciliation below if any end-config object is wholly
+			// unknown or null. Unknown objects arise from conditional expressions
+			// referencing resources not yet applied; both unknown and null objects
+			// would fail to decode into a struct and produce a confusing "Value
+			// Conversion Error" rather than a useful diagnostic. (a_end/b_end are
+			// Required, so null is defensive.)
 			if anyVXCEndObjectUnknownOrNull(aEndStateObj, bEndStateObj, aEndPlanObj, bEndPlanObj) {
 				return
 			}
 
+			_, aEndPlanCSP := classifyPartner(ctx, plan.AEndPartnerConfig, &resp.Diagnostics)
+			_, bEndPlanCSP := classifyPartner(ctx, plan.BEndPartnerConfig, &resp.Diagnostics)
+
 			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            aEndPlanObj,
-				stateEndObj:           aEndStateObj,
-				planPartnerConfig:     plan.AEndPartnerConfig,
-				statePartnerConfig:    &state.AEndPartnerConfig,
-				requiresReplace:       &resp.RequiresReplace,
-				diags:                 &diags,
+				endLabel:    "A-End",
+				planEndObj:  aEndPlanObj,
+				stateEndObj: aEndStateObj,
+				planCSP:     aEndPlanCSP,
+				diags:       &diags,
 			})
 			plan.BEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "B-End",
-				partnerConfigPathRoot: "b_end_partner_config",
-				planEndObj:            bEndPlanObj,
-				stateEndObj:           bEndStateObj,
-				planPartnerConfig:     plan.BEndPartnerConfig,
-				statePartnerConfig:    &state.BEndPartnerConfig,
-				requiresReplace:       &resp.RequiresReplace,
-				diags:                 &diags,
+				endLabel:    "B-End",
+				planEndObj:  bEndPlanObj,
+				stateEndObj: bEndStateObj,
+				planCSP:     bEndPlanCSP,
+				diags:       &diags,
 			})
 			resp.Diagnostics.Append(diags...)
 			if !resp.Diagnostics.HasError() {
@@ -2857,14 +2842,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 }
 
 type vxcEndReconcileInput struct {
-	endLabel              string
-	partnerConfigPathRoot string
-	planEndObj            types.Object
-	stateEndObj           types.Object
-	planPartnerConfig     types.Object
-	statePartnerConfig    *types.Object
-	requiresReplace       *path.Paths
-	diags                 *diag.Diagnostics
+	endLabel    string
+	planEndObj  types.Object
+	stateEndObj types.Object
+	planCSP     bool
+	diags       *diag.Diagnostics
 }
 
 // anyVXCEndObjectUnknownOrNull reports whether any of the given end-config
@@ -2880,9 +2862,8 @@ func anyVXCEndObjectUnknownOrNull(ends ...types.Object) bool {
 
 // reconcileVXCEnd performs the per-end plan reconciliation that ModifyPlan
 // applies symmetrically to A-End and B-End: decoding the end configs, fixing
-// up an unknown ordered_vlan, flagging a replace when a cloud-provider (CSP)
-// partner-config changes, and reconciling requested_product_uid against the
-// current product UID returned by the API. Returns the re-encoded plan
+// up an unknown ordered_vlan, and reconciling requested_product_uid against
+// the current product UID returned by the API. Returns the re-encoded plan
 // end-config object. ModifyPlan cannot mutate state, so nothing here writes
 // back to state.
 func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object {
@@ -2895,13 +2876,6 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 		planConfig.OrderedVLAN = stateConfig.VLAN
 	}
 
-	csp := isCSPPartnerConfig(ctx, in.planPartnerConfig, in.diags)
-
-	// A changed CSP partner-config forces replacement.
-	if !in.statePartnerConfig.IsNull() && csp && !in.planPartnerConfig.Equal(*in.statePartnerConfig) {
-		*in.requiresReplace = append(*in.requiresReplace, path.Root(in.partnerConfigPathRoot))
-	}
-
 	switch {
 	case planConfig.RequestedProductUID.IsUnknown():
 		// Leave unknown as-is: a conditional expression referencing a not-yet-applied
@@ -2912,7 +2886,7 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	case stateConfig.RequestedProductUID.IsNull():
 		// Plan carries an explicit UID and state has none yet; keep the plan value
 		// (and skip the CSP branch, which would otherwise overwrite it with null).
-	case csp:
+	case in.planCSP:
 		if !planConfig.RequestedProductUID.IsNull() && planConfig.RequestedProductUID.ValueString() != "" && !planConfig.RequestedProductUID.Equal(stateConfig.RequestedProductUID) {
 			tflog.Info(ctx, fmt.Sprintf("Cloud provider port mapping detected for %s", in.endLabel),
 				map[string]any{
@@ -2929,20 +2903,94 @@ func reconcileVXCEnd(ctx context.Context, in vxcEndReconcileInput) types.Object 
 	return newPlanObj
 }
 
-// isCSPPartnerConfig reports whether the plan partner-config object is a
-// cloud-provider partner — anything other than the internal "transit",
-// "vrouter", and "a-end" sentinel partners triggers the CSP-specific
-// product-UID rotation handling in ModifyPlan.
-func isCSPPartnerConfig(ctx context.Context, planPartnerConfig types.Object, diags *diag.Diagnostics) bool {
-	if planPartnerConfig.IsNull() || planPartnerConfig.IsUnknown() {
-		return false
+// vxcPartnersSendableOnUpdate lists the partner configurations the provider
+// sends for each end on update. UpdateVXC rejects any B-End configuration that
+// is not "vrouter". Cloud partners appear on neither end.
+var vxcPartnersSendableOnUpdate = map[string][]string{
+	"A-End": {"a-end", "transit", "vrouter"},
+	"B-End": {"vrouter"},
+}
+
+// partnerSendableOnUpdate reports whether the provider sends the named partner
+// config for an end.
+func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
+	return slices.Contains(vxcPartnersSendableOnUpdate[endLabel], partner.ValueString())
+}
+
+// checkPartnerConfigUpdatable rejects a partner-config change the provider
+// cannot carry out, so the apply fails instead of reporting a success that
+// never reached the live VXC. Three changes qualify: removing the block, any
+// change to an end whose live config is a cloud partner, and a partner the
+// provider does not send for that end. A cloud partner added to an end that
+// has none in state is recorded instead, and warns.
+func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
+	if planPartnerConfig.Equal(statePartnerConfig) {
+		return
+	}
+	planPartner, planCSP := classifyPartner(ctx, planPartnerConfig, diags)
+	statePartner, stateCSP := classifyPartner(ctx, statePartnerConfig, diags)
+
+	// A null state with a cloud partner in the plan is the post-import case:
+	// the config is recorded, not sent. Warn here rather than in ModifyPlan,
+	// which Terraform runs on both the plan walk and the apply walk.
+	if statePartnerConfig.IsNull() && planCSP {
+		diags.AddAttributeWarning(
+			path.Root(partnerConfigPathRoot),
+			"Partner configuration is recorded in state only",
+			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC.", endLabel, planPartner.ValueString()),
+		)
+		return
+	}
+
+	const summary = "Partner configuration cannot be changed on a live VXC"
+	const replaceHint = "Replacing destroys and rebuilds the service."
+
+	switch {
+	case planPartnerConfig.IsNull():
+		diags.AddAttributeError(
+			path.Root(partnerConfigPathRoot),
+			summary,
+			fmt.Sprintf("The provider cannot remove a partner configuration from a live VXC, so the %s keeps its %q configuration. Restore the removed block. \"terraform state pull\" prints the recorded block, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
+		)
+	case stateCSP:
+		diags.AddAttributeError(
+			path.Root(partnerConfigPathRoot),
+			summary,
+			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. To correct a recorded value, remove the VXC from state, import it again, and apply the corrected block. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
+		)
+	case !partnerSendableOnUpdate(endLabel, planPartner):
+		diags.AddAttributeError(
+			path.Root(partnerConfigPathRoot),
+			summary,
+			fmt.Sprintf("The provider does not send partner %q on the %s when it updates a VXC, so this change never reaches the live service. Revert the change, or replace the VXC with \"terraform apply -replace=<resource address>\" to build it with the new configuration. %s", planPartner.ValueString(), endLabel, replaceHint),
+		)
+	}
+}
+
+// classifyPartner returns the partner held in a partner-config object, and
+// whether that partner is a cloud partner. The internal "transit", "vrouter",
+// and "a-end" sentinel partners are not. An unknown partner counts as a cloud
+// partner, since it may still resolve to one.
+func classifyPartner(ctx context.Context, partnerConfig types.Object, diags *diag.Diagnostics) (types.String, bool) {
+	if partnerConfig.IsNull() || partnerConfig.IsUnknown() {
+		return types.StringNull(), false
 	}
 	var partnerConfigModel vxcPartnerConfigurationModel
-	*diags = append(*diags, planPartnerConfig.As(ctx, &partnerConfigModel, basetypes.ObjectAsOptions{})...)
+	*diags = append(*diags, partnerConfig.As(ctx, &partnerConfigModel, basetypes.ObjectAsOptions{})...)
 	if partnerConfigModel.Partner.IsNull() {
+		return partnerConfigModel.Partner, false
+	}
+	return partnerConfigModel.Partner, cspPartner(partnerConfigModel.Partner)
+}
+
+// cspPartner reports whether a partner is a cloud partner. The internal
+// "transit", "vrouter", and "a-end" sentinels are not. An unknown partner
+// counts as a cloud partner, since it may still resolve to one.
+func cspPartner(partner types.String) bool {
+	if partner.IsNull() {
 		return false
 	}
-	switch partnerConfigModel.Partner.ValueString() {
+	switch partner.ValueString() {
 	case "transit", "vrouter", "a-end":
 		return false
 	default:
