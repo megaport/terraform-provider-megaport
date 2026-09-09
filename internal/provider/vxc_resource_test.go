@@ -4148,6 +4148,14 @@ func TestAccMegaportVXC_ImportDrift_WithPartnerConfig(t *testing.T) {
 						bgp + "peer_asn":         "64512",
 						bgp + "local_ip_address": "10.0.0.1",
 						bgp + "peer_ip_address":  "10.0.0.2",
+						bgp + "med_in":           "100",
+						bgp + "med_out":          "100",
+						bgp + "export_policy":    "permit",
+						bgp + "description":      "Test BGP Connection",
+						// The API reports these two on every session, so the
+						// import records them even though the config omits them.
+						bgp + "peer_type": "NON_CLOUD",
+						bgp + "local_asn": "64555",
 					}
 					for k, v := range want {
 						if attrs[k] != v {
