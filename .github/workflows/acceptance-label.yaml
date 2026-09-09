@@ -48,6 +48,8 @@ jobs:
             echo "::error::could not read $SENDER's access to $HARNESS"
             exit 1
           }
+          # The API answers the legacy roles, so maintain reads as write and
+          # triage reads as read.
           case "$permission" in
             admin|write) ;;
             *) echo "::error::$SENDER has '$permission' access to $HARNESS; write access is required to run the acceptance tests"; exit 1 ;;
@@ -59,9 +61,18 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.harness-token.outputs.token }}
         run: |
-          # shellcheck disable=SC2016  # $ENV.PR is jq's, not the shell's
-          ids=$(gh api "repos/$HARNESS/actions/workflows/acceptance.yml/runs?event=workflow_dispatch&per_page=100" \
-            --jq '.workflow_runs[] | select(.status != "completed" and (.display_title | startswith("PR #" + $ENV.PR + " "))) | .id')
+          # Filtering by status server side keeps an older run in view however
+          # many dispatches came after it. A run holds one status at a time.
+          ids=""
+          for status in queued pending in_progress; do
+            # shellcheck disable=SC2016  # $ENV.PR is jq's, not the shell's
+            page=$(gh api "repos/$HARNESS/actions/workflows/acceptance.yml/runs?event=workflow_dispatch&status=$status&per_page=100" \
+              --jq '.workflow_runs[] | select(.display_title | startswith("PR #" + $ENV.PR + " ")) | .id') || {
+              echo "::error::could not list $status runs on $HARNESS"
+              exit 1
+            }
+            ids="$ids $page"
+          done
           for id in $ids; do
             echo "cancelling run $id"
             gh api -X POST "repos/$HARNESS/actions/runs/$id/cancel" || echo "::warning::could not cancel run $id"
@@ -73,10 +84,16 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: gh workflow run acceptance.yml -R "$HARNESS" -f provider_ref="$HEAD_SHA" -f pr_number="$PR"
 
-      # Removing the label turns it back into a button for the next push. The
-      # label may already be gone by hand, and that answers 404.
+      # Removing the label turns it back into a button for the next push.
       - name: Remove the label
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/acceptance" || true
+        run: |
+          # A maintainer may have taken the label off by hand, which answers 404.
+          if ! out=$(gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/acceptance" 2>&1); then
+            case "$out" in
+              *"HTTP 404"*) echo "the label was already removed" ;;
+              *) echo "::error::$out"; exit 1 ;;
+            esac
+          fi
