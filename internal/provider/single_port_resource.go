@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -103,7 +104,8 @@ func NewPortResource() resource.Resource {
 
 // portResource is the resource implementation.
 type portResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // Metadata returns the resource type name.
@@ -239,7 +241,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 		CostCentre:            plan.CostCentre.ValueString(),
 		PromoCode:             plan.PromoCode.ValueString(),
 		WaitForProvision:      true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	}
 
 	if !plan.ResourceTags.IsNull() {
@@ -403,7 +405,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		ContractTermMonths:    contractTermMonths,
 		CostCentre:            costCentre,
 		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
+		WaitForTime:           r.waitForTime,
 	})
 	if modifyErr != nil {
 		resp.Diagnostics.AddError(
@@ -501,6 +503,7 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 	r.client = data.client
+	r.waitForTime = data.waitForTime
 }
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

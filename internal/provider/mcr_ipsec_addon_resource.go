@@ -34,7 +34,8 @@ func NewMCRIpsecAddonResource() resource.Resource {
 
 // mcrIpsecAddonResource defines the resource implementation.
 type mcrIpsecAddonResource struct {
-	client *megaport.Client
+	client      *megaport.Client
+	waitForTime time.Duration
 }
 
 // mcrIpsecAddonResourceModel maps the resource schema data.
@@ -95,6 +96,7 @@ func (r *mcrIpsecAddonResource) Configure(_ context.Context, req resource.Config
 	}
 
 	r.client = client.client
+	r.waitForTime = client.waitForTime
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -121,7 +123,7 @@ func (r *mcrIpsecAddonResource) Create(ctx context.Context, req resource.CreateR
 			TunnelCount: tunnelCount,
 		},
 		WaitForProvision: true,
-		WaitForTime:      waitForTime,
+		WaitForTime:      r.waitForTime,
 	}
 
 	if err := r.client.MCRService.UpdateMCRWithAddOn(ctx, mcrID, addOnReq); err != nil {
@@ -231,7 +233,7 @@ func (r *mcrIpsecAddonResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Wait for the MCR to reach a ready state
-	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, waitForTime); err != nil {
+	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, r.waitForTime); err != nil {
 		resp.Diagnostics.AddError(
 			"Error waiting for MCR to be ready",
 			fmt.Sprintf("MCR %s did not reach a ready state after updating IPSec add-on: %s", mcrID, err.Error()),
@@ -299,7 +301,7 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 
 	// Wait for the MCR to return to a ready state so follow-on operations
 	// (e.g., deleting the MCR itself in the same destroy) don't race.
-	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, waitForTime); err != nil {
+	if err := r.client.MCRService.WaitForMCRReady(ctx, mcrID, r.waitForTime); err != nil {
 		if errors.Is(err, megaport.ErrMCRNotFound) || errors.Is(err, megaport.ErrMCRDecommissioned) {
 			return
 		}
@@ -314,7 +316,7 @@ func (r *mcrIpsecAddonResource) Delete(ctx context.Context, req resource.DeleteR
 // while the API still reports tunnels configured on the MCR. It gives up after
 // waitForTime and returns the last error for the caller to surface.
 func (r *mcrIpsecAddonResource) deleteAddOnAwaitingTunnels(ctx context.Context, mcrID, addOnUID string) error {
-	deadline := time.Now().Add(waitForTime)
+	deadline := time.Now().Add(r.waitForTime)
 	for {
 		err := r.client.MCRService.UpdateMCRIPsecAddOn(ctx, mcrID, addOnUID, 0)
 		if err == nil || !isIPsecTunnelsConfiguredError(err) || !time.Now().Before(deadline) {
