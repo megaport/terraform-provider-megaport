@@ -145,7 +145,8 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		)
 		return
 	}
-	if mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+	// A 200 carrying no product means the same thing as a not-found.
+	if mcr == nil || mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 		resp.State.RemoveResource(ctx)
 		return
 	}

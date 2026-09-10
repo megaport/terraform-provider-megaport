@@ -78,6 +78,13 @@ func TestMCRPrefixFilterListRead(t *testing.T) {
 			},
 		},
 		{
+			// A 200 with no product body means the MCR is gone too.
+			name: "MCR returns no product",
+			mock: &MockMCRService{
+				GetMCRPrefixFilterListResult: livePrefixList,
+			},
+		},
+		{
 			name: "MCR returns 404",
 			mock: &MockMCRService{
 				GetMCRErr: notFoundResponseErr(http.StatusNotFound, "Service not found"),
