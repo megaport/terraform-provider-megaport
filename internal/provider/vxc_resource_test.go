@@ -4,17 +4,20 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	fwschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	megaport "github.com/megaport/megaportgo"
 )
 
 const (
@@ -4699,32 +4702,13 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 		}
 		return obj
 	}
-	cspPartner := func(t *testing.T) types.Object {
-		t.Helper()
-		partnerType := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}
-		raw, ok := partnerType.TerraformType(ctx).(tftypes.Object)
-		if !ok {
-			t.Fatal("partner config type is not tftypes.Object")
-		}
-		attrs := nullValueMap(raw)
-		attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
-		val, err := partnerType.ValueFromTerraform(ctx, tftypes.NewValue(raw, attrs))
-		if err != nil {
-			t.Fatalf("build partner config: %v", err)
-		}
-		obj, ok := val.(types.Object)
-		if !ok {
-			t.Fatal("partner config value is not types.Object")
-		}
-		return obj
-	}
-
 	tests := []struct {
 		name           string
 		planRequested  types.String
 		stateRequested types.String
 		stateCurrent   types.String
 		csp            bool
+		unknownPartner bool
 		wantUnknown    bool
 		wantValue      string
 	}{
@@ -4776,27 +4760,27 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 			csp:            false,
 			wantValue:      "port-new",
 		},
+		{
+			name:           "unknown_partner_pins_to_state",
+			planRequested:  types.StringValue("port-new"),
+			stateRequested: types.StringValue("port-state"),
+			stateCurrent:   types.StringValue("port-current"),
+			unknownPartner: true,
+			wantValue:      "port-state",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			planPartner := types.ObjectNull(vxcPartnerConfigAttrs)
-			if tc.csp {
-				planPartner = cspPartner(t)
-			}
-			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
 			diags := diag.Diagnostics{}
-			var rr path.Paths
 
 			gotObj := reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            mkEnd(t, tc.planRequested, types.StringNull()),
-				stateEndObj:           mkEnd(t, tc.stateRequested, tc.stateCurrent),
-				planPartnerConfig:     planPartner,
-				statePartnerConfig:    &statePartner,
-				requiresReplace:       &rr,
-				diags:                 &diags,
+				endLabel:    "A-End",
+				planEndObj:  mkEnd(t, tc.planRequested, types.StringNull()),
+				stateEndObj: mkEnd(t, tc.stateRequested, tc.stateCurrent),
+				// An unknown partner counts as a cloud partner.
+				planCSP: tc.csp || tc.unknownPartner,
+				diags:   &diags,
 			})
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
@@ -4820,10 +4804,417 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 	}
 }
 
-// TestReconcileVXCEnd_RequiresReplace covers the partner-config replace branch:
-// a changed CSP partner-config forces replacement, while an unchanged CSP
-// config, a non-CSP change, or a null state config must not.
-func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
+// assertOneDiag asserts diags holds exactly one diagnostic, with the wanted
+// summary, attribute path, and every mustContain string in the detail. An
+// empty want asserts diags is empty.
+func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.Path, mustContain ...string) {
+	t.Helper()
+	if want == "" {
+		if len(diags) != 0 {
+			t.Errorf("expected no diagnostics, got %v", diags)
+		}
+		return
+	}
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d: %v", len(diags), diags)
+	}
+	if diags[0].Summary() != want {
+		t.Errorf("summary = %q, want %q", diags[0].Summary(), want)
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(diags[0].Detail(), want) {
+			t.Errorf("detail does not name %s: %q", want, diags[0].Detail())
+		}
+	}
+	withPath, ok := diags[0].(diag.DiagnosticWithPath)
+	if !ok {
+		t.Fatalf("diagnostic %q is not attribute-scoped", diags[0].Summary())
+	}
+	if !withPath.Path().Equal(at) {
+		t.Errorf("path = %s, want %s", withPath.Path(), at)
+	}
+}
+
+// vxcPartnerTestTypes holds the VXC schema and the tftypes the partner-config
+// tests build values against.
+type vxcPartnerTestTypes struct {
+	schema  fwschema.Schema
+	obj     tftypes.Object
+	end     tftypes.Object
+	partner tftypes.Object
+	aws     tftypes.Object
+	vrouter tftypes.Object
+	aEnd    tftypes.Object
+	// endVal is a minimal valid a_end/b_end value.
+	endVal tftypes.Value
+}
+
+func newVXCPartnerTestTypes(ctx context.Context, t *testing.T) vxcPartnerTestTypes {
+	t.Helper()
+	r := &vxcResource{}
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+
+	objType, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	nested := func(parent tftypes.Object, name string) tftypes.Object {
+		child, ok := parent.AttributeTypes[name].(tftypes.Object)
+		if !ok {
+			t.Fatalf("%s type is not tftypes.Object", name)
+		}
+		return child
+	}
+	// Both ends carry the same partner-config attribute set.
+	partnerType := nested(objType, "a_end_partner_config")
+	endType := nested(objType, "a_end")
+
+	endAttrs := nullValueMap(endType)
+	endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid-123")
+
+	return vxcPartnerTestTypes{
+		schema:  schemaResp.Schema,
+		obj:     objType,
+		end:     endType,
+		partner: partnerType,
+		aws:     nested(partnerType, "aws_config"),
+		vrouter: nested(partnerType, "vrouter_config"),
+		aEnd:    nested(partnerType, "partner_a_end_config"),
+		endVal:  tftypes.NewValue(endType, endAttrs),
+	}
+}
+
+// partnerVal builds a partner config naming only the partner.
+func (ty vxcPartnerTestTypes) partnerVal(name string) tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, name)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// awsVal builds the shape behind the reported outage: a BGP auth key edit
+// inside an aws_config block.
+func (ty vxcPartnerTestTypes) awsVal(authKey tftypes.Value) tftypes.Value {
+	aws := nullValueMap(ty.aws)
+	aws["auth_key"] = authKey
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
+	attrs["aws_config"] = tftypes.NewValue(ty.aws, aws)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// unknownPartnerVal builds a partner config whose partner has not resolved yet.
+func (ty vxcPartnerTestTypes) unknownPartnerVal() tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// aEndVal builds an "a-end" partner config carrying a nested config block.
+func (ty vxcPartnerTestTypes) aEndVal() tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "a-end")
+	attrs["partner_a_end_config"] = tftypes.NewValue(ty.aEnd, nullValueMap(ty.aEnd))
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+func (ty vxcPartnerTestTypes) vrouterVal(withConfig bool) tftypes.Value {
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "vrouter")
+	if withConfig {
+		attrs["vrouter_config"] = tftypes.NewValue(ty.vrouter, nullValueMap(ty.vrouter))
+	}
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// objectValue converts a raw partner-config value into the types.Object the
+// gate takes.
+func (ty vxcPartnerTestTypes) objectValue(ctx context.Context, t *testing.T, raw tftypes.Value) types.Object {
+	t.Helper()
+	val, err := types.ObjectType{AttrTypes: vxcPartnerConfigAttrs}.ValueFromTerraform(ctx, raw)
+	if err != nil {
+		t.Fatalf("build partner config: %v", err)
+	}
+	obj, ok := val.(types.Object)
+	if !ok {
+		t.Fatal("partner config value is not types.Object")
+	}
+	return obj
+}
+
+// TestVXCModifyPlan_PartnerConfigNeverReplaces pins the fix for the reported
+// outage: no partner-config shape may make ModifyPlan propose a replacement,
+// because the replacement it used to propose decommissioned two live AWS VXCs.
+// ModifyPlan also must not fail the plan, so an explicit replacement still
+// works. It raises no partner-config diagnostic at all: Terraform runs
+// ModifyPlan on both the plan walk and the apply walk, so the post-import
+// warning lives in the Update gate instead.
+func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+	ty := newVXCPartnerTestTypes(ctx, t)
+
+	nullPartner := tftypes.NewValue(ty.partner, nil)
+	knownKey := func(k string) tftypes.Value { return tftypes.NewValue(tftypes.String, k) }
+	unknownKey := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+
+	tests := []struct {
+		name       string
+		state      tftypes.Value
+		plan       tftypes.Value
+		unknownEnd bool
+	}{
+		{name: "csp_auth_key_change", state: ty.awsVal(knownKey("old-key")), plan: ty.awsVal(knownKey("new-key"))},
+		{name: "csp_partner_swap", state: ty.awsVal(knownKey("old-key")), plan: ty.partnerVal("azure")},
+		{name: "csp_unchanged", state: ty.awsVal(knownKey("same")), plan: ty.awsVal(knownKey("same"))},
+		{name: "csp_state_to_vrouter", state: ty.awsVal(knownKey("old-key")), plan: ty.vrouterVal(true)},
+		{name: "csp_block_removed", state: ty.awsVal(knownKey("old-key")), plan: nullPartner},
+		{name: "nested_unknown", state: ty.awsVal(knownKey("old-key")), plan: ty.awsVal(unknownKey)},
+		{name: "vrouter_change", state: ty.vrouterVal(false), plan: ty.vrouterVal(true)},
+		{name: "transit_to_vrouter", state: ty.partnerVal("transit"), plan: ty.vrouterVal(true)},
+		{name: "a_end_sentinel_to_vrouter", state: ty.partnerVal("a-end"), plan: ty.vrouterVal(true)},
+		{name: "vrouter_state_to_csp", state: ty.vrouterVal(true), plan: ty.awsVal(knownKey("new-key"))},
+		{name: "unknown_partner", state: ty.awsVal(knownKey("old-key")), plan: ty.unknownPartnerVal()},
+		{name: "unknown_partner_object", state: ty.awsVal(knownKey("old-key")), plan: tftypes.NewValue(ty.partner, tftypes.UnknownValue)},
+		{
+			// An imported VXC has no partner config in state. Adding one is the
+			// case the Update gate warns about; the plan stays silent.
+			name:  "null_state",
+			state: nullPartner,
+			plan:  ty.awsVal(knownKey("new-key")),
+		},
+		{
+			name:  "unknown_partner_null_state",
+			state: nullPartner,
+			plan:  ty.unknownPartnerVal(),
+		},
+		{
+			name:  "unknown_partner_object_null_state",
+			state: nullPartner,
+			plan:  tftypes.NewValue(ty.partner, tftypes.UnknownValue),
+		},
+		{
+			// The end-config guard returns before the partner classifier runs.
+			name:       "null_state_with_unknown_end",
+			state:      nullPartner,
+			plan:       ty.awsVal(knownKey("new-key")),
+			unknownEnd: true,
+		},
+	}
+
+	for _, root := range []string{"a_end_partner_config", "b_end_partner_config"} {
+		for _, tc := range tests {
+			t.Run(root+"/"+tc.name, func(t *testing.T) {
+				stateAttrs := nullValueMap(ty.obj)
+				stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+				stateAttrs["a_end"] = ty.endVal
+				stateAttrs["b_end"] = ty.endVal
+				stateAttrs[root] = tc.state
+
+				planAttrs := nullValueMap(ty.obj)
+				planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+				planAttrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+				planEndVal := ty.endVal
+				if tc.unknownEnd {
+					planEndVal = tftypes.NewValue(ty.end, tftypes.UnknownValue)
+				}
+				planAttrs["a_end"] = planEndVal
+				planAttrs["b_end"] = planEndVal
+				planAttrs[root] = tc.plan
+
+				plan := tfsdk.Plan{Schema: ty.schema, Raw: tftypes.NewValue(ty.obj, planAttrs)}
+				req := fwresource.ModifyPlanRequest{
+					State: tfsdk.State{Schema: ty.schema, Raw: tftypes.NewValue(ty.obj, stateAttrs)},
+					Plan:  plan,
+				}
+				resp := fwresource.ModifyPlanResponse{Plan: plan}
+
+				r.ModifyPlan(ctx, req, &resp)
+
+				if len(resp.RequiresReplace) != 0 {
+					t.Errorf("expected no RequiresReplace, got %v", resp.RequiresReplace)
+				}
+				assertOneDiag(t, resp.Diagnostics.Errors(), "", path.Root(root))
+				assertOneDiag(t, resp.Diagnostics.Warnings(), "", path.Root(root))
+			})
+		}
+	}
+}
+
+// TestCheckPartnerConfigUpdatable covers the gate Update runs before it sends
+// anything. The provider never sends a cloud partner config, and UpdateVXC
+// rejects any B-End config that is not "vrouter", so both have to fail the
+// apply rather than report a success the live VXC never saw. The gate also
+// owns the post-import warning, so Update emits it once per apply.
+func TestCheckPartnerConfigUpdatable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ty := newVXCPartnerTestTypes(ctx, t)
+
+	nullPartner := tftypes.NewValue(ty.partner, nil)
+	knownKey := func(k string) tftypes.Value { return tftypes.NewValue(tftypes.String, k) }
+
+	// wantAEnd and wantBEnd name the partner the error must quote, or are empty
+	// when that end accepts the change. wantWarnPartner names the partner the
+	// post-import warning must quote, on both ends.
+	tests := []struct {
+		name            string
+		state           tftypes.Value
+		plan            tftypes.Value
+		wantAEnd        string
+		wantBEnd        string
+		wantWarnPartner string
+	}{
+		{
+			name:     "csp_auth_key_change",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.awsVal(knownKey("new-key")),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			// The recorded cloud partner blocks the change, so the error
+			// names the live partner, not the planned one.
+			name:     "csp_partner_swap",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.partnerVal("azure"),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:  "csp_unchanged",
+			state: ty.awsVal(knownKey("same")),
+			plan:  ty.awsVal(knownKey("same")),
+		},
+		{
+			// The provider can send vrouter, but it never sent the live aws
+			// config and cannot unset it.
+			name:     "csp_state_to_vrouter",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.vrouterVal(true),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "csp_block_removed",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     nullPartner,
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "vrouter_state_to_csp",
+			state:    ty.vrouterVal(true),
+			plan:     ty.awsVal(knownKey("new-key")),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:  "vrouter_change",
+			state: ty.vrouterVal(false),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			// UpdateVXC returns ErrInvalidVXCBEndPartnerConfig for a B-End
+			// config that is not vrouter, so only the A-End may send transit.
+			name:     "vrouter_to_transit",
+			state:    ty.vrouterVal(true),
+			plan:     ty.partnerVal("transit"),
+			wantBEnd: "transit",
+		},
+		{
+			name:  "transit_to_vrouter",
+			state: ty.partnerVal("transit"),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			name:  "a_end_sentinel_to_vrouter",
+			state: ty.partnerVal("a-end"),
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			// The A-End sends "a-end"; the B-End cannot. The B-End cell is
+			// defensive: its schema validator already rejects "a-end".
+			name:     "a_end_config_change",
+			state:    ty.partnerVal("a-end"),
+			plan:     ty.aEndVal(),
+			wantBEnd: "a-end",
+		},
+		{
+			// Nothing can be sent for a removal, whatever the partner.
+			name:     "vrouter_removed",
+			state:    ty.vrouterVal(true),
+			plan:     nullPartner,
+			wantAEnd: "vrouter", wantBEnd: "vrouter",
+		},
+		{
+			// An imported VXC has no partner config in state. Adding a cloud
+			// one records it and warns.
+			name:            "null_state_csp_is_recorded",
+			state:           nullPartner,
+			plan:            ty.awsVal(knownKey("new-key")),
+			wantWarnPartner: "aws",
+		},
+		{
+			// Not the recorded-only case: the provider does try to send this,
+			// and the B-End cannot.
+			name:     "null_state_transit",
+			state:    nullPartner,
+			plan:     ty.partnerVal("transit"),
+			wantBEnd: "transit",
+		},
+		{
+			name:  "null_state_vrouter",
+			state: nullPartner,
+			plan:  ty.vrouterVal(true),
+		},
+		{
+			name:     "null_state_a_end",
+			state:    nullPartner,
+			plan:     ty.partnerVal("a-end"),
+			wantBEnd: "a-end",
+		},
+	}
+
+	for _, root := range []string{"a_end_partner_config", "b_end_partner_config"} {
+		endLabel := "A-End"
+		if root == "b_end_partner_config" {
+			endLabel = "B-End"
+		}
+		for _, tc := range tests {
+			t.Run(root+"/"+tc.name, func(t *testing.T) {
+				wantPartner := tc.wantAEnd
+				if root == "b_end_partner_config" {
+					wantPartner = tc.wantBEnd
+				}
+
+				diags := diag.Diagnostics{}
+				checkPartnerConfigUpdatable(ctx,
+					ty.objectValue(ctx, t, tc.plan),
+					ty.objectValue(ctx, t, tc.state),
+					endLabel, root, &diags)
+
+				wantError := ""
+				mustContain := []string{endLabel}
+				if wantPartner != "" {
+					wantError = "Partner configuration cannot be changed on a live VXC"
+					mustContain = append(mustContain, fmt.Sprintf("%q", wantPartner))
+				}
+				assertOneDiag(t, diags.Errors(), wantError, path.Root(root), mustContain...)
+
+				wantWarn := ""
+				warnContain := []string{endLabel}
+				if tc.wantWarnPartner != "" {
+					wantWarn = "Partner configuration is recorded in state only"
+					warnContain = append(warnContain, fmt.Sprintf("%q", tc.wantWarnPartner))
+				}
+				assertOneDiag(t, diags.Warnings(), wantWarn, path.Root(root), warnContain...)
+			})
+		}
+	}
+}
+
+// TestFromAPIVXC_PreservesPlanPartnerConfig pins the state write the warning
+// path depends on. The API never returns a partner config, so an imported VXC
+// only ever gets one from the plan. Dropping this write leaves the applied
+// state disagreeing with the plan, which fails the apply outright.
+func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -4846,62 +5237,40 @@ func TestReconcileVXCEnd_RequiresReplace(t *testing.T) {
 		}
 		return obj
 	}
-	end := func(t *testing.T) types.Object {
-		t.Helper()
-		obj, d := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, vxcEndConfigurationModel{
-			RequestedProductUID: types.StringValue("port-x"),
-			CurrentProductUID:   types.StringValue("port-x"),
-		})
-		if d.HasError() {
-			t.Fatalf("build end object: %v", d.Errors())
-		}
-		return obj
+
+	plan := &vxcResourceModel{
+		AEndPartnerConfig: partnerWith(t, "a-end"),
+		BEndPartnerConfig: partnerWith(t, "aws"),
+	}
+	orm := &vxcResourceModel{}
+
+	if diags := orm.fromAPIVXC(ctx, &megaport.VXC{UID: "vxc-uid-123"}, nil, plan); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
 	}
 
-	tests := []struct {
-		name         string
-		planPartner  func(t *testing.T) types.Object
-		nullState    bool // state partner config is null
-		statePartner string
-		wantReplace  bool
-	}{
-		{name: "csp_changed_forces_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "azure", wantReplace: true},
-		{name: "csp_unchanged_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, statePartner: "aws", wantReplace: false},
-		{name: "non_csp_change_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "transit") }, statePartner: "aws", wantReplace: false},
-		{name: "null_state_no_replace", planPartner: func(t *testing.T) types.Object { return partnerWith(t, "aws") }, nullState: true, wantReplace: false},
+	if !orm.AEndPartnerConfig.Equal(plan.AEndPartnerConfig) {
+		t.Errorf("a_end_partner_config = %v, want the plan value %v", orm.AEndPartnerConfig, plan.AEndPartnerConfig)
+	}
+	if !orm.BEndPartnerConfig.Equal(plan.BEndPartnerConfig) {
+		t.Errorf("b_end_partner_config = %v, want the plan value %v", orm.BEndPartnerConfig, plan.BEndPartnerConfig)
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			statePartner := types.ObjectNull(vxcPartnerConfigAttrs)
-			if !tc.nullState {
-				statePartner = partnerWith(t, tc.statePartner)
-			}
-			diags := diag.Diagnostics{}
-			var rr path.Paths
-
-			reconcileVXCEnd(ctx, vxcEndReconcileInput{
-				endLabel:              "A-End",
-				partnerConfigPathRoot: "a_end_partner_config",
-				planEndObj:            end(t),
-				stateEndObj:           end(t),
-				planPartnerConfig:     tc.planPartner(t),
-				statePartnerConfig:    &statePartner,
-				requiresReplace:       &rr,
-				diags:                 &diags,
-			})
-			if diags.HasError() {
-				t.Fatalf("unexpected diagnostics: %v", diags.Errors())
-			}
-
-			if tc.wantReplace {
-				if len(rr) != 1 || rr[0].String() != path.Root("a_end_partner_config").String() {
-					t.Errorf("expected requiresReplace [a_end_partner_config], got %v", rr)
-				}
-			} else if len(rr) != 0 {
-				t.Errorf("expected no requiresReplace, got %v", rr)
-			}
-		})
+	// A null plan config leaves the state value alone. The gate in Update rejects
+	// any removed partner config before this runs, so this only holds the line
+	// on the write itself.
+	keptAEnd, keptBEnd := orm.AEndPartnerConfig, orm.BEndPartnerConfig
+	nullPlan := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+	if diags := orm.fromAPIVXC(ctx, &megaport.VXC{UID: "vxc-uid-123"}, nil, nullPlan); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
+	}
+	if !orm.AEndPartnerConfig.Equal(keptAEnd) {
+		t.Errorf("a_end_partner_config = %v, want it kept as %v", orm.AEndPartnerConfig, keptAEnd)
+	}
+	if !orm.BEndPartnerConfig.Equal(keptBEnd) {
+		t.Errorf("b_end_partner_config = %v, want it kept as %v", orm.BEndPartnerConfig, keptBEnd)
 	}
 }
 
@@ -5004,4 +5373,61 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy pins the two
+// guards that keep the partner-config warning off the create and destroy
+// walks. Without them a first apply warns about a config it is about to send,
+// and every destroy of a cloud-partner VXC warns too.
+func TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+	ty := newVXCPartnerTestTypes(ctx, t)
+	s := ty.schema
+
+	vxcVal := func(withUID bool) tftypes.Value {
+		attrs := nullValueMap(ty.obj)
+		attrs["product_name"] = tftypes.NewValue(tftypes.String, "test-vxc")
+		attrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 1000)
+		attrs["a_end"] = ty.endVal
+		attrs["b_end"] = ty.endVal
+		attrs["b_end_partner_config"] = ty.partnerVal("aws")
+		if withUID {
+			attrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+		}
+		return tftypes.NewValue(ty.obj, attrs)
+	}
+	nullVal := tftypes.NewValue(ty.obj, nil)
+
+	tests := []struct {
+		name  string
+		state tftypes.Value
+		plan  tftypes.Value
+	}{
+		// No state UID yet, so the VXC does not exist and Create sends the config.
+		{name: "create", state: nullVal, plan: vxcVal(false)},
+		// A null plan is a destroy; the partner config is going away with the VXC.
+		{name: "destroy", state: vxcVal(true), plan: nullVal},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := tfsdk.Plan{Schema: s, Raw: tc.plan}
+			req := fwresource.ModifyPlanRequest{
+				State: tfsdk.State{Schema: s, Raw: tc.state},
+				Plan:  plan,
+			}
+			resp := fwresource.ModifyPlanResponse{Plan: plan}
+
+			r.ModifyPlan(ctx, req, &resp)
+
+			if diags := resp.Diagnostics.Errors(); len(diags) != 0 {
+				t.Errorf("expected no errors, got: %v", diags)
+			}
+			if diags := resp.Diagnostics.Warnings(); len(diags) != 0 {
+				t.Errorf("expected no warnings, got: %v", diags)
+			}
+		})
+	}
 }
