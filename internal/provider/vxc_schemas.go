@@ -8,6 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// The API dropped the interface-level BFD timers in 2024 because the MCR
+// platform cannot set them. Both partner config shapes repeat the block, so
+// both read the message from here.
+const bfdDeprecationMessage = "This block has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
+
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The AWS partner configuration.",
@@ -230,8 +235,9 @@ var (
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
-							Description: "The BFD of the partner configuration interface.",
-							Optional:    true,
+							Description:        "**DEPRECATED**: " + bfdDeprecationMessage,
+							Optional:           true,
+							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
 									Description: "The transmit interval of the BFD.",
@@ -441,8 +447,9 @@ var (
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
-							Description: "The BFD of the partner configuration interface.",
-							Optional:    true,
+							Description:        "**DEPRECATED**: " + bfdDeprecationMessage,
+							Optional:           true,
+							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
 									Description: "The transmit interval of the BFD.",
