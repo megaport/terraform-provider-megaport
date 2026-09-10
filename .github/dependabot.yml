@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Every commit on main needs a Jira key. EIP-3148 is the standing key for Dependabot updates.
+    commit-message:
+      prefix: "EIP-3148"
     open-pull-requests-limit: 5
     groups:
       gomod:
@@ -20,6 +23,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Every commit on main needs a Jira key. EIP-3148 is the standing key for Dependabot updates.
+    commit-message:
+      prefix: "EIP-3148"
     open-pull-requests-limit: 5
     groups:
       github-actions:

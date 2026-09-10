@@ -402,6 +402,8 @@ The CLA clarifies the terms of the [Mozilla Public Licence 2.0](LICENSE) used to
 When you open a Pull Request, all authors of the contributions are required to comment on the Pull Request confirming
 acceptance of the CLA terms. Pull Requests can not be merged until this is complete.
 
+Commit subjects start with a Jira key (`ENG-1234: <summary>`) and branches are named `feature/ENG-1234-<slug>` (`fix/`, `hotfix/`, and `release/` prefixes also pass). GitHub enforces both. If you're contributing from a fork you don't need a key: write a clear subject and a maintainer will squash-merge your pull request under one. Dependabot commits use the standing key `EIP-3148`.
+
 Megaport users are also bound by the [Acceptable Use Policy](https://www.megaport.com/legal/acceptable-use-policy).
 
 ## 🚨 BREAKING CHANGE: Location Data Source Migration
