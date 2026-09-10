@@ -60,45 +60,15 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	apiDiags := diag.Diagnostics{}
 
 	orm.UID = types.StringValue(v.UID)
-	orm.ID = types.Int64Value(int64(v.ID))
 	orm.Name = types.StringValue(v.Name)
 	orm.ServiceID = types.Int64Value(int64(v.ServiceID))
-	orm.Type = types.StringValue(v.Type)
 	orm.RateLimit = types.Int64Value(int64(v.RateLimit))
 	orm.DistanceBand = types.StringValue(v.DistanceBand)
-	orm.ProvisioningStatus = types.StringValue(v.ProvisioningStatus)
-	orm.SecondaryName = types.StringValue(v.SecondaryName)
-	orm.UsageAlgorithm = types.StringValue(v.UsageAlgorithm)
-	orm.CreatedBy = types.StringValue(v.CreatedBy)
 	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
-	orm.CompanyName = types.StringValue(v.CompanyName)
 	orm.Shutdown = types.BoolValue(v.Shutdown)
 	orm.CostCentre = types.StringValue(v.CostCentre)
-	orm.Locked = types.BoolValue(v.Locked)
-	orm.AdminLocked = types.BoolValue(v.AdminLocked)
-	orm.Cancelable = types.BoolValue(v.Cancelable)
 
-	if v.CreateDate != nil {
-		orm.CreateDate = types.StringValue(v.CreateDate.Format(time.RFC850))
-	} else {
-		orm.CreateDate = types.StringNull()
-	}
-	if v.LiveDate != nil {
-		orm.LiveDate = types.StringValue(v.LiveDate.Format(time.RFC850))
-	} else {
-		orm.LiveDate = types.StringNull()
-	}
-	if v.ContractStartDate != nil {
-		orm.ContractStartDate = types.StringValue(v.ContractStartDate.Format(time.RFC850))
-	} else {
-		orm.ContractStartDate = types.StringNull()
-	}
-	if v.ContractEndDate != nil {
-		orm.ContractEndDate = types.StringValue(v.ContractEndDate.Format(time.RFC850))
-	} else {
-		orm.ContractEndDate = types.StringNull()
-	}
 	var aEndOrderedVLAN, bEndOrderedVLAN *int64
 	var aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndVnicIndex, bEndVnicIndex *int64
