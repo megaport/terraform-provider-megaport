@@ -1,0 +1,99 @@
+name: Acceptance on label
+
+# Runs in the base repository with its secrets. Never check out the pull
+# request here; only its number and head SHA leave this job.
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  dispatch:
+    name: Dispatch acceptance tests
+    if: github.event.label.name == 'acceptance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Two labels in quick succession would otherwise both read the run list
+    # before either dispatch exists, and neither would cancel the other.
+    concurrency:
+      group: acceptance-label-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    env:
+      HARNESS: megaport/terraform-provider-acceptance-ci
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Mint a token for the acceptance harness
+        id: harness-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.ACCEPTANCE_APP_ID }}
+          private-key: ${{ secrets.ACCEPTANCE_APP_PRIVATE_KEY }}
+          owner: megaport
+          repositories: terraform-provider-acceptance-ci
+          permission-actions: write
+          permission-metadata: read
+
+      # The harness checks the pull request out and runs its code beside live
+      # credentials, so the label must not grant more than the labeler already
+      # has. Triage access is enough to label; only write access on the harness
+      # may spend a run.
+      - name: Require write access to the harness
+        env:
+          GH_TOKEN: ${{ steps.harness-token.outputs.token }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          permission=$(gh api "repos/$HARNESS/collaborators/$SENDER/permission" --jq .permission) || {
+            echo "::error::could not read $SENDER's access to $HARNESS"
+            exit 1
+          }
+          # The API answers the legacy roles, so maintain reads as write and
+          # triage reads as read.
+          case "$permission" in
+            admin|write) ;;
+            *) echo "::error::$SENDER has '$permission' access to $HARNESS; write access is required to run the acceptance tests"; exit 1 ;;
+          esac
+
+      # Labeling again cancels any run still queued or in progress for this
+      # pull request. The harness names its runs "PR #<n> at <sha>".
+      - name: Cancel earlier runs for this pull request
+        env:
+          GH_TOKEN: ${{ steps.harness-token.outputs.token }}
+        run: |
+          # Filtering by status server side keeps an older run in view however
+          # many dispatches came after it. A run holds one status at a time.
+          ids=""
+          for status in queued pending in_progress; do
+            # shellcheck disable=SC2016  # $ENV.PR is jq's, not the shell's
+            page=$(gh api "repos/$HARNESS/actions/workflows/acceptance.yml/runs?event=workflow_dispatch&status=$status&per_page=100" \
+              --jq '.workflow_runs[] | select(.display_title | startswith("PR #" + $ENV.PR + " ")) | .id') || {
+              echo "::error::could not list $status runs on $HARNESS"
+              exit 1
+            }
+            ids="$ids $page"
+          done
+          for id in $ids; do
+            echo "cancelling run $id"
+            gh api -X POST "repos/$HARNESS/actions/runs/$id/cancel" || echo "::warning::could not cancel run $id"
+          done
+
+      - name: Dispatch the acceptance run
+        env:
+          GH_TOKEN: ${{ steps.harness-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh workflow run acceptance.yml -R "$HARNESS" -f provider_ref="$HEAD_SHA" -f pr_number="$PR"
+
+      # Removing the label turns it back into a button for the next push.
+      - name: Remove the label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A maintainer may have taken the label off by hand, which answers 404.
+          if ! out=$(gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/acceptance" 2>&1); then
+            case "$out" in
+              *"HTTP 404"*) echo "the label was already removed" ;;
+              *) echo "::error::$out"; exit 1 ;;
+            esac
+          fi
