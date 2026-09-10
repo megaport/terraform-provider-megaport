@@ -1474,7 +1474,7 @@ func TestAccMegaportMCRVXCWithBGP_Basic(t *testing.T) {
 	})
 }
 
-func TestGCPVXCWithProductUID(t *testing.T) {
+func TestAccMegaportVXC_GCPProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	gcp := pickGCPPairingKey(t)
@@ -1531,7 +1531,7 @@ func TestGCPVXCWithProductUID(t *testing.T) {
 	})
 }
 
-func TestOracleVXCWithProductUID(t *testing.T) {
+func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortAndMCRTestLocations(t, 1, 2500)
@@ -1598,7 +1598,7 @@ func TestOracleVXCWithProductUID(t *testing.T) {
 	})
 }
 
-func TestAzureVXCWithProductUID(t *testing.T) {
+func TestAccMegaportVXC_AzureProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	azure := pickAzureServiceKey(t)
@@ -1780,7 +1780,7 @@ func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 	})
 }
 
-func TestFullEcosystem(t *testing.T) {
+func TestAccMegaportFullEcosystem_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// loc1 hosts the MCR (2500 Mbps) + LAG port; loc2 needs AWS partner ports; loc3 is unused.
@@ -2114,7 +2114,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 	})
 }
 
-func TestMVE_TransitVXC(t *testing.T) {
+func TestAccMegaportMVETransit_VXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// The MVE and the TRANSIT partner port must share a region, so claim one
@@ -2212,7 +2212,7 @@ func TestMVE_TransitVXC(t *testing.T) {
 	})
 }
 
-func TestMVE_TransitVXCAWS(t *testing.T) {
+func TestAccMegaportMVETransit_VXCAWS(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// loc1 hosts the MVE (needs MVE capacity); loc2 needs both AWS and TRANSIT partner ports.
@@ -2582,7 +2582,7 @@ func TestMVE_TransitVXCAWS(t *testing.T) {
 	})
 }
 
-func TestMVE_AWS_VXC(t *testing.T) {
+func TestAccMegaportMVEAWS_VXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	mveLocID, _ := findMVETestLocation(t, 0)
