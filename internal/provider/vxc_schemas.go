@@ -9,9 +9,9 @@ import (
 )
 
 // The API dropped the interface-level BFD timers in 2024 because the MCR
-// platform cannot set them. Both partner config shapes repeat the block, so
-// both read the message from here.
-const bfdDeprecationMessage = "This block has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
+// platform cannot set them. Both partner config shapes repeat the block, and
+// the block and each timer inside it read the message from here.
+const bfdDeprecationMessage = "Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
 
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
@@ -240,16 +240,19 @@ var (
 							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
-									Description: "The transmit interval of the BFD.",
-									Optional:    true,
+									Description:        "The transmit interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 								"rx_interval": schema.Int64Attribute{
-									Description: "The receive interval of the BFD.",
-									Optional:    true,
+									Description:        "The receive interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 								"multiplier": schema.Int64Attribute{
-									Description: "The multiplier of the BFD.",
-									Optional:    true,
+									Description:        "The multiplier of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 							},
 						},
@@ -452,16 +455,19 @@ var (
 							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
 								"tx_interval": schema.Int64Attribute{
-									Description: "The transmit interval of the BFD.",
-									Optional:    true,
+									Description:        "The transmit interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 								"rx_interval": schema.Int64Attribute{
-									Description: "The receive interval of the BFD.",
-									Optional:    true,
+									Description:        "The receive interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 								"multiplier": schema.Int64Attribute{
-									Description: "The multiplier of the BFD.",
-									Optional:    true,
+									Description:        "The multiplier of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
 								},
 							},
 						},

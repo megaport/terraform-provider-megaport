@@ -35,6 +35,29 @@ func listNestedAttr(t *testing.T, attrs map[string]schema.Attribute, name string
 	return nested
 }
 
+// Every deprecated bfd attribute has to warn, and none of them may start
+// rejecting a config that already sets it.
+func assertBFDDeprecated(t *testing.T, name string, attr schema.Attribute) {
+	t.Helper()
+	if attr.GetDeprecationMessage() == "" {
+		t.Errorf("expected %s to carry a DeprecationMessage", name)
+	}
+	for _, want := range []string{"bgp_connections[].bfd_enabled", "300 ms", "multiplier of 3"} {
+		if !strings.Contains(attr.GetDeprecationMessage(), want) {
+			t.Errorf("expected %s DeprecationMessage to mention %q, got %q", name, want, attr.GetDeprecationMessage())
+		}
+		if !strings.Contains(attr.GetDescription(), want) {
+			t.Errorf("expected %s Description to mention %q, got %q", name, want, attr.GetDescription())
+		}
+	}
+	if !attr.IsOptional() {
+		t.Errorf("expected %s to stay optional", name)
+	}
+	if attr.IsRequired() {
+		t.Errorf("expected %s to stay not-required", name)
+	}
+}
+
 // The bfd timers are inert. Both partner config shapes, on both ends, must
 // warn and point at the switch that does work.
 func TestVXCSchema_InterfaceBFDIsDeprecated(t *testing.T) {
@@ -48,25 +71,16 @@ func TestVXCSchema_InterfaceBFDIsDeprecated(t *testing.T) {
 				interfaces := listNestedAttr(t, config.Attributes, "interfaces")
 				bfd := singleNestedAttr(t, interfaces.NestedObject.Attributes, "bfd")
 
-				if bfd.DeprecationMessage == "" {
-					t.Error("expected bfd to carry a DeprecationMessage")
-				}
-				for _, want := range []string{"bgp_connections[].bfd_enabled", "300 ms", "multiplier of 3"} {
-					if !strings.Contains(bfd.DeprecationMessage, want) {
-						t.Errorf("expected DeprecationMessage to mention %q, got %q", want, bfd.DeprecationMessage)
-					}
-					if !strings.Contains(bfd.Description, want) {
-						t.Errorf("expected Description to mention %q, got %q", want, bfd.Description)
-					}
-				}
+				assertBFDDeprecated(t, "bfd", bfd)
 
-				// Deprecating warns; it must not start rejecting configs that
-				// already set the block.
-				if !bfd.Optional {
-					t.Error("expected bfd to stay optional")
-				}
-				if bfd.Required {
-					t.Error("expected bfd to stay not-required")
+				// The timers carry the warning too. A reader who deep-links to
+				// the nested docs anchor never sees the parent block.
+				for _, timer := range []string{"tx_interval", "rx_interval", "multiplier"} {
+					child, ok := bfd.Attributes[timer]
+					if !ok {
+						t.Fatalf("expected a %q attribute inside bfd", timer)
+					}
+					assertBFDDeprecated(t, "bfd."+timer, child)
 				}
 			})
 		}
