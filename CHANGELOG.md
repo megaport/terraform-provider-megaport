@@ -15,6 +15,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release History
 
+### [v1.14.0] - 2026-08-27
+
+- ESD-1744: emit the post-import warning once per apply
+- fix: make partner-config error recovery steps workable
+- ESD-1744: reject partner-config removal and pin the a-end table entry
+- ESD-1744: reject a CSP partner-config change at apply, not at plan
+- ESD-1744: keep the partner classifier's answer for an unknown partner
+- ESD-1744: run the partner-config gate before the end-config guard
+- ESD-1744: key the partner-config guard off state as well as plan
+- ESD-1744: stop a CSP partner-config change from destroying a live VXC
+
+### [v1.13.3] - 2026-08-26
+
+- ESD-1760: derive the family maximum from the prefix, not the family string
+- ESD-1760: cover the inline decoder and correct the example
+- ESD-1760: resolve an absent prefix list bound by what the other bound says
+- ESD-1760: read an absent prefix list ge or le as the prefix length
+
+### [v1.13.2] - 2026-08-24
+
+- chore(deps): bump the gomod group across 1 directory with 2 updates
+- docs: note why the URL overrides must be appended last
+- fix: require the base and token URL overrides as a pair
+- feat: allow overriding the API base and token URLs via environment
+
+### [v1.13.1] - 2026-08-10
+
+- chore(deps): bump github.com/hashicorp/terraform-plugin-log
+- ESD-1734: make the IX provisioning wait honor wait_time
+
+### [v1.13.0] - 2026-07-30
+
+- docs: correct Cisco vendor_config required-field claims
+- chore(deps): bump golang.org/x/crypto in the gomod group
+- chore(deps): bump actions/checkout in the github-actions group
+- docs: clarify Cisco C8000v autonomous mode vendor config
+- ESD-1611: guard unknown wait_time; skip managed-account test before slot
+- ESD-1611: only add WithCallContext when managed_account_uid is set
+- ESD-1611: tidy go.sum, drop orphaned megaportgo v1.14.1 entries
+- ESD-1611: reject empty managed_account_uid to avoid blanking env var
+- ESD-1611: Add managed_account_uid provider attribute
+
+### [v1.12.0] - 2026-07-23
+
+- feat: expose as_override on VXC BGP connections
+
 ### [v1.11.1] - 2026-07-16
 
 - fix: surface diversity-zone preserve warning on port Update and preserve diversity_zone for nat_gateway
