@@ -2206,7 +2206,7 @@ func TestAccMegaportMVETransit_VXC(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config"},
 			},
 		},
 	})
@@ -5119,6 +5119,12 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantBEnd: "transit",
 		},
 		{
+			// An imported transit VXC whose configuration restates the block.
+			name:  "transit_unchanged",
+			state: ty.partnerVal("transit"),
+			plan:  ty.partnerVal("transit"),
+		},
+		{
 			name:  "transit_to_vrouter",
 			state: ty.partnerVal("transit"),
 			plan:  ty.vrouterVal(true),
@@ -5427,6 +5433,89 @@ func TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy(t *testing.T) {
 			}
 			if diags := resp.Diagnostics.Warnings(); len(diags) != 0 {
 				t.Errorf("expected no warnings, got: %v", diags)
+			}
+		})
+	}
+}
+
+// TestVXCRead_RecordsTransitPartnerConfigOnImport pins when Read records a
+// transit b_end_partner_config. Recording it on a managed refresh would put a
+// value in state the configuration does not have, which then plans its own
+// removal on every apply, so the refresh case matters as much as the import.
+func TestVXCRead_RecordsTransitPartnerConfigOnImport(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	transitConn := func(resourceName string) megaport.CSPConnectionTransit {
+		return megaport.CSPConnectionTransit{ConnectType: "TRANSIT", ResourceName: resourceName}
+	}
+	readVXC := func(conns ...megaport.CSPConnectionConfig) *megaport.VXC {
+		return &megaport.VXC{
+			AEndConfiguration: megaport.VXCEndConfiguration{UID: "a-end-uid"},
+			BEndConfiguration: megaport.VXCEndConfiguration{UID: "b-end-uid"},
+			Resources:         &megaport.VXCResources{CSPConnection: &megaport.CSPConnection{CSPConnection: conns}},
+		}
+	}
+
+	tests := []struct {
+		name string
+		// ImportState writes product_uid and nothing else, so a null
+		// product_name is what marks a read as the one after an import.
+		stateName   string
+		vxc         *megaport.VXC
+		wantTransit bool
+		wantWarning bool
+	}{
+		{name: "import_transit_b_end", vxc: readVXC(transitConn("b_csp_connection")), wantTransit: true},
+		{name: "import_transit_a_end_only", vxc: readVXC(transitConn("a_csp_connection"))},
+		{name: "import_no_csp_connection", vxc: readVXC()},
+		{name: "import_two_transit_b_ends_warns", vxc: readVXC(transitConn("b_csp_connection"), transitConn("b_csp_connection")), wantWarning: true},
+		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(transitConn("b_csp_connection"))},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &vxcResource{client: &megaport.Client{VXCService: &MockVXCService{GetVXCResult: tc.vxc}}}
+
+			schemaResp := fwresource.SchemaResponse{}
+			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+			s := schemaResp.Schema
+			schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+			if !ok {
+				t.Fatal("schema type is not tftypes.Object")
+			}
+			stateAttrs := nullValueMap(schemaObjType)
+			stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+			if tc.stateName != "" {
+				stateAttrs["product_name"] = tftypes.NewValue(tftypes.String, tc.stateName)
+			}
+			state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, stateAttrs)}
+
+			resp := fwresource.ReadResponse{State: state}
+			r.Read(ctx, fwresource.ReadRequest{State: state}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics.Errors())
+			}
+			if got := resp.Diagnostics.WarningsCount() > 0; got != tc.wantWarning {
+				t.Errorf("warning present = %t, want %t: %v", got, tc.wantWarning, resp.Diagnostics.Warnings())
+			}
+
+			var got vxcResourceModel
+			if diags := resp.State.Get(ctx, &got); diags.HasError() {
+				t.Fatalf("reading state back: %v", diags.Errors())
+			}
+			if !tc.wantTransit {
+				if !got.BEndPartnerConfig.IsNull() {
+					t.Fatalf("b_end_partner_config = %v, want null", got.BEndPartnerConfig)
+				}
+				return
+			}
+			var partner vxcPartnerConfigurationModel
+			if diags := got.BEndPartnerConfig.As(ctx, &partner, basetypes.ObjectAsOptions{}); diags.HasError() {
+				t.Fatalf("decoding b_end_partner_config: %v", diags.Errors())
+			}
+			if partner.Partner.ValueString() != "transit" {
+				t.Errorf("b_end_partner_config.partner = %q, want %q", partner.Partner.ValueString(), "transit")
 			}
 		})
 	}
