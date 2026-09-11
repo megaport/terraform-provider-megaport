@@ -2322,7 +2322,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
 
-	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) {
+	// A service key redirects the order to its own B-End, so the port named in
+	// config is not the one the VXC uses. Create skips the check for the same
+	// reason.
+	hasServiceKey := !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown()
+	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) && !hasServiceKey {
 		bEndOrderedVLAN, bEndCurrentVLAN := bEndPlan.OrderedVLAN, bEndState.VLAN
 		if bEndMovesPort {
 			bEndCurrentVLAN = types.Int64Null()

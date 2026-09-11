@@ -406,3 +406,41 @@ func TestVXCUpdate_VLANPreflightOnPortMoveWithoutOrderedVLAN(t *testing.T) {
 		})
 	}
 }
+
+// A service key redirects the order to its own B-End, so the port named in
+// config is not the one the VXC uses and must not be checked.
+func TestVXCUpdate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+	// VLAN 300 is taken on the named port, so an unskipped check would block.
+	ps := newPreflightServer(t, map[string]int{"port-b": 300})
+
+	withKey := func(v tftypes.Value) tftypes.Value {
+		attrs := map[string]tftypes.Value{}
+		if err := v.As(&attrs); err != nil {
+			t.Fatalf("unpacking vxc value: %v", err)
+		}
+		attrs["service_key"] = tftypes.NewValue(tftypes.String, "test-service-key")
+		return tftypes.NewValue(b.objType, attrs)
+	}
+
+	aEnd := b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100), vlan: int64p(100)})
+	state := withKey(b.vxc(aEnd, b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200)}), nil))
+	plan := withKey(b.vxc(aEnd, b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(300), vlan: int64p(200)}), nil))
+
+	resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+	ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+		Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+		State: tfsdk.State{Schema: b.schema, Raw: state},
+	}, &resp)
+
+	for _, d := range resp.Diagnostics.Errors() {
+		if strings.Contains(d.Summary(), "is not available on the") {
+			t.Fatalf("preflight ran on a service-key B-End: %q", d.Summary())
+		}
+	}
+	if len(ps.vlanQueries) != 0 {
+		t.Fatalf("expected no VLAN query, got %v", ps.vlanQueries)
+	}
+}
