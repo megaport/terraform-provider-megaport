@@ -1237,11 +1237,13 @@ func TestMCRPrefixFilterListImportState(t *testing.T) {
 		"description":    got.Description.IsNull(),
 		"address_family": got.AddressFamily.IsNull(),
 		"entries":        got.Entries.IsNull(),
-		"last_updated":   got.LastUpdated.IsNull(),
 	} {
 		if !isNull {
 			t.Errorf("%s is set after import; Read populates it", name)
 		}
+	}
+	if !got.LastUpdated.IsNull() {
+		t.Error("last_updated is set after import; it stays null until the next create or update")
 	}
 
 	// A malformed ID still fails here, before Read runs.

@@ -185,7 +185,8 @@ resource "megaport_mcr_ipsec_addon" "test" {
 
 // TestMCRIpsecAddonImportState checks that ImportState seeds the two
 // identifiers and nothing else, leaving the rest to Read. The nil client is the
-// assertion that it makes no API call: any call would panic.
+// assertion that it makes no API call: client is a pointer, so any call
+// dereferences nil and panics.
 func TestMCRIpsecAddonImportState(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
