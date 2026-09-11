@@ -33,6 +33,7 @@ MVE Images
 
 Read-Only:
 
+- `available_sizes` (List of String) List of available MVE sizes for this image (e.g., 'MVE 2/8', 'MVE 4/16')
 - `id` (Number) The ID of the MVE Image. The image id returned indicates the software version and key configuration parameters of the image.
 - `product` (String) The product of the MVE Image
 - `product_code` (String) The product code of the MVE Image
