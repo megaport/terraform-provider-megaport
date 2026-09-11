@@ -27,6 +27,9 @@ type MockMCRService struct {
 	ListMCRResourceTagsResult map[string]string
 	CapturedResourceTagMCRUID string
 	CapturedGetMCRID          string
+
+	ListMCRPrefixFilterListsResult []*megaport.PrefixFilterList
+	GetMCRPrefixFilterListResult   map[int]*megaport.MCRPrefixFilterList
 }
 
 func (m *MockMCRService) ListMCRs(ctx context.Context, req *megaport.ListMCRsRequest) ([]*megaport.MCR, error) {
@@ -78,11 +81,11 @@ func (m *MockMCRService) CreatePrefixFilterList(ctx context.Context, req *megapo
 }
 
 func (m *MockMCRService) ListMCRPrefixFilterLists(ctx context.Context, mcrId string) ([]*megaport.PrefixFilterList, error) {
-	return nil, nil
+	return m.ListMCRPrefixFilterListsResult, nil
 }
 
 func (m *MockMCRService) GetMCRPrefixFilterList(ctx context.Context, mcrID string, prefixFilterListID int) (*megaport.MCRPrefixFilterList, error) {
-	return nil, nil
+	return m.GetMCRPrefixFilterListResult[prefixFilterListID], nil
 }
 
 func (m *MockMCRService) ModifyMCRPrefixFilterList(ctx context.Context, mcrID string, prefixFilterListID int, prefixFilterList *megaport.MCRPrefixFilterList) (*megaport.ModifyMCRPrefixFilterListResponse, error) {
