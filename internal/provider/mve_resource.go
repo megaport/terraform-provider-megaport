@@ -32,6 +32,7 @@ var (
 	_ resource.Resource                = &mveResource{}
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
+	_ resource.ResourceWithModifyPlan  = &mveResource{}
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
@@ -1092,6 +1093,10 @@ func (r *mveResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// The vendor_config branch below writes back into req.State, so hold the
+	// real prior state for the restore at the end of this method.
+	priorState := req.State.Raw
+
 	// Get the plan and state
 	var plan, state mveResourceModel
 	if !req.Plan.Raw.IsNull() {
@@ -1175,4 +1180,13 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			return
 		}
 	}
+
+	// Removing vnics from a configuration leaves the seven Computed attributes
+	// without a plan modifier marked unknown, which plans an update forever.
+	restored, err := restoreComputedOnNoOpPlan(req.Plan.Raw, priorState, req.Config.Raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Modifying MVE Plan", err.Error())
+		return
+	}
+	resp.Plan.Raw = restored
 }

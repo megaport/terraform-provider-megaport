@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestAccMegaportMVEAruba_Basic(t *testing.T) {
@@ -1056,6 +1058,143 @@ func TestAccMegaportMVEPaloAlto_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+				),
+			},
+		},
+	})
+}
+
+// checkMVEComputedPresent asserts every attribute in mveComputedWithoutModifier
+// is in state. An MVE with no live date reads back an empty one, so presence is
+// the check here, not a non-empty value. TestCheckResourceAttrSet rejects both.
+func checkMVEComputedPresent(name string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[name]
+		if !ok {
+			return fmt.Errorf("%s not found in state", name)
+		}
+		for _, attribute := range mveComputedWithoutModifier {
+			if _, ok := rs.Primary.Attributes[attribute]; !ok {
+				return fmt.Errorf("%s: %s is missing from state", name, attribute)
+			}
+		}
+		return nil
+	}
+}
+
+// TestAccMegaportMVE_VnicsRemoval covers ENG-35420. An MVE that drops the vnics
+// attribute has to plan clean afterwards, with no lifecycle block in the
+// configuration. cost_centre is left unset throughout so it joins the six other
+// computed attributes the framework marks unknown.
+func TestAccMegaportMVE_VnicsRemoval(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveNameRenamed := RandomTestName()
+	mveKey := RandomTestName()
+
+	config := func(name, vnics string) string {
+		return providerConfig + fmt.Sprintf(`
+	data "megaport_location" "test_location" {
+		id = %d
+	}
+
+	data "megaport_mve_images" "aruba" {
+		vendor_filter = "Aruba"
+		id_filter     = %d
+	}
+
+	resource "megaport_mve" "mve" {
+		product_name         = "%s"
+		location_id          = data.megaport_location.test_location.id
+		contract_term_months = 1
+		diversity_zone       = "red"
+
+		vendor_config = {
+			vendor       = "aruba"
+			product_size = "SMALL"
+			mve_label    = "MVE 2/8"
+			image_id     = data.megaport_mve_images.aruba.mve_images.0.id
+			account_name = "%s"
+			account_key  = "%s"
+			system_tag   = "Preconfiguration-aruba-test-1"
+		}
+%s
+	}
+	`, locationID, MVEArubaImageID, name, mveName, mveKey, vnics)
+	}
+
+	withVnics := config(mveName, `
+		vnics = [
+			{
+				description = "Data Plane"
+			},
+			{
+				description = "Control Plane"
+			}
+		]`)
+
+	// The migrated configuration. No vnics, no lifecycle block, and no empty
+	// list either.
+	migrated := func(name string) string { return config(name, "") }
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// A create populates every computed attribute the removal plan
+			// later marks unknown.
+			{
+				Config: withVnics,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.#", "2"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.0.description", "Data Plane"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.1.description", "Control Plane"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mve.mve", "last_updated"),
+					checkMVEComputedPresent("megaport_mve.mve"),
+				),
+			},
+			// Dropping vnics converges. The no-op action is what proves the MVE
+			// keeps its product_uid: a replacement would plan as Replace. The
+			// test framework then plans again after the apply and fails the
+			// step on a non-empty plan.
+			{
+				Config: migrated(mveName),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_mve.mve", plancheck.ResourceActionNoop),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.#", "2"),
+					checkMVEComputedPresent("megaport_mve.mve"),
+				),
+			},
+			// The next two plans stay empty as well.
+			{
+				Config:   migrated(mveName),
+				PlanOnly: true,
+			},
+			{
+				Config:   migrated(mveName),
+				PlanOnly: true,
+			},
+			// A real change still refreshes the computed attributes. Pinning
+			// them here would fail the apply with an inconsistent result.
+			{
+				Config: migrated(mveNameRenamed),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectUnknownValue("megaport_mve.mve", tfjsonpath.New("last_updated")),
+						plancheck.ExpectUnknownValue("megaport_mve.mve", tfjsonpath.New("provisioning_status")),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameRenamed),
+					checkMVEComputedPresent("megaport_mve.mve"),
 				),
 			},
 		},
