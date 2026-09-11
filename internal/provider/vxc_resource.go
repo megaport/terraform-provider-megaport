@@ -2260,20 +2260,23 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
 
-	// A move re-requests the same VLAN on a different port, so it needs the
-	// check as much as a VLAN change does. Send no current VLAN in that case:
-	// the VLAN this end holds today says nothing about the port it moves to.
+	// A move re-requests a VLAN on a different port, so it needs the check too.
+	// The API validates the VLAN in the request, or the VLAN the VXC already
+	// holds when the request carries none, against the destination port alone.
 	if (aEndVLANChanged || aEndMovesPort) && supportVLANUpdates(aEndPartnerType) {
-		aEndCurrentVLAN := aEndState.VLAN
+		aEndOrderedVLAN, aEndCurrentVLAN := aEndPlan.OrderedVLAN, aEndState.VLAN
 		if aEndMovesPort {
 			aEndCurrentVLAN = types.Int64Null()
+			if !aEndVLANChanged {
+				aEndOrderedVLAN = aEndState.VLAN
+			}
 		}
 		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
 			svc:              r.client.PortService,
 			end:              "A-End",
 			productUID:       aEndPlan.RequestedProductUID.ValueString(),
 			productType:      aEndProductType,
-			orderedVLAN:      aEndPlan.OrderedVLAN,
+			orderedVLAN:      aEndOrderedVLAN,
 			currentVLAN:      aEndCurrentVLAN,
 			hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
 		})...)
@@ -2320,16 +2323,19 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) {
-		bEndCurrentVLAN := bEndState.VLAN
+		bEndOrderedVLAN, bEndCurrentVLAN := bEndPlan.OrderedVLAN, bEndState.VLAN
 		if bEndMovesPort {
 			bEndCurrentVLAN = types.Int64Null()
+			if !bEndVLANChanged {
+				bEndOrderedVLAN = bEndState.VLAN
+			}
 		}
 		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
 			svc:              r.client.PortService,
 			end:              "B-End",
 			productUID:       bEndPlan.RequestedProductUID.ValueString(),
 			productType:      bEndProductType,
-			orderedVLAN:      bEndPlan.OrderedVLAN,
+			orderedVLAN:      bEndOrderedVLAN,
 			currentVLAN:      bEndCurrentVLAN,
 			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
 		})...)

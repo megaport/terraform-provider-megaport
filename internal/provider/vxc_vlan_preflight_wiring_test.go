@@ -362,3 +362,47 @@ func TestVXCUpdate_VLANPreflightOnPortMove(t *testing.T) {
 		}
 	})
 }
+
+// With ordered_vlan omitted or set to auto-assign, the move request carries no
+// VLAN, and the API then validates the VLAN the VXC already holds.
+func TestVXCUpdate_VLANPreflightOnPortMoveWithoutOrderedVLAN(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+
+	for _, tc := range []struct {
+		name        string
+		orderedVLAN *int64
+	}{
+		{"ordered_vlan omitted", nil},
+		{"ordered_vlan auto-assign", int64p(0)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ps := newPreflightServer(t, map[string]int{"port-c": 100})
+
+			aEnd := func(uid string) tftypes.Value {
+				return b.end(vxcEndSpec{productUID: uid, orderedVLAN: tc.orderedVLAN, vlan: int64p(100)})
+			}
+			bEnd := b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200)})
+			state := b.vxc(aEnd("port-a"), bEnd, nil)
+
+			resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+			ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+				Plan:  tfsdk.Plan{Schema: b.schema, Raw: b.vxc(aEnd("port-c"), bEnd, nil)},
+				State: tfsdk.State{Schema: b.schema, Raw: state},
+			}, &resp)
+
+			if !resp.Diagnostics.HasError() {
+				t.Fatal("expected Update to fail on the VLAN the move carries over")
+			}
+			summary := resp.Diagnostics.Errors()[0].Summary()
+			if summary != "VLAN 100 is not available on the A-End port" {
+				t.Fatalf("unexpected error summary: %q", summary)
+			}
+			if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-c", "100"}) {
+				t.Fatalf("expected one VLAN query for port-c/100, got %v", got)
+			}
+		})
+	}
+}
