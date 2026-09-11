@@ -298,7 +298,7 @@ resource "megaport_vxc" "service_key_vxc" {
 ### Optional
 
 - `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. It does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again. (see [below for nested schema](#nestedatt--a_end_partner_config))
-- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. Imported VXCs do not have this field populated by the API. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again. (see [below for nested schema](#nestedatt--b_end_partner_config))
+- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. It does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider records a "transit" configuration when the B-End is a transit connection. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
@@ -484,7 +484,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes))
@@ -495,9 +495,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
@@ -550,7 +550,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
@@ -568,9 +568,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
@@ -741,7 +741,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes))
@@ -752,9 +752,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
@@ -807,7 +807,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
@@ -825,9 +825,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>

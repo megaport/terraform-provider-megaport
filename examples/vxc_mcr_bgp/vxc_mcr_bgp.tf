@@ -67,11 +67,6 @@ resource "megaport_vxc" "aws_vxc" {
         {
           ip_addresses     = ["10.0.0.1/30"]
           nat_ip_addresses = ["10.0.0.1"]
-          bfd = {
-            tx_interval = 500
-            rx_interval = 400
-            multiplier  = 5
-          }
           bgp_connections = [
             {
               peer_asn         = 64512
