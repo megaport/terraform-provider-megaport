@@ -33,6 +33,9 @@ type preflightServer struct {
 	mu           sync.Mutex
 	vlanQueries  []vlanQuery
 	productTypes []string
+
+	// serviceKeyBEnd is the port UID a service key lookup resolves to.
+	serviceKeyBEnd string
 }
 
 func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
@@ -55,6 +58,8 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 				data = append(data, v)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
+		case isGetV2 && len(parts) == 3 && parts[1] == "service" && strings.HasPrefix(parts[2], "key"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productUid": ps.serviceKeyBEnd}})
 		case isGetV2 && len(parts) == 3 && parts[1] == "product":
 			ps.productTypes = append(ps.productTypes, parts[2])
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productType": megaport.PRODUCT_MEGAPORT}})
@@ -135,6 +140,17 @@ func (b *vxcValueBuilder) transitPartner() tftypes.Value {
 	attrs := nullValueMap(b.partnerTyp)
 	attrs["partner"] = tftypes.NewValue(tftypes.String, "transit")
 	return tftypes.NewValue(b.partnerTyp, attrs)
+}
+
+// withServiceKey returns v with service_key set. The builder leaves it null.
+func (b *vxcValueBuilder) withServiceKey(t *testing.T, v tftypes.Value, key string) tftypes.Value {
+	t.Helper()
+	attrs := map[string]tftypes.Value{}
+	if err := v.As(&attrs); err != nil {
+		t.Fatalf("unpacking vxc value: %v", err)
+	}
+	attrs["service_key"] = tftypes.NewValue(tftypes.String, key)
+	return tftypes.NewValue(b.objType, attrs)
 }
 
 func (b *vxcValueBuilder) vxc(aEnd, bEnd tftypes.Value, bEndPartner *tftypes.Value) tftypes.Value {
@@ -417,12 +433,7 @@ func TestVXCUpdate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
 	ps := newPreflightServer(t, map[string]int{"port-b": 300})
 
 	withKey := func(v tftypes.Value) tftypes.Value {
-		attrs := map[string]tftypes.Value{}
-		if err := v.As(&attrs); err != nil {
-			t.Fatalf("unpacking vxc value: %v", err)
-		}
-		attrs["service_key"] = tftypes.NewValue(tftypes.String, "test-service-key")
-		return tftypes.NewValue(b.objType, attrs)
+		return b.withServiceKey(t, v, "test-service-key")
 	}
 
 	aEnd := b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100), vlan: int64p(100)})
@@ -469,6 +480,40 @@ func TestVXCCreate_VLANPreflightBlocksTakenBEndVLAN(t *testing.T) {
 		t.Fatalf("unexpected error summary: %q", summary)
 	}
 	want := []vlanQuery{{"port-a", "100"}, {"port-b", "200"}}
+	if !slices.Equal(ps.vlanQueries, want) {
+		t.Fatalf("expected queries %v, got %v", want, ps.vlanQueries)
+	}
+}
+
+func TestVXCCreate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+	// VLAN 200 is taken on the port named in config, so an unskipped check
+	// would block a create the service key redirects elsewhere.
+	ps := newPreflightServer(t, map[string]int{"port-b": 200})
+	ps.serviceKeyBEnd = "port-key"
+
+	plan := b.withServiceKey(t, b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200)}),
+		nil,
+	), "test-service-key")
+
+	resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+	ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+	for _, d := range resp.Diagnostics.Errors() {
+		if strings.Contains(d.Summary(), "is not available on the") {
+			t.Fatalf("preflight ran on a service-key B-End: %q", d.Summary())
+		}
+	}
+	// The B-End product type lookup sits right before the B-End preflight, so
+	// seeing it proves Create reached the preflight rather than exiting early.
+	if !slices.Contains(ps.productTypes, "port-b") {
+		t.Fatalf("expected a B-End product type lookup, got %v", ps.productTypes)
+	}
+	want := []vlanQuery{{"port-a", "100"}}
 	if !slices.Equal(ps.vlanQueries, want) {
 		t.Fatalf("expected queries %v, got %v", want, ps.vlanQueries)
 	}
