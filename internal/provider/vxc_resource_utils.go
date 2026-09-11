@@ -876,6 +876,16 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 	return diags, transitPartnerConfig, transitConfigObj
 }
 
+// movesPort reports whether Update sends this end to a different port. A
+// partner port that rotated under us (the planned UID is already the current
+// one) is not a move, and a CSP end is never moved.
+func movesPort(plan, state *vxcEndConfigurationModel, isCSP bool) bool {
+	return !plan.RequestedProductUID.IsNull() &&
+		!plan.RequestedProductUID.Equal(state.RequestedProductUID) &&
+		!isCSP &&
+		!plan.RequestedProductUID.Equal(state.CurrentProductUID)
+}
+
 func supportVLANUpdates(partnerType string) bool {
 	// AWS and Transit connections do not support VLAN updates
 	if partnerType == "aws" || partnerType == "transit" {

@@ -264,3 +264,101 @@ func TestVXCUpdate_VLANPreflightOnlyOnOrderedVLANChange(t *testing.T) {
 		}
 	})
 }
+
+// A port move re-requests the VLAN on the new port without changing
+// ordered_vlan, so the plan-vs-state VLAN comparison alone never fires.
+func TestVXCUpdate_VLANPreflightOnPortMove(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+
+	state := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100), vlan: int64p(100)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200)}),
+		nil,
+	)
+
+	t.Run("a-end move is checked against the new port", func(t *testing.T) {
+		t.Parallel()
+		// VLAN 100 is taken on the destination. The end already holds 100 on
+		// its old port, so a current-VLAN of 100 would wrongly skip the check.
+		ps := newPreflightServer(t, map[string]int{"port-c": 100})
+
+		plan := b.vxc(
+			b.end(vxcEndSpec{productUID: "port-c", orderedVLAN: int64p(100), vlan: int64p(100)}),
+			b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200)}),
+			nil,
+		)
+
+		resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+		ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+			Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+			State: tfsdk.State{Schema: b.schema, Raw: state},
+		}, &resp)
+
+		if !resp.Diagnostics.HasError() {
+			t.Fatal("expected Update to fail on the taken VLAN at the move destination")
+		}
+		summary := resp.Diagnostics.Errors()[0].Summary()
+		if summary != "VLAN 100 is not available on the A-End port" {
+			t.Fatalf("unexpected error summary: %q", summary)
+		}
+		if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-c", "100"}) {
+			t.Fatalf("expected one VLAN query for port-c/100, got %v", got)
+		}
+	})
+
+	t.Run("a-end move passes when the vlan is free there", func(t *testing.T) {
+		t.Parallel()
+		ps := newPreflightServer(t, nil)
+
+		plan := b.vxc(
+			b.end(vxcEndSpec{productUID: "port-c", orderedVLAN: int64p(100), vlan: int64p(100)}),
+			b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200)}),
+			nil,
+		)
+
+		resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+		ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+			Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+			State: tfsdk.State{Schema: b.schema, Raw: state},
+		}, &resp)
+
+		for _, d := range resp.Diagnostics.Errors() {
+			if strings.Contains(d.Summary(), "is not available on the") {
+				t.Fatalf("preflight blocked a free VLAN: %q", d.Summary())
+			}
+		}
+		if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-c", "100"}) {
+			t.Fatalf("expected one VLAN query for port-c/100, got %v", got)
+		}
+	})
+
+	t.Run("b-end move is checked against the new port", func(t *testing.T) {
+		t.Parallel()
+		ps := newPreflightServer(t, map[string]int{"port-d": 200})
+
+		plan := b.vxc(
+			b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100), vlan: int64p(100)}),
+			b.end(vxcEndSpec{productUID: "port-d", orderedVLAN: int64p(200), vlan: int64p(200)}),
+			nil,
+		)
+
+		resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+		ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+			Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+			State: tfsdk.State{Schema: b.schema, Raw: state},
+		}, &resp)
+
+		if !resp.Diagnostics.HasError() {
+			t.Fatal("expected Update to fail on the taken VLAN at the move destination")
+		}
+		summary := resp.Diagnostics.Errors()[0].Summary()
+		if summary != "VLAN 200 is not available on the B-End port" {
+			t.Fatalf("unexpected error summary: %q", summary)
+		}
+		if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-d", "200"}) {
+			t.Fatalf("expected one VLAN query for port-d/200, got %v", got)
+		}
+	})
+}
