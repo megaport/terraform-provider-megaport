@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -26,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -34,6 +34,7 @@ var (
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+	_ resource.ResourceWithModifyPlan  = &mcrResource{}
 
 	mcrPrefixFilterListModelAttributes = map[string]attr.Type{
 		"id":             types.Int64Type,
@@ -238,29 +239,10 @@ func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(ctx context.Cont
 	orm.AddressFamily = types.StringValue(m.AddressFamily)
 	entriesList := []types.Object{}
 	for _, entry := range m.Entries {
-		var le, ge int
-		// Get Mask Length if not provided by API
-		if entry.Le == 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			le = length
-			ge = length
-		} else if entry.Le != 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			ge = length
-			le = entry.Le
-		} else {
-			le = entry.Le
-			ge = entry.Ge
+		ge, le, geLeDiags := resolveGeLe(entry)
+		diags.Append(geLeDiags...)
+		if geLeDiags.HasError() {
+			return diags
 		}
 		entryModel := &mcrPrefixListEntryModel{
 			Action: types.StringValue(entry.Action),
@@ -918,10 +900,10 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)
@@ -1217,10 +1199,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)
@@ -1279,6 +1261,58 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		)
 		return
 	}
+}
+
+// ModifyPlan converges a plan whose only content is unknowns. Removing the
+// deprecated prefix_filter_lists attribute makes the framework mark every
+// Computed attribute with a null config value as unknown, and it does that
+// before any plan modifier runs. Restoring prior state here is the only place
+// left. A real change anywhere skips the restore: Update rewrites those
+// attributes, so pinning them would fail the apply with an inconsistent result.
+func (r *mcrResource) ModifyPlan(_ context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Nothing to restore when creating (no prior state) or destroying (no plan).
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state, config map[string]tftypes.Value
+	if err := req.Plan.Raw.As(&plan); err != nil {
+		resp.Diagnostics.AddError("Error Modifying MCR Plan", "Could not read the planned values: "+err.Error())
+		return
+	}
+	if err := req.State.Raw.As(&state); err != nil {
+		resp.Diagnostics.AddError("Error Modifying MCR Plan", "Could not read the prior state values: "+err.Error())
+		return
+	}
+	if err := req.Config.Raw.As(&config); err != nil {
+		resp.Diagnostics.AddError("Error Modifying MCR Plan", "Could not read the configured values: "+err.Error())
+		return
+	}
+
+	restorable := map[string]tftypes.Value{}
+	for name, planValue := range plan {
+		if planValue.Equal(state[name]) {
+			continue
+		}
+		// Same test the framework used to mark it: unknown in the plan, null
+		// in the config. An attribute wired to another resource's unknown
+		// output fails this and stays unknown.
+		if !planValue.IsKnown() && config[name].IsNull() {
+			restorable[name] = state[name]
+			continue
+		}
+		// A real change. Leave the whole plan as it is.
+		return
+	}
+
+	if len(restorable) == 0 {
+		return
+	}
+
+	for name, stateValue := range restorable {
+		plan[name] = stateValue
+	}
+	resp.Plan.Raw = tftypes.NewValue(req.Plan.Raw.Type(), plan)
 }
 
 // Configure adds the provider configured client to the resource.
