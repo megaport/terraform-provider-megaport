@@ -484,7 +484,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--a_end_partner_config--partner_a_end_config--interfaces--ip_routes))
@@ -495,9 +495,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--a_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
@@ -550,7 +550,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
@@ -568,9 +568,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
@@ -741,7 +741,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_routes` (Attributes List) The IP routes of the partner configuration. (see [below for nested schema](#nestedatt--b_end_partner_config--partner_a_end_config--interfaces--ip_routes))
@@ -752,9 +752,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--b_end_partner_config--partner_a_end_config--interfaces--bgp_connections"></a>
@@ -807,7 +807,7 @@ Required:
 
 Optional:
 
-- `bfd` (Attributes) The BFD of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
+- `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
@@ -825,9 +825,9 @@ Optional:
 
 Optional:
 
-- `multiplier` (Number) The multiplier of the BFD.
-- `rx_interval` (Number) The receive interval of the BFD.
-- `tx_interval` (Number) The transmit interval of the BFD.
+- `multiplier` (Number, Deprecated) The multiplier of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `rx_interval` (Number, Deprecated) The receive interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
+- `tx_interval` (Number, Deprecated) The transmit interval of the BFD. **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on.
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections"></a>
