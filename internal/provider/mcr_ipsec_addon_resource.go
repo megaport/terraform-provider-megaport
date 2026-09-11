@@ -345,7 +345,8 @@ func isIPsecTunnelsConfiguredError(err error) bool {
 		strings.Contains(apiErr.Message, "configured tunnels")
 }
 
-// ImportState imports the resource state.
+// ImportState seeds the identifiers. The framework calls Read next, which
+// populates the rest and removes the resource if the product is gone.
 func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Parse the import ID (format: mcr_uid:add_on_uid)
 	mcrUID, addOnUID, err := parseImportIDStrings(req.ID)
@@ -360,37 +361,6 @@ func (r *mcrIpsecAddonResource) ImportState(ctx context.Context, req resource.Im
 	// Set the parsed values in the state
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("mcr_id"), mcrUID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("add_on_uid"), addOnUID)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Verify the resource exists
-	mcr, err := r.client.MCRService.GetMCR(ctx, mcrUID)
-	if err != nil {
-		if megaport.IsServiceNotFoundError(err) {
-			resp.Diagnostics.AddError(
-				"Resource not found",
-				fmt.Sprintf("MCR %s does not exist", mcrUID),
-			)
-			return
-		}
-		resp.Diagnostics.AddError(
-			"Error verifying resource during import",
-			fmt.Sprintf("Could not read MCR %s: %s", mcrUID, err.Error()),
-		)
-		return
-	}
-
-	addOn := r.findIPsecAddOn(mcr, addOnUID)
-	if addOn == nil {
-		resp.Diagnostics.AddError(
-			"Resource not found",
-			fmt.Sprintf("IPSec add-on %s does not exist on MCR %s", addOnUID, mcrUID),
-		)
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tunnel_count"), int64(addOn.TunnelCount))...)
 }
 
 // findIPsecAddOn finds an IPSec add-on in the MCR's add-ons list.
