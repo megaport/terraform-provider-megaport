@@ -844,6 +844,38 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 	return diags, aEndMegaportConfig, partnerConfigObj
 }
 
+// fillTransitPartnerConfigOnImport records b_end_partner_config as "transit"
+// when the B-End CSP connection is a transit connection. The transit config
+// carries no settings, so the read has everything the block needs. One
+// "b_csp_connection" match fills it; more than one is left for the user.
+func (orm *vxcResourceModel) fillTransitPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if !orm.BEndPartnerConfig.IsNull() || v.Resources == nil || v.Resources.CSPConnection == nil {
+		return diags
+	}
+	matches := 0
+	for _, c := range v.Resources.CSPConnection.CSPConnection {
+		if transit, ok := c.(megaport.CSPConnectionTransit); ok && transit.ResourceName == "b_csp_connection" {
+			matches++
+		}
+	}
+	switch matches {
+	case 0:
+	case 1:
+		transitDiags, _, transitObj := createTransitPartnerConfig(ctx)
+		diags.Append(transitDiags...)
+		if !diags.HasError() {
+			orm.BEndPartnerConfig = transitObj
+		}
+	default:
+		diags.AddWarning(
+			"b_end_partner_config not recorded on import",
+			fmt.Sprintf("The VXC has %d transit B-End connections, so the provider cannot tell which one to record. Add b_end_partner_config = { partner = \"transit\" } to the configuration by hand.", matches),
+		)
+	}
+	return diags
+}
+
 func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport.VXCPartnerConfigTransit, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	transitPartnerConfig := megaport.VXCPartnerConfigTransit{
