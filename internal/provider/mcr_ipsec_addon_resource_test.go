@@ -164,12 +164,6 @@ resource "megaport_mcr" "mcr" {
 	location_id          = data.megaport_location.test_location.id
 	contract_term_months = 1
 	cost_centre          = "%s"
-
-	prefix_filter_lists = []
-
-	lifecycle {
-		ignore_changes = [prefix_filter_lists]
-	}
 }
 
 resource "megaport_mcr_ipsec_addon" "test" {

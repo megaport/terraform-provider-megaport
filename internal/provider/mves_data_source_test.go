@@ -19,6 +19,7 @@ import (
 type MockMVEService struct {
 	ListMVEsResult            []*megaport.MVE
 	ListMVEsErr               error
+	GetMVEFunc                func(ctx context.Context, mveID string) (*megaport.MVE, error)
 	GetMVEResult              *megaport.MVE
 	GetMVEErr                 error
 	ListMVEResourceTagsFunc   func(ctx context.Context, mveID string) (map[string]string, error)
@@ -38,6 +39,9 @@ func (m *MockMVEService) ListMVEs(ctx context.Context, req *megaport.ListMVEsReq
 }
 
 func (m *MockMVEService) GetMVE(ctx context.Context, mveId string) (*megaport.MVE, error) {
+	if m.GetMVEFunc != nil {
+		return m.GetMVEFunc(ctx, mveId)
+	}
 	if m.GetMVEErr != nil {
 		return nil, m.GetMVEErr
 	}
