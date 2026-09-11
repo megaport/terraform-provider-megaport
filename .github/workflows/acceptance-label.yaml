@@ -82,7 +82,9 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.harness-token.outputs.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: gh workflow run acceptance.yml -R "$HARNESS" -f provider_ref="$HEAD_SHA" -f pr_number="$PR"
+        # Without --ref, gh resolves the harness default branch over GraphQL,
+        # which needs contents:read that this token deliberately lacks.
+        run: gh workflow run acceptance.yml -R "$HARNESS" --ref main -f provider_ref="$HEAD_SHA" -f pr_number="$PR"
 
       # Removing the label turns it back into a button for the next push.
       - name: Remove the label
