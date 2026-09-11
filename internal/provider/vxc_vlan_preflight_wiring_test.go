@@ -444,3 +444,32 @@ func TestVXCUpdate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
 		t.Fatalf("expected no VLAN query, got %v", ps.vlanQueries)
 	}
 }
+
+func TestVXCCreate_VLANPreflightBlocksTakenBEndVLAN(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+	// The A-End VLAN is free, so Create reaches the B-End check.
+	ps := newPreflightServer(t, map[string]int{"port-b": 200})
+
+	plan := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200)}),
+		nil,
+	)
+
+	resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+	ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("expected Create to fail on the taken B-End VLAN")
+	}
+	summary := resp.Diagnostics.Errors()[0].Summary()
+	if summary != "VLAN 200 is not available on the B-End port" {
+		t.Fatalf("unexpected error summary: %q", summary)
+	}
+	want := []vlanQuery{{"port-a", "100"}, {"port-b", "200"}}
+	if !slices.Equal(ps.vlanQueries, want) {
+		t.Fatalf("expected queries %v, got %v", want, ps.vlanQueries)
+	}
+}
