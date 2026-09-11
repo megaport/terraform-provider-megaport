@@ -1082,11 +1082,10 @@ func checkMVEComputedPresent(name string) resource.TestCheckFunc {
 	}
 }
 
-// TestAccMegaportMVE_VnicsRemoval covers ENG-35420. An MVE that drops the vnics
-// attribute has to plan clean afterwards, with no lifecycle block in the
-// configuration. cost_centre is left unset throughout so it joins the six other
-// computed attributes the framework marks unknown.
-func TestAccMegaportMVE_VnicsRemoval(t *testing.T) {
+// An MVE that drops the vnics attribute has to plan clean afterwards, with no
+// lifecycle block in the configuration. cost_centre is left unset throughout so
+// it joins the six other computed attributes the framework marks unknown.
+func TestAccMegaportMVEAruba_VnicsRemoval(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locationID, _ := findMVETestLocation(t, 2)
