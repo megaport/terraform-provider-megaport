@@ -33,9 +33,10 @@ const updateTimeout = 120 * time.Second
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vxcResource{}
-	_ resource.ResourceWithConfigure   = &vxcResource{}
-	_ resource.ResourceWithImportState = &vxcResource{}
+	_ resource.Resource                   = &vxcResource{}
+	_ resource.ResourceWithConfigure      = &vxcResource{}
+	_ resource.ResourceWithImportState    = &vxcResource{}
+	_ resource.ResourceWithValidateConfig = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
 		"owner_uid":             types.StringType,
@@ -2827,6 +2828,106 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+}
+
+// valueAs returns v as T. A value of another type reads as null.
+func valueAs[T attr.Value](v attr.Value) T {
+	typed, ok := v.(T)
+	if !ok {
+		var null T
+		return null
+	}
+	return typed
+}
+
+// ValidateConfig rejects an MCR to AWS Direct Connect VXC whose explicit BGP
+// connection cannot share the MD5 key AWS receives. Megaport generates that key
+// when auth_key is blank and does not return it at order time, so the provider
+// cannot copy it into the vRouter session.
+func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config vxcResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if config.AEndPartnerConfig.IsNull() || config.AEndPartnerConfig.IsUnknown() ||
+		config.BEndPartnerConfig.IsNull() || config.BEndPartnerConfig.IsUnknown() {
+		return
+	}
+
+	bEnd := config.BEndPartnerConfig.Attributes()
+	if valueAs[types.String](bEnd["partner"]).ValueString() != "aws" {
+		return
+	}
+	awsObj := valueAs[types.Object](bEnd["aws_config"])
+	if awsObj.IsNull() || awsObj.IsUnknown() {
+		return
+	}
+	aws := awsObj.Attributes()
+	if valueAs[types.String](aws["connect_type"]).ValueString() != "AWS" {
+		return
+	}
+	authKey := valueAs[types.String](aws["auth_key"])
+	if authKey.IsUnknown() {
+		return
+	}
+
+	aEnd := config.AEndPartnerConfig.Attributes()
+	var vrouterAttr string
+	switch valueAs[types.String](aEnd["partner"]).ValueString() {
+	case "vrouter":
+		vrouterAttr = "vrouter_config"
+	case "a-end":
+		vrouterAttr = "partner_a_end_config"
+	default:
+		return
+	}
+	vrouterObj := valueAs[types.Object](aEnd[vrouterAttr])
+	if vrouterObj.IsNull() || vrouterObj.IsUnknown() {
+		return
+	}
+	interfaces := valueAs[types.List](vrouterObj.Attributes()["interfaces"])
+	if interfaces.IsNull() || interfaces.IsUnknown() {
+		return
+	}
+
+	const remedy = "Set `password` and `b_end_partner_config.aws_config.auth_key` to the same value, or omit `a_end_partner_config` so Megaport configures both ends with one generated key."
+	for i, ifaceVal := range interfaces.Elements() {
+		ifaceObj := valueAs[types.Object](ifaceVal)
+		if ifaceObj.IsNull() || ifaceObj.IsUnknown() {
+			continue
+		}
+		bgpConnections := valueAs[types.List](ifaceObj.Attributes()["bgp_connections"])
+		if bgpConnections.IsNull() || bgpConnections.IsUnknown() {
+			continue
+		}
+		for j, bgpVal := range bgpConnections.Elements() {
+			bgpObj := valueAs[types.Object](bgpVal)
+			if bgpObj.IsNull() || bgpObj.IsUnknown() {
+				continue
+			}
+			password := valueAs[types.String](bgpObj.Attributes()["password"])
+			if password.IsUnknown() {
+				continue
+			}
+			passwordPath := path.Root("a_end_partner_config").AtName(vrouterAttr).AtName("interfaces").AtListIndex(i).AtName("bgp_connections").AtListIndex(j).AtName("password")
+			if password.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					passwordPath,
+					"Missing BGP password on an MCR to AWS Direct Connect VXC",
+					"AWS receives the MD5 key from `auth_key`, and Megaport generates one when it is blank. The provider cannot copy that key into this BGP connection, so the MCR session comes up without MD5 and BGP stays down. "+remedy,
+				)
+				continue
+			}
+			if authKey.IsNull() || password.ValueString() != authKey.ValueString() {
+				resp.Diagnostics.AddAttributeError(
+					passwordPath,
+					"BGP password does not match auth_key on an MCR to AWS Direct Connect VXC",
+					"The MCR BGP session uses `password` and the AWS virtual interface uses `auth_key`. BGP only comes up when both carry the same MD5 key. "+remedy,
+				)
+			}
+		}
+	}
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

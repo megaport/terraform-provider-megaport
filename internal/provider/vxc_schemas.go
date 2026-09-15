@@ -45,7 +45,7 @@ var (
 				Optional:    true,
 			},
 			"auth_key": schema.StringAttribute{
-				Description: "The authentication key of the partner configuration.",
+				Description: "The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On an MCR to AWS VXC with `connect_type = \"AWS\"` and an explicit `a_end_partner_config`, set it to the same value as every `bgp_connections[].password`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.",
 				Sensitive:   true,
 				Optional:    true,
 			},
@@ -338,7 +338,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: "The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = \"AWS\"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.",
 										Sensitive:   true,
 										Optional:    true,
 									},
@@ -493,7 +493,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: "The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = \"AWS\"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.",
 										Sensitive:   true,
 										Optional:    true,
 									},
