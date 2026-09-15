@@ -105,7 +105,7 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			aEnd:       vxcVrouterPartnerConfig(types.StringNull()),
 			bEnd:       vxcAWSPartnerConfig("AWS", key),
 			wantErrors: 1,
-			wantText:   []string{"Missing BGP password", "`password`", "`b_end_partner_config.aws_config.auth_key`", "omit `a_end_partner_config`"},
+			wantText:   []string{"Missing BGP password", "`password`", "the AWS end's `aws_config.auth_key`", "omit the vRouter end's explicit config"},
 		},
 		{
 			name:       "missing password and no auth_key",
@@ -119,7 +119,7 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			aEnd:       vxcVrouterPartnerConfig(otherKey),
 			bEnd:       vxcAWSPartnerConfig("AWS", key),
 			wantErrors: 1,
-			wantText:   []string{"does not match auth_key", "omit `a_end_partner_config`"},
+			wantText:   []string{"does not match auth_key", "omit the vRouter end's explicit config"},
 		},
 		{
 			name:       "password set and no auth_key",
@@ -154,6 +154,13 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			name:       "deprecated a-end shape is checked too",
 			aEnd:       vxcAEndPartnerConfig(types.StringNull()),
 			bEnd:       vxcAWSPartnerConfig("AWS", key),
+			wantErrors: 1,
+			wantText:   []string{"Missing BGP password"},
+		},
+		{
+			name:       "AWS on a_end and vrouter on b_end is checked too",
+			aEnd:       vxcAWSPartnerConfig("AWS", key),
+			bEnd:       vxcVrouterPartnerConfig(types.StringNull()),
 			wantErrors: 1,
 			wantText:   []string{"Missing BGP password"},
 		},
@@ -275,6 +282,50 @@ func TestVXCResourceCreateChecksBGPPassword(t *testing.T) {
 	resp := fwresource.CreateResponse{}
 	r.Create(ctx, fwresource.CreateRequest{
 		Plan: tfsdk.Plan{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, planAttrs)},
+	}, &resp)
+
+	if got := resp.Diagnostics.ErrorsCount(); got != 1 {
+		t.Fatalf("expected 1 error, got %d: %v", got, resp.Diagnostics.Errors())
+	}
+	if summary := resp.Diagnostics.Errors()[0].Summary(); !strings.Contains(summary, "Missing BGP password") {
+		t.Errorf("expected a missing password error, got: %s", summary)
+	}
+}
+
+// TestVXCResourceUpdateChecksBGPPassword covers the apply-time gate on Update,
+// which runs checkPartnerConfigUpdatable before checkAWSBGPPassword. Plan and
+// state carry the same partner config so that check passes without error and
+// the BGP password check still runs.
+func TestVXCResourceUpdateChecksBGPPassword(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	objType, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+
+	attrs := nullValueMap(objType)
+	attrs["product_name"] = tftypes.NewValue(tftypes.String, "vxc-one")
+	for name, val := range map[string]attr.Value{
+		"a_end_partner_config": vxcVrouterPartnerConfig(types.StringValue("")),
+		"b_end_partner_config": vxcAWSPartnerConfig("AWS", types.StringValue("")),
+	} {
+		raw, err := val.ToTerraformValue(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		attrs[name] = raw
+	}
+	tfValue := tftypes.NewValue(objType, attrs)
+
+	resp := fwresource.UpdateResponse{}
+	r.Update(ctx, fwresource.UpdateRequest{
+		Plan:  tfsdk.Plan{Schema: schemaResp.Schema, Raw: tfValue},
+		State: tfsdk.State{Schema: schemaResp.Schema, Raw: tfValue},
 	}, &resp)
 
 	if got := resp.Diagnostics.ErrorsCount(); got != 1 {
