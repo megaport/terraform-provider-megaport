@@ -243,3 +243,44 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 		})
 	}
 }
+
+// TestVXCResourceCreateChecksBGPPassword covers the apply-time gate. A password
+// that comes from another resource is unknown while the config is validated, so
+// Create is the last place that can reject it.
+func TestVXCResourceCreateChecksBGPPassword(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	objType, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+
+	planAttrs := nullValueMap(objType)
+	planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "vxc-one")
+	for name, val := range map[string]attr.Value{
+		"a_end_partner_config": vxcVrouterPartnerConfig(types.StringValue("")),
+		"b_end_partner_config": vxcAWSPartnerConfig("AWS", types.StringValue("")),
+	} {
+		raw, err := val.ToTerraformValue(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		planAttrs[name] = raw
+	}
+
+	resp := fwresource.CreateResponse{}
+	r.Create(ctx, fwresource.CreateRequest{
+		Plan: tfsdk.Plan{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, planAttrs)},
+	}, &resp)
+
+	if got := resp.Diagnostics.ErrorsCount(); got != 1 {
+		t.Fatalf("expected 1 error, got %d: %v", got, resp.Diagnostics.Errors())
+	}
+	if summary := resp.Diagnostics.Errors()[0].Summary(); !strings.Contains(summary, "Missing BGP password") {
+		t.Errorf("expected a missing password error, got: %s", summary)
+	}
+}

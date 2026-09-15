@@ -1233,6 +1233,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	checkAWSBGPPassword(plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	buyReq := &megaport.BuyVXCRequest{
 		VXCName:    plan.Name.ValueString(),
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
@@ -2303,6 +2308,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	checkAWSBGPPassword(plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// If imported, partner config will be null in state. Copy plan values
 	// so downstream deserialization (.As()) does not fail on null objects.
 	if state.AEndPartnerConfig.IsNull() {
@@ -2840,22 +2850,30 @@ func valueAs[T attr.Value](v attr.Value) T {
 	return typed
 }
 
-// ValidateConfig rejects an MCR to AWS Direct Connect VXC whose explicit BGP
-// connection cannot share the MD5 key AWS receives. Megaport generates that key
-// when auth_key is blank and does not return it at order time, so the provider
-// cannot copy it into the vRouter session.
 func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config vxcResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if config.AEndPartnerConfig.IsNull() || config.AEndPartnerConfig.IsUnknown() ||
-		config.BEndPartnerConfig.IsNull() || config.BEndPartnerConfig.IsUnknown() {
+	checkAWSBGPPassword(config.AEndPartnerConfig, config.BEndPartnerConfig, &resp.Diagnostics)
+}
+
+// checkAWSBGPPassword rejects an MCR to AWS Direct Connect VXC whose explicit
+// BGP connection cannot share the MD5 key AWS receives. Megaport generates that
+// key when auth_key is blank and does not return it at order time, so the
+// provider cannot copy it into the vRouter session.
+//
+// Create and Update run this again on the plan. A password that comes from
+// another resource is unknown while the config is validated, and nothing
+// validates the config a second time once that value resolves.
+func checkAWSBGPPassword(aEndPartnerConfig, bEndPartnerConfig types.Object, diags *diag.Diagnostics) {
+	if aEndPartnerConfig.IsNull() || aEndPartnerConfig.IsUnknown() ||
+		bEndPartnerConfig.IsNull() || bEndPartnerConfig.IsUnknown() {
 		return
 	}
 
-	bEnd := config.BEndPartnerConfig.Attributes()
+	bEnd := bEndPartnerConfig.Attributes()
 	if valueAs[types.String](bEnd["partner"]).ValueString() != "aws" {
 		return
 	}
@@ -2869,7 +2887,7 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 	}
 	authKey := valueAs[types.String](aws["auth_key"])
 
-	aEnd := config.AEndPartnerConfig.Attributes()
+	aEnd := aEndPartnerConfig.Attributes()
 	var vrouterAttr string
 	switch valueAs[types.String](aEnd["partner"]).ValueString() {
 	case "vrouter":
@@ -2911,7 +2929,7 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 			// A blank password reaches the API as no password at all, the same
 			// as a null one, because the SDK tags it omitempty.
 			if password.IsNull() || password.ValueString() == "" {
-				resp.Diagnostics.AddAttributeError(
+				diags.AddAttributeError(
 					passwordPath,
 					"Missing BGP password on an MCR to AWS Direct Connect VXC",
 					"AWS receives the MD5 key from `auth_key`, and Megaport generates one when it is blank. The provider cannot copy that key into this BGP connection, so the MCR session comes up without MD5 and BGP stays down. "+remedy,
@@ -2924,7 +2942,7 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 				continue
 			}
 			if authKey.IsNull() || password.ValueString() != authKey.ValueString() {
-				resp.Diagnostics.AddAttributeError(
+				diags.AddAttributeError(
 					passwordPath,
 					"BGP password does not match auth_key on an MCR to AWS Direct Connect VXC",
 					"The MCR BGP session uses `password` and the AWS virtual interface uses `auth_key`. BGP only comes up when both carry the same MD5 key. "+remedy,
