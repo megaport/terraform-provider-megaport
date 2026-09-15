@@ -1535,7 +1535,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortAndMCRTestLocations(t, 1, 2500)
-	oracleVCID := pickOracleVirtualCircuitID(t)
+	oracle := pickOracleVirtualCircuitID(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	oracleCostCentreName := RandomTestName()
@@ -1548,11 +1548,6 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
 					id = %d
-				  }
-
-				data "megaport_partner" "oracle_port" {
-  					connect_type = "ORACLE"
-  					location_id  = 147
 				  }
 
 				  resource "megaport_mcr" "mcr" {
@@ -1576,7 +1571,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 					}
 
 					b_end = {
-					  requested_product_uid = data.megaport_partner.oracle_port.product_uid
+					  requested_product_uid = "%s"
 					}
 
 					b_end_partner_config = {
@@ -1586,7 +1581,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
                         }
                     }
 				  }
-                  `, locs[0], mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, oracleVCID),
+                  `, locs[0], mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, oracle.PartnerPortUID, oracle.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
@@ -2035,7 +2030,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
-	oracleVCID := pickOracleVirtualCircuitID(t)
+	oracle := pickOracleVirtualCircuitID(t)
 	portName := RandomTestName()
 	oracleVXCName := RandomTestName()
 
@@ -2075,7 +2070,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
                         }
                     }
                 }
-                `, locs[0], portName, oracleVXCName, oracleVCID),
+                `, locs[0], portName, oracleVXCName, oracle.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -2087,7 +2082,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "rate_limit", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "contract_term_months", "1"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracleVCID),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracle.Key),
 				),
 			},
 			// ImportState testing
