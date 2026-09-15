@@ -2868,9 +2868,6 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 		return
 	}
 	authKey := valueAs[types.String](aws["auth_key"])
-	if authKey.IsUnknown() {
-		return
-	}
 
 	aEnd := config.AEndPartnerConfig.Attributes()
 	var vrouterAttr string
@@ -2919,6 +2916,11 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 					"Missing BGP password on an MCR to AWS Direct Connect VXC",
 					"AWS receives the MD5 key from `auth_key`, and Megaport generates one when it is blank. The provider cannot copy that key into this BGP connection, so the MCR session comes up without MD5 and BGP stays down. "+remedy,
 				)
+				continue
+			}
+			// The key is not known until the resource it comes from applies,
+			// so the pair cannot be compared yet.
+			if authKey.IsUnknown() {
 				continue
 			}
 			if authKey.IsNull() || password.ValueString() != authKey.ValueString() {

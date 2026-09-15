@@ -183,9 +183,24 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			bEnd: vxcAWSPartnerConfig("AWS", key),
 		},
 		{
-			name: "unknown auth_key is skipped",
+			name: "unknown auth_key skips only the comparison",
 			aEnd: vxcVrouterPartnerConfig(key),
 			bEnd: vxcAWSPartnerConfig("AWS", types.StringUnknown()),
+		},
+		{
+			// The password is wrong whatever the key turns out to be.
+			name:       "unknown auth_key still rejects a missing password",
+			aEnd:       vxcVrouterPartnerConfig(types.StringNull()),
+			bEnd:       vxcAWSPartnerConfig("AWS", types.StringUnknown()),
+			wantErrors: 1,
+			wantText:   []string{"Missing BGP password"},
+		},
+		{
+			name:       "unknown auth_key still rejects an empty password",
+			aEnd:       vxcVrouterPartnerConfig(types.StringValue("")),
+			bEnd:       vxcAWSPartnerConfig("AWS", types.StringUnknown()),
+			wantErrors: 1,
+			wantText:   []string{"Missing BGP password"},
 		},
 		{
 			name: "unknown a_end_partner_config is skipped",

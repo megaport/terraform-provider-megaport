@@ -405,7 +405,7 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On an MCR to AWS VXC with `connect_type = "AWS"` and an explicit `a_end_partner_config`, set it to the same value as every `bgp_connections[].password`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. Under `b_end_partner_config` on a VXC with an explicit `a_end_partner_config`, set it to the same value as every `bgp_connections[].password`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -519,7 +519,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. Under `a_end_partner_config` on a VXC to AWS with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -592,7 +592,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. Under `a_end_partner_config` on a VXC to AWS with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -662,7 +662,7 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On an MCR to AWS VXC with `connect_type = "AWS"` and an explicit `a_end_partner_config`, set it to the same value as every `bgp_connections[].password`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. Under `b_end_partner_config` on a VXC with an explicit `a_end_partner_config`, set it to the same value as every `bgp_connections[].password`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -776,7 +776,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. Under `a_end_partner_config` on a VXC to AWS with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -849,7 +849,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The MD5 password of the BGP connection. On an MCR to AWS VXC with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`, or omit `a_end_partner_config` so Megaport configures both ends with one generated key.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. Under `a_end_partner_config` on a VXC to AWS with `connect_type = "AWS"`, set it to the same value as `b_end_partner_config.aws_config.auth_key`. Omitting `a_end_partner_config` is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
