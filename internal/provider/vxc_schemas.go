@@ -16,7 +16,7 @@ const bfdDeprecationMessage = "Setting the BFD timers has no effect. MCR always 
 // Both the vRouter and the deprecated a-end shape repeat the BGP connection
 // password field, and either end can carry the AWS config or the vRouter
 // config, so the description lives here once.
-const awsBGPPasswordDescription = "The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = \"AWS\"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key."
+const awsBGPPasswordDescription = "The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = \"AWS\"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key."
 
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
