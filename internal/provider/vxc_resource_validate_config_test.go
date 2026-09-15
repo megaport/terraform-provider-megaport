@@ -108,7 +108,7 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			wantText:   []string{"Missing BGP password", "`password`", "`b_end_partner_config.aws_config.auth_key`", "omit `a_end_partner_config`"},
 		},
 		{
-			name:       "missing password and blank auth_key",
+			name:       "missing password and no auth_key",
 			aEnd:       vxcVrouterPartnerConfig(types.StringNull()),
 			bEnd:       vxcAWSPartnerConfig("AWS", types.StringNull()),
 			wantErrors: 1,
@@ -122,11 +122,27 @@ func TestVXCResourceValidateConfig(t *testing.T) {
 			wantText:   []string{"does not match auth_key", "omit `a_end_partner_config`"},
 		},
 		{
-			name:       "password set and auth_key blank",
+			name:       "password set and no auth_key",
 			aEnd:       vxcVrouterPartnerConfig(key),
 			bEnd:       vxcAWSPartnerConfig("AWS", types.StringNull()),
 			wantErrors: 1,
 			wantText:   []string{"does not match auth_key"},
+		},
+		{
+			// A blank password reaches the API as no password at all, so a
+			// blank pair on both ends is the reported broken shape.
+			name:       "empty password and empty auth_key",
+			aEnd:       vxcVrouterPartnerConfig(types.StringValue("")),
+			bEnd:       vxcAWSPartnerConfig("AWS", types.StringValue("")),
+			wantErrors: 1,
+			wantText:   []string{"Missing BGP password"},
+		},
+		{
+			name:       "empty password and set auth_key",
+			aEnd:       vxcVrouterPartnerConfig(types.StringValue("")),
+			bEnd:       vxcAWSPartnerConfig("AWS", key),
+			wantErrors: 1,
+			wantText:   []string{"Missing BGP password"},
 		},
 		{
 			name:       "one error per bad connection",

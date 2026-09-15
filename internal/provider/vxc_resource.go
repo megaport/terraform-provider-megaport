@@ -2911,7 +2911,9 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 				continue
 			}
 			passwordPath := path.Root("a_end_partner_config").AtName(vrouterAttr).AtName("interfaces").AtListIndex(i).AtName("bgp_connections").AtListIndex(j).AtName("password")
-			if password.IsNull() {
+			// A blank password reaches the API as no password at all, the same
+			// as a null one, because the SDK tags it omitempty.
+			if password.IsNull() || password.ValueString() == "" {
 				resp.Diagnostics.AddAttributeError(
 					passwordPath,
 					"Missing BGP password on an MCR to AWS Direct Connect VXC",
