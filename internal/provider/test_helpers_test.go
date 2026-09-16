@@ -1266,26 +1266,27 @@ var (
 )
 
 // pickOracleVirtualCircuitID returns a unique Oracle virtual circuit ID from the
-// pool that is not already attached to an existing VXC. Each candidate is probed
-// via LookupPartnerPorts — if the VCID is already in use (orphaned from a prior
-// test run), it is skipped. Calls t.Skip if no usable VCID is found.
-func pickOracleVirtualCircuitID(t *testing.T) string {
+// pool that is not already attached to an existing VXC, along with the partner
+// port the API resolves for it. The port comes from the key's own Oracle region
+// and realm, so ordering against it keeps the realm of the key and the port the
+// same. Calls t.Skip if no usable VCID is found.
+func pickOracleVirtualCircuitID(t *testing.T) cspPickResult {
 	t.Helper()
 	creds, err := loadCSPCredentials()
 	if err != nil {
 		t.Skipf("skipping: %v", err)
-		return ""
+		return cspPickResult{}
 	}
 	if len(creds.OracleVirtualCircuitIDs) == 0 {
 		t.Skip("skipping: no Oracle virtual circuit IDs in testdata/csp_credentials.json")
-		return ""
+		return cspPickResult{}
 	}
 
 	ctx := context.Background()
 	client, clientErr := getTestClient()
 	if clientErr != nil {
 		t.Skipf("skipping: could not get test client: %v", clientErr)
-		return ""
+		return cspPickResult{}
 	}
 
 	oracleClaimedMu.Lock()
@@ -1295,7 +1296,8 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 			continue
 		}
 		// Probe the API to check the VCID is not already attached to a live VXC.
-		_, lookupErr := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
+		// The response names the partner port in the key's own region and realm.
+		resp, lookupErr := client.VXCService.LookupPartnerPorts(ctx, &megaport.LookupPartnerPortsRequest{
 			Partner:   "ORACLE",
 			Key:       id,
 			PortSpeed: 1000,
@@ -1311,11 +1313,11 @@ func pickOracleVirtualCircuitID(t *testing.T) string {
 			delete(oracleClaimedIDs, claimedID)
 			oracleClaimedMu.Unlock()
 		})
-		t.Logf("pickOracleVirtualCircuitID: using ...%s", id[max(0, len(id)-4):])
-		return id
+		t.Logf("pickOracleVirtualCircuitID: using ...%s (port %s)", id[max(0, len(id)-4):], resp.ProductUID)
+		return cspPickResult{Key: id, PartnerPortUID: resp.ProductUID}
 	}
 	t.Skip("skipping: no Oracle virtual circuit ID available (all claimed or in use on API)")
-	return ""
+	return cspPickResult{}
 }
 
 func loadCSPCredentials() (cspCredentials, error) {
