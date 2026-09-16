@@ -2105,8 +2105,7 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.Append(state.fillTransitPartnerConfigOnImport(ctx, vxc)...)
-		resp.Diagnostics.Append(state.fillCloudPartnerConfigOnImport(ctx, vxc)...)
+		resp.Diagnostics.Append(state.fillBEndPartnerConfigOnImport(ctx, vxc)...)
 	}
 
 	// Set refreshed state

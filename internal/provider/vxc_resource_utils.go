@@ -855,53 +855,21 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 	return diags, aEndMegaportConfig, partnerConfigObj
 }
 
-// fillTransitPartnerConfigOnImport records b_end_partner_config as "transit"
-// when the B-End CSP connection is a transit connection. The transit config
-// carries no settings, so the read has everything the block needs. One
-// "b_csp_connection" match fills it; more than one is left for the user.
-func (orm *vxcResourceModel) fillTransitPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
-	var diags diag.Diagnostics
-	if !orm.BEndPartnerConfig.IsNull() || v.Resources == nil || v.Resources.CSPConnection == nil {
-		return diags
-	}
-	matches := 0
-	for _, c := range v.Resources.CSPConnection.CSPConnection {
-		if transit, ok := c.(megaport.CSPConnectionTransit); ok && transit.ResourceName == "b_csp_connection" {
-			matches++
-		}
-	}
-	switch matches {
-	case 0:
-	case 1:
-		transitDiags, _, transitObj := createTransitPartnerConfig(ctx)
-		diags.Append(transitDiags...)
-		if !diags.HasError() {
-			orm.BEndPartnerConfig = transitObj
-		}
-	default:
-		diags.AddWarning(
-			"b_end_partner_config not recorded on import",
-			fmt.Sprintf("The VXC has %d transit B-End connections, so the provider cannot tell which one to record. Add b_end_partner_config = { partner = \"transit\" } to the configuration by hand.", matches),
-		)
-	}
-	return diags
-}
-
-// fillCloudPartnerConfigOnImport records b_end_partner_config from the B-End
-// cloud CSP connection: AWS, AWS hosted connection, Azure, Google, or Oracle.
-// It records the settings a configuration has to carry, and leaves the ones
-// the cloud assigns null: recording those would clash with a configuration
-// that omits them, and the update check treats that as a change it cannot
-// send. One "b_csp_connection" match fills the block, more than one is left
+// fillBEndPartnerConfigOnImport records b_end_partner_config from the B-End CSP
+// connection: transit, AWS, AWS hosted connection, Azure, Google, or Oracle. It
+// records the settings a configuration has to carry, and leaves the ones the
+// cloud assigns null: recording those would clash with a configuration that
+// omits them, and the update check treats that as a change it cannot send. One
+// "b_csp_connection" the import can read fills the block, more than one is left
 // for the user.
-func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
+func (orm *vxcResourceModel) fillBEndPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if !orm.BEndPartnerConfig.IsNull() || v.Resources == nil || v.Resources.CSPConnection == nil {
 		return diags
 	}
 	var matches []megaport.CSPConnectionConfig
 	for _, c := range v.Resources.CSPConnection.CSPConnection {
-		if cloudBEndCSPConnection(c) {
+		if bEndImportCSPConnection(c) {
 			matches = append(matches, c)
 		}
 	}
@@ -912,7 +880,7 @@ func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context,
 	default:
 		diags.AddWarning(
 			"b_end_partner_config not recorded on import",
-			fmt.Sprintf("The VXC has %d cloud B-End connections, so the provider cannot tell which one to record. Add b_end_partner_config to the configuration by hand.", len(matches)),
+			fmt.Sprintf("The VXC has %d B-End connections the import can read, so the provider cannot tell which one to record. Add b_end_partner_config to the configuration by hand.", len(matches)),
 		)
 		return diags
 	}
@@ -922,6 +890,8 @@ func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context,
 	var partnerDiags diag.Diagnostics
 	var partnerObj basetypes.ObjectValue
 	switch conn := matches[0].(type) {
+	case megaport.CSPConnectionTransit:
+		partnerDiags, _, partnerObj = createTransitPartnerConfig(ctx)
 	case megaport.CSPConnectionAWS:
 		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{
 			ConnectType:    stringOrNull(conn.ConnectType),
@@ -970,10 +940,12 @@ func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context,
 	return diags
 }
 
-// cloudBEndCSPConnection reports whether c is a B-End connection to one of the
-// cloud partners the import rebuilds.
-func cloudBEndCSPConnection(c megaport.CSPConnectionConfig) bool {
+// bEndImportCSPConnection reports whether c is a B-End connection the import
+// rebuilds a partner config from.
+func bEndImportCSPConnection(c megaport.CSPConnectionConfig) bool {
 	switch conn := c.(type) {
+	case megaport.CSPConnectionTransit:
+		return conn.ResourceName == "b_csp_connection"
 	case megaport.CSPConnectionAWS:
 		return conn.ResourceName == "b_csp_connection"
 	case megaport.CSPConnectionAWSHC:

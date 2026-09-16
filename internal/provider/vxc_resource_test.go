@@ -6006,6 +6006,7 @@ func TestVXCRead_RecordsTransitPartnerConfigOnImport(t *testing.T) {
 		{name: "import_transit_a_end_only", vxc: readVXC(transitConn("a_csp_connection"))},
 		{name: "import_no_csp_connection", vxc: readVXC()},
 		{name: "import_two_transit_b_ends_warns", vxc: readVXC(transitConn("b_csp_connection"), transitConn("b_csp_connection")), wantWarning: true},
+		{name: "import_transit_and_cloud_b_ends_warns", vxc: readVXC(transitConn("b_csp_connection"), megaport.CSPConnectionAWS{ConnectType: "AWS", ResourceName: "b_csp_connection"}), wantWarning: true},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(transitConn("b_csp_connection"))},
 	}
 
@@ -6189,6 +6190,7 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 			vxc:  readVXC(megaport.CSPConnectionGoogle{ConnectType: "GOOGLE", ResourceName: "a_csp_connection", PairingKey: "pair-key"}),
 		},
 		{name: "two_cloud_b_ends_warns", vxc: readVXC(awsConn, googleConn), wantWarning: "not recorded"},
+		{name: "transit_and_cloud_b_ends_warns", vxc: readVXC(awsConn, megaport.CSPConnectionTransit{ConnectType: "TRANSIT", ResourceName: "b_csp_connection"}), wantWarning: "not recorded"},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(awsConn)},
 	}
 
