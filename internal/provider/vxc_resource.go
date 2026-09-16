@@ -2799,7 +2799,7 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	if err := r.waitForVXCDecommission(ctx, state.UID.ValueString(), waitForTime, 30*time.Second); err != nil {
+	if err := r.waitForVXCDecommission(ctx, state.UID.ValueString(), r.waitForTime, 30*time.Second); err != nil {
 		resp.Diagnostics.AddError(
 			"VXC cancelled but not decommissioned",
 			"VXC "+state.UID.ValueString()+" was cancelled but did not reach DECOMMISSIONED: "+err.Error()+
