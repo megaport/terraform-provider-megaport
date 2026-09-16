@@ -4542,6 +4542,167 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_ImportDrift_Azure imports an Azure VXC and applies a
+// configuration that sets port_choice, which the import leaves null. The apply
+// records the value and plans no further change.
+func TestAccMegaportVXC_ImportDrift_Azure(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	azure := pickAzureServiceKey(t)
+	mcrLocationID, _ := findMCRTestLocation(t, 5000)
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	// baseConfig is everything except the VXC, so forgetConfig below can drop
+	// the resource block entirely while the removed block still references it.
+	baseConfig := providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 5000
+				asn                  = 64555
+			}
+		`, mcrLocationID, mcrName)
+
+	vxcConfig := func() string {
+		return baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 200
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 2192
+				}
+
+				b_end = {
+					requested_product_uid = "%s"
+				}
+
+				b_end_partner_config = {
+					partner = "azure"
+					azure_config = {
+						port_choice = "primary"
+						service_key = "%s"
+					}
+				}
+			}
+		`, vxcName, azure.PartnerPortUID, azure.Key)
+	}
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create the Azure VXC.
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "azure"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.port_choice", "primary"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					captureUID,
+				),
+			},
+			// Step 2: Forget the VXC. The live service stays up and Terraform
+			// stops managing it, so step 3 imports it the way a customer does.
+			{
+				Config: forgetConfig,
+			},
+			// Step 3: Import the VXC. The read rebuilds b_end_partner_config
+			// from the Azure connection, which carries the service key but not
+			// the port choice.
+			{
+				Config:                               vxcConfig(),
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
+						}
+					}
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
+					if got := attrs["b_end_partner_config.partner"]; got != "azure" {
+						return fmt.Errorf("imported state %q = %q, want %q", "b_end_partner_config.partner", got, "azure")
+					}
+					if got := attrs["b_end_partner_config.azure_config.service_key"]; got != azure.Key {
+						return fmt.Errorf("imported state %q = %q, want %q", "b_end_partner_config.azure_config.service_key", got, azure.Key)
+					}
+					// Azure assigns the port, so the import leaves port_choice
+					// for the configuration to set.
+					if got := attrs["b_end_partner_config.azure_config.port_choice"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", "b_end_partner_config.azure_config.port_choice", got)
+					}
+					return nil
+				},
+			},
+			// Step 4: Apply the config against the imported state. It sets
+			// port_choice, which the import left null, so the apply records it
+			// and warns instead of failing.
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "azure"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.port_choice", "primary"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.service_key", azure.Key),
+				),
+			},
+			// Step 5: Plan-only to verify no drift after the first apply.
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_ImportDrift_WithVnicIndex tests that a VXC connected to an
 // MVE vNIC imports without drift. The import reads vnic_index back, and the
 // first apply after it plans no change.
