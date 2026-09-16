@@ -33,6 +33,7 @@ var (
 	_ resource.Resource                = &mveResource{}
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
+	_ resource.ResourceWithModifyPlan  = &mveResource{}
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
@@ -1184,6 +1185,23 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		return
 	}
 
+	r.planVendorConfigReplacement(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Removing vnics from a configuration leaves cost_centre marked unknown,
+	// which plans an update forever.
+	restored, err := restoreComputedOnNoOpPlan(req.Plan.Raw, req.State.Raw, req.Config.Raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Modifying MVE Plan", err.Error())
+		return
+	}
+	resp.Plan.Raw = restored
+}
+
+// planVendorConfigReplacement requires replacement when the vendor config block changes.
+func (r *mveResource) planVendorConfigReplacement(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	var plan, state mveResourceModel
 	planDiags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(planDiags...)
