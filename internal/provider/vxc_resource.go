@@ -2110,6 +2110,16 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			return
 		}
 		resp.Diagnostics.Append(state.fillTransitPartnerConfigOnImport(ctx, vxc)...)
+
+		// service_key is order-time only, so the API never returns it: this
+		// flag is the only way the plan modifier can tell a null key that
+		// might still be live on the imported VXC from one that never
+		// existed. Update clears it once the key is recorded. Terraform
+		// always supplies Private; nil only happens when a test calls Read
+		// directly without going through the protocol server.
+		if resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, []byte("true"))...)
+		}
 	}
 
 	// Set refreshed state
@@ -2769,6 +2779,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 	state.ServiceKey = plan.ServiceKey
+	if !plan.ServiceKey.IsNull() && resp.Private != nil {
+		// The key is now recorded in state, so the plan modifier no longer
+		// needs the import flag to tell this VXC apart from one that was
+		// never given a key.
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, nil)...)
+	}
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state

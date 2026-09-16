@@ -17,11 +17,26 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// requiresReplaceServiceKey replaces the VXC only when state already holds a
-// service key. The API never returns the key, so an imported VXC has it null
-// and the first apply records the configured value in place.
-func requiresReplaceServiceKey(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-	resp.RequiresReplace = !req.StateValue.IsNull()
+// serviceKeyImportedPrivateKey marks that the null service_key in state came
+// from the read after an import, not from an ordinary VXC that was never
+// given a key. Read sets it; Update clears it once the key is recorded.
+const serviceKeyImportedPrivateKey = "service_key_imported"
+
+// requiresReplaceServiceKey replaces the VXC on any service key change,
+// except recording a key for the first time on a VXC imported without one.
+// The API never returns the key, so an imported VXC has it null in state
+// regardless of whether the live VXC has one; the private flag tells that
+// case apart from an ordinary VXC that was simply created with no key, which
+// must still replace so the key actually reaches the API.
+func requiresReplaceServiceKey(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	if !req.StateValue.IsNull() {
+		resp.RequiresReplace = true
+		return
+	}
+
+	imported, diags := req.Private.GetKey(ctx, serviceKeyImportedPrivateKey)
+	resp.Diagnostics.Append(diags...)
+	resp.RequiresReplace = len(imported) == 0
 }
 
 // resolvePrefixListID looks up a prefix filter list by description on the

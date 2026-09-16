@@ -11,9 +11,14 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// service_key is an order-time input that the API never returns, so an imported
-// VXC holds it null. Replacing on null->value would destroy the live service the
-// user just imported, and a single-use key cannot be ordered a second time.
+// service_key is an order-time input that the API never returns, so an
+// imported VXC holds it null the same as an ordinary VXC that was simply
+// never given a key. Only a private-state flag that Read sets on the import
+// read tells the two apart, and this harness cannot fabricate that flag
+// (the framework's private-state type is internal to the dependency, so no
+// package outside it can construct one). The genuine post-import case, where
+// the flag is set and the plan updates in place, is covered end to end by
+// TestAccMegaportVXC_ImportDrift_ServiceKey instead.
 func TestVXCServiceKeyRequiresReplace(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -22,10 +27,10 @@ func TestVXCServiceKeyRequiresReplace(t *testing.T) {
 		want  bool
 	}{
 		{
-			name:  "added after import",
+			name:  "added to an ordinary VXC that was never given a key",
 			state: types.StringNull(),
 			plan:  types.StringValue("key-1"),
-			want:  false,
+			want:  true,
 		},
 		{
 			name:  "changed to another key",
