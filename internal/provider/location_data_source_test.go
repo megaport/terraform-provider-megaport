@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestDynamicLocation(t *testing.T) {
+func TestAccMegaportLocation_Dynamic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locID := findAnyActiveLocationID(t)

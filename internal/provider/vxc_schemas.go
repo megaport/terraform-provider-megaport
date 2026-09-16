@@ -28,6 +28,11 @@ func optionalBool(desc string) schema.BoolAttribute {
 	return schema.BoolAttribute{Description: desc, Optional: true}
 }
 
+// The API dropped the interface-level BFD timers in 2024 because the MCR
+// platform cannot set them. Both partner config shapes repeat the block, and
+// the block and each timer inside it read the message from here.
+const bfdDeprecationMessage = "Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
+
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The AWS partner configuration.",
@@ -175,12 +180,25 @@ var (
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
-							Description: "The BFD of the partner configuration interface.",
-							Optional:    true,
+							Description:        "**DEPRECATED**: " + bfdDeprecationMessage,
+							Optional:           true,
+							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
-								"tx_interval": optionalInt64("The transmit interval of the BFD."),
-								"rx_interval": optionalInt64("The receive interval of the BFD."),
-								"multiplier":  optionalInt64("The multiplier of the BFD."),
+								"tx_interval": schema.Int64Attribute{
+									Description:        "The transmit interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
+								"rx_interval": schema.Int64Attribute{
+									Description:        "The receive interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
+								"multiplier": schema.Int64Attribute{
+									Description:        "The multiplier of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
 							},
 						},
 						"vlan": optionalInt64("Inner-VLAN for implicit Q-inQ VXCs. Typically used only for Azure VXCs. The default is no inner-vlan."),
@@ -305,12 +323,25 @@ var (
 							ElementType: types.StringType,
 						},
 						"bfd": schema.SingleNestedAttribute{
-							Description: "The BFD of the partner configuration interface.",
-							Optional:    true,
+							Description:        "**DEPRECATED**: " + bfdDeprecationMessage,
+							Optional:           true,
+							DeprecationMessage: bfdDeprecationMessage,
 							Attributes: map[string]schema.Attribute{
-								"tx_interval": optionalInt64("The transmit interval of the BFD."),
-								"rx_interval": optionalInt64("The receive interval of the BFD."),
-								"multiplier":  optionalInt64("The multiplier of the BFD."),
+								"tx_interval": schema.Int64Attribute{
+									Description:        "The transmit interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
+								"rx_interval": schema.Int64Attribute{
+									Description:        "The receive interval of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
+								"multiplier": schema.Int64Attribute{
+									Description:        "The multiplier of the BFD. **DEPRECATED**: " + bfdDeprecationMessage,
+									Optional:           true,
+									DeprecationMessage: bfdDeprecationMessage,
+								},
 							},
 						},
 						"bgp_connections": schema.ListNestedAttribute{
