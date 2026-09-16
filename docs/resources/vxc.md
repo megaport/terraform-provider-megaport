@@ -553,6 +553,7 @@ Optional:
 - `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `dhcp_pools` (Attributes List) The DHCP pool to serve on this interface. The API accepts at most one pool per interface. The API does not return the pool on read, so it is never refreshed into state and stays null on import. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--dhcp_pools))
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
@@ -598,6 +599,22 @@ Optional:
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--dhcp_pools"></a>
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.dhcp_pools`
+
+Required:
+
+- `end_ip_address` (String) Last IPv4 address in the range to assign to DHCP clients.
+- `network` (String) IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.
+- `start_ip_address` (String) First IPv4 address in the range to assign to DHCP clients.
+
+Optional:
+
+- `default_gateway` (String) IPv4 address of a default gateway to offer DHCP clients.
+- `description` (String) Description for the DHCP pool. Maximum 100 characters.
+- `dns_servers` (List of String) IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
@@ -810,6 +827,7 @@ Optional:
 - `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `dhcp_pools` (Attributes List) The DHCP pool to serve on this interface. The API accepts at most one pool per interface. The API does not return the pool on read, so it is never refreshed into state and stays null on import. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--dhcp_pools))
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
@@ -855,6 +873,22 @@ Optional:
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--dhcp_pools"></a>
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.dhcp_pools`
+
+Required:
+
+- `end_ip_address` (String) Last IPv4 address in the range to assign to DHCP clients.
+- `network` (String) IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.
+- `start_ip_address` (String) First IPv4 address in the range to assign to DHCP clients.
+
+Optional:
+
+- `default_gateway` (String) IPv4 address of a default gateway to offer DHCP clients.
+- `description` (String) Description for the DHCP pool. Maximum 100 characters.
+- `dns_servers` (List of String) IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>

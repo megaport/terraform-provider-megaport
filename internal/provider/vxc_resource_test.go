@@ -5691,6 +5691,95 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_DhcpPool orders an MCR VXC whose A-End vrouter config
+// carries one subInterface with an address range and a DHCP pool inside it. The
+// API does not return the pool on read, so the framework's post-apply plan
+// proves the write-only attribute produces no drift.
+func TestAccMegaportVXC_DhcpPool(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	// MCR and the TRANSIT partner port must share a region, so claim one
+	// location that satisfies both and use it for both ends.
+	mcrLocID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	config := providerConfig + fmt.Sprintf(`
+		data "megaport_location" "mcr_loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.mcr_loc.id
+			contract_term_months = 1
+			port_speed           = 1000
+			asn                  = 64555
+		}
+
+		data "megaport_partner" "internet_port" {
+			connect_type = "TRANSIT"
+			location_id  = data.megaport_location.mcr_loc.id
+		}
+
+		resource "megaport_vxc" "dhcp_vxc" {
+			product_name         = "%s"
+			rate_limit           = 100
+			contract_term_months = 1
+
+			a_end = {
+				requested_product_uid = megaport_mcr.mcr.product_uid
+			}
+
+			a_end_partner_config = {
+				partner = "vrouter"
+				vrouter_config = {
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["192.168.1.1/24"]
+							dhcp_pools = [
+								{
+									network          = "192.168.1.0/24"
+									start_ip_address = "192.168.1.10"
+									end_ip_address   = "192.168.1.100"
+									default_gateway  = "192.168.1.1"
+									description      = "tf acc test pool"
+									dns_servers      = ["1.1.1.1", "8.8.8.8"]
+								},
+							]
+						},
+					]
+				}
+			}
+
+			b_end = {
+				requested_product_uid = data.megaport_partner.internet_port.product_uid
+			}
+		}
+	`, mcrLocID, mcrName, vxcName)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.dhcp_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.#", "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.network", "192.168.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.start_ip_address", "192.168.1.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.end_ip_address", "192.168.1.100"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.default_gateway", "192.168.1.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.description", "tf acc test pool"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools.0.dns_servers.#", "2"),
+				),
+			},
+		},
+	})
+}
+
 // TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy pins the two
 // guards that keep the partner-config warning off the create and destroy
 // walks. Without them a first apply warns about a config it is about to send,

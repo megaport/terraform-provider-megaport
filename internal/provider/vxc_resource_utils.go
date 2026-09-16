@@ -690,6 +690,27 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 			}
 			toAppend.IpSecTunnelOptions = &tunnel
 		}
+		if !iface.DhcpPools.IsNull() && !iface.DhcpPools.IsUnknown() {
+			pools := []*dhcpPoolModel{}
+			poolDiags := iface.DhcpPools.ElementsAs(ctx, &pools, false)
+			diags.Append(poolDiags...)
+			for _, pool := range pools {
+				poolToAppend := megaport.DhcpPoolConfig{
+					Network:        pool.Network.ValueString(),
+					StartIpAddress: pool.StartIPAddress.ValueString(),
+					EndIpAddress:   pool.EndIPAddress.ValueString(),
+					DefaultGateway: pool.DefaultGateway.ValueString(),
+					Description:    pool.Description.ValueString(),
+				}
+				if !pool.DNSServers.IsNull() {
+					dnsServers := []string{}
+					dnsDiags := pool.DNSServers.ElementsAs(ctx, &dnsServers, true)
+					diags.Append(dnsDiags...)
+					poolToAppend.DnsServers = dnsServers
+				}
+				toAppend.DhcpPools = append(toAppend.DhcpPools, poolToAppend)
+			}
+		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}
 	vrouterConfigObj, bEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterConfig)
@@ -1145,6 +1166,7 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 			PacketFilterIn:     types.Int64Null(),
 			PacketFilterOut:    types.Int64Null(),
 			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 			IPAddresses:        types.ListNull(types.StringType),
 			NatIPAddresses:     types.ListNull(types.StringType),
 			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),

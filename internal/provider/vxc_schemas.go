@@ -309,6 +309,42 @@ var (
 								},
 							},
 						},
+						"dhcp_pools": schema.ListNestedAttribute{
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. The API does not return the pool on read, so it is never refreshed into state and stays null on import.",
+							Optional:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"network": schema.StringAttribute{
+										Description: "IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.",
+										Required:    true,
+									},
+									"start_ip_address": schema.StringAttribute{
+										Description: "First IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"end_ip_address": schema.StringAttribute{
+										Description: "Last IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"default_gateway": schema.StringAttribute{
+										Description: "IPv4 address of a default gateway to offer DHCP clients.",
+										Optional:    true,
+									},
+									"description": schema.StringAttribute{
+										Description: "Description for the DHCP pool. Maximum 100 characters.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.LengthAtMost(100),
+										},
+									},
+									"dns_servers": schema.ListAttribute{
+										Description: "IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.",
+										Optional:    true,
+										ElementType: types.StringType,
+									},
+								},
+							},
+						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
