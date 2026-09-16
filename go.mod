@@ -1,6 +1,6 @@
 module github.com/megaport/terraform-provider-megaport
 
-go 1.25.8
+go 1.26.0
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
@@ -81,7 +81,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zclconf/go-cty v1.18.1 // indirect
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/exp v0.0.0-20230809150735-7b3493d9a819 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
