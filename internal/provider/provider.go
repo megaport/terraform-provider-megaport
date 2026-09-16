@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -91,7 +92,7 @@ func (p *megaportProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Description: "Indicates acceptance of the Megaport API terms, this is required to use the provider. Can also be set using the environment variable MEGAPORT_ACCEPT_PURCHASE_TERMS",
 			},
 			"wait_time": schema.Int64Attribute{
-				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers.",
+				Description: "Maximum time in minutes to wait for resources to finish provisioning during create and update operations, and for a VXC to decommission during destroy, before timing out. Defaults to 10, minimum 1. Increase this if you provision resources that take longer than 10 minutes to become live, such as MVEs or VXCs to cloud providers.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
@@ -297,6 +298,14 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	if managedAccountUID != "" {
 		clientOpts = append(clientOpts, megaport.WithCallContext(managedAccountUID))
 	}
+	urlOverrides, err := clientURLOverrides()
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Megaport API URL override", err.Error())
+		return
+	}
+	// Appended last on purpose: WithEnvironment above also sets the base URL, and the last write wins.
+	clientOpts = append(clientOpts, urlOverrides...)
+
 	megaportClient, err := megaport.New(nil, clientOpts...)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -329,6 +338,28 @@ func (p *megaportProvider) Configure(ctx context.Context, req provider.Configure
 	resp.ResourceData = providerData
 
 	tflog.Info(ctx, "Configured Megaport API client", map[string]any{"success": true})
+}
+
+// clientURLOverrides points the client at an API host outside the three named environments, so
+// acceptance tests can run against an ephemeral stack. Both vars are required together. A token URL
+// on its own authenticates against the override while the API calls stay on the named environment,
+// and a base URL on its own cannot authenticate at all, because megaportgo derives the token URL
+// from a fixed host switch that rejects unknown hosts.
+func clientURLOverrides() ([]megaport.ClientOpt, error) {
+	baseURL := os.Getenv("MEGAPORT_BASE_URL")
+	tokenURL := os.Getenv("MEGAPORT_TOKEN_URL")
+
+	switch {
+	case baseURL == "" && tokenURL == "":
+		return nil, nil
+	case baseURL == "" || tokenURL == "":
+		return nil, errors.New("MEGAPORT_BASE_URL and MEGAPORT_TOKEN_URL must be set together")
+	}
+
+	return []megaport.ClientOpt{
+		megaport.WithBaseURL(baseURL),
+		megaport.WithTokenURL(tokenURL),
+	}, nil
 }
 
 // DataSources defines the data sources implemented in the provider.
