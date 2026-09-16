@@ -584,7 +584,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"service_key": schema.StringAttribute{
-				Description: "The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. Changing a key already in state replaces the VXC.",
+				Description: "The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. That apply only records the key in state: it does not send the key to Megaport, so set it to the key the live VXC was ordered with. Changing a key already in state replaces the VXC.",
 				Optional:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
