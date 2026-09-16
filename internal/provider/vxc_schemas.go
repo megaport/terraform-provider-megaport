@@ -310,7 +310,7 @@ var (
 							},
 						},
 						"dhcp_pools": schema.ListNestedAttribute{
-							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. The API does not return the pool on read, so it is never refreshed into state and stays null on import.",
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface, and rejects a pool when the far end of the VXC is Transit or IX. The API does not return the pool on read, so it is never refreshed into state and stays null on import.",
 							Optional:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{

@@ -5691,35 +5691,38 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	})
 }
 
-// TestAccMegaportVXC_DhcpPool orders an MCR VXC whose A-End vrouter config
-// carries one subInterface with an address range and a DHCP pool inside it. The
-// API does not return the pool on read, so the framework's post-apply plan
-// proves the write-only attribute produces no drift.
+// TestAccMegaportVXC_DhcpPool orders an MCR to Port VXC whose A-End vrouter
+// config carries one subInterface with an address range and a DHCP pool inside
+// it. The API does not return the pool on read, so the framework's post-apply
+// plan proves the write-only attribute produces no drift. The B-End is a Port:
+// the API rejects a pool when the far end is Transit or IX.
 func TestAccMegaportVXC_DhcpPool(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// MCR and the TRANSIT partner port must share a region, so claim one
-	// location that satisfies both and use it for both ends.
-	mcrLocID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
 	mcrName := RandomTestName()
+	portName := RandomTestName()
 	vxcName := RandomTestName()
 
 	config := providerConfig + fmt.Sprintf(`
-		data "megaport_location" "mcr_loc" {
+		data "megaport_location" "loc" {
 			id = %d
 		}
 
 		resource "megaport_mcr" "mcr" {
 			product_name         = "%s"
-			location_id          = data.megaport_location.mcr_loc.id
+			location_id          = data.megaport_location.loc.id
 			contract_term_months = 1
 			port_speed           = 1000
 			asn                  = 64555
 		}
 
-		data "megaport_partner" "internet_port" {
-			connect_type = "TRANSIT"
-			location_id  = data.megaport_location.mcr_loc.id
+		resource "megaport_port" "port" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
 		}
 
 		resource "megaport_vxc" "dhcp_vxc" {
@@ -5754,10 +5757,11 @@ func TestAccMegaportVXC_DhcpPool(t *testing.T) {
 			}
 
 			b_end = {
-				requested_product_uid = data.megaport_partner.internet_port.product_uid
+				requested_product_uid = megaport_port.port.product_uid
+				ordered_vlan          = 100
 			}
 		}
-	`, mcrLocID, mcrName, vxcName)
+	`, locs[0], mcrName, portName, vxcName)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
