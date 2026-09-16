@@ -151,6 +151,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
+	// An import has no state or plan to take requested_product_uid from. Record
+	// the port the VXC runs on, which is what the plan proposes anyway. An empty
+	// string would read as a change against the configured port on every plan.
+	if plan == nil && orm.AEndConfiguration.IsNull() {
+		aEndRequestedProductUID = v.AEndConfiguration.UID
+	}
+
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
 		RequestedProductUID:   types.StringValue(aEndRequestedProductUID),
@@ -233,6 +240,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			idx := planBEnd.NetworkInterfaceIndex.ValueInt64()
 			bEndVnicIndex = &idx
 		}
+	}
+
+	if plan == nil && orm.BEndConfiguration.IsNull() {
+		bEndRequestedProductUID = v.BEndConfiguration.UID
 	}
 
 	bEndModel := &vxcEndConfigurationModel{
@@ -874,6 +885,107 @@ func (orm *vxcResourceModel) fillTransitPartnerConfigOnImport(ctx context.Contex
 		)
 	}
 	return diags
+}
+
+// fillCloudPartnerConfigOnImport records b_end_partner_config from the B-End
+// cloud CSP connection: AWS, AWS hosted connection, Azure, Google, or Oracle.
+// It records the settings a configuration has to carry, and leaves the ones
+// the cloud assigns null: recording those would clash with a configuration
+// that omits them, and the update check treats that as a change it cannot
+// send. One "b_csp_connection" match fills the block, more than one is left
+// for the user.
+func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if !orm.BEndPartnerConfig.IsNull() || v.Resources == nil || v.Resources.CSPConnection == nil {
+		return diags
+	}
+	var matches []megaport.CSPConnectionConfig
+	for _, c := range v.Resources.CSPConnection.CSPConnection {
+		if cloudBEndCSPConnection(c) {
+			matches = append(matches, c)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return diags
+	case 1:
+	default:
+		diags.AddWarning(
+			"b_end_partner_config not recorded on import",
+			fmt.Sprintf("The VXC has %d cloud B-End connections, so the provider cannot tell which one to record. Add b_end_partner_config to the configuration by hand.", len(matches)),
+		)
+		return diags
+	}
+
+	const summary = "Import complete, some settings need adding by hand"
+	const recordsOnNextApply = "Setting one records the value in Terraform state on the next apply, which does not change the live VXC."
+	var partnerDiags diag.Diagnostics
+	var partnerObj basetypes.ObjectValue
+	switch conn := matches[0].(type) {
+	case megaport.CSPConnectionAWS:
+		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{
+			ConnectType:    stringOrNull(conn.ConnectType),
+			Type:           stringOrNull(conn.Type),
+			OwnerAccount:   stringOrNull(conn.OwnerAccount),
+			ConnectionName: stringOrNull(conn.Name),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, aws_config.amazon_ip_address, and aws_config.prefixes null in b_end_partner_config. AWS assigns those values when the order leaves them out, and the read cannot tell an assigned value from one the configuration set. "+recordsOnNextApply,
+		)
+	case megaport.CSPConnectionAWSHC:
+		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{
+			ConnectType:    stringOrNull(conn.ConnectType),
+			OwnerAccount:   stringOrNull(conn.OwnerAccount),
+			ConnectionName: stringOrNull(conn.Name),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves aws_config.type null in b_end_partner_config, because the read of an AWS hosted connection does not carry it. "+recordsOnNextApply,
+		)
+	case megaport.CSPConnectionAzure:
+		partnerDiags, _, partnerObj = createAzurePartnerConfig(ctx, vxcPartnerConfigAzureModel{
+			ServiceKey: stringOrNull(conn.ServiceKey),
+			Peers:      types.ListNull(types.ObjectType{AttrTypes: partnerOrderAzurePeeringConfigAttrs}),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves azure_config.port_choice and azure_config.peers null in b_end_partner_config. Set azure_config.port_choice to the port the live service uses, primary or secondary. "+recordsOnNextApply,
+		)
+	case megaport.CSPConnectionGoogle:
+		partnerDiags, _, partnerObj = createGooglePartnerConfig(ctx, vxcPartnerConfigGoogleModel{
+			PairingKey: stringOrNull(conn.PairingKey),
+		})
+	case megaport.CSPConnectionOracle:
+		partnerDiags, _, partnerObj = createOraclePartnerConfig(ctx, vxcPartnerConfigOracleModel{
+			VirtualCircuitId: stringOrNull(conn.VirtualCircuitId),
+		})
+	default:
+		return diags
+	}
+	diags.Append(partnerDiags...)
+	if !diags.HasError() {
+		orm.BEndPartnerConfig = partnerObj
+	}
+	return diags
+}
+
+// cloudBEndCSPConnection reports whether c is a B-End connection to one of the
+// cloud partners the import rebuilds.
+func cloudBEndCSPConnection(c megaport.CSPConnectionConfig) bool {
+	switch conn := c.(type) {
+	case megaport.CSPConnectionAWS:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionAWSHC:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionAzure:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionGoogle:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionOracle:
+		return conn.ResourceName == "b_csp_connection"
+	}
+	return false
 }
 
 func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport.VXCPartnerConfigTransit, basetypes.ObjectValue) {
