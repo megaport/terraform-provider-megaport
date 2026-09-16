@@ -131,6 +131,26 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	// A decommissioned MCR answers the prefix list call with 400 "Not an active
+	// MCR service", so check the parent before asking for the list.
+	mcr, err := r.client.MCRService.GetMCR(ctx, state.MCRID.ValueString())
+	if err != nil {
+		if megaport.IsServiceNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error reading MCR",
+			fmt.Sprintf("Could not read MCR %s: %s", state.MCRID.ValueString(), err.Error()),
+		)
+		return
+	}
+	// A 200 carrying no product means the same thing as a not-found.
+	if mcr == nil || mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Get the prefix filter list from API
 	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx,
 		state.MCRID.ValueString(), int(state.ID.ValueInt64()))
