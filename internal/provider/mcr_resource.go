@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -34,6 +33,7 @@ var (
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+	_ resource.ResourceWithModifyPlan  = &mcrResource{}
 
 	mcrPrefixFilterListModelAttributes = map[string]attr.Type{
 		"id":             types.Int64Type,
@@ -238,29 +238,10 @@ func (orm *mcrPrefixFilterListModel) fromAPIMCRPrefixFilterList(ctx context.Cont
 	orm.AddressFamily = types.StringValue(m.AddressFamily)
 	entriesList := []types.Object{}
 	for _, entry := range m.Entries {
-		var le, ge int
-		// Get Mask Length if not provided by API
-		if entry.Le == 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			le = length
-			ge = length
-		} else if entry.Le != 0 && entry.Ge == 0 {
-			_, net, err := net.ParseCIDR(entry.Prefix)
-			if err != nil {
-				diags.AddError("Error parsing prefix", fmt.Sprintf("Error parsing prefix %s: %s", entry.Prefix, err))
-				return diags
-			}
-			length, _ := net.Mask.Size()
-			ge = length
-			le = entry.Le
-		} else {
-			le = entry.Le
-			ge = entry.Ge
+		ge, le, geLeDiags := resolveGeLe(entry)
+		diags.Append(geLeDiags...)
+		if geLeDiags.HasError() {
+			return diags
 		}
 		entryModel := &mcrPrefixListEntryModel{
 			Action: types.StringValue(entry.Action),
@@ -926,10 +907,10 @@ func (r *mcrResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)
@@ -1225,10 +1206,10 @@ func (r *mcrResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			for _, detailedList := range detailedPrefixFilterLists {
 				parsedModel := &mcrPrefixFilterListModel{}
 				parsedDiags := parsedModel.fromAPIMCRPrefixFilterList(ctx, detailedList)
+				resp.Diagnostics.Append(parsedDiags...)
 				if parsedDiags.HasError() {
 					return
 				}
-				resp.Diagnostics.Append(parsedDiags...)
 				parsedObj, parsedDiags := types.ObjectValueFrom(ctx, mcrPrefixFilterListModelAttributes, parsedModel)
 				resp.Diagnostics.Append(parsedDiags...)
 				parsedListObjs = append(parsedListObjs, parsedObj)
@@ -1287,6 +1268,17 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		)
 		return
 	}
+}
+
+// ModifyPlan converges a plan whose only content is the unknowns left behind
+// by removing the deprecated prefix_filter_lists attribute.
+func (r *mcrResource) ModifyPlan(_ context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	restored, err := restoreComputedOnNoOpPlan(req.Plan.Raw, req.State.Raw, req.Config.Raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Modifying MCR Plan", err.Error())
+		return
+	}
+	resp.Plan.Raw = restored
 }
 
 // Configure adds the provider configured client to the resource.
