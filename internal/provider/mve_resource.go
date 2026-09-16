@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -32,6 +33,7 @@ var (
 	_ resource.Resource                = &mveResource{}
 	_ resource.ResourceWithConfigure   = &mveResource{}
 	_ resource.ResourceWithImportState = &mveResource{}
+	_ resource.ResourceWithModifyPlan  = &mveResource{}
 
 	vnicAttrs = map[string]attr.Type{
 		"description": types.StringType,
@@ -591,6 +593,15 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 		orm.ResourceTags = types.MapNull(types.StringType)
 	}
 
+	if len(p.NetworkInterfaces) == 0 {
+		apiDiags.AddError(
+			"MVE returned without vnics",
+			fmt.Sprintf("The Megaport API returned MVE %s with no vnics. Every MVE has at least one, so the response is incomplete, "+
+				"usually because the API could not reach its provisioning backend. Retry the operation.", p.UID),
+		)
+		return apiDiags
+	}
+
 	vnics := []types.Object{}
 	for _, n := range p.NetworkInterfaces {
 		model := &mveNetworkInterfaceModel{
@@ -605,6 +616,33 @@ func (orm *mveResourceModel) fromAPIMVE(ctx context.Context, p *megaport.MVE, ta
 	orm.NetworkInterfaces = networkInterfaceList
 
 	return apiDiags
+}
+
+// mveVnicRetries is how many extra reads getMVEWithVnics makes before it
+// returns an MVE that still has no vnics. The interval is a var so tests can
+// shorten it.
+const mveVnicRetries = 3
+
+var mveVnicRetryInterval = 2 * time.Second
+
+// getMVEWithVnics reads an MVE and re-reads it while the response has no vnics.
+// The API fills vnics from its provisioning backend on every read, so a
+// transient failure there returns a live MVE with an empty list.
+func getMVEWithVnics(ctx context.Context, svc megaport.MVEService, uid string) (*megaport.MVE, error) {
+	mve, err := svc.GetMVE(ctx, uid)
+	for attempt := 0; err == nil && len(mve.NetworkInterfaces) == 0 && attempt < mveVnicRetries; attempt++ {
+		tflog.Debug(ctx, "MVE returned without vnics, re-reading", map[string]interface{}{
+			"mve_id":  uid,
+			"attempt": attempt + 1,
+		})
+		select {
+		case <-time.After(mveVnicRetryInterval):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		mve, err = svc.GetMVE(ctx, uid)
+	}
+	return mve, err
 }
 
 // NewMVEResource is a helper function to simplify the provider implementation.
@@ -951,7 +989,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdMVE.TechnicalServiceUID
 
-	mve, err := r.client.MVEService.GetMVE(ctx, createdID)
+	mve, err := getMVEWithVnics(ctx, r.client.MVEService, createdID)
 	if err != nil {
 		addAPIError(&resp.Diagnostics, readErrorSummary("MVE", createdID), err)
 		return
@@ -1149,6 +1187,23 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		return
 	}
 
+	r.planVendorConfigReplacement(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Removing vnics from a configuration leaves cost_centre marked unknown,
+	// which plans an update forever.
+	restored, err := restoreComputedOnNoOpPlan(req.Plan.Raw, req.State.Raw, req.Config.Raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Modifying MVE Plan", err.Error())
+		return
+	}
+	resp.Plan.Raw = restored
+}
+
+// planVendorConfigReplacement requires replacement when the vendor config block changes.
+func (r *mveResource) planVendorConfigReplacement(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	var plan, state mveResourceModel
 	planDiags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(planDiags...)
