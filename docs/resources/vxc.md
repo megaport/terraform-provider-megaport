@@ -302,7 +302,7 @@ resource "megaport_vxc" "service_key_vxc" {
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
-- `service_key` (String, Sensitive) The service key of the VXC.
+- `service_key` (String, Sensitive) The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. Changing a key already in state replaces the VXC.
 - `shutdown` (Boolean) Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).
 
 ### Read-Only

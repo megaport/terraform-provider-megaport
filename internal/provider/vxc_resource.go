@@ -584,11 +584,15 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"service_key": schema.StringAttribute{
-				Description: "The service key of the VXC.",
+				Description: "The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. Changing a key already in state replaces the VXC.",
 				Optional:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplaceIf(
+						requiresReplaceServiceKey,
+						"Replace the VXC when a service key already in state changes.",
+						"Replace the VXC when a service key already in state changes.",
+					),
 				},
 			},
 			"product_name": schema.StringAttribute{
@@ -2764,6 +2768,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
+	state.ServiceKey = plan.ServiceKey
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state

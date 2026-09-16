@@ -9,11 +9,20 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// requiresReplaceServiceKey replaces the VXC only when state already holds a
+// service key. The API never returns the key, so an imported VXC has it null
+// and the first apply records the configured value in place.
+func requiresReplaceServiceKey(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	resp.RequiresReplace = !req.StateValue.IsNull()
+}
 
 // resolvePrefixListID looks up a prefix filter list by description on the
 // supplied slice (typically returned by vrouterPrefixFilterListsForEndpoint).
