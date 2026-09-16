@@ -105,20 +105,10 @@ func (r *mcrPrefixFilterListResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	// Extract planned entries for comparison during API response processing
-	var plannedEntries []*mcrPrefixFilterListEntryResourceModel
-	if !plan.Entries.IsNull() && !plan.Entries.IsUnknown() {
-		entryDiags := plan.Entries.ElementsAs(ctx, &plannedEntries, false)
-		resp.Diagnostics.Append(entryDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	// Update the model with API response, using plan for exact match comparison
+	// Update the model with the API response
 	var state mcrPrefixFilterListResourceModel
 	state.MCRID = plan.MCRID // Preserve the MCR ID from the plan
-	fromAPIDiags := state.fromAPIWithPlan(ctx, createdList, plannedEntries)
+	fromAPIDiags := state.fromAPI(ctx, createdList)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -141,15 +131,24 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Extract current state entries to use for exact match comparison
-	// This preserves exact match configurations during refresh
-	var stateEntries []*mcrPrefixFilterListEntryResourceModel
-	if !state.Entries.IsNull() && !state.Entries.IsUnknown() {
-		entryDiags := state.Entries.ElementsAs(ctx, &stateEntries, false)
-		resp.Diagnostics.Append(entryDiags...)
-		if resp.Diagnostics.HasError() {
+	// A decommissioned MCR answers the prefix list call with 400 "Not an active
+	// MCR service", so check the parent before asking for the list.
+	mcr, err := r.client.MCRService.GetMCR(ctx, state.MCRID.ValueString())
+	if err != nil {
+		if megaport.IsServiceNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
 			return
 		}
+		resp.Diagnostics.AddError(
+			"Error reading MCR",
+			fmt.Sprintf("Could not read MCR %s: %s", state.MCRID.ValueString(), err.Error()),
+		)
+		return
+	}
+	// A 200 carrying no product means the same thing as a not-found.
+	if mcr == nil || mcr.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
 	// Get the prefix filter list from API
@@ -171,9 +170,8 @@ func (r *mcrPrefixFilterListResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Update state from API response, using existing state for exact match comparison
-	// Pass stateEntries for normal read operations to enable exact match normalization, or nil for import to return raw API values
-	fromAPIDiags := state.fromAPIWithPlan(ctx, prefixFilterList, stateEntries)
+	// Update state from the API response
+	fromAPIDiags := state.fromAPI(ctx, prefixFilterList)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -225,18 +223,8 @@ func (r *mcrPrefixFilterListResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	// Extract planned entries for comparison during API response processing
-	var plannedEntries []*mcrPrefixFilterListEntryResourceModel
-	if !plan.Entries.IsNull() && !plan.Entries.IsUnknown() {
-		entryDiags := plan.Entries.ElementsAs(ctx, &plannedEntries, false)
-		resp.Diagnostics.Append(entryDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	// Update state from API response, using plan for exact match comparison
-	fromAPIDiags := state.fromAPIWithPlan(ctx, updatedList, plannedEntries)
+	// Update state from the API response
+	fromAPIDiags := state.fromAPI(ctx, updatedList)
 	resp.Diagnostics.Append(fromAPIDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -294,7 +282,8 @@ func (r *mcrPrefixFilterListResource) Delete(ctx context.Context, req resource.D
 	}
 }
 
-// ImportState imports the resource state.
+// ImportState seeds the identifiers. The framework calls Read next, which
+// populates the rest and removes the resource if the product is gone.
 func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Parse the import ID (format: mcr_uid:prefix_list_id)
 	mcrUID, prefixListID, err := parseImportID(req.ID)
@@ -309,44 +298,6 @@ func (r *mcrPrefixFilterListResource) ImportState(ctx context.Context, req resou
 	// Set the parsed values in the state
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("mcr_id"), mcrUID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), prefixListID)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Verify the resource exists by attempting to read it
-	prefixFilterList, err := r.client.MCRService.GetMCRPrefixFilterList(ctx, mcrUID, int(prefixListID))
-	if err != nil {
-		if apiErr, ok := err.(*megaport.ErrorResponse); ok {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				resp.Diagnostics.AddError(
-					"Resource not found",
-					fmt.Sprintf("Prefix filter list %d does not exist for MCR %s", prefixListID, mcrUID),
-				)
-				return
-			}
-		}
-		resp.Diagnostics.AddError(
-			"Error verifying resource during import",
-			fmt.Sprintf("Could not verify prefix filter list %d for MCR %s: %s", prefixListID, mcrUID, err.Error()),
-		)
-		return
-	}
-
-	// Set the imported resource state
-	var state mcrPrefixFilterListResourceModel
-	state.MCRID = types.StringValue(mcrUID)
-	fromAPIDiags := state.fromAPI(ctx, prefixFilterList)
-	resp.Diagnostics.Append(fromAPIDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Set last updated timestamp for imported resource
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-
-	// Save the imported state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // validatePrefixListEntry validates a single prefix list entry
