@@ -33,6 +33,7 @@ var (
 	_ resource.Resource                = &mcrResource{}
 	_ resource.ResourceWithConfigure   = &mcrResource{}
 	_ resource.ResourceWithImportState = &mcrResource{}
+	_ resource.ResourceWithModifyPlan  = &mcrResource{}
 
 	mcrPrefixFilterListModelAttributes = map[string]attr.Type{
 		"id":             types.Int64Type,
@@ -1259,6 +1260,17 @@ func (r *mcrResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		)
 		return
 	}
+}
+
+// ModifyPlan converges a plan whose only content is the unknowns left behind
+// by removing the deprecated prefix_filter_lists attribute.
+func (r *mcrResource) ModifyPlan(_ context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	restored, err := restoreComputedOnNoOpPlan(req.Plan.Raw, req.State.Raw, req.Config.Raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Modifying MCR Plan", err.Error())
+		return
+	}
+	resp.Plan.Raw = restored
 }
 
 // Configure adds the provider configured client to the resource.

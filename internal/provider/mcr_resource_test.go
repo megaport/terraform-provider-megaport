@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestAccMegaportMCR_Basic(t *testing.T) {
@@ -769,6 +771,153 @@ func TestAccMegaportMCR_UpdateASN(t *testing.T) {
 				Config:             configNoASN,
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
+// mcrComputedFromAPI lists the attributes fromAPIMCR rewrites from the API
+// response on every read. The migration plan marks all of them unknown, so a
+// converged plan has to leave each one populated. attribute_tags is left out:
+// fromAPIMCR leaves that map alone when the API sends no tags, so state can
+// hold a null there.
+var mcrComputedFromAPI = []string{
+	"aggregation_id",
+	"cancelable",
+	"company_name",
+	"contract_end_date",
+	"contract_start_date",
+	"lag_id",
+	"lag_primary",
+	"last_updated",
+	"live_date",
+	"provisioning_status",
+	"terminate_date",
+}
+
+// checkMCRComputedPresent asserts every attribute in mcrComputedFromAPI is in
+// state. An MCR with no live date reads back an empty one, so presence is the
+// check here, not a non-empty value. TestCheckResourceAttrSet rejects both.
+func checkMCRComputedPresent(name string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[name]
+		if !ok {
+			return fmt.Errorf("%s not found in state", name)
+		}
+		for _, attribute := range mcrComputedFromAPI {
+			if _, ok := rs.Primary.Attributes[attribute]; !ok {
+				return fmt.Errorf("%s: %s is missing from state", name, attribute)
+			}
+		}
+		return nil
+	}
+}
+
+// TestAccMegaportMCR_InlinePrefixListMigration covers GitHub issue #450. An MCR
+// that drops the deprecated prefix_filter_lists attribute has to plan clean
+// afterwards, with no lifecycle block in the configuration.
+func TestAccMegaportMCR_InlinePrefixListMigration(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMCRTestLocation(t, 1000)
+	mcrName := RandomTestName()
+	mcrNameRenamed := RandomTestName()
+	prefixFilterName := RandomTestName()
+	costCentreName := RandomTestName()
+
+	withInlineList := providerConfig + fmt.Sprintf(`
+	data "megaport_location" "test_location" {
+		id = %d
+	}
+
+	resource "megaport_mcr" "mcr" {
+		product_name         = "%s"
+		port_speed           = 1000
+		location_id          = data.megaport_location.test_location.id
+		contract_term_months = 12
+		cost_centre          = "%s"
+
+		prefix_filter_lists = [{
+			description    = "%s"
+			address_family = "IPv4"
+			entries = [{
+				action = "permit"
+				prefix = "10.0.1.0/24"
+				ge     = 25
+				le     = 32
+			}]
+		}]
+	}
+	`, locationID, mcrName, costCentreName, prefixFilterName)
+
+	// The migrated configuration. No prefix_filter_lists, no lifecycle block,
+	// and no empty list either.
+	migrated := func(name string) string {
+		return providerConfig + fmt.Sprintf(`
+	data "megaport_location" "test_location" {
+		id = %d
+	}
+
+	resource "megaport_mcr" "mcr" {
+		product_name         = "%s"
+		port_speed           = 1000
+		location_id          = data.megaport_location.test_location.id
+		contract_term_months = 12
+		cost_centre          = "%s"
+	}
+	`, locationID, name, costCentreName)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// The inline attribute still works, and a create populates every
+			// computed attribute the migration plan later marks unknown.
+			{
+				Config: withInlineList,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "1"),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.0.description", prefixFilterName),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "provisioning_status"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "company_name"),
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "last_updated"),
+					checkMCRComputedPresent("megaport_mcr.mcr"),
+				),
+			},
+			// Dropping the attribute converges. The test framework plans after
+			// every apply and fails the step on a non-empty plan, so this step
+			// is the regression guard for the reported bug.
+			{
+				Config: migrated(mcrName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrName),
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "prefix_filter_lists.#", "1"),
+					checkMCRComputedPresent("megaport_mcr.mcr"),
+				),
+			},
+			// The next two plans stay empty as well.
+			{
+				Config:   migrated(mcrName),
+				PlanOnly: true,
+			},
+			{
+				Config:   migrated(mcrName),
+				PlanOnly: true,
+			},
+			// A real change still refreshes the computed attributes. Pinning
+			// them here would fail the apply with an inconsistent result.
+			{
+				Config: migrated(mcrNameRenamed),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectUnknownValue("megaport_mcr.mcr", tfjsonpath.New("last_updated")),
+						plancheck.ExpectUnknownValue("megaport_mcr.mcr", tfjsonpath.New("provisioning_status")),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mcr.mcr", "product_name", mcrNameRenamed),
+					checkMCRComputedPresent("megaport_mcr.mcr"),
+				),
 			},
 		},
 	})
