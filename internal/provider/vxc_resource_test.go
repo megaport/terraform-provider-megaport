@@ -6133,7 +6133,7 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 			},
 		},
 		{
-			name: "aws_hosted_connection", vxc: readVXC(awsHCConn), wantPartner: "aws", wantWarning: "aws_config.type",
+			name: "aws_hosted_connection", vxc: readVXC(awsHCConn), wantPartner: "aws", wantWarning: "aws_config.type, aws_config.asn",
 			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
 				var aws vxcPartnerConfigAWSModel
 				decode(t, partner.AWSPartnerConfig, &aws)

@@ -941,7 +941,7 @@ func (orm *vxcResourceModel) fillCloudPartnerConfigOnImport(ctx context.Context,
 		})
 		diags.AddWarning(
 			summary,
-			"The import leaves aws_config.type null in b_end_partner_config, because the read of an AWS hosted connection does not carry it. "+recordsOnNextApply,
+			"The import leaves aws_config.type, aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, aws_config.amazon_ip_address, and aws_config.prefixes null in b_end_partner_config. The read of an AWS hosted connection carries none of them. "+recordsOnNextApply,
 		)
 	case megaport.CSPConnectionAzure:
 		partnerDiags, _, partnerObj = createAzurePartnerConfig(ctx, vxcPartnerConfigAzureModel{
