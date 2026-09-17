@@ -151,16 +151,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
-	// An import has no state or plan to take requested_product_uid from. Record
-	// the port the VXC runs on, which is what the plan proposes anyway. An empty
-	// string would read as a change against the configured port on every plan.
-	if plan == nil && orm.AEndConfiguration.IsNull() {
-		aEndRequestedProductUID = v.AEndConfiguration.UID
-	}
-
+	// An import has no requested_product_uid to take, so leave it null and let
+	// the first plan after the import propose the configured port. Recording the
+	// port the order landed on would pin a cloud end to it, because ModifyPlan
+	// holds a cloud end at the value state already carries.
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(aEndRequestedProductUID),
+		RequestedProductUID:   stringOrNull(aEndRequestedProductUID),
 		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
@@ -242,13 +239,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
-	if plan == nil && orm.BEndConfiguration.IsNull() {
-		bEndRequestedProductUID = v.BEndConfiguration.UID
-	}
-
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(bEndRequestedProductUID),
+		RequestedProductUID:   stringOrNull(bEndRequestedProductUID),
 		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),

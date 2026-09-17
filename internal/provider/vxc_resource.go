@@ -2504,6 +2504,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
 			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
 			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+		} else if aEndState.RequestedProductUID.IsNull() {
+			// An import leaves requested_product_uid null. Record what the
+			// configuration asked for, the way a create does. The current UID
+			// would be the port the order landed on, which the configuration
+			// never matches once a cloud partner moves the end.
+			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
 		} else {
 			aEndState.RequestedProductUID = aEndState.CurrentProductUID
 		}
@@ -2512,6 +2518,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		// Do not update the product UID if the partner is a CSP
 		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
 			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
+			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
+		} else if bEndState.RequestedProductUID.IsNull() {
 			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
 		} else {
 			bEndState.RequestedProductUID = bEndState.CurrentProductUID

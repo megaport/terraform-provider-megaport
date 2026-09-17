@@ -5852,10 +5852,11 @@ func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 	}
 }
 
-// TestFromAPIVXC_ImportRecordsRequestedProductUID pins requested_product_uid on
-// the import read. An import has no state or plan to take it from, and an empty
-// string there reads as a change against the configured port on every plan.
-func TestFromAPIVXC_ImportRecordsRequestedProductUID(t *testing.T) {
+// TestFromAPIVXC_ImportLeavesRequestedProductUIDNull pins requested_product_uid
+// on the import read. Recording the port the order landed on pins a cloud end to
+// it, because ModifyPlan holds a cloud end at the value state already carries,
+// and the order does not always land on the port the configuration asked for.
+func TestFromAPIVXC_ImportLeavesRequestedProductUIDNull(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -5865,40 +5866,49 @@ func TestFromAPIVXC_ImportRecordsRequestedProductUID(t *testing.T) {
 		BEndConfiguration: megaport.VXCEndConfiguration{UID: "b-end-partner-uid"},
 	}
 
-	requestedUID := func(t *testing.T, end types.Object) string {
+	requestedUID := func(t *testing.T, end types.Object) types.String {
 		t.Helper()
 		var cfg vxcEndConfigurationModel
 		if diags := end.As(ctx, &cfg, basetypes.ObjectAsOptions{}); diags.HasError() {
 			t.Fatalf("decode end config: %v", diags.Errors())
 		}
-		return cfg.RequestedProductUID.ValueString()
+		return cfg.RequestedProductUID
 	}
 
 	imported := &vxcResourceModel{}
 	if diags := imported.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
 		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
 	}
-	if got := requestedUID(t, imported.AEndConfiguration); got != "a-end-port-uid" {
-		t.Errorf("a_end.requested_product_uid = %q after import, want the A-End product UID", got)
+	if got := requestedUID(t, imported.AEndConfiguration); !got.IsNull() {
+		t.Errorf("a_end.requested_product_uid = %q after import, want it null", got.ValueString())
 	}
-	if got := requestedUID(t, imported.BEndConfiguration); got != "b-end-partner-uid" {
-		t.Errorf("b_end.requested_product_uid = %q after import, want the B-End product UID", got)
+	if got := requestedUID(t, imported.BEndConfiguration); !got.IsNull() {
+		t.Errorf("b_end.requested_product_uid = %q after import, want it null", got.ValueString())
 	}
 
-	// A managed refresh keeps the value state already holds, even an empty one.
-	// A cloud end that never requested a port has an empty value on purpose.
+	// A refresh after an import keeps it null. A managed refresh keeps the value
+	// state already holds.
 	end, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
-		RequestedProductUID: types.StringValue(""),
+		RequestedProductUID: types.StringNull(),
 	})
 	if diags.HasError() {
 		t.Fatalf("build end config: %v", diags.Errors())
 	}
-	refreshed := &vxcResourceModel{AEndConfiguration: end, BEndConfiguration: end}
+	managed, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
+		RequestedProductUID: types.StringValue("configured-port-uid"),
+	})
+	if diags.HasError() {
+		t.Fatalf("build end config: %v", diags.Errors())
+	}
+	refreshed := &vxcResourceModel{AEndConfiguration: end, BEndConfiguration: managed}
 	if diags := refreshed.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
 		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
 	}
-	if got := requestedUID(t, refreshed.BEndConfiguration); got != "" {
-		t.Errorf("b_end.requested_product_uid = %q after refresh, want it left empty", got)
+	if got := requestedUID(t, refreshed.AEndConfiguration); !got.IsNull() {
+		t.Errorf("a_end.requested_product_uid = %q after refresh, want it left null", got.ValueString())
+	}
+	if got := requestedUID(t, refreshed.BEndConfiguration); got.ValueString() != "configured-port-uid" {
+		t.Errorf("b_end.requested_product_uid = %q after refresh, want the value state holds", got.ValueString())
 	}
 }
 
