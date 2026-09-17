@@ -33,9 +33,10 @@ const updateTimeout = 120 * time.Second
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vxcResource{}
-	_ resource.ResourceWithConfigure   = &vxcResource{}
-	_ resource.ResourceWithImportState = &vxcResource{}
+	_ resource.Resource                   = &vxcResource{}
+	_ resource.ResourceWithConfigure      = &vxcResource{}
+	_ resource.ResourceWithImportState    = &vxcResource{}
+	_ resource.ResourceWithValidateConfig = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
 		"owner_uid":             types.StringType,
@@ -1232,6 +1233,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	checkAWSBGPPassword(ctx, plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	buyReq := &megaport.BuyVXCRequest{
 		VXCName:    plan.Name.ValueString(),
 		Term:       int(plan.ContractTermMonths.ValueInt64()),
@@ -2302,6 +2308,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	checkAWSBGPPassword(ctx, plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// If imported, partner config will be null in state. Copy plan values
 	// so downstream deserialization (.As()) does not fail on null objects.
 	if state.AEndPartnerConfig.IsNull() {
@@ -2827,6 +2838,195 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+}
+
+func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config vxcResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	checkAWSBGPPassword(ctx, config.AEndPartnerConfig, config.BEndPartnerConfig, &resp.Diagnostics)
+}
+
+// checkAWSBGPPassword rejects an MCR to AWS Direct Connect VXC whose explicit
+// BGP connection cannot share the MD5 key AWS receives. Megaport generates that
+// key when auth_key is blank and does not return it at order time, so the
+// provider cannot copy it into the vRouter session.
+//
+// Create and Update run this again on the plan. A password that comes from
+// another resource is unknown while the config is validated, and nothing
+// validates the config a second time once that value resolves.
+//
+// The schema lets either end carry the AWS config and the other the vRouter
+// config, so this checks both orderings.
+func checkAWSBGPPassword(ctx context.Context, aEndPartnerConfig, bEndPartnerConfig types.Object, diags *diag.Diagnostics) {
+	checkAWSBGPPasswordEnd(ctx, "a_end_partner_config", aEndPartnerConfig, bEndPartnerConfig, diags)
+	checkAWSBGPPasswordEnd(ctx, "b_end_partner_config", bEndPartnerConfig, aEndPartnerConfig, diags)
+}
+
+// bgpPasswordEntry locates one BGP connection's password within its parent
+// interfaces list, for building the diagnostic's attribute path.
+type bgpPasswordEntry struct {
+	interfaceIndex  int
+	connectionIndex int
+	password        types.String
+}
+
+// checkAWSBGPPasswordEnd checks vrouterEndConfig's vRouter or deprecated
+// a-end BGP connections against awsEndConfig's AWS config. vrouterEndPath is
+// the schema attribute name of vrouterEndConfig, used to build error paths.
+func checkAWSBGPPasswordEnd(ctx context.Context, vrouterEndPath string, vrouterEndConfig, awsEndConfig types.Object, diags *diag.Diagnostics) {
+	if vrouterEndConfig.IsNull() || vrouterEndConfig.IsUnknown() ||
+		awsEndConfig.IsNull() || awsEndConfig.IsUnknown() {
+		return
+	}
+
+	var awsEnd vxcPartnerConfigurationModel
+	if d := awsEndConfig.As(ctx, &awsEnd, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+	if awsEnd.Partner.ValueString() != "aws" || awsEnd.AWSPartnerConfig.IsNull() || awsEnd.AWSPartnerConfig.IsUnknown() {
+		return
+	}
+	var awsConfig vxcPartnerConfigAWSModel
+	if d := awsEnd.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+	if awsConfig.ConnectType.ValueString() != "AWS" {
+		return
+	}
+	authKey := awsConfig.AuthKey
+
+	var vrouterEnd vxcPartnerConfigurationModel
+	if d := vrouterEndConfig.As(ctx, &vrouterEnd, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+
+	var vrouterAttr string
+	var entries []bgpPasswordEntry
+	switch vrouterEnd.Partner.ValueString() {
+	case "vrouter":
+		vrouterAttr = "vrouter_config"
+		if vrouterEnd.VrouterPartnerConfig.IsNull() || vrouterEnd.VrouterPartnerConfig.IsUnknown() {
+			return
+		}
+		var vrouterConfig vxcPartnerConfigVrouterModel
+		if d := vrouterEnd.VrouterPartnerConfig.As(ctx, &vrouterConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+			return
+		}
+		entries = vrouterInterfaceBGPPasswords(ctx, vrouterConfig.Interfaces)
+	case "a-end":
+		vrouterAttr = "partner_a_end_config"
+		if vrouterEnd.PartnerAEndConfig.IsNull() || vrouterEnd.PartnerAEndConfig.IsUnknown() {
+			return
+		}
+		var aEndConfig vxcPartnerConfigAEndModel
+		if d := vrouterEnd.PartnerAEndConfig.As(ctx, &aEndConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+			return
+		}
+		entries = aEndInterfaceBGPPasswords(ctx, aEndConfig.Interfaces)
+	default:
+		return
+	}
+
+	const remedy = "Set `password` and the AWS end's `aws_config.auth_key` to the same value, or omit the vRouter end's explicit config so Megaport configures both ends with one generated key."
+	for _, entry := range entries {
+		if entry.password.IsUnknown() {
+			continue
+		}
+		passwordPath := path.Root(vrouterEndPath).AtName(vrouterAttr).AtName("interfaces").AtListIndex(entry.interfaceIndex).AtName("bgp_connections").AtListIndex(entry.connectionIndex).AtName("password")
+		// A blank password reaches the API as no password at all, the same
+		// as a null one, because the SDK tags it omitempty.
+		if entry.password.IsNull() || entry.password.ValueString() == "" {
+			diags.AddAttributeError(
+				passwordPath,
+				"Missing BGP password on an MCR to AWS Direct Connect VXC",
+				"AWS receives the MD5 key from `auth_key`, and Megaport generates one when it is blank. The provider cannot copy that key into this BGP connection, so the MCR session comes up without MD5 and BGP stays down. "+remedy,
+			)
+			continue
+		}
+		// The key is not known until the resource it comes from applies,
+		// so the pair cannot be compared yet.
+		if authKey.IsUnknown() {
+			continue
+		}
+		if authKey.IsNull() || entry.password.ValueString() != authKey.ValueString() {
+			diags.AddAttributeError(
+				passwordPath,
+				"BGP password does not match auth_key on an MCR to AWS Direct Connect VXC",
+				"The MCR BGP session uses `password` and the AWS virtual interface uses `auth_key`. BGP only comes up when both carry the same MD5 key. "+remedy,
+			)
+		}
+	}
+}
+
+// vrouterInterfaceBGPPasswords extracts each BGP connection's password from a
+// vrouter_config.interfaces list. The vrouter interface and BGP connection
+// attrs match vxcPartnerConfigInterfaceModel and bgpConnectionConfigModel
+// exactly, so this reuses the same typed decode the rest of the file uses.
+func vrouterInterfaceBGPPasswords(ctx context.Context, interfaces types.List) []bgpPasswordEntry {
+	if interfaces.IsNull() || interfaces.IsUnknown() {
+		return nil
+	}
+	var ifaceModels []*vxcPartnerConfigInterfaceModel
+	if interfaces.ElementsAs(ctx, &ifaceModels, true).HasError() {
+		return nil
+	}
+	var entries []bgpPasswordEntry
+	for i, iface := range ifaceModels {
+		if iface == nil || iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+			continue
+		}
+		var bgpConnections []*bgpConnectionConfigModel
+		if iface.BgpConnections.ElementsAs(ctx, &bgpConnections, true).HasError() {
+			continue
+		}
+		for j, bgpConnection := range bgpConnections {
+			if bgpConnection == nil {
+				continue
+			}
+			entries = append(entries, bgpPasswordEntry{i, j, bgpConnection.Password})
+		}
+	}
+	return entries
+}
+
+// aEndInterfaceBGPPasswords extracts each BGP connection's password from a
+// deprecated partner_a_end_config.interfaces list. Its interface and BGP
+// connection attrs (vxcPartnerConfigAEndInterfaceAttrs, bgpConnectionConfig)
+// are narrower than the vrouter shape's, so the framework's exact
+// struct-to-object field match rejects them against
+// vxcPartnerConfigInterfaceModel/bgpConnectionConfigModel. This reads the one
+// field it needs off each object's attrs map instead of adding structs that
+// would exist only for this check.
+func aEndInterfaceBGPPasswords(ctx context.Context, interfaces types.List) []bgpPasswordEntry {
+	if interfaces.IsNull() || interfaces.IsUnknown() {
+		return nil
+	}
+	var ifaceObjs []types.Object
+	if interfaces.ElementsAs(ctx, &ifaceObjs, true).HasError() {
+		return nil
+	}
+	var entries []bgpPasswordEntry
+	for i, iface := range ifaceObjs {
+		bgpConnections, ok := iface.Attributes()["bgp_connections"].(types.List)
+		if !ok || bgpConnections.IsNull() || bgpConnections.IsUnknown() {
+			continue
+		}
+		var connObjs []types.Object
+		if bgpConnections.ElementsAs(ctx, &connObjs, true).HasError() {
+			continue
+		}
+		for j, conn := range connObjs {
+			password, ok := conn.Attributes()["password"].(types.String)
+			if !ok {
+				continue
+			}
+			entries = append(entries, bgpPasswordEntry{i, j, password})
+		}
+	}
+	return entries
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
