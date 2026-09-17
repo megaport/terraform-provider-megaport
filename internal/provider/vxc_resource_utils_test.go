@@ -181,7 +181,6 @@ func TestCreateVrouterPartnerConfig_DhcpPools(t *testing.T) {
 	assert.Equal(t, "Office LAN DHCP pool", full.Description)
 	assert.Equal(t, []string{"1.1.1.1", "8.8.8.8"}, full.DnsServers)
 
-	// The optional fields stay empty so omitempty keeps them out of the order.
 	require.Len(t, vrouterConfig.Interfaces[1].DhcpPools, 1)
 	minimal := vrouterConfig.Interfaces[1].DhcpPools[0]
 	assert.Equal(t, "192.168.2.0/24", minimal.Network)
@@ -594,6 +593,7 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 	assert.True(t, ifaces[0].PacketFilterIn.IsNull())
 	assert.True(t, ifaces[0].PacketFilterOut.IsNull())
 	assert.True(t, ifaces[0].IpSecTunnelOptions.IsNull(), "the PSK is write-only, so no tunnel options come back")
+	assert.True(t, ifaces[0].DhcpPools.IsNull(), "megaportgo drops the pools the API returns")
 	assert.True(t, ifaces[0].NatIPAddresses.IsNull())
 }
 
@@ -712,7 +712,7 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	// A user writing this end by hand cannot see these either, so the warning
 	// has to reach a skipped end as well as a rebuilt one.
 	assert.Equal(t, "Import complete, some settings need adding by hand", diags.Warnings()[1].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "dhcp_pools", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
 		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")

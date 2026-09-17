@@ -310,7 +310,7 @@ var (
 							},
 						},
 						"dhcp_pools": schema.ListNestedAttribute{
-							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface, and rejects a pool when the far end of the VXC is Transit or IX. The API does not return the pool on read, so it is never refreshed into state and stays null on import.",
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import.",
 							Optional:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
@@ -333,9 +333,6 @@ var (
 									"description": schema.StringAttribute{
 										Description: "Description for the DHCP pool. Maximum 100 characters.",
 										Optional:    true,
-										Validators: []validator.String{
-											stringvalidator.LengthAtMost(100),
-										},
 									},
 									"dns_servers": schema.ListAttribute{
 										Description: "IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.",

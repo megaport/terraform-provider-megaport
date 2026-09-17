@@ -456,8 +456,8 @@ type vxcPartnerConfigInterfaceModel struct {
 	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
 }
 
-// dhcpPoolModel maps a single dhcp_pools entry. The API does not return pools
-// on read, so the provider only ever writes it to an order.
+// dhcpPoolModel maps a single dhcp_pools entry. The SDK read type drops the
+// pools the API returns, so the provider only ever writes it to an order.
 type dhcpPoolModel struct {
 	Network        types.String `tfsdk:"network"`
 	StartIPAddress types.String `tfsdk:"start_ip_address"`
