@@ -118,10 +118,10 @@ type mveProbeOpts struct {
 }
 
 // findMVETestLocation returns a staging location with confirmed Aruba SMALL MVE
-// capacity in the "red" diversity zone. Each call returns a different location.
-//
-//nolint:unparam // minCPUCores kept for future use when API populates the field
-func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
+// capacity in the "red" diversity zone, validated for vnicCount vNICs. Each call
+// returns a different location. Pass the maximum vNIC count the test will ever
+// provision so the probe matches the final config.
+func findMVETestLocation(t *testing.T, vnicCount int) (id int, name string) {
 	return findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.ArubaConfig{
 			Vendor:      "aruba",
@@ -133,7 +133,7 @@ func findMVETestLocation(t *testing.T, minCPUCores int) (id int, name string) {
 			SystemTag:   "Preconfiguration-aruba-test-1",
 		},
 		diversityZone: "red",
-		vnicCount:     2,
+		vnicCount:     vnicCount,
 	})
 }
 
