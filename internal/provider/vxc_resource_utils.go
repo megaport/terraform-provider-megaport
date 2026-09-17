@@ -887,14 +887,32 @@ func (orm *vxcResourceModel) fillBEndPartnerConfigOnImport(ctx context.Context, 
 			matches = append(matches, c)
 		}
 	}
+	const notRecorded = "b_end_partner_config not recorded on import"
 	switch len(matches) {
 	case 0:
+		if bEndCSPConnectionPresent(v) {
+			diags.AddWarning(
+				notRecorded,
+				"The provider cannot rebuild b_end_partner_config from the B-End connection this VXC uses. Add the block to the configuration by hand.",
+			)
+		}
 		return diags
 	case 1:
 	default:
 		diags.AddWarning(
-			"b_end_partner_config not recorded on import",
+			notRecorded,
 			fmt.Sprintf("The VXC has %d B-End connections the import can read, so the provider cannot tell which one to record. Add b_end_partner_config to the configuration by hand.", len(matches)),
+		)
+		return diags
+	}
+
+	// A caller without permission on the B-End gets the connection stripped back
+	// to its resource name and connect type, which would rebuild a block holding
+	// nothing but the partner name.
+	if !bEndImportCarriesSettings(matches[0]) {
+		diags.AddWarning(
+			notRecorded,
+			"The read of the B-End connection carries none of the settings b_end_partner_config needs. Add the block to the configuration by hand.",
 		)
 		return diags
 	}
@@ -970,6 +988,41 @@ func bEndImportCSPConnection(c megaport.CSPConnectionConfig) bool {
 		return conn.ResourceName == "b_csp_connection"
 	case megaport.CSPConnectionOracle:
 		return conn.ResourceName == "b_csp_connection"
+	}
+	return false
+}
+
+// bEndCSPConnectionPresent reports whether the VXC has a B-End CSP connection at
+// all, whatever its partner. It separates a VXC whose B-End the import cannot
+// rebuild, such as IBM, from one that has no B-End CSP connection to rebuild.
+func bEndCSPConnectionPresent(v *megaport.VXC) bool {
+	for _, c := range v.Resources.CSPConnection.CSPConnection {
+		if ibm, ok := c.(megaport.CSPConnectionIBM); ok && ibm.ResourceName == "b_csp_connection" {
+			return true
+		}
+		if bEndImportCSPConnection(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// bEndImportCarriesSettings reports whether c holds any setting the import
+// records. A transit config carries none by design, so it always qualifies.
+func bEndImportCarriesSettings(c megaport.CSPConnectionConfig) bool {
+	switch conn := c.(type) {
+	case megaport.CSPConnectionTransit:
+		return true
+	case megaport.CSPConnectionAWS:
+		return conn.Type != "" || conn.OwnerAccount != "" || conn.Name != ""
+	case megaport.CSPConnectionAWSHC:
+		return conn.OwnerAccount != "" || conn.Name != ""
+	case megaport.CSPConnectionAzure:
+		return conn.ServiceKey != ""
+	case megaport.CSPConnectionGoogle:
+		return conn.PairingKey != ""
+	case megaport.CSPConnectionOracle:
+		return conn.VirtualCircuitId != ""
 	}
 	return false
 }

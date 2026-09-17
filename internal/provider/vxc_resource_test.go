@@ -5568,11 +5568,13 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 
 	// wantAEnd and wantBEnd name the partner the error must quote, or are empty
 	// when that end accepts the change. wantWarnPartner names the partner the
-	// post-import warning must quote, on both ends.
+	// post-import warning must quote, on both ends. rebuiltOnImport marks a
+	// state the import rebuilt, which is the only state a null may be filled in.
 	tests := []struct {
 		name            string
 		state           tftypes.Value
 		plan            tftypes.Value
+		rebuiltOnImport bool
 		wantAEnd        string
 		wantBEnd        string
 		wantWarnPartner string
@@ -5672,9 +5674,18 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			// An imported AWS VXC records prefixes as null. Setting it fills
 			// the gap: recorded and warned about, like the null-state case.
 			name:            "csp_fills_null_prefixes",
+			rebuiltOnImport: true,
 			state:           ty.awsVal(knownKey("same")),
 			plan:            ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": knownKey("same"), "prefixes": knownKey("10.0.0.0/24")}),
 			wantWarnPartner: "aws",
+		},
+		{
+			// The same fill on a state the user wrote, not one the import
+			// rebuilt, is a change the provider cannot send.
+			name:     "csp_fills_null_without_import",
+			state:    ty.awsVal(knownKey("same")),
+			plan:     ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": knownKey("same"), "prefixes": knownKey("10.0.0.0/24")}),
+			wantAEnd: "aws", wantBEnd: "aws",
 		},
 		{
 			name:     "csp_fills_null_and_changes_value",
@@ -5699,7 +5710,8 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			// The shape the import records for an AWS VIF, against the
 			// configuration the user then writes. The cloud-assigned values
 			// are null in state, so the apply records them and warns.
-			name: "csp_import_shape_then_user_config",
+			name:            "csp_import_shape_then_user_config",
+			rebuiltOnImport: true,
 			state: ty.awsFieldsVal(map[string]tftypes.Value{
 				"connect_type": knownKey("AWS"), "type": knownKey("private"),
 				"owner_account": knownKey("123456789012"), "name": knownKey("my-vif"),
@@ -5713,7 +5725,8 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 		},
 		{
 			// An AWS hosted connection import leaves type null.
-			name: "csp_fills_null_awshc_type",
+			name:            "csp_fills_null_awshc_type",
+			rebuiltOnImport: true,
 			state: ty.awsFieldsVal(map[string]tftypes.Value{
 				"connect_type": knownKey("AWSHC"), "owner_account": knownKey("123456789012"), "name": knownKey("my-hc"),
 			}),
@@ -5725,6 +5738,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 		},
 		{
 			name:            "csp_fills_null_port_choice",
+			rebuiltOnImport: true,
 			state:           ty.azureFieldsVal(map[string]tftypes.Value{"service_key": knownKey("svc")}),
 			plan:            ty.azureFieldsVal(map[string]tftypes.Value{"service_key": knownKey("svc"), "port_choice": knownKey("primary")}),
 			wantWarnPartner: "azure",
@@ -5766,7 +5780,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 				checkPartnerConfigUpdatable(ctx,
 					ty.objectValue(ctx, t, tc.plan),
 					ty.objectValue(ctx, t, tc.state),
-					endLabel, root, &diags)
+					endLabel, root, tc.rebuiltOnImport, &diags)
 
 				wantError := ""
 				mustContain := []string{endLabel}
@@ -6382,6 +6396,20 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 		},
 		{name: "two_cloud_b_ends_warns", vxc: readVXC(awsConn, googleConn), wantWarning: "not recorded"},
 		{name: "transit_and_cloud_b_ends_warns", vxc: readVXC(awsConn, megaport.CSPConnectionTransit{ConnectType: "TRANSIT", ResourceName: "b_csp_connection"}), wantWarning: "not recorded"},
+		{
+			// A caller without permission on the B-End reads the connection
+			// stripped back to its resource name and connect type.
+			name:        "stripped_b_end_warns",
+			vxc:         readVXC(megaport.CSPConnectionAWS{ConnectType: "AWS", ResourceName: "b_csp_connection"}),
+			wantWarning: "none of the settings",
+		},
+		{
+			// A partner the import cannot rebuild, such as IBM, still has a
+			// B-End the user has to write by hand.
+			name:        "unsupported_partner_warns",
+			vxc:         readVXC(megaport.CSPConnectionIBM{ConnectType: "IBM", ResourceName: "b_csp_connection"}),
+			wantWarning: "cannot rebuild",
+		},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(awsConn)},
 	}
 
@@ -6405,8 +6433,8 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 
 			resp := fwresource.ReadResponse{State: state}
 			r.Read(ctx, fwresource.ReadRequest{State: state}, &resp)
-			if resp.Diagnostics.HasError() {
-				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics.Errors())
+			if errs := errorsWithoutUninitializedPrivateState(resp.Diagnostics); len(errs) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", errs)
 			}
 			warnings := resp.Diagnostics.Warnings()
 			switch {
@@ -6436,4 +6464,18 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 			tc.check(t, partner)
 		})
 	}
+}
+
+// errorsWithoutUninitializedPrivateState drops the diagnostic a private state
+// write raises when nothing initialized the store. The framework initializes it
+// on every real call, however its type is internal, so a unit test cannot.
+func errorsWithoutUninitializedPrivateState(diags diag.Diagnostics) []diag.Diagnostic {
+	var errs []diag.Diagnostic
+	for _, d := range diags.Errors() {
+		if d.Summary() == "Uninitialized ProviderData" {
+			continue
+		}
+		errs = append(errs, d)
+	}
+	return errs
 }

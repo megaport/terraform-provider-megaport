@@ -31,6 +31,12 @@ import (
 // Update Timeout for VXC Update Verification - will be configurable in future release.
 const updateTimeout = 120 * time.Second
 
+// Private state key marking a b_end_partner_config the import rebuilt from the
+// API. Only such a config may have a null setting filled on a later apply. The
+// key stays set for the life of the resource, because the settings the import
+// left null are never sent, however many applies pass.
+const cloudPartnerConfigFromImportKey = "cloud_partner_config_from_import"
+
 // Ensure the implementation satisfies the expected interfaces.
 var (
 	_ resource.Resource                = &vxcResource{}
@@ -2106,6 +2112,9 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 			return
 		}
 		resp.Diagnostics.Append(state.fillBEndPartnerConfigOnImport(ctx, vxc)...)
+		if _, isCSP := classifyPartner(ctx, state.BEndPartnerConfig, &resp.Diagnostics); isCSP {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, cloudPartnerConfigFromImportKey, []byte("true"))...)
+		}
 	}
 
 	// Set refreshed state
@@ -2296,8 +2305,13 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerChange = true
 	}
 
-	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &resp.Diagnostics)
-	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &resp.Diagnostics)
+	rebuilt, privateDiags := req.Private.GetKey(ctx, cloudPartnerConfigFromImportKey)
+	resp.Diagnostics.Append(privateDiags...)
+
+	// An import never rebuilds a cloud partner config on the A-End, so nothing
+	// there can hold a null the provider left.
+	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", false, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", rebuilt != nil, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -3156,8 +3170,8 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 // change to an end whose live config is a cloud partner, and a partner the
 // provider does not send for that end. A cloud partner added to an end that
 // has none in state is recorded instead, and warns. So is a value set on a
-// cloud partner setting the import left null.
-func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
+// cloud partner setting an import left null, which rebuiltOnImport selects.
+func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, rebuiltOnImport bool, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
 	}
@@ -3167,8 +3181,10 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 	// A null state with a cloud partner in the plan is the post-import case:
 	// the config is recorded, not sent. Warn here rather than in ModifyPlan,
 	// which Terraform runs on both the plan walk and the apply walk. A plan
-	// that only fills settings the import left null is the same case.
-	if planCSP && (statePartnerConfig.IsNull() || (stateCSP && onlyFillsNulls(planPartnerConfig, statePartnerConfig))) {
+	// that only fills settings the import left null is the same case. A config
+	// the user wrote, rather than an import rebuilt, left those settings out on
+	// purpose, so filling one there is a change the provider cannot send.
+	if planCSP && (statePartnerConfig.IsNull() || (stateCSP && rebuiltOnImport && onlyFillsNulls(planPartnerConfig, statePartnerConfig))) {
 		diags.AddAttributeWarning(
 			path.Root(partnerConfigPathRoot),
 			"Partner configuration is recorded in state only",
@@ -3205,20 +3221,22 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 // onlyFillsNulls reports whether plan differs from state only where state is
 // null. Every value set in state must be unchanged in plan. It walks nested
 // objects. A list that differs at all counts as a change, so a plan that fills
-// a null inside a list is not treated as a fill.
+// a null inside a list is not treated as a fill. A whole nested block the state
+// does not have is a change too: the import records every block it read, so one
+// missing from state was never on the live VXC.
 func onlyFillsNulls(plan, state attr.Value) bool {
-	if state.IsNull() || plan.Equal(state) {
+	if plan.Equal(state) {
 		return true
 	}
 	if plan.IsNull() || plan.IsUnknown() {
 		return false
 	}
-	planObj, ok := plan.(types.Object)
-	if !ok {
-		return false
+	planObj, planIsObj := plan.(types.Object)
+	stateObj, stateIsObj := state.(types.Object)
+	if !planIsObj || !stateIsObj {
+		return state.IsNull()
 	}
-	stateObj, ok := state.(types.Object)
-	if !ok {
+	if stateObj.IsNull() {
 		return false
 	}
 	planAttrs := planObj.Attributes()
