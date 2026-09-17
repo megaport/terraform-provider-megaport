@@ -103,13 +103,23 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	var aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndVnicIndex, bEndVnicIndex *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
+	// Neither end has a requested_product_uid until state or plan actually
+	// supplies one. An import supplies neither, so it stays null: recording
+	// the port the order landed on would pin a cloud end to it, because
+	// ModifyPlan holds a cloud end at the value state already carries. A
+	// managed refresh must not collapse this with a cloud end that legitimately
+	// never requested a port, which state already holds as an empty string.
+	aEndRequestedProductUIDNull, bEndRequestedProductUIDNull := true, true
 
 	// First, try to get values from existing state
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
 		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, aEndDiags...)
-		aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+		if !existingAEnd.RequestedProductUID.IsNull() {
+			aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+			aEndRequestedProductUIDNull = false
+		}
 		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingAEnd.OrderedVLAN.ValueInt64()
 			aEndOrderedVLAN = &vlan
@@ -134,8 +144,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		planDiags := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, planDiags...)
 
-		if aEndRequestedProductUID == "" && !planAEnd.RequestedProductUID.IsNull() {
+		if aEndRequestedProductUIDNull && !planAEnd.RequestedProductUID.IsNull() {
 			aEndRequestedProductUID = planAEnd.RequestedProductUID.ValueString()
+			aEndRequestedProductUIDNull = false
 		}
 		if aEndOrderedVLAN == nil && !planAEnd.OrderedVLAN.IsNull() && !planAEnd.OrderedVLAN.IsUnknown() {
 			vlan := planAEnd.OrderedVLAN.ValueInt64()
@@ -151,13 +162,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
-	// An import has no requested_product_uid to take, so leave it null and let
-	// the first plan after the import propose the configured port. Recording the
-	// port the order landed on would pin a cloud end to it, because ModifyPlan
-	// holds a cloud end at the value state already carries.
+	aEndRequestedProductUIDValue := types.StringNull()
+	if !aEndRequestedProductUIDNull {
+		aEndRequestedProductUIDValue = types.StringValue(aEndRequestedProductUID)
+	}
+
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		RequestedProductUID:   stringOrNull(aEndRequestedProductUID),
+		RequestedProductUID:   aEndRequestedProductUIDValue,
 		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
@@ -213,7 +225,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
 			bEndVnicIndex = &idx
 		}
-		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+		if !existingBEnd.RequestedProductUID.IsNull() {
+			bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+			bEndRequestedProductUIDNull = false
+		}
 	}
 
 	// If plan is provided and state values are empty, use plan values for B-End.
@@ -222,8 +237,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		planDiags := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, planDiags...)
 
-		if bEndRequestedProductUID == "" && !planBEnd.RequestedProductUID.IsNull() {
+		if bEndRequestedProductUIDNull && !planBEnd.RequestedProductUID.IsNull() {
 			bEndRequestedProductUID = planBEnd.RequestedProductUID.ValueString()
+			bEndRequestedProductUIDNull = false
 		}
 		if bEndOrderedVLAN == nil && !planBEnd.OrderedVLAN.IsNull() && !planBEnd.OrderedVLAN.IsUnknown() {
 			vlan := planBEnd.OrderedVLAN.ValueInt64()
@@ -239,9 +255,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
+	bEndRequestedProductUIDValue := types.StringNull()
+	if !bEndRequestedProductUIDNull {
+		bEndRequestedProductUIDValue = types.StringValue(bEndRequestedProductUID)
+	}
+
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		RequestedProductUID:   stringOrNull(bEndRequestedProductUID),
+		RequestedProductUID:   bEndRequestedProductUIDValue,
 		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),

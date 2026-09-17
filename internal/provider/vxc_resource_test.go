@@ -5887,7 +5887,10 @@ func TestFromAPIVXC_ImportLeavesRequestedProductUIDNull(t *testing.T) {
 	}
 
 	// A refresh after an import keeps it null. A managed refresh keeps the value
-	// state already holds.
+	// state already holds, even an empty one: a cloud end that never requested a
+	// port has an empty value on purpose, and turning that into null would let
+	// ModifyPlan's state-and-plan-both-null case backfill it from the current
+	// product UID, proposing a diff on a resource nothing actually changed on.
 	end, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
 		RequestedProductUID: types.StringNull(),
 	})
@@ -5896,6 +5899,12 @@ func TestFromAPIVXC_ImportLeavesRequestedProductUIDNull(t *testing.T) {
 	}
 	managed, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
 		RequestedProductUID: types.StringValue("configured-port-uid"),
+	})
+	if diags.HasError() {
+		t.Fatalf("build end config: %v", diags.Errors())
+	}
+	neverRequested, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
+		RequestedProductUID: types.StringValue(""),
 	})
 	if diags.HasError() {
 		t.Fatalf("build end config: %v", diags.Errors())
@@ -5909,6 +5918,17 @@ func TestFromAPIVXC_ImportLeavesRequestedProductUIDNull(t *testing.T) {
 	}
 	if got := requestedUID(t, refreshed.BEndConfiguration); got.ValueString() != "configured-port-uid" {
 		t.Errorf("b_end.requested_product_uid = %q after refresh, want the value state holds", got.ValueString())
+	}
+
+	neverRequestedRefreshed := &vxcResourceModel{AEndConfiguration: neverRequested, BEndConfiguration: neverRequested}
+	if diags := neverRequestedRefreshed.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
+	}
+	if got := requestedUID(t, neverRequestedRefreshed.AEndConfiguration); got.IsNull() || got.ValueString() != "" {
+		t.Errorf("a_end.requested_product_uid = %v after refresh, want the empty value state holds", got)
+	}
+	if got := requestedUID(t, neverRequestedRefreshed.BEndConfiguration); got.IsNull() || got.ValueString() != "" {
+		t.Errorf("b_end.requested_product_uid = %v after refresh, want the empty value state holds", got)
 	}
 }
 
