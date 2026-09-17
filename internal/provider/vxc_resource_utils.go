@@ -70,7 +70,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	orm.SecondaryName = types.StringValue(v.SecondaryName)
 	orm.UsageAlgorithm = types.StringValue(v.UsageAlgorithm)
 	orm.CreatedBy = types.StringValue(v.CreatedBy)
-	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
+	// megalith only sets up billing once the order is fully approved, so a VXC
+	// still awaiting approval reports the default 1-month term. Keep the
+	// configured value until the order is approved, or Terraform rejects the
+	// apply as an inconsistent result.
+	if !vxcOrderPendingApproval(v.VXCApproval) || orm.ContractTermMonths.IsNull() {
+		orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
+	}
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
 	orm.CompanyName = types.StringValue(v.CompanyName)
 	orm.Shutdown = types.BoolValue(v.Shutdown)
