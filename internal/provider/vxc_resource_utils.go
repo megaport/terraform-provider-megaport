@@ -764,14 +764,11 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPartnerConfigAEndModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	aEndMegaportConfig := &megaport.VXCOrderVrouterPartnerConfig{}
-	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
+	ifaceModels := []*vxcPartnerConfigAEndInterfaceModel{}
 	ifaceDiags := partnerConfigAEndModel.Interfaces.ElementsAs(ctx, &ifaceModels, true)
 	diags.Append(ifaceDiags...)
 	for _, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
-		if !iface.IpMtu.IsNull() {
-			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
-		}
 		if !iface.IPAddresses.IsNull() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
@@ -807,7 +804,7 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 			}
 		}
 		if !iface.BgpConnections.IsNull() {
-			bgpConnections := []*bgpConnectionConfigModel{}
+			bgpConnections := []*aEndBgpConnectionConfigModel{}
 			bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 			diags.Append(bgpDiags...)
 			for _, bgpConnection := range bgpConnections {
