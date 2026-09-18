@@ -612,11 +612,15 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"service_key": schema.StringAttribute{
-				Description: "The service key of the VXC.",
+				Description: "The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. That apply only records the key in state: it does not send the key to Megaport, so set it to the key the live VXC was ordered with. Changing a key already in state replaces the VXC. A VXC imported with an earlier provider version plans a replace when the key is added: remove it from state and import it again first.",
 				Optional:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplaceIf(
+						requiresReplaceServiceKey,
+						"Replace the VXC when a service key already in state changes.",
+						"Replace the VXC when a service key already in state changes.",
+					),
 				},
 			},
 			"product_name": schema.StringAttribute{
@@ -2137,6 +2141,16 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		if _, isCSP := classifyPartner(ctx, state.BEndPartnerConfig, &resp.Diagnostics); isCSP {
 			resp.Diagnostics.Append(resp.Private.SetKey(ctx, cloudPartnerConfigFromImportKey, []byte("true"))...)
 		}
+
+		// service_key is order-time only, so the API never returns it: this
+		// flag is the only way the plan modifier can tell a null key that
+		// might still be live on the imported VXC from one that never
+		// existed. Update clears it once the key is recorded. Terraform
+		// always supplies Private; nil only happens when a test calls Read
+		// directly without going through the protocol server.
+		if resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, []byte("true"))...)
+		}
 	}
 
 	// Set refreshed state
@@ -2808,6 +2822,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
+	state.ServiceKey = plan.ServiceKey
+	if !plan.ServiceKey.IsNull() && resp.Private != nil {
+		imported, privDiags := resp.Private.GetKey(ctx, serviceKeyImportedPrivateKey)
+		resp.Diagnostics.Append(privDiags...)
+		if len(imported) > 0 {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("service_key"),
+				"Service key is recorded in state only",
+				"Terraform records the service key in state. The API accepts a service key only when the VXC is ordered, so this does not change the live VXC. Set it to the key the VXC was ordered with.",
+			)
+			// The key is now recorded in state, so the plan modifier no
+			// longer needs the import flag to tell this VXC apart from one
+			// that was never given a key.
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, nil)...)
+		}
+	}
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
