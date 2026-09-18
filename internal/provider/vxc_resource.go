@@ -200,10 +200,20 @@ var (
 		"vlan":                  types.Int64Type,
 		"bgp_connections":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
 		"ip_sec_tunnel_options": types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs),
+		"dhcp_pools":            types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 		"description":           types.StringType,
 		"interface_type":        types.StringType,
 		"packet_filter_in":      types.Int64Type,
 		"packet_filter_out":     types.Int64Type,
+	}
+
+	dhcpPoolAttrs = map[string]attr.Type{
+		"network":          types.StringType,
+		"start_ip_address": types.StringType,
+		"end_ip_address":   types.StringType,
+		"default_gateway":  types.StringType,
+		"description":      types.StringType,
+		"dns_servers":      types.ListType{}.WithElementType(types.StringType),
 	}
 
 	ipSecTunnelOptionsAttrs = map[string]attr.Type{
@@ -438,11 +448,23 @@ type vxcPartnerConfigInterfaceModel struct {
 	Bfd                types.Object `tfsdk:"bfd"`
 	BgpConnections     types.List   `tfsdk:"bgp_connections"`
 	IpSecTunnelOptions types.Object `tfsdk:"ip_sec_tunnel_options"`
+	DhcpPools          types.List   `tfsdk:"dhcp_pools"`
 	VLAN               types.Int64  `tfsdk:"vlan"`
 	Description        types.String `tfsdk:"description"`
 	InterfaceType      types.String `tfsdk:"interface_type"`
 	PacketFilterIn     types.Int64  `tfsdk:"packet_filter_in"`
 	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
+}
+
+// dhcpPoolModel maps a single dhcp_pools entry. The SDK read type drops the
+// pools the API returns, so the provider only ever writes it to an order.
+type dhcpPoolModel struct {
+	Network        types.String `tfsdk:"network"`
+	StartIPAddress types.String `tfsdk:"start_ip_address"`
+	EndIPAddress   types.String `tfsdk:"end_ip_address"`
+	DefaultGateway types.String `tfsdk:"default_gateway"`
+	Description    types.String `tfsdk:"description"`
+	DNSServers     types.List   `tfsdk:"dns_servers"`
 }
 
 // ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
@@ -2197,7 +2219,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
 		diags.AddWarning(
 			"Import complete, some settings need adding by hand",
-			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Three more settings have no attribute at all: a DHCP pool, eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
+			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out, dhcp_pools or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Two more settings have no attribute at all: eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
 		)
 	}
 

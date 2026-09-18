@@ -5686,6 +5686,132 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_DhcpPool orders an MCR to Port VXC whose A-End vrouter
+// config carries one subInterface with an address range and a DHCP pool inside
+// it, then changes the pool. It proves the API accepts both orders and that the
+// attribute produces no drift. State is built from the plan, never from a read,
+// so these attribute checks do not prove the request mapping;
+// TestCreateVrouterPartnerConfig_DhcpPools covers that. The B-End is a Port:
+// the API rejects a pool when the far end is Transit or IX.
+func TestAccMegaportVXC_DhcpPool(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	mkConfig := func(pool string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.loc.id
+			contract_term_months = 1
+			port_speed           = 1000
+			asn                  = 64555
+		}
+
+		resource "megaport_port" "port" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+
+		resource "megaport_vxc" "dhcp_vxc" {
+			product_name         = "%s"
+			rate_limit           = 100
+			contract_term_months = 1
+
+			a_end = {
+				requested_product_uid = megaport_mcr.mcr.product_uid
+			}
+
+			a_end_partner_config = {
+				partner = "vrouter"
+				vrouter_config = {
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["192.168.1.1/24"]
+							dhcp_pools = [%s
+							]
+						},
+					]
+				}
+			}
+
+			b_end = {
+				requested_product_uid = megaport_port.port.product_uid
+				ordered_vlan          = 100
+			}
+		}
+	`, locs[0], mcrName, portName, vxcName, pool)
+	}
+
+	initialPool := `
+								{
+									network          = "192.168.1.0/24"
+									start_ip_address = "192.168.1.10"
+									end_ip_address   = "192.168.1.100"
+									default_gateway  = "192.168.1.1"
+									description      = "tf acc test pool"
+									dns_servers      = ["1.1.1.1", "8.8.8.8"]
+								},`
+
+	updatedPool := `
+								{
+									network          = "192.168.1.0/24"
+									start_ip_address = "192.168.1.20"
+									end_ip_address   = "192.168.1.200"
+									default_gateway  = "192.168.1.1"
+									description      = "tf acc test pool updated"
+									dns_servers      = ["9.9.9.9"]
+								},`
+
+	poolAttr := func(name string) string {
+		return "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools." + name
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: mkConfig(initialPool),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.dhcp_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.network"), "192.168.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.start_ip_address"), "192.168.1.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.end_ip_address"), "192.168.1.100"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.default_gateway"), "192.168.1.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.description"), "tf acc test pool"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.#"), "2"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.0"), "1.1.1.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.1"), "8.8.8.8"),
+				),
+			},
+			{
+				Config: mkConfig(updatedPool),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.start_ip_address"), "192.168.1.20"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.end_ip_address"), "192.168.1.200"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.description"), "tf acc test pool updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.0"), "9.9.9.9"),
+				),
+			},
+		},
+	})
+}
+
 // TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy pins the two
 // guards that keep the partner-config warning off the create and destroy
 // walks. Without them a first apply warns about a config it is about to send,

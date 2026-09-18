@@ -690,6 +690,27 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 			}
 			toAppend.IpSecTunnelOptions = &tunnel
 		}
+		if !iface.DhcpPools.IsNull() && !iface.DhcpPools.IsUnknown() {
+			pools := []*dhcpPoolModel{}
+			poolDiags := iface.DhcpPools.ElementsAs(ctx, &pools, false)
+			diags.Append(poolDiags...)
+			for _, pool := range pools {
+				poolToAppend := megaport.DhcpPoolConfig{
+					Network:        pool.Network.ValueString(),
+					StartIpAddress: pool.StartIPAddress.ValueString(),
+					EndIpAddress:   pool.EndIPAddress.ValueString(),
+					DefaultGateway: pool.DefaultGateway.ValueString(),
+					Description:    pool.Description.ValueString(),
+				}
+				if !pool.DNSServers.IsNull() && !pool.DNSServers.IsUnknown() {
+					dnsServers := []string{}
+					dnsDiags := pool.DNSServers.ElementsAs(ctx, &dnsServers, true)
+					diags.Append(dnsDiags...)
+					poolToAppend.DnsServers = dnsServers
+				}
+				toAppend.DhcpPools = append(toAppend.DhcpPools, poolToAppend)
+			}
+		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}
 	vrouterConfigObj, bEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterConfig)
@@ -1123,7 +1144,8 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // Some attributes always stay null. The BGP password is deliberate: the API
 // does return it, and writing it would persist a live MD5 key in plain text in
 // state. megaportgo does not model the interface-level ip_mtu, vlan,
-// description, interface_type, packet filters or IPsec tunnel options, and the
+// description, interface_type, packet filters, IPsec tunnel options or DHCP
+// pools, and the
 // read never echoes permit_export_to or deny_export_to. The caller warns about
 // those, because they are missing whether or not this rebuild runs. The
 // interface bfd block is the one exception. megalith does not re-serialize it
@@ -1145,6 +1167,7 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 			PacketFilterIn:     types.Int64Null(),
 			PacketFilterOut:    types.Int64Null(),
 			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 			IPAddresses:        types.ListNull(types.StringType),
 			NatIPAddresses:     types.ListNull(types.StringType),
 			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),

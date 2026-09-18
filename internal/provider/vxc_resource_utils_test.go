@@ -61,6 +61,7 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 			Bfd:                types.ObjectNull(bfdConfigAttrs),
 			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
 			IpSecTunnelOptions: tunnel,
+			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 		}
 	}
 
@@ -112,6 +113,86 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	assert.Nil(t, vrouterConfig.Interfaces[2].IpSecTunnelOptions)
 }
 
+// TestCreateVrouterPartnerConfig_DhcpPools verifies the model -> SDK mapping for
+// dhcp_pools: every field the configuration sets reaches the order, the optional
+// fields stay empty when unset, and an interface with no pool sends no slice.
+func TestCreateVrouterPartnerConfig_DhcpPools(t *testing.T) {
+	ctx := context.Background()
+
+	poolType := types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)
+
+	dnsServers, diags := types.ListValueFrom(ctx, types.StringType, []string{"1.1.1.1", "8.8.8.8"})
+	require.False(t, diags.HasError(), "building dns_servers list: %v", diags)
+
+	fullPool := dhcpPoolModel{
+		Network:        types.StringValue("192.168.1.0/24"),
+		StartIPAddress: types.StringValue("192.168.1.10"),
+		EndIPAddress:   types.StringValue("192.168.1.100"),
+		DefaultGateway: types.StringValue("192.168.1.1"),
+		Description:    types.StringValue("Office LAN DHCP pool"),
+		DNSServers:     dnsServers,
+	}
+	// Only the three required fields; the optionals stay out of the order.
+	minimalPool := dhcpPoolModel{
+		Network:        types.StringValue("192.168.2.0/24"),
+		StartIPAddress: types.StringValue("192.168.2.10"),
+		EndIPAddress:   types.StringValue("192.168.2.100"),
+		DefaultGateway: types.StringNull(),
+		Description:    types.StringNull(),
+		DNSServers:     types.ListNull(types.StringType),
+	}
+
+	fullList, diags := types.ListValueFrom(ctx, poolType, []dhcpPoolModel{fullPool})
+	require.False(t, diags.HasError(), "building full pool list: %v", diags)
+	minimalList, diags := types.ListValueFrom(ctx, poolType, []dhcpPoolModel{minimalPool})
+	require.False(t, diags.HasError(), "building minimal pool list: %v", diags)
+
+	newIface := func(pools types.List) vxcPartnerConfigInterfaceModel {
+		return vxcPartnerConfigInterfaceModel{
+			IPAddresses:        types.ListNull(types.StringType),
+			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+			NatIPAddresses:     types.ListNull(types.StringType),
+			Bfd:                types.ObjectNull(bfdConfigAttrs),
+			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			DhcpPools:          pools,
+		}
+	}
+
+	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{
+		newIface(fullList),
+		newIface(minimalList),
+		newIface(types.ListNull(poolType)),
+	})
+	require.False(t, diags.HasError(), "building interface list: %v", diags)
+
+	model := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
+
+	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil, nil)
+	require.False(t, diags.HasError(), "createVrouterPartnerConfig: %v", diags)
+	require.Len(t, vrouterConfig.Interfaces, 3)
+
+	require.Len(t, vrouterConfig.Interfaces[0].DhcpPools, 1)
+	full := vrouterConfig.Interfaces[0].DhcpPools[0]
+	assert.Equal(t, "192.168.1.0/24", full.Network)
+	assert.Equal(t, "192.168.1.10", full.StartIpAddress)
+	assert.Equal(t, "192.168.1.100", full.EndIpAddress)
+	assert.Equal(t, "192.168.1.1", full.DefaultGateway)
+	assert.Equal(t, "Office LAN DHCP pool", full.Description)
+	assert.Equal(t, []string{"1.1.1.1", "8.8.8.8"}, full.DnsServers)
+
+	require.Len(t, vrouterConfig.Interfaces[1].DhcpPools, 1)
+	minimal := vrouterConfig.Interfaces[1].DhcpPools[0]
+	assert.Equal(t, "192.168.2.0/24", minimal.Network)
+	assert.Equal(t, "192.168.2.10", minimal.StartIpAddress)
+	assert.Equal(t, "192.168.2.100", minimal.EndIpAddress)
+	assert.Empty(t, minimal.DefaultGateway)
+	assert.Empty(t, minimal.Description)
+	assert.Nil(t, minimal.DnsServers)
+
+	assert.Nil(t, vrouterConfig.Interfaces[2].DhcpPools)
+}
+
 // TestCreateVrouterPartnerConfig_BgpAsOverride verifies the model -> SDK mapping
 // for the optional as_override BGP field: set true/false round-trips the value,
 // and unset (null) leaves the pointer nil so the API default applies.
@@ -143,6 +224,7 @@ func TestCreateVrouterPartnerConfig_BgpAsOverride(t *testing.T) {
 		Bfd:                types.ObjectNull(bfdConfigAttrs),
 		BgpConnections:     bgpList,
 		IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+		DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 	}
 	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{iface})
 	require.False(t, diags.HasError(), "building interface list: %v", diags)
@@ -511,6 +593,7 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 	assert.True(t, ifaces[0].PacketFilterIn.IsNull())
 	assert.True(t, ifaces[0].PacketFilterOut.IsNull())
 	assert.True(t, ifaces[0].IpSecTunnelOptions.IsNull(), "the PSK is write-only, so no tunnel options come back")
+	assert.True(t, ifaces[0].DhcpPools.IsNull(), "megaportgo drops the pools the API returns")
 	assert.True(t, ifaces[0].NatIPAddresses.IsNull())
 }
 
@@ -629,7 +712,7 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	// A user writing this end by hand cannot see these either, so the warning
 	// has to reach a skipped end as well as a rebuilt one.
 	assert.Equal(t, "Import complete, some settings need adding by hand", diags.Warnings()[1].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "dhcp_pools", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
 		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")
