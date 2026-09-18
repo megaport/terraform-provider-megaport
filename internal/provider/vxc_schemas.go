@@ -37,7 +37,7 @@ var (
 				Required:    true,
 			},
 			"asn": schema.Int64Attribute{
-				Description: "The ASN of the partner configuration.",
+				Description: "The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.",
 				Optional:    true,
 			},
 			"amazon_asn": schema.Int64Attribute{
@@ -50,7 +50,7 @@ var (
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
-				Description: "The prefixes of the partner configuration.",
+				Description: "The prefixes of the partner configuration. An import leaves this value null.",
 				Optional:    true,
 			},
 			"customer_ip_address": schema.StringAttribute{
@@ -77,7 +77,7 @@ var (
 				Sensitive:   true,
 			},
 			"port_choice": schema.StringAttribute{
-				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.",
+				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'. An import leaves this value null, so set it before the first apply after an import.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("primary", "secondary"),
