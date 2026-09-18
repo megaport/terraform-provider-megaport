@@ -156,12 +156,11 @@ var (
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
-	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
-	// shape; on decode into the model, unmatched attrs remain null, and on
-	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
-	// this map to match the struct breaks encoding with a Value Conversion
-	// Error because the framework requires attr.Type ↔ schema equality.
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) and
+	// vxcPartnerConfigAEndInterfaceModel. The framework pairs struct fields and
+	// object attributes one for one in both directions, so an extra on either
+	// side fails with a Value Conversion Error. The wider vrouter model cannot
+	// decode this shape.
 	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
@@ -462,6 +461,17 @@ type vxcPartnerConfigInterfaceModel struct {
 	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
 }
 
+// vxcPartnerConfigAEndInterfaceModel maps an interface in the deprecated A-End
+// partner configuration. It must match vxcPartnerConfigAEndInterfaceAttrs one
+// for one, so it cannot reuse the wider vxcPartnerConfigInterfaceModel.
+type vxcPartnerConfigAEndInterfaceModel struct {
+	IPAddresses    types.List   `tfsdk:"ip_addresses"`
+	IPRoutes       types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd            types.Object `tfsdk:"bfd"`
+	BgpConnections types.List   `tfsdk:"bgp_connections"`
+}
+
 // dhcpPoolModel maps a single dhcp_pools entry. The SDK read type drops the
 // pools the API returns, so the provider only ever writes it to an order.
 type dhcpPoolModel struct {
@@ -507,6 +517,31 @@ type bgpConnectionConfigModel struct {
 	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
 	LocalAsn           types.Int64  `tfsdk:"local_asn"`
 	PeerType           types.String `tfsdk:"peer_type"`
+	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
+	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
+	Password           types.String `tfsdk:"password"`
+	Shutdown           types.Bool   `tfsdk:"shutdown"`
+	Description        types.String `tfsdk:"description"`
+	MedIn              types.Int64  `tfsdk:"med_in"`
+	MedOut             types.Int64  `tfsdk:"med_out"`
+	BfdEnabled         types.Bool   `tfsdk:"bfd_enabled"`
+	AsOverride         types.Bool   `tfsdk:"as_override"`
+	ExportPolicy       types.String `tfsdk:"export_policy"`
+	PermitExportTo     types.List   `tfsdk:"permit_export_to"`
+	DenyExportTo       types.List   `tfsdk:"deny_export_to"`
+	ImportWhitelist    types.String `tfsdk:"import_whitelist"`
+	ImportBlacklist    types.String `tfsdk:"import_blacklist"`
+	ExportWhitelist    types.String `tfsdk:"export_whitelist"`
+	ExportBlacklist    types.String `tfsdk:"export_blacklist"`
+	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
+}
+
+// aEndBgpConnectionConfigModel represents a BGP connection in the deprecated
+// A-End partner configuration. It must match bgpConnectionConfig one for one,
+// which omits the peer_type that bgpConnectionConfigModel carries.
+type aEndBgpConnectionConfigModel struct {
+	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
+	LocalAsn           types.Int64  `tfsdk:"local_asn"`
 	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
 	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
 	Password           types.String `tfsdk:"password"`
