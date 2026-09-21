@@ -494,9 +494,9 @@ func TestVerifyUpdateApplied(t *testing.T) {
 	}
 }
 
-// vrouterBGPFromObject decodes a partner config object down to its BGP
-// connection models so the assertions below can read individual fields.
-func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.ObjectValue) []bgpConnectionConfigModel {
+// vrouterInterfacesFromObject decodes a partner config object down to its
+// interface models so the assertions below can read individual fields.
+func vrouterInterfacesFromObject(t *testing.T, ctx context.Context, obj basetypes.ObjectValue) []vxcPartnerConfigInterfaceModel {
 	t.Helper()
 	partner := &vxcPartnerConfigurationModel{}
 	require.False(t, obj.As(ctx, partner, basetypes.ObjectAsOptions{}).HasError())
@@ -504,24 +504,51 @@ func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.Objec
 	require.False(t, partner.VrouterPartnerConfig.As(ctx, vrouter, basetypes.ObjectAsOptions{}).HasError())
 	var ifaces []vxcPartnerConfigInterfaceModel
 	require.False(t, vrouter.Interfaces.ElementsAs(ctx, &ifaces, false).HasError())
-	require.Len(t, ifaces, 1)
+	return ifaces
+}
+
+// vrouterBGPFromObject decodes a partner config object down to the first
+// interface's BGP connection models.
+func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.ObjectValue) []bgpConnectionConfigModel {
+	t.Helper()
+	ifaces := vrouterInterfacesFromObject(t, ctx, obj)
+	require.NotEmpty(t, ifaces)
 	var bgps []bgpConnectionConfigModel
 	require.False(t, ifaces[0].BgpConnections.ElementsAs(ctx, &bgps, false).HasError())
 	return bgps
 }
 
 // mcrVrouterConn mirrors the shape a real MCR-to-cloud VXC read returns: one
-// interface, one BGP session, one prefix filter list attached. resourceName is
-// the end label megalith puts on every CSP connection.
+// interface carrying every setting the read echoes, one BGP session, one prefix
+// filter list attached, and a second interface with nothing but its address.
+// resourceName is the end label megalith puts on every CSP connection.
 func mcrVrouterConn(resourceName string) megaport.CSPConnectionVirtualRouter {
 	localAsn := 133937
 	asOverride := true
+	ipMtu := 1500
+	innerVLAN := 300
+	packetFilterIn := int64(41)
+	packetFilterOut := int64(42)
 	return megaport.CSPConnectionVirtualRouter{
 		ConnectType:  "VROUTER",
 		ResourceName: resourceName,
 		VLAN:         2125,
 		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{{
-			IPAddresses: []string{"169.254.145.218/29"},
+			IPAddresses:     []string{"169.254.145.218/29"},
+			InterfaceType:   "subInterface",
+			Description:     "to-gcp",
+			IpMtu:           &ipMtu,
+			VLAN:            &innerVLAN,
+			PacketFilterIn:  &packetFilterIn,
+			PacketFilterOut: &packetFilterOut,
+			DhcpPools: []megaport.DhcpPoolConfig{{
+				Network:        "192.168.1.0/24",
+				StartIpAddress: "192.168.1.10",
+				EndIpAddress:   "192.168.1.50",
+				DefaultGateway: "192.168.1.1",
+				Description:    "branch-pool",
+				DnsServers:     []string{"1.1.1.1", "8.8.8.8"},
+			}},
 			IPRoutes: []megaport.IpRoute{{
 				Prefix: "10.0.0.0/8", Description: "to-datacenter", NextHop: "169.254.145.217",
 			}},
@@ -541,6 +568,9 @@ func mcrVrouterConn(resourceName string) megaport.CSPConnectionVirtualRouter {
 				AsOverride:         &asOverride,
 				ImportWhitelist:    12345,
 			}},
+		}, {
+			IPAddresses:   []string{"169.254.145.226/29"},
+			InterfaceType: "subInterface",
 		}},
 	}
 }
@@ -667,13 +697,8 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 
 	require.Equal(t, 0, diags.WarningsCount(), "the unreadable-field warning belongs to the caller, which sees the skipped ends too")
 
-	partner := &vxcPartnerConfigurationModel{}
-	require.False(t, obj.As(ctx, partner, basetypes.ObjectAsOptions{}).HasError())
-	vrouter := &vxcPartnerConfigVrouterModel{}
-	require.False(t, partner.VrouterPartnerConfig.As(ctx, vrouter, basetypes.ObjectAsOptions{}).HasError())
-	var ifaces []vxcPartnerConfigInterfaceModel
-	require.False(t, vrouter.Interfaces.ElementsAs(ctx, &ifaces, false).HasError())
-	require.Len(t, ifaces, 1)
+	ifaces := vrouterInterfacesFromObject(t, ctx, obj)
+	require.Len(t, ifaces, 2)
 
 	var ips []string
 	require.False(t, ifaces[0].IPAddresses.ElementsAs(ctx, &ips, false).HasError())
@@ -686,19 +711,123 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 	assert.Equal(t, "to-datacenter", routes[0].Description.ValueString())
 	assert.Equal(t, "169.254.145.217", routes[0].NextHop.ValueString())
 
-	// megalith does not re-serialize the interface bfd block, and megaportgo
-	// models none of ip_mtu, vlan, description, interface_type or the packet
-	// filters, so no import can recover them.
+	assert.Equal(t, "subInterface", ifaces[0].InterfaceType.ValueString())
+	assert.Equal(t, "to-gcp", ifaces[0].Description.ValueString())
+	assert.Equal(t, int64(1500), ifaces[0].IpMtu.ValueInt64())
+	assert.Equal(t, int64(300), ifaces[0].VLAN.ValueInt64())
+	assert.Equal(t, int64(41), ifaces[0].PacketFilterIn.ValueInt64())
+	assert.Equal(t, int64(42), ifaces[0].PacketFilterOut.ValueInt64())
+
+	var pools []dhcpPoolModel
+	require.False(t, ifaces[0].DhcpPools.ElementsAs(ctx, &pools, false).HasError())
+	require.Len(t, pools, 1)
+	assert.Equal(t, "192.168.1.0/24", pools[0].Network.ValueString())
+	assert.Equal(t, "192.168.1.10", pools[0].StartIPAddress.ValueString())
+	assert.Equal(t, "192.168.1.50", pools[0].EndIPAddress.ValueString())
+	assert.Equal(t, "192.168.1.1", pools[0].DefaultGateway.ValueString())
+	assert.Equal(t, "branch-pool", pools[0].Description.ValueString())
+	var dns []string
+	require.False(t, pools[0].DNSServers.ElementsAs(ctx, &dns, false).HasError())
+	assert.Equal(t, []string{"1.1.1.1", "8.8.8.8"}, dns)
+
+	// megalith does not re-serialize the interface bfd block, so no import can
+	// recover it.
 	assert.True(t, ifaces[0].Bfd.IsNull(), "bfd is not returned by the read")
-	assert.True(t, ifaces[0].IpMtu.IsNull())
-	assert.True(t, ifaces[0].VLAN.IsNull())
-	assert.True(t, ifaces[0].Description.IsNull())
-	assert.True(t, ifaces[0].InterfaceType.IsNull())
-	assert.True(t, ifaces[0].PacketFilterIn.IsNull())
-	assert.True(t, ifaces[0].PacketFilterOut.IsNull())
-	assert.True(t, ifaces[0].IpSecTunnelOptions.IsNull(), "the PSK is write-only, so no tunnel options come back")
-	assert.True(t, ifaces[0].DhcpPools.IsNull(), "megaportgo drops the pools the API returns")
+	assert.True(t, ifaces[0].IpSecTunnelOptions.IsNull(), "a subinterface carries no tunnel")
 	assert.True(t, ifaces[0].NatIPAddresses.IsNull())
+
+	// A setting the API left out has to stay absent from state: writing a zero
+	// would make the user restate it in the configuration.
+	assert.Equal(t, "subInterface", ifaces[1].InterfaceType.ValueString())
+	assert.True(t, ifaces[1].Description.IsNull())
+	assert.True(t, ifaces[1].IpMtu.IsNull())
+	assert.True(t, ifaces[1].VLAN.IsNull())
+	assert.True(t, ifaces[1].PacketFilterIn.IsNull())
+	assert.True(t, ifaces[1].PacketFilterOut.IsNull())
+	assert.True(t, ifaces[1].DhcpPools.IsNull())
+	assert.True(t, ifaces[1].IpSecTunnelOptions.IsNull())
+	assert.True(t, ifaces[1].IPRoutes.IsNull())
+	assert.True(t, ifaces[1].BgpConnections.IsNull())
+}
+
+// TestBuildVrouterPartnerConfigFromAPI_IPsecTunnel covers the tunnel interface.
+// The read carries the whole tunnel, and a missed one loses a live IPsec
+// session on the first apply after the import.
+func TestBuildVrouterPartnerConfigFromAPI_IPsecTunnel(t *testing.T) {
+	ctx := context.Background()
+
+	passive := true
+	phase1Lifetime := 28800
+	phase2Lifetime := 3600
+	conn := megaport.CSPConnectionVirtualRouter{
+		ConnectType:  "VROUTER",
+		ResourceName: "a_csp_connection",
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{{
+			InterfaceType: "ipSecTunnel",
+			IpSecTunnelOptions: &megaport.IPsecTunnelState{
+				SourceIpAddress:      "169.254.100.1",
+				DestinationIpAddress: "203.0.113.10",
+				Passive:              &passive,
+				LocalId:              "mcr-local",
+				RemoteId:             "peer-remote",
+				Phase1Lifetime:       &phase1Lifetime,
+				Phase2Lifetime:       &phase2Lifetime,
+			},
+		}},
+	}
+
+	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, conn, nil)
+	require.False(t, diags.HasError())
+	require.False(t, obj.IsNull())
+
+	ifaces := vrouterInterfacesFromObject(t, ctx, obj)
+	require.Len(t, ifaces, 1)
+	assert.Equal(t, "ipSecTunnel", ifaces[0].InterfaceType.ValueString())
+
+	tunnel := &ipSecTunnelOptionsModel{}
+	require.False(t, ifaces[0].IpSecTunnelOptions.As(ctx, tunnel, basetypes.ObjectAsOptions{}).HasError())
+	assert.Equal(t, "169.254.100.1", tunnel.SourceIPAddress.ValueString())
+	assert.Equal(t, "203.0.113.10", tunnel.DestinationIPAddress.ValueString())
+	assert.True(t, tunnel.Passive.ValueBool())
+	assert.Equal(t, "mcr-local", tunnel.LocalID.ValueString())
+	assert.Equal(t, "peer-remote", tunnel.RemoteID.ValueString())
+	assert.Equal(t, int64(28800), tunnel.Phase1Lifetime.ValueInt64())
+	assert.Equal(t, int64(3600), tunnel.Phase2Lifetime.ValueInt64())
+
+	// The read returns the key in clear, and pre_shared_key is write-only, so a
+	// value in state fails the next apply.
+	assert.True(t, tunnel.PreSharedKey.IsNull())
+}
+
+// TestBuildVrouterPartnerConfigFromAPI_TunnelOmissionsStayNull covers a tunnel
+// the API sent with nothing but its two addresses.
+func TestBuildVrouterPartnerConfigFromAPI_TunnelOmissionsStayNull(t *testing.T) {
+	ctx := context.Background()
+
+	conn := megaport.CSPConnectionVirtualRouter{
+		ConnectType:  "VROUTER",
+		ResourceName: "a_csp_connection",
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{{
+			InterfaceType: "ipSecTunnel",
+			IpSecTunnelOptions: &megaport.IPsecTunnelState{
+				SourceIpAddress:      "169.254.100.1",
+				DestinationIpAddress: "203.0.113.10",
+			},
+		}},
+	}
+
+	obj, diags := buildVrouterPartnerConfigFromAPI(ctx, conn, nil)
+	require.False(t, diags.HasError())
+
+	ifaces := vrouterInterfacesFromObject(t, ctx, obj)
+	require.Len(t, ifaces, 1)
+	tunnel := &ipSecTunnelOptionsModel{}
+	require.False(t, ifaces[0].IpSecTunnelOptions.As(ctx, tunnel, basetypes.ObjectAsOptions{}).HasError())
+	assert.True(t, tunnel.Passive.IsNull())
+	assert.True(t, tunnel.LocalID.IsNull())
+	assert.True(t, tunnel.RemoteID.IsNull())
+	assert.True(t, tunnel.Phase1Lifetime.IsNull())
+	assert.True(t, tunnel.Phase2Lifetime.IsNull())
 }
 
 // TestBuildVrouterPartnerConfigFromAPI_UnresolvedPrefixFilter checks the unsafe
@@ -782,8 +911,9 @@ func TestFillVrouterPartnerConfigsOnImport_MatchesEndsByResourceName(t *testing.
 	}
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(bConn, aConn))
 	require.False(t, diags.HasError())
-	require.Equal(t, 1, diags.WarningsCount(), "the unreadable-field warning is emitted once for the VXC, not once per end")
-	assert.Equal(t, "Import complete, some settings need adding by hand", diags.Warnings()[0].Summary())
+	require.Equal(t, 2, diags.WarningsCount(), "the import warnings are emitted once for the VXC, not once per end")
+	assert.Equal(t, "Import complete, check the plan before the next apply", diags.Warnings()[0].Summary())
+	assert.Equal(t, "Import complete, two BGP settings have no attribute", diags.Warnings()[1].Summary())
 
 	require.False(t, state.AEndPartnerConfig.IsNull())
 	require.False(t, state.BEndPartnerConfig.IsNull())
@@ -811,16 +941,43 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 2, diags.WarningsCount())
+	require.Equal(t, 3, diags.WarningsCount())
 	assert.Contains(t, diags.Warnings()[0].Detail(), "a_end_partner_config")
-	// A user writing this end by hand cannot see these either, so the warning
-	// has to reach a skipped end as well as a rebuilt one.
-	assert.Equal(t, "Import complete, some settings need adding by hand", diags.Warnings()[1].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "dhcp_pools", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
-		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
+	// A user writing this end by hand faces the same rule, so the warning has
+	// to reach a skipped end as well as a rebuilt one.
+	assert.Equal(t, "Import complete, check the plan before the next apply", diags.Warnings()[1].Summary())
+	assert.Equal(t, "Import complete, two BGP settings have no attribute", diags.Warnings()[2].Summary())
+	// Naming a setting the import now reads would send the user to the portal
+	// for a value already in state.
+	for _, attr := range []string{"ip_mtu", "interface_type", "packet_filter", "dhcp_pools", "IPsec", "vlan", "permit_export_to", "deny_export_to"} {
+		assert.NotContains(t, diags.Warnings()[1].Detail(), attr)
+		assert.NotContains(t, diags.Warnings()[2].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")
 	assert.True(t, state.BEndPartnerConfig.IsNull())
+}
+
+// TestFillVrouterPartnerConfigsOnImport_NoBGPConnections covers the shape an
+// IPsec-only VXC returns. Naming two BGP settings on a service with no BGP
+// session sends the user looking for a peering that is not there.
+func TestFillVrouterPartnerConfigsOnImport_NoBGPConnections(t *testing.T) {
+	ctx := context.Background()
+	r := &vxcResource{}
+
+	conn := mcrVrouterConn("a_csp_connection")
+	for i := range conn.Interfaces {
+		conn.Interfaces[i].BGPConnections = nil
+	}
+
+	state := &vxcResourceModel{
+		AEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+		BEndPartnerConfig: types.ObjectNull(vxcPartnerConfigAttrs),
+	}
+	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(conn))
+	require.False(t, diags.HasError())
+	require.Equal(t, 1, diags.WarningsCount())
+	assert.Equal(t, "Import complete, check the plan before the next apply", diags.Warnings()[0].Summary())
+	assert.False(t, state.AEndPartnerConfig.IsNull())
 }
 
 // TestFillVrouterPartnerConfigsOnImport_PasswordWarningReachesSkippedEnd covers
@@ -949,7 +1106,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnlabeledConnection(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 2, diags.WarningsCount(), "the unmatched end, and what no end can read")
+	require.Equal(t, 3, diags.WarningsCount(), "the unmatched end, plus the two import warnings")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "neither a_csp_connection nor b_csp_connection")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
@@ -970,7 +1127,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName(t *testing.T) 
 	vxc := importVXC(mcrVrouterConn("a_unrelated"), mcrVrouterConn("c_csp_connection"))
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 2, diags.WarningsCount(), "the unmatched ends, and what no end can read")
+	require.Equal(t, 3, diags.WarningsCount(), "the unmatched ends, plus the two import warnings")
 	// Both are reported, so a name megalith stops sending cannot go silent.
 	assert.Contains(t, diags.Warnings()[0].Detail(), "2 virtual router connections")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
@@ -1026,7 +1183,7 @@ func TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription(t *tes
 	// mcrVrouterConn references list 12345 on its BGP connection.
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("a_csp_connection")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 2, diags.WarningsCount(), "the shared description, and what the end cannot read")
+	require.Equal(t, 3, diags.WarningsCount(), "the shared description, plus the two import warnings")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "shares the description")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 }

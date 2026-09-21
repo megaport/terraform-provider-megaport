@@ -472,8 +472,7 @@ type vxcPartnerConfigAEndInterfaceModel struct {
 	BgpConnections types.List   `tfsdk:"bgp_connections"`
 }
 
-// dhcpPoolModel maps a single dhcp_pools entry. The SDK read type drops the
-// pools the API returns, so the provider only ever writes it to an order.
+// dhcpPoolModel maps a single dhcp_pools entry.
 type dhcpPoolModel struct {
 	Network        types.String `tfsdk:"network"`
 	StartIPAddress types.String `tfsdk:"start_ip_address"`
@@ -483,10 +482,10 @@ type dhcpPoolModel struct {
 	DNSServers     types.List   `tfsdk:"dns_servers"`
 }
 
-// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
-// never returns the PSK or lifetimes. PreSharedKey is a write-only argument, so
-// it is null in plan/state and sourced from the configuration when ordering;
-// the lifetimes are preserved from plan/state rather than read back.
+// ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block.
+// PreSharedKey is a write-only argument, so it is null in plan and state and
+// sourced from the configuration when ordering. The API returns the key in
+// clear on a read, and megaportgo drops it before the provider sees it.
 type ipSecTunnelOptionsModel struct {
 	SourceIPAddress      types.String `tfsdk:"source_ip_address"`
 	DestinationIPAddress types.String `tfsdk:"destination_ip_address"`
@@ -2211,6 +2210,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 	// the only reliable link.
 	byEnd := map[string][]megaport.CSPConnectionVirtualRouter{}
 	unmatched := 0
+	bgpConns := 0
 	if v.Resources != nil && v.Resources.CSPConnection != nil {
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
 			vr, ok := c.(megaport.CSPConnectionVirtualRouter)
@@ -2218,6 +2218,9 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 				continue
 			}
 			warnImportedBGPPasswords(vr, &diags)
+			for _, iface := range vr.Interfaces {
+				bgpConns += len(iface.BGPConnections)
+			}
 			switch vr.ResourceName {
 			case "a_csp_connection":
 				byEnd["a"] = append(byEnd["a"], vr)
@@ -2271,13 +2274,19 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 		}
 	}
 
-	// megalith replaces a_csp_request wholesale on an update, so a setting
-	// Terraform never read is dropped by the next apply. A skipped end needs the
-	// same warning: the user writing it by hand cannot see them either.
+	// megalith replaces a_csp_request wholesale on an update, so a setting the
+	// configuration omits is dropped by the next apply. A skipped end needs the
+	// same warning: the user writing that end by hand faces the same rule.
 	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
 		diags.AddWarning(
-			"Import complete, some settings need adding by hand",
-			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out, dhcp_pools or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Two more settings have no attribute at all: eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
+			"Import complete, check the plan before the next apply",
+			"The import wrote the router settings the API returned into state. Run terraform plan and add the settings it reports to the configuration. An apply sends the whole interface and drops whatever the configuration leaves out.",
+		)
+	}
+	if bgpConns > 0 {
+		diags.AddWarning(
+			"Import complete, two BGP settings have no attribute",
+			"This provider has no attribute for eBGP multihop or remove private ASN. An apply drops either one the live service uses, and there is no way to put it back. Raise an issue if you need them.",
 		)
 	}
 

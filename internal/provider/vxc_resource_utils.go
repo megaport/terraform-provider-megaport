@@ -1314,15 +1314,11 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // API data cannot produce a faithful config, so the caller leaves state alone.
 //
 // Some attributes always stay null. The BGP password is deliberate: the API
-// does return it, and writing it would persist a live MD5 key in plain text in
-// state. megaportgo does not model the interface-level ip_mtu, vlan,
-// description, interface_type, packet filters, IPsec tunnel options or DHCP
-// pools, and the
-// read never echoes permit_export_to or deny_export_to. The caller warns about
-// those, because they are missing whether or not this rebuild runs. The
-// interface bfd block is the one exception. megalith does not re-serialize it
-// and NetAuto discards it. A warning would name a setting the API cannot
-// accept.
+// returns it in clear, and writing it would persist a live secret in state.
+// The read returns the IPsec pre-shared key in clear too, and megaportgo drops
+// it before the provider sees it. The interface bfd block is the last gap.
+// megalith does not re-serialize it and NetAuto discards it, so a warning would
+// name a setting the API cannot accept.
 func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 	if len(vrConn.Interfaces) == 0 {
@@ -1332,12 +1328,12 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 	interfaceModels := make([]vxcPartnerConfigInterfaceModel, 0, len(vrConn.Interfaces))
 	for _, apiIface := range vrConn.Interfaces {
 		ifaceModel := vxcPartnerConfigInterfaceModel{
-			IpMtu:              types.Int64Null(),
-			VLAN:               types.Int64Null(),
-			Description:        types.StringNull(),
-			InterfaceType:      types.StringNull(),
-			PacketFilterIn:     types.Int64Null(),
-			PacketFilterOut:    types.Int64Null(),
+			IpMtu:              int64PtrOrNull(apiIface.IpMtu),
+			VLAN:               int64PtrOrNull(apiIface.VLAN),
+			Description:        stringOrNull(apiIface.Description),
+			InterfaceType:      stringOrNull(apiIface.InterfaceType),
+			PacketFilterIn:     int64PtrOrNull(apiIface.PacketFilterIn),
+			PacketFilterOut:    int64PtrOrNull(apiIface.PacketFilterOut),
 			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
 			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 			IPAddresses:        types.ListNull(types.StringType),
@@ -1345,6 +1341,45 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
 			Bfd:                types.ObjectNull(bfdConfigAttrs),
 			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+		}
+
+		if t := apiIface.IpSecTunnelOptions; t != nil {
+			tunnelModel := ipSecTunnelOptionsModel{
+				SourceIPAddress:      types.StringValue(t.SourceIpAddress),
+				DestinationIPAddress: types.StringValue(t.DestinationIpAddress),
+				PreSharedKey:         types.StringNull(),
+				Passive:              types.BoolPointerValue(t.Passive),
+				LocalID:              stringOrNull(t.LocalId),
+				RemoteID:             stringOrNull(t.RemoteId),
+				Phase1Lifetime:       int64PtrOrNull(t.Phase1Lifetime),
+				Phase2Lifetime:       int64PtrOrNull(t.Phase2Lifetime),
+			}
+			tunnelObj, tunnelDiags := types.ObjectValueFrom(ctx, ipSecTunnelOptionsAttrs, tunnelModel)
+			diags.Append(tunnelDiags...)
+			ifaceModel.IpSecTunnelOptions = tunnelObj
+		}
+
+		if len(apiIface.DhcpPools) > 0 {
+			poolModels := make([]dhcpPoolModel, 0, len(apiIface.DhcpPools))
+			for _, p := range apiIface.DhcpPools {
+				poolModel := dhcpPoolModel{
+					Network:        types.StringValue(p.Network),
+					StartIPAddress: types.StringValue(p.StartIpAddress),
+					EndIPAddress:   types.StringValue(p.EndIpAddress),
+					DefaultGateway: stringOrNull(p.DefaultGateway),
+					Description:    stringOrNull(p.Description),
+					DNSServers:     types.ListNull(types.StringType),
+				}
+				if len(p.DnsServers) > 0 {
+					dnsList, dnsDiags := types.ListValueFrom(ctx, types.StringType, p.DnsServers)
+					diags.Append(dnsDiags...)
+					poolModel.DNSServers = dnsList
+				}
+				poolModels = append(poolModels, poolModel)
+			}
+			poolList, poolDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs), poolModels)
+			diags.Append(poolDiags...)
+			ifaceModel.DhcpPools = poolList
 		}
 
 		if len(apiIface.IPAddresses) > 0 {
@@ -1485,4 +1520,13 @@ func int64OrNull(v int) basetypes.Int64Value {
 		return types.Int64Null()
 	}
 	return types.Int64Value(int64(v))
+}
+
+// int64PtrOrNull is int64OrNull for a field the SDK models as a pointer, where
+// nil says the API omitted it and zero is a value the user set.
+func int64PtrOrNull[T int | int64](v *T) basetypes.Int64Value {
+	if v == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*v))
 }

@@ -6230,13 +6230,16 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 						{
 							interface_type = "subInterface"
 							ip_addresses   = ["169.254.100.1/30"]
+							ip_mtu         = 1500
 						},
 						{
 							interface_type = "ipSecTunnel"
+							ip_mtu         = 1400
 							ip_sec_tunnel_options = {
 								source_ip_address      = "169.254.100.1"
 								destination_ip_address = "203.0.113.10"
 								pre_shared_key         = "tf-acc-test-psk"
+								passive                = true
 								phase1_lifetime        = 28800
 								phase2_lifetime        = 3600
 							}
@@ -6271,6 +6274,27 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 					// pre_shared_key is write-only: it must never be persisted to state.
 					resource.TestCheckNoResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.pre_shared_key"),
 				),
+			},
+			// The import reads the interfaces back, so a_end_partner_config has
+			// to match the applied configuration attribute for attribute.
+			{
+				ResourceName:                         "megaport_vxc.ipsec_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.ipsec_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "b_end_partner_config", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 		},
 	})

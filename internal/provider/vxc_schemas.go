@@ -261,7 +261,7 @@ var (
 							Optional:    true,
 						},
 						"ip_sec_tunnel_options": schema.SingleNestedAttribute{
-							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. The API does not return the pre-shared key or lifetimes on read: `pre_shared_key` is a write-only argument (never stored in state), and the lifetimes are preserved from config so they never show drift.",
+							Description: "The IPsec tunnel to configure on this interface. Requires `interface_type` to be `ipSecTunnel` and the attached MCR to have an IPsec add-on with available tunnel capacity. There is one tunnel per `ipSecTunnel` interface; declare multiple interfaces for multiple tunnels. An import reads the tunnel back, apart from `pre_shared_key`, which is a write-only argument and is never stored in state.",
 							Optional:    true,
 							Validators: []validator.Object{
 								ipSecPhaseLifetimeValidator{},
@@ -276,7 +276,7 @@ var (
 									Required:    true,
 								},
 								"pre_shared_key": schema.StringAttribute{
-									Description: "Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. The API does not return it on read.",
+									Description: "Pre-shared key used to authenticate the IPsec tunnel. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+), so the key is never written to the plan or state; it is read from the configuration only when the tunnel is provisioned. An import leaves it null, so add it to the configuration by hand.",
 									Required:    true,
 									Sensitive:   true,
 									WriteOnly:   true,
@@ -294,14 +294,14 @@ var (
 									Optional:    true,
 								},
 								"phase1_lifetime": schema.Int64Attribute{
-									Description: "IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted. Write-only: not returned by the API on read.",
+									Description: "IKE phase 1 (IKE SA) lifetime in seconds. Must be between 3600 and 604800. Defaults to 28800 on the API when omitted.",
 									Optional:    true,
 									Validators: []validator.Int64{
 										int64validator.Between(3600, 604800),
 									},
 								},
 								"phase2_lifetime": schema.Int64Attribute{
-									Description: "IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted. Write-only: not returned by the API on read.",
+									Description: "IKE phase 2 (IPsec SA) lifetime in seconds. Must be between 600 and 86400, and less than phase1_lifetime. Defaults to 3600 on the API when omitted.",
 									Optional:    true,
 									Validators: []validator.Int64{
 										int64validator.Between(600, 86400),
@@ -310,7 +310,7 @@ var (
 							},
 						},
 						"dhcp_pools": schema.ListNestedAttribute{
-							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import.",
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX.",
 							Optional:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
