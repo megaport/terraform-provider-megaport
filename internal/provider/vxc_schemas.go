@@ -37,7 +37,7 @@ var (
 				Required:    true,
 			},
 			"asn": schema.Int64Attribute{
-				Description: "The ASN of the partner configuration.",
+				Description: "The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.",
 				Optional:    true,
 			},
 			"amazon_asn": schema.Int64Attribute{
@@ -50,7 +50,7 @@ var (
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
-				Description: "The prefixes of the partner configuration.",
+				Description: "The prefixes of the partner configuration. An import leaves this value null.",
 				Optional:    true,
 			},
 			"customer_ip_address": schema.StringAttribute{
@@ -77,7 +77,7 @@ var (
 				Sensitive:   true,
 			},
 			"port_choice": schema.StringAttribute{
-				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.",
+				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'. An import leaves this value null, so set it before the first apply after an import.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("primary", "secondary"),
@@ -305,6 +305,39 @@ var (
 									Optional:    true,
 									Validators: []validator.Int64{
 										int64validator.Between(600, 86400),
+									},
+								},
+							},
+						},
+						"dhcp_pools": schema.ListNestedAttribute{
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import.",
+							Optional:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"network": schema.StringAttribute{
+										Description: "IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.",
+										Required:    true,
+									},
+									"start_ip_address": schema.StringAttribute{
+										Description: "First IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"end_ip_address": schema.StringAttribute{
+										Description: "Last IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"default_gateway": schema.StringAttribute{
+										Description: "IPv4 address of a default gateway to offer DHCP clients.",
+										Optional:    true,
+									},
+									"description": schema.StringAttribute{
+										Description: "Description for the DHCP pool. Maximum 100 characters.",
+										Optional:    true,
+									},
+									"dns_servers": schema.ListAttribute{
+										Description: "IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.",
+										Optional:    true,
+										ElementType: types.StringType,
 									},
 								},
 							},
