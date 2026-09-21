@@ -520,9 +520,12 @@ func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.Objec
 }
 
 // mcrVrouterConn mirrors the shape a real MCR-to-cloud VXC read returns: one
-// interface carrying every setting the read echoes, one BGP session, one prefix
-// filter list attached, and a second interface with nothing but its address.
-// resourceName is the end label megalith puts on every CSP connection.
+// interface carrying every setting the mapper reads, one BGP session, one
+// prefix filter list attached, and a second interface with nothing but its
+// address. resourceName is the end label megalith puts on every CSP
+// connection. The packet filters only reach a NAT Gateway endpoint in
+// practice; they sit here anyway so one fixture covers every field the
+// mapper reads.
 func mcrVrouterConn(resourceName string) megaport.CSPConnectionVirtualRouter {
 	localAsn := 133937
 	asOverride := true
@@ -613,10 +616,10 @@ func TestBuildVrouterPartnerConfigFromAPI_PopulatesBGP(t *testing.T) {
 	assert.True(t, bgp.ExportBlacklist.IsNull())
 
 	// The read does echo the password, but writing it would persist a live MD5
-	// key in plain text in state. The export lists are not echoed at all.
+	// key in plain text in state.
 	assert.True(t, bgp.Password.IsNull(), "the password must be left out of state")
-	assert.True(t, bgp.PermitExportTo.IsNull())
-	assert.True(t, bgp.DenyExportTo.IsNull())
+	assert.True(t, bgp.PermitExportTo.IsNull(), "this fixture leaves the export lists unset")
+	assert.True(t, bgp.DenyExportTo.IsNull(), "this fixture leaves the export lists unset")
 }
 
 // TestBuildVrouterPartnerConfigFromAPI_OmittedScalarsStayNull covers the common
@@ -947,7 +950,7 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	assert.Equal(t, "Import complete, two BGP settings have no attribute", diags.Warnings()[1].Summary())
 	// Naming a setting the import now reads would send the user to the portal
 	// for a value already in state.
-	for _, attr := range []string{"ip_mtu", "interface_type", "packet_filter", "dhcp_pools", "IPsec", "vlan", "permit_export_to", "deny_export_to"} {
+	for _, attr := range []string{"ip_mtu", "interface_type", "description", "packet_filter", "dhcp_pools", "IPsec", "vlan", "permit_export_to", "deny_export_to"} {
 		assert.NotContains(t, diags.Warnings()[1].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")

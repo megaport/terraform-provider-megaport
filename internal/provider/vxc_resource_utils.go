@@ -1315,10 +1315,9 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 //
 // Some attributes always stay null. The BGP password is deliberate: the API
 // returns it in clear, and writing it would persist a live secret in state.
-// The read returns the IPsec pre-shared key in clear too, and megaportgo drops
-// it before the provider sees it. The interface bfd block is the last gap.
-// megalith does not re-serialize it and NetAuto discards it, so a warning would
-// name a setting the API cannot accept.
+// ipSecTunnelOptionsModel documents why PreSharedKey stays null too. The
+// interface bfd block is the last gap: megalith does not re-serialize it and
+// NetAuto discards it, so a warning would name a setting the API cannot accept.
 func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPConnectionVirtualRouter, pflMap map[int]string) (basetypes.ObjectValue, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 	if len(vrConn.Interfaces) == 0 {
@@ -1523,7 +1522,9 @@ func int64OrNull(v int) basetypes.Int64Value {
 }
 
 // int64PtrOrNull is int64OrNull for a field the SDK models as a pointer, where
-// nil says the API omitted it and zero is a value the user set.
+// nil says the API omitted it. Unlike int64OrNull, it never mistakes a real
+// zero for an omission: none of its callers (MTU, VLAN, packet filter IDs,
+// tunnel lifetimes) accept zero as a valid value.
 func int64PtrOrNull[T int | int64](v *T) basetypes.Int64Value {
 	if v == nil {
 		return types.Int64Null()

@@ -2210,7 +2210,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 	// the only reliable link.
 	byEnd := map[string][]megaport.CSPConnectionVirtualRouter{}
 	unmatched := 0
-	bgpConns := 0
+	hasBGPConn := false
 	if v.Resources != nil && v.Resources.CSPConnection != nil {
 		for _, c := range v.Resources.CSPConnection.CSPConnection {
 			vr, ok := c.(megaport.CSPConnectionVirtualRouter)
@@ -2219,7 +2219,9 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 			}
 			warnImportedBGPPasswords(vr, &diags)
 			for _, iface := range vr.Interfaces {
-				bgpConns += len(iface.BGPConnections)
+				if len(iface.BGPConnections) > 0 {
+					hasBGPConn = true
+				}
 			}
 			switch vr.ResourceName {
 			case "a_csp_connection":
@@ -2287,10 +2289,10 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 			"The import wrote the router settings the API returned into state. Run terraform plan and add the settings it reports to the configuration. An apply sends the whole interface and drops whatever the configuration leaves out.",
 		)
 	}
-	if bgpConns > 0 {
+	if hasBGPConn {
 		diags.AddWarning(
 			"Import complete, two BGP settings have no attribute",
-			"This provider has no attribute for eBGP multihop or remove private ASN. An apply drops either one the live service uses, and there is no way to put it back. Raise an issue if you need them.",
+			"This provider has no attribute for eBGP multihop or for removing the private ASN. An apply drops whichever of these the live service uses, with no way to restore it. Raise an issue if you need either one.",
 		)
 	}
 

@@ -179,11 +179,11 @@ var (
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"description": schema.StringAttribute{
-							Description: "Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.",
+							Description: "Optional human-readable description for the interface.",
 							Optional:    true,
 						},
 						"interface_type": schema.StringAttribute{
-							Description: "Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.",
+							Description: "Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`.",
 							Optional:    true,
 							Validators: []validator.String{
 								stringvalidator.OneOf("subInterface", "ipSecTunnel"),
