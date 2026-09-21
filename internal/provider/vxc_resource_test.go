@@ -3895,6 +3895,165 @@ func TestAccMegaportVXC_ImportDrift_Basic(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_ImportDrift_ServiceKey covers the post-import case for
+// service_key. The API never returns the key, so an imported VXC holds it null;
+// adding it back to the configuration has to record it in place rather than
+// destroy the live VXC, because a single-use key cannot be ordered twice.
+func TestAccMegaportVXC_ImportDrift_ServiceKey(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	keyDescription := RandomTestName()
+	vxcName := RandomTestName()
+
+	// baseConfig holds everything the VXC needs, so the forget step below can
+	// drop the VXC alone and leave the ports and the key in state.
+	baseConfig := providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_service_key" "key" {
+				product_uid = megaport_port.port_2.product_uid
+				description = "%s"
+				max_speed   = 500
+				single_use  = true
+				active      = true
+				vlan        = 200
+			}
+		`, locs[0], portName1, portName2, keyDescription)
+
+	vxcConfig := baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+				service_key          = megaport_service_key.key.key
+
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {}
+			}
+		`, vxcName)
+
+	// The forget step drops the VXC from state and leaves the live service
+	// alone, which is the only way to reach a genuine import here: the
+	// framework rejects importing over a resource the same test case created.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: order the VXC against the service key
+			{
+				Config: vxcConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "service_key"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "b_end.current_product_uid"),
+					captureUID,
+				),
+			},
+			// Step 2: forget the VXC. The live service stays up and Terraform
+			// stops managing it, so step 3 can import it for real.
+			{
+				Config: forgetConfig,
+			},
+			// Step 3: import the VXC. The API does not return the key, so the
+			// imported state holds it null.
+			{
+				Config:                               vxcConfig,
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					for _, st := range states {
+						if st.Attributes["product_uid"] != vxcUID {
+							continue
+						}
+						if key, ok := st.Attributes["service_key"]; ok && key != "" {
+							return fmt.Errorf("imported service_key = %q, want none", key)
+						}
+						return nil
+					}
+					return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+				},
+			},
+			// Step 4: apply the config the key is in. The key is recorded in
+			// place, and the UID proves the live VXC was not replaced.
+			{
+				Config: vxcConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "service_key"),
+					func(state *terraform.State) error {
+						rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+						if !ok {
+							return fmt.Errorf("megaport_vxc.vxc not found in state")
+						}
+						if got := rs.Primary.Attributes["product_uid"]; got != vxcUID {
+							return fmt.Errorf("product_uid = %q, want %q: the VXC was replaced", got, vxcUID)
+						}
+						return nil
+					},
+				),
+			},
+			// Step 5: plan-only to confirm the recorded key leaves no drift
+			{
+				Config:   vxcConfig,
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_ImportDrift_WithPartnerConfig tests that a VXC with partner configs
 // does not cause drift after import. This is the scenario from the original bug report
 // where MCR VXCs with vrouter partner configs would continuously show changes.

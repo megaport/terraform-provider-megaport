@@ -9,11 +9,35 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// serviceKeyImportedPrivateKey marks that the null service_key in state came
+// from the read after an import, not from an ordinary VXC that was never
+// given a key. Read sets it; Update clears it once the key is recorded.
+const serviceKeyImportedPrivateKey = "service_key_imported"
+
+// requiresReplaceServiceKey replaces the VXC on any service key change,
+// except recording a key for the first time on a VXC imported without one.
+// The API never returns the key, so an imported VXC has it null in state
+// regardless of whether the live VXC has one; the private flag tells that
+// case apart from an ordinary VXC that was simply created with no key, which
+// must still replace so the key actually reaches the API.
+func requiresReplaceServiceKey(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	if !req.StateValue.IsNull() {
+		resp.RequiresReplace = true
+		return
+	}
+
+	imported, diags := req.Private.GetKey(ctx, serviceKeyImportedPrivateKey)
+	resp.Diagnostics.Append(diags...)
+	resp.RequiresReplace = len(imported) == 0
+}
 
 // resolvePrefixListID looks up a prefix filter list by description on the
 // supplied slice (typically returned by vrouterPrefixFilterListsForEndpoint).
