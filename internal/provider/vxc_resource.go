@@ -39,9 +39,10 @@ const cloudPartnerConfigFromImportKey = "cloud_partner_config_from_import"
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vxcResource{}
-	_ resource.ResourceWithConfigure   = &vxcResource{}
-	_ resource.ResourceWithImportState = &vxcResource{}
+	_ resource.Resource                   = &vxcResource{}
+	_ resource.ResourceWithConfigure      = &vxcResource{}
+	_ resource.ResourceWithImportState    = &vxcResource{}
+	_ resource.ResourceWithValidateConfig = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
 		"owner_uid":             types.StringType,
@@ -1246,7 +1247,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. Set only the nested configuration block that "partner" names. The plan fails on any other block. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1266,7 +1267,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, amazon_ip_address, and prefixes on an AWS configuration, those same settings plus type on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. Set only the nested configuration block that "partner" names. The plan fails on any other block. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, amazon_ip_address, and prefixes on an AWS configuration, those same settings plus type on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1286,6 +1287,83 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 		},
+	}
+}
+
+// The nested block each partner value configures. "transit" configures none.
+var vxcPartnerConfigBlocks = map[string]string{
+	"aws":     "aws_config",
+	"azure":   "azure_config",
+	"google":  "google_config",
+	"ibm":     "ibm_config",
+	"oracle":  "oracle_config",
+	"vrouter": "vrouter_config",
+	"a-end":   "partner_a_end_config",
+	"transit": "",
+}
+
+func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config vxcResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validateVXCPartnerConfigBlocks(ctx, "a_end_partner_config", config.AEndPartnerConfig, &resp.Diagnostics)
+	validateVXCPartnerConfigBlocks(ctx, "b_end_partner_config", config.BEndPartnerConfig, &resp.Diagnostics)
+}
+
+// The order never sends a block the partner value does not configure, and the
+// state the provider records leaves it out, so the apply fails after the buy.
+func validateVXCPartnerConfigBlocks(ctx context.Context, attribute string, partnerConfig types.Object, diags *diag.Diagnostics) {
+	if partnerConfig.IsNull() || partnerConfig.IsUnknown() {
+		return
+	}
+
+	var model vxcPartnerConfigurationModel
+	modelDiags := partnerConfig.As(ctx, &model, basetypes.ObjectAsOptions{})
+	diags.Append(modelDiags...)
+	if modelDiags.HasError() {
+		return
+	}
+
+	if model.Partner.IsNull() || model.Partner.IsUnknown() {
+		return
+	}
+	partner := model.Partner.ValueString()
+	expected, known := vxcPartnerConfigBlocks[partner]
+	if !known {
+		// An unrecognized partner is the OneOf validator's error to report.
+		return
+	}
+
+	blocks := []struct {
+		name  string
+		value types.Object
+	}{
+		{"aws_config", model.AWSPartnerConfig},
+		{"azure_config", model.AzurePartnerConfig},
+		{"google_config", model.GooglePartnerConfig},
+		{"ibm_config", model.IBMPartnerConfig},
+		{"oracle_config", model.OraclePartnerConfig},
+		{"vrouter_config", model.VrouterPartnerConfig},
+		{"partner_a_end_config", model.PartnerAEndConfig},
+	}
+
+	uses := fmt.Sprintf("Partner %q uses %s.", partner, expected)
+	if expected == "" {
+		uses = fmt.Sprintf("Partner %q uses no configuration block.", partner)
+	}
+
+	for _, block := range blocks {
+		if block.name == expected || block.value.IsNull() || block.value.IsUnknown() {
+			continue
+		}
+		diags.AddAttributeError(
+			path.Root(attribute),
+			"Invalid VXC partner configuration",
+			fmt.Sprintf("%s sets %s. %s Remove %s, or change partner.", attribute, block.name, uses, block.name),
+		)
 	}
 }
 
