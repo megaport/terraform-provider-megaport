@@ -552,8 +552,8 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Grow the LAG before anything else, so a rejected order leaves it untouched. A
 	// decrease never arrives here, because ModifyPlan turns it into a replacement.
 	var lagPortUIDs []string
-	if plannedCount := int(plan.LagCount.ValueInt64()); plannedCount > lagMemberCount(&state) {
-		uids, addDiags := r.addLagPorts(ctx, &plan, plannedCount)
+	if plannedCount, currentCount := int(plan.LagCount.ValueInt64()), lagMemberCount(&state); plannedCount > currentCount {
+		uids, addDiags := r.addLagPorts(ctx, &plan, plannedCount, currentCount)
 		resp.Diagnostics.Append(addDiags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -596,7 +596,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error modifying port",
-			"Could not modify port with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Could not modify port with ID "+state.UID.ValueString()+": "+err.Error()+lagGrowNote(lagPortUIDs),
 		)
 		return
 	}
@@ -605,7 +605,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	if portErr != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading port",
-			"Could not read port with ID "+plan.UID.ValueString()+": "+portErr.Error(),
+			"Could not read port with ID "+plan.UID.ValueString()+": "+portErr.Error()+lagGrowNote(lagPortUIDs),
 		)
 		return
 	}
@@ -620,7 +620,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating port tags",
-				"Could not update port tags with ID "+plan.UID.ValueString()+": "+err.Error(),
+				"Could not update port tags with ID "+plan.UID.ValueString()+": "+err.Error()+lagGrowNote(lagPortUIDs),
 			)
 			return
 		}
@@ -630,7 +630,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	if tagErr != nil {
 		resp.Diagnostics.AddError(
 			"Error reading port tags",
-			"Could not read port tags with ID "+plan.UID.ValueString()+": "+tagErr.Error(),
+			"Could not read port tags with ID "+plan.UID.ValueString()+": "+tagErr.Error()+lagGrowNote(lagPortUIDs),
 		)
 		return
 	}
@@ -770,7 +770,7 @@ func lagMemberCount(state *lagPortResourceModel) int {
 // addLagPorts brings the planned LAG up to target ports and returns the members it ends with.
 // The API builds each new port from this request rather than from the primary, so the LAG's own
 // location and speed have to be sent.
-func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResourceModel, target int) ([]string, diag.Diagnostics) {
+func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResourceModel, target, current int) ([]string, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
 	primary, err := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
@@ -786,6 +786,17 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 		diags.AddError(
 			"Port is not part of a LAG",
 			"Port "+plan.UID.ValueString()+" reports no aggregation ID, so ports cannot be added to it. Please report this issue to Megaport.",
+		)
+		return nil, diags
+	}
+
+	// A product list read that drops an entry it cannot parse looks like a shrunken LAG.
+	// Ordering against that count overshoots, and the next plan then proposes a replace.
+	if primary.LagCount < current {
+		diags.AddError(
+			"LAG member count went backwards",
+			fmt.Sprintf("LAG %s reports %d member ports, and state holds %d. A count that drops points to an incomplete read, so this apply ordered nothing. Run it again.",
+				plan.UID.ValueString(), primary.LagCount, current),
 		)
 		return nil, diags
 	}
@@ -847,4 +858,14 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 	}
 
 	return append(primary.LagPortUIDs, order.TechnicalServiceUIDs...), diags
+}
+
+// lagGrowNote names the ports a grow ordered. Update writes state after the calls that
+// follow the grow, so a failure in one of them leaves the new ports live and unrecorded.
+func lagGrowNote(uids []string) string {
+	if len(uids) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" The grow step already ordered ports. The LAG now holds %d: %s. State does not have them yet, so run the apply again.",
+		len(uids), strings.Join(uids, ", "))
 }

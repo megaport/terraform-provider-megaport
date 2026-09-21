@@ -119,6 +119,7 @@ func TestAddLagPorts(t *testing.T) {
 		aggregationID int
 		memberUIDs    []string
 		target        int
+		current       int
 		wantOrder     bool
 		wantLagCount  float64
 		wantUIDs      []string
@@ -131,6 +132,7 @@ func TestAddLagPorts(t *testing.T) {
 			aggregationID: 7,
 			memberUIDs:    []string{lagPortStubUID, "lag-uid-2", "lag-uid-3"},
 			target:        3,
+			current:       3,
 			wantUIDs:      []string{lagPortStubUID, "lag-uid-2", "lag-uid-3"},
 		},
 		{
@@ -138,8 +140,20 @@ func TestAddLagPorts(t *testing.T) {
 			aggregationID: 7,
 			memberUIDs:    []string{lagPortStubUID, "lag-uid-2"},
 			target:        4,
+			current:       2,
 			wantOrder:     true,
 			wantLagCount:  2,
+			wantError:     true,
+		},
+		{
+			// The product list read drops entries it cannot parse. Ordering against a
+			// short count pushes the LAG past lag_count, and the next plan then
+			// proposes replacing a LAG the customer is still using.
+			name:          "orders nothing when the live read is short",
+			aggregationID: 7,
+			memberUIDs:    []string{lagPortStubUID, "lag-uid-2"},
+			target:        4,
+			current:       3,
 			wantError:     true,
 		},
 		{
@@ -179,7 +193,7 @@ func TestAddLagPorts(t *testing.T) {
 				ResourceTags:          types.MapNull(types.StringType),
 			}
 
-			uids, diags := r.addLagPorts(context.Background(), plan, tc.target)
+			uids, diags := r.addLagPorts(context.Background(), plan, tc.target, tc.current)
 
 			if diags.HasError() != tc.wantError {
 				t.Fatalf("error = %v, want %v (diags: %v)", diags.HasError(), tc.wantError, diags.Errors())
