@@ -1345,8 +1345,8 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 
 		if t := apiIface.IpSecTunnelOptions; t != nil {
 			tunnelModel := ipSecTunnelOptionsModel{
-				SourceIPAddress:      types.StringValue(t.SourceIpAddress),
-				DestinationIPAddress: types.StringValue(t.DestinationIpAddress),
+				SourceIPAddress:      stringOrNull(t.SourceIpAddress),
+				DestinationIPAddress: stringOrNull(t.DestinationIpAddress),
 				PreSharedKey:         types.StringNull(),
 				Passive:              types.BoolPointerValue(t.Passive),
 				LocalID:              stringOrNull(t.LocalId),
@@ -1363,9 +1363,9 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 			poolModels := make([]dhcpPoolModel, 0, len(apiIface.DhcpPools))
 			for _, p := range apiIface.DhcpPools {
 				poolModel := dhcpPoolModel{
-					Network:        types.StringValue(p.Network),
-					StartIPAddress: types.StringValue(p.StartIpAddress),
-					EndIPAddress:   types.StringValue(p.EndIpAddress),
+					Network:        stringOrNull(p.Network),
+					StartIPAddress: stringOrNull(p.StartIpAddress),
+					EndIPAddress:   stringOrNull(p.EndIpAddress),
 					DefaultGateway: stringOrNull(p.DefaultGateway),
 					Description:    stringOrNull(p.Description),
 					DNSServers:     types.ListNull(types.StringType),

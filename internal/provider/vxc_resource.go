@@ -2240,6 +2240,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 		)
 	}
 
+	wroteAny := false
 	for _, end := range []struct {
 		label  string
 		uid    string
@@ -2271,13 +2272,16 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 		diags.Append(buildDiags...)
 		if !obj.IsNull() {
 			*end.target = obj
+			wroteAny = true
 		}
 	}
 
 	// megalith replaces a_csp_request wholesale on an update, so a setting the
-	// configuration omits is dropped by the next apply. A skipped end needs the
-	// same warning: the user writing that end by hand faces the same rule.
-	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
+	// configuration omits is dropped by the next apply. Gated on wroteAny, not
+	// on how many connections the API reported: an ambiguous match or a failed
+	// prefix filter lookup already carries its own warning or error and writes
+	// nothing, so claiming the import wrote settings there would be false.
+	if wroteAny {
 		diags.AddWarning(
 			"Import complete, check the plan before the next apply",
 			"The import wrote the router settings the API returned into state. Run terraform plan and add the settings it reports to the configuration. An apply sends the whole interface and drops whatever the configuration leaves out.",

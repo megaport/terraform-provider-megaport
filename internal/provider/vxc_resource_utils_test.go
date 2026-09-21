@@ -508,11 +508,12 @@ func vrouterInterfacesFromObject(t *testing.T, ctx context.Context, obj basetype
 }
 
 // vrouterBGPFromObject decodes a partner config object down to the first
-// interface's BGP connection models.
-func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.ObjectValue) []bgpConnectionConfigModel {
+// interface's BGP connection models. wantIfaces pins the interface count so a
+// build that drops or duplicates an interface fails here, not silently.
+func vrouterBGPFromObject(t *testing.T, ctx context.Context, obj basetypes.ObjectValue, wantIfaces int) []bgpConnectionConfigModel {
 	t.Helper()
 	ifaces := vrouterInterfacesFromObject(t, ctx, obj)
-	require.NotEmpty(t, ifaces)
+	require.Len(t, ifaces, wantIfaces)
 	var bgps []bgpConnectionConfigModel
 	require.False(t, ifaces[0].BgpConnections.ElementsAs(ctx, &bgps, false).HasError())
 	return bgps
@@ -592,7 +593,7 @@ func TestBuildVrouterPartnerConfigFromAPI_PopulatesBGP(t *testing.T) {
 	assert.True(t, partner.AzurePartnerConfig.IsNull())
 	assert.True(t, partner.PartnerAEndConfig.IsNull())
 
-	bgps := vrouterBGPFromObject(t, ctx, obj)
+	bgps := vrouterBGPFromObject(t, ctx, obj, 2)
 	require.Len(t, bgps, 1)
 	bgp := bgps[0]
 	assert.Equal(t, int64(16550), bgp.PeerAsn.ValueInt64())
@@ -643,7 +644,7 @@ func TestBuildVrouterPartnerConfigFromAPI_OmittedScalarsStayNull(t *testing.T) {
 	require.False(t, diags.HasError())
 	require.False(t, obj.IsNull())
 
-	bgps := vrouterBGPFromObject(t, ctx, obj)
+	bgps := vrouterBGPFromObject(t, ctx, obj, 1)
 	require.Len(t, bgps, 1)
 	bgp := bgps[0]
 	assert.Equal(t, int64(64512), bgp.PeerAsn.ValueInt64())
@@ -682,7 +683,7 @@ func TestBuildVrouterPartnerConfigFromAPI_PasswordNotInState(t *testing.T) {
 	require.False(t, obj.IsNull())
 	assert.Equal(t, 0, diags.WarningsCount(), "the password warning belongs to the caller, which sees the skipped ends too")
 
-	bgps := vrouterBGPFromObject(t, ctx, obj)
+	bgps := vrouterBGPFromObject(t, ctx, obj, 2)
 	require.Len(t, bgps, 1)
 	assert.True(t, bgps[0].Password.IsNull())
 }
@@ -917,8 +918,8 @@ func TestFillVrouterPartnerConfigsOnImport_MatchesEndsByResourceName(t *testing.
 
 	require.False(t, state.AEndPartnerConfig.IsNull())
 	require.False(t, state.BEndPartnerConfig.IsNull())
-	aBgps := vrouterBGPFromObject(t, ctx, state.AEndPartnerConfig)
-	bBgps := vrouterBGPFromObject(t, ctx, state.BEndPartnerConfig)
+	aBgps := vrouterBGPFromObject(t, ctx, state.AEndPartnerConfig, 2)
+	bBgps := vrouterBGPFromObject(t, ctx, state.BEndPartnerConfig, 2)
 	require.Len(t, aBgps, 1)
 	require.Len(t, bBgps, 1)
 	assert.Equal(t, "169.254.145.217", aBgps[0].PeerIPAddress.ValueString())
@@ -941,17 +942,13 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 3, diags.WarningsCount())
+	require.Equal(t, 2, diags.WarningsCount())
 	assert.Contains(t, diags.Warnings()[0].Detail(), "a_end_partner_config")
-	// A user writing this end by hand faces the same rule, so the warning has
-	// to reach a skipped end as well as a rebuilt one.
-	assert.Equal(t, "Import complete, check the plan before the next apply", diags.Warnings()[1].Summary())
-	assert.Equal(t, "Import complete, two BGP settings have no attribute", diags.Warnings()[2].Summary())
+	assert.Equal(t, "Import complete, two BGP settings have no attribute", diags.Warnings()[1].Summary())
 	// Naming a setting the import now reads would send the user to the portal
 	// for a value already in state.
 	for _, attr := range []string{"ip_mtu", "interface_type", "packet_filter", "dhcp_pools", "IPsec", "vlan", "permit_export_to", "deny_export_to"} {
 		assert.NotContains(t, diags.Warnings()[1].Detail(), attr)
-		assert.NotContains(t, diags.Warnings()[2].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")
 	assert.True(t, state.BEndPartnerConfig.IsNull())
@@ -1106,7 +1103,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnlabeledConnection(t *testing.T) {
 
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 3, diags.WarningsCount(), "the unmatched end, plus the two import warnings")
+	require.Equal(t, 2, diags.WarningsCount(), "the unmatched end, plus the BGP-settings warning")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "neither a_csp_connection nor b_csp_connection")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 	assert.True(t, state.BEndPartnerConfig.IsNull())
@@ -1127,7 +1124,7 @@ func TestFillVrouterPartnerConfigsOnImport_UnexpectedResourceName(t *testing.T) 
 	vxc := importVXC(mcrVrouterConn("a_unrelated"), mcrVrouterConn("c_csp_connection"))
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, vxc)
 	assert.False(t, diags.HasError())
-	require.Equal(t, 3, diags.WarningsCount(), "the unmatched ends, plus the two import warnings")
+	require.Equal(t, 2, diags.WarningsCount(), "the unmatched ends, plus the BGP-settings warning")
 	// Both are reported, so a name megalith stops sending cannot go silent.
 	assert.Contains(t, diags.Warnings()[0].Detail(), "2 virtual router connections")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
@@ -1183,7 +1180,7 @@ func TestFillVrouterPartnerConfigsOnImport_DuplicatePrefixListDescription(t *tes
 	// mcrVrouterConn references list 12345 on its BGP connection.
 	diags := r.fillVrouterPartnerConfigsOnImport(ctx, state, importVXC(mcrVrouterConn("a_csp_connection")))
 	assert.False(t, diags.HasError())
-	require.Equal(t, 3, diags.WarningsCount(), "the shared description, plus the two import warnings")
+	require.Equal(t, 2, diags.WarningsCount(), "the shared description, plus the BGP-settings warning")
 	assert.Contains(t, diags.Warnings()[0].Detail(), "shares the description")
 	assert.True(t, state.AEndPartnerConfig.IsNull())
 }
