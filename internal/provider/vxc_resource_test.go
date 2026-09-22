@@ -5666,8 +5666,9 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantWarnPartner: "aws",
 		},
 		{
-			// An imported AWS VXC records prefixes as null. Setting it fills
-			// the gap: recorded and warned about, like the null-state case.
+			// An imported AWS VXC records prefixes as null when the API reports
+			// none. Setting it fills the gap: recorded and warned about, like the
+			// null-state case.
 			name:            "csp_fills_null_prefixes",
 			rebuiltOnImport: true,
 			state:           ty.awsVal(knownKey("same")),
