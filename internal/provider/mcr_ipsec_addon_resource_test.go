@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -41,6 +42,82 @@ func TestIsIPsecTunnelsConfiguredError(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDeleteAddOnAwaitingTunnels covers the loop's exits. The retry interval is
+// 15s, so the retry itself is proved by cancelling the context during the wait:
+// a loop that returned the API error instead would never reach that branch.
+func TestDeleteAddOnAwaitingTunnels(t *testing.T) {
+	// waitForTime is a package var the provider sets at Configure time, so it is
+	// zero here and the loop would never retry. Not parallel: it is shared state.
+	prevWaitForTime := waitForTime
+	waitForTime = 30 * time.Second
+	t.Cleanup(func() { waitForTime = prevWaitForTime })
+
+	tunnelsErr := notFoundResponseErr(http.StatusBadRequest,
+		"IPSec validation failed: You cannot disable IPSec when there are 1 tunnels configured. Please remove them first.")
+
+	newResource := func(fn func(ctx context.Context, mcrID, addOnUID string, tunnelCount int) error) *mcrIpsecAddonResource {
+		return &mcrIpsecAddonResource{client: &megaport.Client{
+			MCRService: &MockMCRService{UpdateMCRIPsecAddOnFunc: fn},
+		}}
+	}
+
+	t.Run("disables the add-on and returns", func(t *testing.T) {
+		calls := 0
+		var gotCount int
+		r := newResource(func(_ context.Context, _, _ string, tunnelCount int) error {
+			calls++
+			gotCount = tunnelCount
+			return nil
+		})
+
+		if err := r.deleteAddOnAwaitingTunnels(context.Background(), "mcr-1", "addon-1"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("UpdateMCRIPsecAddOn called %d times, want 1", calls)
+		}
+		if gotCount != 0 {
+			t.Errorf("tunnel_count = %d, want 0", gotCount)
+		}
+	})
+
+	t.Run("returns an unrelated error without retrying", func(t *testing.T) {
+		calls := 0
+		wantErr := notFoundResponseErr(http.StatusBadRequest, "Could not find a service with UID")
+		r := newResource(func(_ context.Context, _, _ string, _ int) error {
+			calls++
+			return wantErr
+		})
+
+		err := r.deleteAddOnAwaitingTunnels(context.Background(), "mcr-1", "addon-1")
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("err = %v, want the API error", err)
+		}
+		if calls != 1 {
+			t.Errorf("UpdateMCRIPsecAddOn called %d times, want 1", calls)
+		}
+	})
+
+	t.Run("waits while the API reports tunnels configured", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		calls := 0
+		r := newResource(func(_ context.Context, _, _ string, _ int) error {
+			calls++
+			cancel()
+			return tunnelsErr
+		})
+
+		err := r.deleteAddOnAwaitingTunnels(ctx, "mcr-1", "addon-1")
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("err = %v, want context.Canceled; the loop returned instead of waiting to retry", err)
+		}
+		if calls != 1 {
+			t.Errorf("UpdateMCRIPsecAddOn called %d times, want 1", calls)
+		}
+	})
 }
 
 func TestAccMegaportMCRIpsecAddon_Basic(t *testing.T) {
