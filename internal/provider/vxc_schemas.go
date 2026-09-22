@@ -50,7 +50,7 @@ var (
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
-				Description: "The prefixes of the partner configuration. An import leaves this value null.",
+				Description: "The prefixes of the partner configuration.",
 				Optional:    true,
 			},
 			"customer_ip_address": schema.StringAttribute{
