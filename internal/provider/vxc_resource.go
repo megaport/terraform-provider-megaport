@@ -1359,8 +1359,7 @@ func validateVXCPartnerConfigBlocks(ctx context.Context, attribute string, partn
 		if block.name == expected || block.value.IsNull() || block.value.IsUnknown() {
 			continue
 		}
-		diags.AddAttributeError(
-			path.Root(attribute),
+		diags.AddError(
 			"Invalid VXC partner configuration",
 			fmt.Sprintf("%s sets %s. %s Remove %s, or change partner.", attribute, block.name, uses, block.name),
 		)
