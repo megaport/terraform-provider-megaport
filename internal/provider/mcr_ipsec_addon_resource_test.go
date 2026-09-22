@@ -28,6 +28,7 @@ func TestIsIPsecTunnelsConfiguredError(t *testing.T) {
 		{"nil", nil, false},
 		{"400 configured tunnels", apiErr(http.StatusBadRequest, "Invalid ipsec_tunnels. Requested limit is less than number of configured tunnels."), true},
 		{"400 configured tunnels wrapped", fmt.Errorf("delete failed: %w", apiErr(http.StatusBadRequest, "number of configured tunnels")), true},
+		{"400 tunnels configured", apiErr(http.StatusBadRequest, "IPSec validation failed: You cannot disable IPSec when there are 1 tunnels configured. Please remove them first."), true},
 		{"400 unrelated message", apiErr(http.StatusBadRequest, "Could not find a service with UID"), false},
 		{"404 configured tunnels", apiErr(http.StatusNotFound, "configured tunnels"), false},
 		{"plain error", errors.New("configured tunnels"), false},
