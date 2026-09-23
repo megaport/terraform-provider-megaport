@@ -13,6 +13,11 @@ import (
 // the block and each timer inside it read the message from here.
 const bfdDeprecationMessage = "Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
 
+// Both the vRouter and the deprecated a-end shape repeat the BGP connection
+// password field, and either end can carry the AWS config or the vRouter
+// config, so the description lives here once.
+const awsBGPPasswordDescription = "The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = \"AWS\"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key."
+
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The AWS partner configuration.",
@@ -37,7 +42,7 @@ var (
 				Required:    true,
 			},
 			"asn": schema.Int64Attribute{
-				Description: "The ASN of the partner configuration.",
+				Description: "The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.",
 				Optional:    true,
 			},
 			"amazon_asn": schema.Int64Attribute{
@@ -45,7 +50,7 @@ var (
 				Optional:    true,
 			},
 			"auth_key": schema.StringAttribute{
-				Description: "The authentication key of the partner configuration.",
+				Description: "The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.",
 				Sensitive:   true,
 				Optional:    true,
 			},
@@ -77,7 +82,7 @@ var (
 				Sensitive:   true,
 			},
 			"port_choice": schema.StringAttribute{
-				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.",
+				Description: "Which port to choose when building the VXC. Can either be 'primary' or 'secondary'. An import leaves this value null, so set it before the first apply after an import.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("primary", "secondary"),
@@ -309,6 +314,39 @@ var (
 								},
 							},
 						},
+						"dhcp_pools": schema.ListNestedAttribute{
+							Description: "The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import.",
+							Optional:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"network": schema.StringAttribute{
+										Description: "IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.",
+										Required:    true,
+									},
+									"start_ip_address": schema.StringAttribute{
+										Description: "First IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"end_ip_address": schema.StringAttribute{
+										Description: "Last IPv4 address in the range to assign to DHCP clients.",
+										Required:    true,
+									},
+									"default_gateway": schema.StringAttribute{
+										Description: "IPv4 address of a default gateway to offer DHCP clients.",
+										Optional:    true,
+									},
+									"description": schema.StringAttribute{
+										Description: "Description for the DHCP pool. Maximum 100 characters.",
+										Optional:    true,
+									},
+									"dns_servers": schema.ListAttribute{
+										Description: "IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.",
+										Optional:    true,
+										ElementType: types.StringType,
+									},
+								},
+							},
+						},
 						"bgp_connections": schema.ListNestedAttribute{
 							Description: "The BGP connections of the partner configuration interface.",
 							Optional:    true,
@@ -338,7 +376,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: awsBGPPasswordDescription,
 										Sensitive:   true,
 										Optional:    true,
 									},
@@ -493,7 +531,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: awsBGPPasswordDescription,
 										Sensitive:   true,
 										Optional:    true,
 									},

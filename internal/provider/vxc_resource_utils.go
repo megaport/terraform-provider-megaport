@@ -11,11 +11,36 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
+
+// serviceKeyImportedPrivateKey marks that the null service_key in state came
+// from the read after an import, not from an ordinary VXC that was never
+// given a key. Read sets it; Update clears it once the key is recorded.
+const serviceKeyImportedPrivateKey = "service_key_imported"
+
+// requiresReplaceServiceKey replaces the VXC on any service key change,
+// except recording a key for the first time on a VXC imported without one.
+// The API never returns the key, so an imported VXC has it null in state
+// regardless of whether the live VXC has one; the private flag tells that
+// case apart from an ordinary VXC that was simply created with no key, which
+// must still replace so the key actually reaches the API.
+func requiresReplaceServiceKey(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	if !req.StateValue.IsNull() {
+		resp.RequiresReplace = true
+		return
+	}
+
+	imported, diags := req.Private.GetKey(ctx, serviceKeyImportedPrivateKey)
+	resp.Diagnostics.Append(diags...)
+	resp.RequiresReplace = len(imported) == 0
+}
 
 // resolvePrefixListID looks up a prefix filter list by description on the
 // supplied slice (typically returned by vrouterPrefixFilterListsForEndpoint).
@@ -72,7 +97,13 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	orm.SecondaryName = types.StringValue(v.SecondaryName)
 	orm.UsageAlgorithm = types.StringValue(v.UsageAlgorithm)
 	orm.CreatedBy = types.StringValue(v.CreatedBy)
-	orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
+	// megalith only sets up billing once the order is fully approved, so a VXC
+	// still awaiting approval reports the default 1-month term. Keep the
+	// configured value until the order is approved, or Terraform rejects the
+	// apply as an inconsistent result.
+	if !vxcOrderPendingApproval(v.VXCApproval) || orm.ContractTermMonths.IsNull() {
+		orm.ContractTermMonths = types.Int64Value(int64(v.ContractTermMonths))
+	}
 	orm.CompanyUID = types.StringValue(v.CompanyUID)
 	orm.CompanyName = types.StringValue(v.CompanyName)
 	orm.Shutdown = types.BoolValue(v.Shutdown)
@@ -105,13 +136,23 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 	var aEndInnerVLAN, bEndInnerVLAN *int64
 	var aEndVnicIndex, bEndVnicIndex *int64
 	var aEndRequestedProductUID, bEndRequestedProductUID string
+	// Neither end has a requested_product_uid until state or plan actually
+	// supplies one. An import supplies neither, so it stays null: recording
+	// the port the order landed on would pin a cloud end to it, because
+	// ModifyPlan holds a cloud end at the value state already carries. A
+	// managed refresh must not collapse this with a cloud end that legitimately
+	// never requested a port, which state already holds as an empty string.
+	aEndRequestedProductUIDNull, bEndRequestedProductUIDNull := true, true
 
 	// First, try to get values from existing state
 	if !orm.AEndConfiguration.IsNull() {
 		existingAEnd := &vxcEndConfigurationModel{}
 		aEndDiags := orm.AEndConfiguration.As(ctx, existingAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, aEndDiags...)
-		aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+		if !existingAEnd.RequestedProductUID.IsNull() {
+			aEndRequestedProductUID = existingAEnd.RequestedProductUID.ValueString()
+			aEndRequestedProductUIDNull = false
+		}
 		if !existingAEnd.OrderedVLAN.IsNull() && !existingAEnd.OrderedVLAN.IsUnknown() {
 			vlan := existingAEnd.OrderedVLAN.ValueInt64()
 			aEndOrderedVLAN = &vlan
@@ -136,8 +177,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		planDiags := plan.AEndConfiguration.As(ctx, planAEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, planDiags...)
 
-		if aEndRequestedProductUID == "" && !planAEnd.RequestedProductUID.IsNull() {
+		if aEndRequestedProductUIDNull && !planAEnd.RequestedProductUID.IsNull() {
 			aEndRequestedProductUID = planAEnd.RequestedProductUID.ValueString()
+			aEndRequestedProductUIDNull = false
 		}
 		if aEndOrderedVLAN == nil && !planAEnd.OrderedVLAN.IsNull() && !planAEnd.OrderedVLAN.IsUnknown() {
 			vlan := planAEnd.OrderedVLAN.ValueInt64()
@@ -153,9 +195,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
+	aEndRequestedProductUIDValue := types.StringNull()
+	if !aEndRequestedProductUIDNull {
+		aEndRequestedProductUIDValue = types.StringValue(aEndRequestedProductUID)
+	}
+
 	aEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.AEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(aEndRequestedProductUID),
+		RequestedProductUID:   aEndRequestedProductUIDValue,
 		CurrentProductUID:     types.StringValue(v.AEndConfiguration.UID),
 		Name:                  types.StringValue(v.AEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.AEndConfiguration.LocationID)),
@@ -211,7 +258,10 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 			idx := existingBEnd.NetworkInterfaceIndex.ValueInt64()
 			bEndVnicIndex = &idx
 		}
-		bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+		if !existingBEnd.RequestedProductUID.IsNull() {
+			bEndRequestedProductUID = existingBEnd.RequestedProductUID.ValueString()
+			bEndRequestedProductUIDNull = false
+		}
 	}
 
 	// If plan is provided and state values are empty, use plan values for B-End.
@@ -220,8 +270,9 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		planDiags := plan.BEndConfiguration.As(ctx, planBEnd, basetypes.ObjectAsOptions{})
 		apiDiags = append(apiDiags, planDiags...)
 
-		if bEndRequestedProductUID == "" && !planBEnd.RequestedProductUID.IsNull() {
+		if bEndRequestedProductUIDNull && !planBEnd.RequestedProductUID.IsNull() {
 			bEndRequestedProductUID = planBEnd.RequestedProductUID.ValueString()
+			bEndRequestedProductUIDNull = false
 		}
 		if bEndOrderedVLAN == nil && !planBEnd.OrderedVLAN.IsNull() && !planBEnd.OrderedVLAN.IsUnknown() {
 			vlan := planBEnd.OrderedVLAN.ValueInt64()
@@ -237,9 +288,14 @@ func (orm *vxcResourceModel) fromAPIVXC(ctx context.Context, v *megaport.VXC, ta
 		}
 	}
 
+	bEndRequestedProductUIDValue := types.StringNull()
+	if !bEndRequestedProductUIDNull {
+		bEndRequestedProductUIDValue = types.StringValue(bEndRequestedProductUID)
+	}
+
 	bEndModel := &vxcEndConfigurationModel{
 		OwnerUID:              types.StringValue(v.BEndConfiguration.OwnerUID),
-		RequestedProductUID:   types.StringValue(bEndRequestedProductUID),
+		RequestedProductUID:   bEndRequestedProductUIDValue,
 		CurrentProductUID:     types.StringValue(v.BEndConfiguration.UID),
 		Name:                  types.StringValue(v.BEndConfiguration.Name),
 		LocationID:            types.Int64Value(int64(v.BEndConfiguration.LocationID)),
@@ -692,6 +748,27 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 			}
 			toAppend.IpSecTunnelOptions = &tunnel
 		}
+		if !iface.DhcpPools.IsNull() && !iface.DhcpPools.IsUnknown() {
+			pools := []*dhcpPoolModel{}
+			poolDiags := iface.DhcpPools.ElementsAs(ctx, &pools, false)
+			diags.Append(poolDiags...)
+			for _, pool := range pools {
+				poolToAppend := megaport.DhcpPoolConfig{
+					Network:        pool.Network.ValueString(),
+					StartIpAddress: pool.StartIPAddress.ValueString(),
+					EndIpAddress:   pool.EndIPAddress.ValueString(),
+					DefaultGateway: pool.DefaultGateway.ValueString(),
+					Description:    pool.Description.ValueString(),
+				}
+				if !pool.DNSServers.IsNull() && !pool.DNSServers.IsUnknown() {
+					dnsServers := []string{}
+					dnsDiags := pool.DNSServers.ElementsAs(ctx, &dnsServers, true)
+					diags.Append(dnsDiags...)
+					poolToAppend.DnsServers = dnsServers
+				}
+				toAppend.DhcpPools = append(toAppend.DhcpPools, poolToAppend)
+			}
+		}
 		vrouterPartnerConfig.Interfaces = append(vrouterPartnerConfig.Interfaces, toAppend)
 	}
 	vrouterConfigObj, bEndDiags := types.ObjectValueFrom(ctx, vxcPartnerConfigVrouterAttrs, vrouterConfig)
@@ -720,14 +797,11 @@ func createVrouterPartnerConfig(ctx context.Context, vrouterConfig vxcPartnerCon
 func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPartnerConfigAEndModel, prefixFilterList []*megaport.PrefixFilterList) (diag.Diagnostics, *megaport.VXCOrderVrouterPartnerConfig, basetypes.ObjectValue) {
 	diags := diag.Diagnostics{}
 	aEndMegaportConfig := &megaport.VXCOrderVrouterPartnerConfig{}
-	ifaceModels := []*vxcPartnerConfigInterfaceModel{}
+	ifaceModels := []*vxcPartnerConfigAEndInterfaceModel{}
 	ifaceDiags := partnerConfigAEndModel.Interfaces.ElementsAs(ctx, &ifaceModels, true)
 	diags.Append(ifaceDiags...)
 	for _, iface := range ifaceModels {
 		toAppend := megaport.PartnerConfigInterface{}
-		if !iface.IpMtu.IsNull() {
-			toAppend.IpMtu = int(iface.IpMtu.ValueInt64())
-		}
 		if !iface.IPAddresses.IsNull() {
 			ipAddresses := []string{}
 			ipDiags := iface.IPAddresses.ElementsAs(ctx, &ipAddresses, true)
@@ -763,7 +837,7 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 			}
 		}
 		if !iface.BgpConnections.IsNull() {
-			bgpConnections := []*bgpConnectionConfigModel{}
+			bgpConnections := []*aEndBgpConnectionConfigModel{}
 			bgpDiags := iface.BgpConnections.ElementsAs(ctx, &bgpConnections, false)
 			diags.Append(bgpDiags...)
 			for _, bgpConnection := range bgpConnections {
@@ -846,36 +920,163 @@ func createAEndPartnerConfig(ctx context.Context, partnerConfigAEndModel vxcPart
 	return diags, aEndMegaportConfig, partnerConfigObj
 }
 
-// fillTransitPartnerConfigOnImport records b_end_partner_config as "transit"
-// when the B-End CSP connection is a transit connection. The transit config
-// carries no settings, so the read has everything the block needs. One
-// "b_csp_connection" match fills it; more than one is left for the user.
-func (orm *vxcResourceModel) fillTransitPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
+// fillBEndPartnerConfigOnImport records b_end_partner_config from the B-End CSP
+// connection: transit, AWS, AWS hosted connection, Azure, Google, or Oracle. It
+// records the settings a configuration has to carry, and leaves the ones the
+// cloud assigns null: recording those would clash with a configuration that
+// omits them, and the update check treats that as a change it cannot send. One
+// "b_csp_connection" the import can read fills the block, more than one is left
+// for the user.
+func (orm *vxcResourceModel) fillBEndPartnerConfigOnImport(ctx context.Context, v *megaport.VXC) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if !orm.BEndPartnerConfig.IsNull() || v.Resources == nil || v.Resources.CSPConnection == nil {
 		return diags
 	}
-	matches := 0
+	var matches []megaport.CSPConnectionConfig
 	for _, c := range v.Resources.CSPConnection.CSPConnection {
-		if transit, ok := c.(megaport.CSPConnectionTransit); ok && transit.ResourceName == "b_csp_connection" {
-			matches++
+		if bEndImportCSPConnection(c) {
+			matches = append(matches, c)
 		}
 	}
-	switch matches {
+	const notRecorded = "b_end_partner_config not recorded on import"
+	switch len(matches) {
 	case 0:
-	case 1:
-		transitDiags, _, transitObj := createTransitPartnerConfig(ctx)
-		diags.Append(transitDiags...)
-		if !diags.HasError() {
-			orm.BEndPartnerConfig = transitObj
+		if bEndCSPConnectionPresent(v) {
+			diags.AddWarning(
+				notRecorded,
+				"The provider cannot rebuild b_end_partner_config from the B-End connection this VXC uses. Add the block to the configuration by hand.",
+			)
 		}
+		return diags
+	case 1:
 	default:
 		diags.AddWarning(
-			"b_end_partner_config not recorded on import",
-			fmt.Sprintf("The VXC has %d transit B-End connections, so the provider cannot tell which one to record. Add b_end_partner_config = { partner = \"transit\" } to the configuration by hand.", matches),
+			notRecorded,
+			fmt.Sprintf("The VXC has %d B-End connections the import can read, so the provider cannot tell which one to record. Add b_end_partner_config to the configuration by hand.", len(matches)),
 		)
+		return diags
+	}
+
+	// A caller without permission on the B-End gets the connection stripped back
+	// to its resource name and connect type, which would rebuild a block holding
+	// nothing but the partner name.
+	if !bEndImportCarriesSettings(matches[0]) {
+		diags.AddWarning(
+			notRecorded,
+			"The read of the B-End connection carries none of the settings b_end_partner_config needs. Add the block to the configuration by hand.",
+		)
+		return diags
+	}
+
+	const summary = "Import complete, some settings need adding by hand"
+	const recordsOnNextApply = "Setting one records the value in Terraform state on the next apply, which does not change the live VXC."
+	var partnerDiags diag.Diagnostics
+	var partnerObj basetypes.ObjectValue
+	switch conn := matches[0].(type) {
+	case megaport.CSPConnectionTransit:
+		partnerDiags, _, partnerObj = createTransitPartnerConfig(ctx)
+	case megaport.CSPConnectionAWS:
+		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{
+			ConnectType:    stringOrNull(conn.ConnectType),
+			Type:           stringOrNull(conn.Type),
+			OwnerAccount:   stringOrNull(conn.OwnerAccount),
+			Prefixes:       stringOrNull(string(conn.Prefixes)),
+			ConnectionName: stringOrNull(conn.Name),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address null in b_end_partner_config. AWS assigns those values when the order leaves them out, and the read cannot tell an assigned value from one the configuration set. "+recordsOnNextApply+" The import records aws_config.prefixes as the API reports it. A configuration that leaves it out fails the next apply, so copy the recorded value into the configuration.",
+		)
+	case megaport.CSPConnectionAWSHC:
+		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{
+			ConnectType:    stringOrNull(conn.ConnectType),
+			OwnerAccount:   stringOrNull(conn.OwnerAccount),
+			ConnectionName: stringOrNull(conn.Name),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves aws_config.type, aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, aws_config.amazon_ip_address, and aws_config.prefixes null in b_end_partner_config. The read of an AWS hosted connection carries none of them. "+recordsOnNextApply,
+		)
+	case megaport.CSPConnectionAzure:
+		partnerDiags, _, partnerObj = createAzurePartnerConfig(ctx, vxcPartnerConfigAzureModel{
+			ServiceKey: stringOrNull(conn.ServiceKey),
+			Peers:      types.ListNull(types.ObjectType{AttrTypes: partnerOrderAzurePeeringConfigAttrs}),
+		})
+		diags.AddWarning(
+			summary,
+			"The import leaves azure_config.port_choice and azure_config.peers null in b_end_partner_config. Set azure_config.port_choice to the port the live service uses, primary or secondary. "+recordsOnNextApply,
+		)
+	case megaport.CSPConnectionGoogle:
+		partnerDiags, _, partnerObj = createGooglePartnerConfig(ctx, vxcPartnerConfigGoogleModel{
+			PairingKey: stringOrNull(conn.PairingKey),
+		})
+	case megaport.CSPConnectionOracle:
+		partnerDiags, _, partnerObj = createOraclePartnerConfig(ctx, vxcPartnerConfigOracleModel{
+			VirtualCircuitId: stringOrNull(conn.VirtualCircuitId),
+		})
+	default:
+		return diags
+	}
+	diags.Append(partnerDiags...)
+	if !diags.HasError() {
+		orm.BEndPartnerConfig = partnerObj
 	}
 	return diags
+}
+
+// bEndImportCSPConnection reports whether c is a B-End connection the import
+// rebuilds a partner config from.
+func bEndImportCSPConnection(c megaport.CSPConnectionConfig) bool {
+	switch conn := c.(type) {
+	case megaport.CSPConnectionTransit:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionAWS:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionAWSHC:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionAzure:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionGoogle:
+		return conn.ResourceName == "b_csp_connection"
+	case megaport.CSPConnectionOracle:
+		return conn.ResourceName == "b_csp_connection"
+	}
+	return false
+}
+
+// bEndCSPConnectionPresent reports whether the VXC has a B-End CSP connection at
+// all, whatever its partner. It separates a VXC whose B-End the import cannot
+// rebuild, such as IBM, from one that has no B-End CSP connection to rebuild.
+func bEndCSPConnectionPresent(v *megaport.VXC) bool {
+	for _, c := range v.Resources.CSPConnection.CSPConnection {
+		if ibm, ok := c.(megaport.CSPConnectionIBM); ok && ibm.ResourceName == "b_csp_connection" {
+			return true
+		}
+		if bEndImportCSPConnection(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// bEndImportCarriesSettings reports whether c holds any setting the import
+// records. A transit config carries none by design, so it always qualifies.
+func bEndImportCarriesSettings(c megaport.CSPConnectionConfig) bool {
+	switch conn := c.(type) {
+	case megaport.CSPConnectionTransit:
+		return true
+	case megaport.CSPConnectionAWS:
+		return conn.Type != "" || conn.OwnerAccount != "" || conn.Name != ""
+	case megaport.CSPConnectionAWSHC:
+		return conn.OwnerAccount != "" || conn.Name != ""
+	case megaport.CSPConnectionAzure:
+		return conn.ServiceKey != ""
+	case megaport.CSPConnectionGoogle:
+		return conn.PairingKey != ""
+	case megaport.CSPConnectionOracle:
+		return conn.VirtualCircuitId != ""
+	}
+	return false
 }
 
 func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport.VXCPartnerConfigTransit, basetypes.ObjectValue) {
@@ -907,6 +1108,16 @@ func createTransitPartnerConfig(ctx context.Context) (diag.Diagnostics, megaport
 	diags.Append(transitDiags...)
 
 	return diags, transitPartnerConfig, transitConfigObj
+}
+
+// movesPort reports whether Update sends this end to a different port. A
+// partner port that rotated under us (the planned UID is already the current
+// one) is not a move, and a CSP end is never moved.
+func movesPort(plan, state *vxcEndConfigurationModel, isCSP bool) bool {
+	return !plan.RequestedProductUID.IsNull() &&
+		!plan.RequestedProductUID.Equal(state.RequestedProductUID) &&
+		!isCSP &&
+		!plan.RequestedProductUID.Equal(state.CurrentProductUID)
 }
 
 func supportVLANUpdates(partnerType string) bool {
@@ -1147,6 +1358,67 @@ func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
 	return "Error Updating VXC", fmt.Sprintf("Could not update VXC with ID %s: %s", vxcUID, err.Error())
 }
 
+type vlanPreflightInput struct {
+	svc         megaport.PortService
+	end         string // "A-End" or "B-End", used in the error message
+	productUID  string
+	productType string
+	orderedVLAN types.Int64
+	// currentVLAN is what this end already holds, so pinning an API-allocated
+	// VLAN is not mistaken for requesting a taken one. Null on create.
+	currentVLAN types.Int64
+	// hasPartnerConfig marks an end whose port Megaport picks, so the requested
+	// UID may not be the port the order lands on.
+	hasPartnerConfig bool
+}
+
+// vlanAvailabilityPreflight turns a taken VLAN into a clear error naming the end
+// and the port, instead of the backend's "VLAN N not available on service <id>",
+// an internal id the user cannot map to their config. Only an explicit "taken"
+// answer is acted on: the API answers per port but VLANs are unique across a CSP
+// capacity group, so "available" does not mean the order will be accepted.
+func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if in.orderedVLAN.IsNull() || in.orderedVLAN.IsUnknown() {
+		return diags
+	}
+	vlan := int(in.orderedVLAN.ValueInt64())
+	// 0 auto-assigns and -1 is untagged, so neither pins a VLAN to check.
+	if vlan <= 0 {
+		return diags
+	}
+	// Asking to keep the VLAN this end already holds always reads as unavailable.
+	if !in.currentVLAN.IsNull() && !in.currentVLAN.IsUnknown() && int(in.currentVLAN.ValueInt64()) == vlan {
+		return diags
+	}
+	// The API may rotate a Partner Port to a sibling in the same location and
+	// diversity zone, so the requested port's answer can be the wrong port's.
+	if in.hasPartnerConfig {
+		return diags
+	}
+	// MVE VLANs are scoped per vNIC and MCR/VRouter ends can dictate their own,
+	// so a per-service answer there could wrongly block a valid order.
+	if in.productUID == "" || !strings.EqualFold(in.productType, megaport.PRODUCT_MEGAPORT) {
+		return diags
+	}
+
+	available, err := in.svc.CheckPortVLANAvailability(ctx, in.productUID, vlan)
+	if err != nil {
+		tflog.Debug(ctx, "VLAN availability preflight skipped", map[string]any{
+			"end": in.end, "product_uid": in.productUID, "vlan": vlan, "error": err.Error(),
+		})
+		return diags
+	}
+	if !available {
+		diags.AddError(
+			fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end),
+			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
+		)
+	}
+	return diags
+}
+
 // prefixFilterIDToName resolves a prefix filter list ID to its description.
 // The second return is false when a set ID is missing from the map, which means
 // the caller cannot rebuild the config faithfully.
@@ -1167,7 +1439,8 @@ func prefixFilterIDToName(id int, pflMap map[int]string) (basetypes.StringValue,
 // Some attributes always stay null. The BGP password is deliberate: the API
 // does return it, and writing it would persist a live MD5 key in plain text in
 // state. megaportgo does not model the interface-level ip_mtu, vlan,
-// description, interface_type, packet filters or IPsec tunnel options, and the
+// description, interface_type, packet filters, IPsec tunnel options or DHCP
+// pools, and the
 // read never echoes permit_export_to or deny_export_to. The caller warns about
 // those, because they are missing whether or not this rebuild runs. The
 // interface bfd block is the one exception. megalith does not re-serialize it
@@ -1189,6 +1462,7 @@ func buildVrouterPartnerConfigFromAPI(ctx context.Context, vrConn megaport.CSPCo
 			PacketFilterIn:     types.Int64Null(),
 			PacketFilterOut:    types.Int64Null(),
 			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 			IPAddresses:        types.ListNull(types.StringType),
 			NatIPAddresses:     types.ListNull(types.StringType),
 			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
