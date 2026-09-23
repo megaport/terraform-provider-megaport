@@ -799,6 +799,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.AddError(
 			"vendor config required", "vendor config required",
 		)
+		return
 	}
 	vcModel := &vendorConfigModel{}
 	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
@@ -839,16 +840,30 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
-
-	if err != nil {
+	if err != nil && createdMVE == nil {
 		resp.Diagnostics.AddError(
-			"Error Reading MVE",
+			"Error Creating MVE",
 			"Could not create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	createdID := createdMVE.TechnicalServiceUID
+
+	// Persist the UID immediately so any failure below leaves a tracked
+	// (tainted) resource instead of an orphan that later applies try to recreate.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"MVE ordered but not ready",
+			"MVE "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+		)
+		return
+	}
 
 	// get the created MVE
 	mve, err := getMVEWithVnics(ctx, r.client.MVEService, createdID)

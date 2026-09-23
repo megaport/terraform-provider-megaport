@@ -577,7 +577,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	// Create the IX
 	ixResp, err := r.client.IXService.BuyIX(ctx, buyReq)
-	if err != nil {
+	if err != nil && ixResp == nil {
 		resp.Diagnostics.AddError(
 			"Error creating IX",
 			"Could not create IX, unexpected error: "+err.Error(),
@@ -585,8 +585,25 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	createdID := ixResp.TechnicalServiceUID
+
+	// Persist the UID immediately so any failure below leaves a tracked
+	// (tainted) resource instead of an orphan that later applies try to recreate.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"IX ordered but not ready",
+			"IX "+plan.ProductName.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+		)
+		return
+	}
+
 	// Get the created IX
-	ix, err := r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
+	ix, err := r.client.IXService.GetIX(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading IX",

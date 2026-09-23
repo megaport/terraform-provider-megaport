@@ -407,7 +407,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
-	if err != nil {
+	if err != nil && createdPort == nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
@@ -424,6 +424,21 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
+
+	// Persist the UID immediately so any failure below leaves a tracked
+	// (tainted) resource instead of an orphan that later applies try to recreate.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"LAG port ordered but not ready",
+			"LAG port "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+		)
+		return
+	}
 
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
@@ -844,7 +859,7 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 	if err != nil {
 		diags.AddError(
 			"Error adding ports to the LAG",
-			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the LAG does not count the new ports until they provision, so applying again before then orders more ports.",
+			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the next refresh counts the new ports, and applying again does not order more.",
 				count, plan.UID.ValueString(), err.Error()),
 		)
 		return nil, diags
