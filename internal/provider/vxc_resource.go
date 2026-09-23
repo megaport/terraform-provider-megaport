@@ -2,9 +2,11 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,77 @@ import (
 
 // Update Timeout for VXC Update Verification - will be configurable in future release.
 const updateTimeout = 120 * time.Second
+
+// Approval statuses the API reports on vxcApproval while a cross-organization
+// order waits for a party to approve it (megalith OpenAPI VxcApprovalStatus).
+const (
+	vxcApprovalPendingInternal = "PENDING_INTERNAL"
+	vxcApprovalPendingExternal = "PENDING_EXTERNAL"
+)
+
+// vxcApprovalTypeNew is the vxcApproval.Type for a new-order approval, as
+// opposed to a speed-change approval on an existing VXC.
+const vxcApprovalTypeNew = "NEW"
+
+// Provisioning statuses the SDK defines no constant for. FAILED follows a
+// rejected or 60-day-expired order; CANCELLED_PARENT follows the cancellation
+// of a parent service.
+const (
+	vxcStatusFailed          = "FAILED"
+	vxcStatusCancelledParent = "CANCELLED_PARENT"
+)
+
+// vxcPendingApprovalError signals that an ordered VXC is waiting on order
+// approval rather than provisioning.
+type vxcPendingApprovalError struct {
+	approval megaport.VXCApproval
+}
+
+func (e *vxcPendingApprovalError) Error() string {
+	return fmt.Sprintf("VXC is pending approval (%s)", e.approval.Status)
+}
+
+// vxcOrderPendingApproval reports whether the API says a party still has to
+// approve this VXC order.
+func vxcOrderPendingApproval(approval *megaport.VXCApproval) bool {
+	return approval != nil &&
+		(approval.Status == vxcApprovalPendingInternal || approval.Status == vxcApprovalPendingExternal)
+}
+
+// approvingParty renders the trading name the API reports on a new-order
+// approval. The name belongs to another organization, which chooses its own
+// text, so quote it rather than pass control characters to the terminal.
+func approvingParty(approval megaport.VXCApproval) string {
+	const maxLen = 120
+	if approval.Message == "" {
+		return ""
+	}
+	name := approval.Message
+	// Cut on runes, not bytes, so a multi-byte name does not end mid-character.
+	if runes := []rune(name); len(runes) > maxLen {
+		name = string(runes[:maxLen]) + "..."
+	}
+	return strconv.Quote(name)
+}
+
+// vxcPendingApprovalWarning builds the create-time warning detail for a VXC
+// that was ordered but still needs approval. PENDING_INTERNAL means the
+// caller's own organization must approve, PENDING_EXTERNAL the counterparty.
+func vxcPendingApprovalWarning(name, uid string, approval megaport.VXCApproval) string {
+	party := approvingParty(approval)
+	if approval.Status == vxcApprovalPendingInternal {
+		detail := "VXC " + name + " (" + uid + ") was ordered successfully but requires approval from your own organization"
+		if party != "" {
+			detail += " (" + party + ")"
+		}
+		return detail + " before it can deploy. Approve the order in the Megaport portal. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
+	}
+	detail := "VXC " + name + " (" + uid + ") was ordered successfully and is waiting for approval"
+	if party != "" {
+		detail += " by " + party
+	}
+	return detail + ". It deploys once the order is approved. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
+}
 
 // Private state key marking a b_end_partner_config the import rebuilt from the
 // API. Only such a config may have a null setting filled on a later apply. The
@@ -689,7 +762,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pending-approval state. The provider waits for wait_time. If the order is still pending, the apply completes with a warning, and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"secondary_name": schema.StringAttribute{
@@ -1124,7 +1197,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the A-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1208,7 +1281,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections and when a service key sets the B-End port. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1384,6 +1457,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			)
 			return
 		}
+	}
+
+	resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+		svc:              r.client.PortService,
+		end:              "A-End",
+		productUID:       a.RequestedProductUID.ValueString(),
+		productType:      productType,
+		orderedVLAN:      a.OrderedVLAN,
+		currentVLAN:      types.Int64Null(),
+		hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+	})...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
@@ -1707,6 +1793,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
+	// Skip when a service key redirected the order to a different B-End, since
+	// the product type above was resolved for the port the user named, not the
+	// one being ordered.
+	if serviceKeyBEndUID == "" {
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       b.RequestedProductUID.ValueString(),
+			productType:      productType,
+			orderedVLAN:      b.OrderedVLAN,
+			currentVLAN:      types.Int64Null(),
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	if !b.InnerVLAN.IsNull() || !b.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
 		if !b.InnerVLAN.IsNull() {
@@ -1961,8 +2065,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.BEndConfiguration = *bEndConfig
 
-	buyReq.BEndConfiguration = *bEndConfig
-
 	err := r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1983,6 +2085,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createdID := createdVXC.TechnicalServiceUID
 	waitErr := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second)
+	var pending *vxcPendingApprovalError
+	if errors.As(waitErr, &pending) {
+		resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
+		waitErr = nil
+	}
 	if !saveCreatedUID(ctx, resp, "VXC", plan.Name.ValueString(), createdID, waitErr) {
 		return
 	}
@@ -2026,6 +2133,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 // waitForVXCProvision polls the VXC until it reaches a ready state, hits a
 // terminal state, or the timeout elapses. Transient read errors are retried
 // rather than aborting the wait, since the order has already been placed.
+// An order still awaiting approval when the timeout elapses returns
+// *vxcPendingApprovalError, so the caller can warn instead of failing.
 func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
 	// The polls share this deadline so a stalled HTTP request can't hang
 	// the wait past the overall timeout.
@@ -2034,6 +2143,10 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
+
+	// Set while a party still has to approve the order. The wait continues so an
+	// approval granted inside the timeout still yields a deployed VXC.
+	var pendingApproval *megaport.VXCApproval
 
 	for {
 		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
@@ -2045,14 +2158,27 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 			})
 		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
 			return nil
-		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED:
+		// FAILED and the CANCELLED-family terminal states are checked before the
+		// approval status so a rejected, expired, or cancelled order errors even if
+		// a stale PENDING_* approval accompanies it.
+		case vxc.ProvisioningStatus == vxcStatusFailed:
+			return fmt.Errorf("VXC %s failed to provision (status %q); the order may have been rejected or expired unapproved", uid, vxc.ProvisioningStatus)
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED || vxc.ProvisioningStatus == vxcStatusCancelledParent:
 			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		case vxcOrderPendingApproval(vxc.VXCApproval):
+			pendingApproval = vxc.VXCApproval
+		default:
+			// Approved, or never needed approval; it is provisioning normally.
+			pendingApproval = nil
 		}
 
 		select {
 		case <-pollCtx.Done():
 			if ctx.Err() != nil {
 				return ctx.Err()
+			}
+			if pendingApproval != nil {
+				return &vxcPendingApprovalError{approval: *pendingApproval}
 			}
 			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
 		case <-ticker.C:
@@ -2137,6 +2263,13 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 		resp.State.RemoveResource(ctx)
 		return
+	}
+
+	if vxc.ProvisioningStatus == vxcStatusFailed {
+		resp.Diagnostics.AddWarning(
+			"VXC failed to provision",
+			"VXC "+state.UID.ValueString()+" reports status FAILED. The order may have been rejected, or expired unapproved. It stays in this state until you act, and it will never carry traffic. Remove it from your configuration or replace it.",
+		)
 	}
 
 	// Get tags
@@ -2472,15 +2605,43 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
+	aEndMovesPort := movesPort(aEndPlan, aEndState, aEndCSP)
+	bEndMovesPort := movesPort(bEndPlan, bEndState, bEndCSP)
+
 	// Only send a VLAN update when the user has actually changed ordered_vlan.
 	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
 	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
 	// allocated a non-zero VLAN — incorrectly queuing a VLAN mutation on every
 	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
-	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
-		supportVLANUpdates(aEndPartnerType) {
+	aEndVLANChanged := !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN)
+	if aEndVLANChanged && supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+	}
+
+	// A move re-requests a VLAN on a different port, so it needs the check too.
+	// The API validates the VLAN in the request, or the VLAN the VXC already
+	// holds when the request carries none, against the destination port alone.
+	if (aEndVLANChanged || aEndMovesPort) && supportVLANUpdates(aEndPartnerType) {
+		aEndOrderedVLAN, aEndCurrentVLAN := aEndPlan.OrderedVLAN, aEndState.VLAN
+		if aEndMovesPort {
+			aEndCurrentVLAN = types.Int64Null()
+			if !aEndVLANChanged {
+				aEndOrderedVLAN = aEndState.VLAN
+			}
+		}
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "A-End",
+			productUID:       aEndPlan.RequestedProductUID.ValueString(),
+			productType:      aEndProductType,
+			orderedVLAN:      aEndOrderedVLAN,
+			currentVLAN:      aEndCurrentVLAN,
+			hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
@@ -2514,10 +2675,36 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
-	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
-		supportVLANUpdates(bEndPartnerType) {
+	bEndVLANChanged := !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN)
+	if bEndVLANChanged && supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+	}
+
+	// A service key redirects the order to its own B-End, so the port named in
+	// config is not the one the VXC uses. Create skips the check for the same
+	// reason.
+	hasServiceKey := !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown()
+	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) && !hasServiceKey {
+		bEndOrderedVLAN, bEndCurrentVLAN := bEndPlan.OrderedVLAN, bEndState.VLAN
+		if bEndMovesPort {
+			bEndCurrentVLAN = types.Int64Null()
+			if !bEndVLANChanged {
+				bEndOrderedVLAN = bEndState.VLAN
+			}
+		}
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       bEndPlan.RequestedProductUID.ValueString(),
+			productType:      bEndProductType,
+			orderedVLAN:      bEndOrderedVLAN,
+			currentVLAN:      bEndCurrentVLAN,
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
@@ -2585,8 +2772,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
+		if aEndMovesPort {
 			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
 			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
 		} else if aEndState.RequestedProductUID.IsNull() {
@@ -2600,8 +2786,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
+		if bEndMovesPort {
 			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
 			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
 		} else if bEndState.RequestedProductUID.IsNull() {
@@ -2756,9 +2941,16 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if isChanged {
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 		if err != nil {
+			detail := "Could not update VXC with ID " + state.UID.ValueString() + ": " + err.Error()
+			// The API rejects network-attribute changes while the order awaits
+			// approval; point at the approval workflow instead of the bare 400.
+			if vxc, getErr := r.client.VXCService.GetVXC(ctx, state.UID.ValueString()); getErr == nil &&
+				vxcOrderPendingApproval(vxc.VXCApproval) && vxc.VXCApproval.Type == vxcApprovalTypeNew {
+				detail += ". The VXC order is still pending approval (" + vxc.VXCApproval.Status + "), and its network attributes cannot be changed until the order is approved."
+			}
 			resp.Diagnostics.AddError(
 				"Error Updating VXC",
-				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+				detail,
 			)
 			return
 		}

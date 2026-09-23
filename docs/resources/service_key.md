@@ -61,7 +61,7 @@ resource "megaport_service_key" "time_limited" {
 ### Optional
 
 - `description` (String) A description for the service key.
-- `pre_approved` (Boolean) Whether the service key is pre-approved for use.
+- `pre_approved` (Boolean) Whether the service key is pre-approved for use. When false, a VXC ordered against this key is created in a pending-approval state and does not deploy until you approve the order; the ordering party's apply completes with a warning in the meantime.
 - `valid_for` (Attributes) The date range for which the service key is valid. (see [below for nested schema](#nestedatt--valid_for))
 - `vlan` (Number) The VLAN ID for the service key. Required when single_use is true.
 
