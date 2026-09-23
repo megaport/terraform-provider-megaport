@@ -2,9 +2,11 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,11 +33,89 @@ import (
 // Update Timeout for VXC Update Verification - will be configurable in future release.
 const updateTimeout = 120 * time.Second
 
+// Approval statuses the API reports on vxcApproval while a cross-organization
+// order waits for a party to approve it (megalith OpenAPI VxcApprovalStatus).
+const (
+	vxcApprovalPendingInternal = "PENDING_INTERNAL"
+	vxcApprovalPendingExternal = "PENDING_EXTERNAL"
+)
+
+// vxcApprovalTypeNew is the vxcApproval.Type for a new-order approval, as
+// opposed to a speed-change approval on an existing VXC.
+const vxcApprovalTypeNew = "NEW"
+
+// Provisioning statuses the SDK defines no constant for. FAILED follows a
+// rejected or 60-day-expired order; CANCELLED_PARENT follows the cancellation
+// of a parent service.
+const (
+	vxcStatusFailed          = "FAILED"
+	vxcStatusCancelledParent = "CANCELLED_PARENT"
+)
+
+// vxcPendingApprovalError signals that an ordered VXC is waiting on order
+// approval rather than provisioning.
+type vxcPendingApprovalError struct {
+	approval megaport.VXCApproval
+}
+
+func (e *vxcPendingApprovalError) Error() string {
+	return fmt.Sprintf("VXC is pending approval (%s)", e.approval.Status)
+}
+
+// vxcOrderPendingApproval reports whether the API says a party still has to
+// approve this VXC order.
+func vxcOrderPendingApproval(approval *megaport.VXCApproval) bool {
+	return approval != nil &&
+		(approval.Status == vxcApprovalPendingInternal || approval.Status == vxcApprovalPendingExternal)
+}
+
+// approvingParty renders the trading name the API reports on a new-order
+// approval. The name belongs to another organization, which chooses its own
+// text, so quote it rather than pass control characters to the terminal.
+func approvingParty(approval megaport.VXCApproval) string {
+	const maxLen = 120
+	if approval.Message == "" {
+		return ""
+	}
+	name := approval.Message
+	// Cut on runes, not bytes, so a multi-byte name does not end mid-character.
+	if runes := []rune(name); len(runes) > maxLen {
+		name = string(runes[:maxLen]) + "..."
+	}
+	return strconv.Quote(name)
+}
+
+// vxcPendingApprovalWarning builds the create-time warning detail for a VXC
+// that was ordered but still needs approval. PENDING_INTERNAL means the
+// caller's own organization must approve, PENDING_EXTERNAL the counterparty.
+func vxcPendingApprovalWarning(name, uid string, approval megaport.VXCApproval) string {
+	party := approvingParty(approval)
+	if approval.Status == vxcApprovalPendingInternal {
+		detail := "VXC " + name + " (" + uid + ") was ordered successfully but requires approval from your own organization"
+		if party != "" {
+			detail += " (" + party + ")"
+		}
+		return detail + " before it can deploy. Approve the order in the Megaport portal. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
+	}
+	detail := "VXC " + name + " (" + uid + ") was ordered successfully and is waiting for approval"
+	if party != "" {
+		detail += " by " + party
+	}
+	return detail + ". It deploys once the order is approved. Apply again afterward to see it go live. Unapproved orders expire after 60 days."
+}
+
+// Private state key marking a b_end_partner_config the import rebuilt from the
+// API. Only such a config may have a null setting filled on a later apply. The
+// key stays set for the life of the resource, because the settings the import
+// left null are never sent, however many applies pass.
+const cloudPartnerConfigFromImportKey = "cloud_partner_config_from_import"
+
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vxcResource{}
-	_ resource.ResourceWithConfigure   = &vxcResource{}
-	_ resource.ResourceWithImportState = &vxcResource{}
+	_ resource.Resource                   = &vxcResource{}
+	_ resource.ResourceWithConfigure      = &vxcResource{}
+	_ resource.ResourceWithImportState    = &vxcResource{}
+	_ resource.ResourceWithValidateConfig = &vxcResource{}
 
 	vxcEndConfigurationAttrs = map[string]attr.Type{
 		"owner_uid":             types.StringType,
@@ -150,12 +230,11 @@ var (
 		"interfaces": types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs)),
 	}
 
-	// Must match aEndPartnerConfigSchema (vxc_schemas.go) exactly. The shared
-	// vxcPartnerConfigInterfaceModel carries additional fields for the vrouter
-	// shape; on decode into the model, unmatched attrs remain null, and on
-	// encode via ObjectValueFrom, extra struct fields are ignored. Widening
-	// this map to match the struct breaks encoding with a Value Conversion
-	// Error because the framework requires attr.Type ↔ schema equality.
+	// Must match aEndPartnerConfigSchema (vxc_schemas.go) and
+	// vxcPartnerConfigAEndInterfaceModel. The framework pairs struct fields and
+	// object attributes one for one in both directions, so an extra on either
+	// side fails with a Value Conversion Error. The wider vrouter model cannot
+	// decode this shape.
 	vxcPartnerConfigAEndInterfaceAttrs = map[string]attr.Type{
 		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
 		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
@@ -200,10 +279,20 @@ var (
 		"vlan":                  types.Int64Type,
 		"bgp_connections":       types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
 		"ip_sec_tunnel_options": types.ObjectType{}.WithAttributeTypes(ipSecTunnelOptionsAttrs),
+		"dhcp_pools":            types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 		"description":           types.StringType,
 		"interface_type":        types.StringType,
 		"packet_filter_in":      types.Int64Type,
 		"packet_filter_out":     types.Int64Type,
+	}
+
+	dhcpPoolAttrs = map[string]attr.Type{
+		"network":          types.StringType,
+		"start_ip_address": types.StringType,
+		"end_ip_address":   types.StringType,
+		"default_gateway":  types.StringType,
+		"description":      types.StringType,
+		"dns_servers":      types.ListType{}.WithElementType(types.StringType),
 	}
 
 	ipSecTunnelOptionsAttrs = map[string]attr.Type{
@@ -438,11 +527,34 @@ type vxcPartnerConfigInterfaceModel struct {
 	Bfd                types.Object `tfsdk:"bfd"`
 	BgpConnections     types.List   `tfsdk:"bgp_connections"`
 	IpSecTunnelOptions types.Object `tfsdk:"ip_sec_tunnel_options"`
+	DhcpPools          types.List   `tfsdk:"dhcp_pools"`
 	VLAN               types.Int64  `tfsdk:"vlan"`
 	Description        types.String `tfsdk:"description"`
 	InterfaceType      types.String `tfsdk:"interface_type"`
 	PacketFilterIn     types.Int64  `tfsdk:"packet_filter_in"`
 	PacketFilterOut    types.Int64  `tfsdk:"packet_filter_out"`
+}
+
+// vxcPartnerConfigAEndInterfaceModel maps an interface in the deprecated A-End
+// partner configuration. It must match vxcPartnerConfigAEndInterfaceAttrs one
+// for one, so it cannot reuse the wider vxcPartnerConfigInterfaceModel.
+type vxcPartnerConfigAEndInterfaceModel struct {
+	IPAddresses    types.List   `tfsdk:"ip_addresses"`
+	IPRoutes       types.List   `tfsdk:"ip_routes"`
+	NatIPAddresses types.List   `tfsdk:"nat_ip_addresses"`
+	Bfd            types.Object `tfsdk:"bfd"`
+	BgpConnections types.List   `tfsdk:"bgp_connections"`
+}
+
+// dhcpPoolModel maps a single dhcp_pools entry. The SDK read type drops the
+// pools the API returns, so the provider only ever writes it to an order.
+type dhcpPoolModel struct {
+	Network        types.String `tfsdk:"network"`
+	StartIPAddress types.String `tfsdk:"start_ip_address"`
+	EndIPAddress   types.String `tfsdk:"end_ip_address"`
+	DefaultGateway types.String `tfsdk:"default_gateway"`
+	Description    types.String `tfsdk:"description"`
+	DNSServers     types.List   `tfsdk:"dns_servers"`
 }
 
 // ipSecTunnelOptionsModel maps a single ip_sec_tunnel_options block. The API
@@ -479,6 +591,31 @@ type bgpConnectionConfigModel struct {
 	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
 	LocalAsn           types.Int64  `tfsdk:"local_asn"`
 	PeerType           types.String `tfsdk:"peer_type"`
+	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
+	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
+	Password           types.String `tfsdk:"password"`
+	Shutdown           types.Bool   `tfsdk:"shutdown"`
+	Description        types.String `tfsdk:"description"`
+	MedIn              types.Int64  `tfsdk:"med_in"`
+	MedOut             types.Int64  `tfsdk:"med_out"`
+	BfdEnabled         types.Bool   `tfsdk:"bfd_enabled"`
+	AsOverride         types.Bool   `tfsdk:"as_override"`
+	ExportPolicy       types.String `tfsdk:"export_policy"`
+	PermitExportTo     types.List   `tfsdk:"permit_export_to"`
+	DenyExportTo       types.List   `tfsdk:"deny_export_to"`
+	ImportWhitelist    types.String `tfsdk:"import_whitelist"`
+	ImportBlacklist    types.String `tfsdk:"import_blacklist"`
+	ExportWhitelist    types.String `tfsdk:"export_whitelist"`
+	ExportBlacklist    types.String `tfsdk:"export_blacklist"`
+	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
+}
+
+// aEndBgpConnectionConfigModel represents a BGP connection in the deprecated
+// A-End partner configuration. It must match bgpConnectionConfig one for one,
+// which omits the peer_type that bgpConnectionConfigModel carries.
+type aEndBgpConnectionConfigModel struct {
+	PeerAsn            types.Int64  `tfsdk:"peer_asn"`
+	LocalAsn           types.Int64  `tfsdk:"local_asn"`
 	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
 	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
 	Password           types.String `tfsdk:"password"`
@@ -584,11 +721,15 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"service_key": schema.StringAttribute{
-				Description: "The service key of the VXC.",
+				Description: "The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. That apply only records the key in state: it does not send the key to Megaport, so set it to the key the live VXC was ordered with. Changing a key already in state replaces the VXC. A VXC imported with an earlier provider version plans a replace when the key is added: remove it from state and import it again first.",
 				Optional:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplaceIf(
+						requiresReplaceServiceKey,
+						"Replace the VXC when a service key already in state changes.",
+						"Replace the VXC when a service key already in state changes.",
+					),
 				},
 			},
 			"product_name": schema.StringAttribute{
@@ -621,7 +762,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
-				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
+				Description: "The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pending-approval state. The provider waits for wait_time. If the order is still pending, the apply completes with a warning, and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
 				Computed:    true,
 			},
 			"secondary_name": schema.StringAttribute{
@@ -1056,7 +1197,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the A-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1140,7 +1281,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.",
+						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections and when a service key sets the B-End port. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1179,7 +1320,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1199,7 +1340,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, plus prefixes on an AWS configuration when the API reports one, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, and amazon_ip_address on an AWS configuration, those same settings plus type and prefixes on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1228,6 +1369,11 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	var plan vxcResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	checkAWSBGPPassword(ctx, plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -1311,6 +1457,19 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			)
 			return
 		}
+	}
+
+	resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+		svc:              r.client.PortService,
+		end:              "A-End",
+		productUID:       a.RequestedProductUID.ValueString(),
+		productType:      productType,
+		orderedVLAN:      a.OrderedVLAN,
+		currentVLAN:      types.Int64Null(),
+		hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+	})...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
@@ -1634,6 +1793,24 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
+	// Skip when a service key redirected the order to a different B-End, since
+	// the product type above was resolved for the port the user named, not the
+	// one being ordered.
+	if serviceKeyBEndUID == "" {
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       b.RequestedProductUID.ValueString(),
+			productType:      productType,
+			orderedVLAN:      b.OrderedVLAN,
+			currentVLAN:      types.Int64Null(),
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	if !b.InnerVLAN.IsNull() || !b.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
 		if !b.InnerVLAN.IsNull() {
@@ -1888,8 +2065,6 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	buyReq.BEndConfiguration = *bEndConfig
 
-	buyReq.BEndConfiguration = *bEndConfig
-
 	err := r.client.VXCService.ValidateVXCOrder(ctx, buyReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1918,11 +2093,16 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
-		resp.Diagnostics.AddError(
-			"VXC ordered but not ready",
-			"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
-		)
-		return
+		var pending *vxcPendingApprovalError
+		if errors.As(err, &pending) {
+			resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
+		} else {
+			resp.Diagnostics.AddError(
+				"VXC ordered but not ready",
+				"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
+			)
+			return
+		}
 	}
 
 	// get the created VXC
@@ -1964,6 +2144,8 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 // waitForVXCProvision polls the VXC until it reaches a ready state, hits a
 // terminal state, or the timeout elapses. Transient read errors are retried
 // rather than aborting the wait, since the order has already been placed.
+// An order still awaiting approval when the timeout elapses returns
+// *vxcPendingApprovalError, so the caller can warn instead of failing.
 func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeoutAfter, pollInterval time.Duration) error {
 	// The polls share this deadline so a stalled HTTP request can't hang
 	// the wait past the overall timeout.
@@ -1972,6 +2154,10 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
+
+	// Set while a party still has to approve the order. The wait continues so an
+	// approval granted inside the timeout still yields a deployed VXC.
+	var pendingApproval *megaport.VXCApproval
 
 	for {
 		vxc, err := r.client.VXCService.GetVXC(pollCtx, uid)
@@ -1983,14 +2169,27 @@ func (r *vxcResource) waitForVXCProvision(ctx context.Context, uid string, timeo
 			})
 		case slices.Contains(megaport.SERVICE_STATE_READY, vxc.ProvisioningStatus):
 			return nil
-		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED:
+		// FAILED and the CANCELLED-family terminal states are checked before the
+		// approval status so a rejected, expired, or cancelled order errors even if
+		// a stale PENDING_* approval accompanies it.
+		case vxc.ProvisioningStatus == vxcStatusFailed:
+			return fmt.Errorf("VXC %s failed to provision (status %q); the order may have been rejected or expired unapproved", uid, vxc.ProvisioningStatus)
+		case vxc.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED || vxc.ProvisioningStatus == megaport.STATUS_CANCELLED || vxc.ProvisioningStatus == vxcStatusCancelledParent:
 			return fmt.Errorf("VXC %s reached terminal state %q before provisioning", uid, vxc.ProvisioningStatus)
+		case vxcOrderPendingApproval(vxc.VXCApproval):
+			pendingApproval = vxc.VXCApproval
+		default:
+			// Approved, or never needed approval; it is provisioning normally.
+			pendingApproval = nil
 		}
 
 		select {
 		case <-pollCtx.Done():
 			if ctx.Err() != nil {
 				return ctx.Err()
+			}
+			if pendingApproval != nil {
+				return &vxcPendingApprovalError{approval: *pendingApproval}
 			}
 			return fmt.Errorf("time expired waiting for VXC %s to provision", uid)
 		case <-ticker.C:
@@ -2077,6 +2276,13 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
+	if vxc.ProvisioningStatus == vxcStatusFailed {
+		resp.Diagnostics.AddWarning(
+			"VXC failed to provision",
+			"VXC "+state.UID.ValueString()+" reports status FAILED. The order may have been rejected, or expired unapproved. It stays in this state until you act, and it will never carry traffic. Remove it from your configuration or replace it.",
+		)
+	}
+
 	// Get tags
 	tags, err := r.client.VXCService.ListVXCResourceTags(ctx, state.UID.ValueString())
 	if err != nil {
@@ -2105,7 +2311,20 @@ func (r *vxcResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.Append(state.fillTransitPartnerConfigOnImport(ctx, vxc)...)
+		resp.Diagnostics.Append(state.fillBEndPartnerConfigOnImport(ctx, vxc)...)
+		if _, isCSP := classifyPartner(ctx, state.BEndPartnerConfig, &resp.Diagnostics); isCSP {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, cloudPartnerConfigFromImportKey, []byte("true"))...)
+		}
+
+		// service_key is order-time only, so the API never returns it: this
+		// flag is the only way the plan modifier can tell a null key that
+		// might still be live on the imported VXC from one that never
+		// existed. Update clears it once the key is recorded. Terraform
+		// always supplies Private; nil only happens when a test calls Read
+		// directly without going through the protocol server.
+		if resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, []byte("true"))...)
+		}
 	}
 
 	// Set refreshed state
@@ -2197,7 +2416,7 @@ func (r *vxcResource) fillVrouterPartnerConfigsOnImport(ctx context.Context, sta
 	if len(byEnd["a"])+len(byEnd["b"])+unmatched > 0 {
 		diags.AddWarning(
 			"Import complete, some settings need adding by hand",
-			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Three more settings have no attribute at all: a DHCP pool, eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
+			"Terraform cannot read ip_mtu, vlan, description, interface_type, packet_filter_in, packet_filter_out, dhcp_pools or the IPsec tunnel options off a VXC. The read also leaves permit_export_to and deny_export_to out of every BGP connection. These settings are absent from state whether or not the live service uses them. An apply sends the whole interface and drops whatever the configuration omits. Check the interfaces and BGP connections in the Megaport portal and add any setting they use to the configuration before the next apply. Two more settings have no attribute at all: eBGP multihop and remove private ASN. The configuration cannot hold those, so an apply drops them and there is no way to put them back. Raise an issue if the live service uses one.",
 		)
 	}
 
@@ -2296,8 +2515,18 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerChange = true
 	}
 
-	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", &resp.Diagnostics)
-	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", &resp.Diagnostics)
+	rebuilt, privateDiags := req.Private.GetKey(ctx, cloudPartnerConfigFromImportKey)
+	resp.Diagnostics.Append(privateDiags...)
+
+	// An import never rebuilds a cloud partner config on the A-End, so nothing
+	// there can hold a null the provider left.
+	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", false, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", rebuilt != nil, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	checkAWSBGPPassword(ctx, plan.AEndPartnerConfig, plan.BEndPartnerConfig, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -2387,15 +2616,43 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
 	}
 
+	aEndMovesPort := movesPort(aEndPlan, aEndState, aEndCSP)
+	bEndMovesPort := movesPort(bEndPlan, bEndState, bEndCSP)
+
 	// Only send a VLAN update when the user has actually changed ordered_vlan.
 	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
 	// would permanently disagree when ordered_vlan=0 (auto-assign) and the API
 	// allocated a non-zero VLAN — incorrectly queuing a VLAN mutation on every
 	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
-	if !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
-		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) &&
-		supportVLANUpdates(aEndPartnerType) {
+	aEndVLANChanged := !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
+		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN)
+	if aEndVLANChanged && supportVLANUpdates(aEndPartnerType) {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
+	}
+
+	// A move re-requests a VLAN on a different port, so it needs the check too.
+	// The API validates the VLAN in the request, or the VLAN the VXC already
+	// holds when the request carries none, against the destination port alone.
+	if (aEndVLANChanged || aEndMovesPort) && supportVLANUpdates(aEndPartnerType) {
+		aEndOrderedVLAN, aEndCurrentVLAN := aEndPlan.OrderedVLAN, aEndState.VLAN
+		if aEndMovesPort {
+			aEndCurrentVLAN = types.Int64Null()
+			if !aEndVLANChanged {
+				aEndOrderedVLAN = aEndState.VLAN
+			}
+		}
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "A-End",
+			productUID:       aEndPlan.RequestedProductUID.ValueString(),
+			productType:      aEndProductType,
+			orderedVLAN:      aEndOrderedVLAN,
+			currentVLAN:      aEndCurrentVLAN,
+			hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	aEndState.OrderedVLAN = aEndPlan.OrderedVLAN
 
@@ -2429,10 +2686,36 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
-	if !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
-		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) &&
-		supportVLANUpdates(bEndPartnerType) {
+	bEndVLANChanged := !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
+		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN)
+	if bEndVLANChanged && supportVLANUpdates(bEndPartnerType) {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
+	}
+
+	// A service key redirects the order to its own B-End, so the port named in
+	// config is not the one the VXC uses. Create skips the check for the same
+	// reason.
+	hasServiceKey := !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown()
+	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) && !hasServiceKey {
+		bEndOrderedVLAN, bEndCurrentVLAN := bEndPlan.OrderedVLAN, bEndState.VLAN
+		if bEndMovesPort {
+			bEndCurrentVLAN = types.Int64Null()
+			if !bEndVLANChanged {
+				bEndOrderedVLAN = bEndState.VLAN
+			}
+		}
+		resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
+			svc:              r.client.PortService,
+			end:              "B-End",
+			productUID:       bEndPlan.RequestedProductUID.ValueString(),
+			productType:      bEndProductType,
+			orderedVLAN:      bEndOrderedVLAN,
+			currentVLAN:      bEndCurrentVLAN,
+			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
+		})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
@@ -2500,18 +2783,24 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if !aEndPlan.RequestedProductUID.IsNull() && !aEndPlan.RequestedProductUID.Equal(aEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !aEndCSP && !aEndPlan.RequestedProductUID.Equal(aEndState.CurrentProductUID) {
+		if aEndMovesPort {
 			updateReq.AEndProductUID = megaport.PtrTo(aEndPlan.RequestedProductUID.ValueString())
+			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
+		} else if aEndState.RequestedProductUID.IsNull() {
+			// An import leaves requested_product_uid null. Record what the
+			// configuration asked for, the way a create does. The current UID
+			// would be the port the order landed on, which the configuration
+			// never matches once a cloud partner moves the end.
 			aEndState.RequestedProductUID = aEndPlan.RequestedProductUID
 		} else {
 			aEndState.RequestedProductUID = aEndState.CurrentProductUID
 		}
 	}
 	if !bEndPlan.RequestedProductUID.IsNull() && !bEndPlan.RequestedProductUID.Equal(bEndState.RequestedProductUID) {
-		// Do not update the product UID if the partner is a CSP
-		if !bEndCSP && !bEndPlan.RequestedProductUID.Equal(bEndState.CurrentProductUID) {
+		if bEndMovesPort {
 			updateReq.BEndProductUID = megaport.PtrTo(bEndPlan.RequestedProductUID.ValueString())
+			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
+		} else if bEndState.RequestedProductUID.IsNull() {
 			bEndState.RequestedProductUID = bEndPlan.RequestedProductUID
 		} else {
 			bEndState.RequestedProductUID = bEndState.CurrentProductUID
@@ -2663,9 +2952,16 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if isChanged {
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 		if err != nil {
+			detail := "Could not update VXC with ID " + state.UID.ValueString() + ": " + err.Error()
+			// The API rejects network-attribute changes while the order awaits
+			// approval; point at the approval workflow instead of the bare 400.
+			if vxc, getErr := r.client.VXCService.GetVXC(ctx, state.UID.ValueString()); getErr == nil &&
+				vxcOrderPendingApproval(vxc.VXCApproval) && vxc.VXCApproval.Type == vxcApprovalTypeNew {
+				detail += ". The VXC order is still pending approval (" + vxc.VXCApproval.Status + "), and its network attributes cannot be changed until the order is approved."
+			}
 			resp.Diagnostics.AddError(
 				"Error Updating VXC",
-				"Could not update VXC with ID "+state.UID.ValueString()+": "+err.Error(),
+				detail,
 			)
 			return
 		}
@@ -2764,6 +3060,22 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	apiDiags := state.fromAPIVXC(ctx, vxc, tags, &plan)
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
+	state.ServiceKey = plan.ServiceKey
+	if !plan.ServiceKey.IsNull() && resp.Private != nil {
+		imported, privDiags := resp.Private.GetKey(ctx, serviceKeyImportedPrivateKey)
+		resp.Diagnostics.Append(privDiags...)
+		if len(imported) > 0 {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("service_key"),
+				"Service key is recorded in state only",
+				"Terraform records the service key in state. The API accepts a service key only when the VXC is ordered, so this does not change the live VXC. Set it to the key the VXC was ordered with.",
+			)
+			// The key is now recorded in state, so the plan modifier no
+			// longer needs the import flag to tell this VXC apart from one
+			// that was never given a key.
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, serviceKeyImportedPrivateKey, nil)...)
+		}
+	}
 	resp.Diagnostics.Append(apiDiags...)
 
 	// Set refreshed state
@@ -2827,6 +3139,195 @@ func (r *vxcResource) Configure(_ context.Context, req resource.ConfigureRequest
 	client := data.client
 
 	r.client = client
+}
+
+func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config vxcResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	checkAWSBGPPassword(ctx, config.AEndPartnerConfig, config.BEndPartnerConfig, &resp.Diagnostics)
+}
+
+// checkAWSBGPPassword rejects an MCR to AWS Direct Connect VXC whose explicit
+// BGP connection cannot share the MD5 key AWS receives. Megaport generates that
+// key when auth_key is blank and does not return it at order time, so the
+// provider cannot copy it into the vRouter session.
+//
+// Create and Update run this again on the plan. A password that comes from
+// another resource is unknown while the config is validated, and nothing
+// validates the config a second time once that value resolves.
+//
+// The schema lets either end carry the AWS config and the other the vRouter
+// config, so this checks both orderings.
+func checkAWSBGPPassword(ctx context.Context, aEndPartnerConfig, bEndPartnerConfig types.Object, diags *diag.Diagnostics) {
+	checkAWSBGPPasswordEnd(ctx, "a_end_partner_config", aEndPartnerConfig, bEndPartnerConfig, diags)
+	checkAWSBGPPasswordEnd(ctx, "b_end_partner_config", bEndPartnerConfig, aEndPartnerConfig, diags)
+}
+
+// bgpPasswordEntry locates one BGP connection's password within its parent
+// interfaces list, for building the diagnostic's attribute path.
+type bgpPasswordEntry struct {
+	interfaceIndex  int
+	connectionIndex int
+	password        types.String
+}
+
+// checkAWSBGPPasswordEnd checks vrouterEndConfig's vRouter or deprecated
+// a-end BGP connections against awsEndConfig's AWS config. vrouterEndPath is
+// the schema attribute name of vrouterEndConfig, used to build error paths.
+func checkAWSBGPPasswordEnd(ctx context.Context, vrouterEndPath string, vrouterEndConfig, awsEndConfig types.Object, diags *diag.Diagnostics) {
+	if vrouterEndConfig.IsNull() || vrouterEndConfig.IsUnknown() ||
+		awsEndConfig.IsNull() || awsEndConfig.IsUnknown() {
+		return
+	}
+
+	var awsEnd vxcPartnerConfigurationModel
+	if d := awsEndConfig.As(ctx, &awsEnd, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+	if awsEnd.Partner.ValueString() != "aws" || awsEnd.AWSPartnerConfig.IsNull() || awsEnd.AWSPartnerConfig.IsUnknown() {
+		return
+	}
+	var awsConfig vxcPartnerConfigAWSModel
+	if d := awsEnd.AWSPartnerConfig.As(ctx, &awsConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+	if awsConfig.ConnectType.ValueString() != "AWS" {
+		return
+	}
+	authKey := awsConfig.AuthKey
+
+	var vrouterEnd vxcPartnerConfigurationModel
+	if d := vrouterEndConfig.As(ctx, &vrouterEnd, basetypes.ObjectAsOptions{}); d.HasError() {
+		return
+	}
+
+	var vrouterAttr string
+	var entries []bgpPasswordEntry
+	switch vrouterEnd.Partner.ValueString() {
+	case "vrouter":
+		vrouterAttr = "vrouter_config"
+		if vrouterEnd.VrouterPartnerConfig.IsNull() || vrouterEnd.VrouterPartnerConfig.IsUnknown() {
+			return
+		}
+		var vrouterConfig vxcPartnerConfigVrouterModel
+		if d := vrouterEnd.VrouterPartnerConfig.As(ctx, &vrouterConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+			return
+		}
+		entries = vrouterInterfaceBGPPasswords(ctx, vrouterConfig.Interfaces)
+	case "a-end":
+		vrouterAttr = "partner_a_end_config"
+		if vrouterEnd.PartnerAEndConfig.IsNull() || vrouterEnd.PartnerAEndConfig.IsUnknown() {
+			return
+		}
+		var aEndConfig vxcPartnerConfigAEndModel
+		if d := vrouterEnd.PartnerAEndConfig.As(ctx, &aEndConfig, basetypes.ObjectAsOptions{}); d.HasError() {
+			return
+		}
+		entries = aEndInterfaceBGPPasswords(ctx, aEndConfig.Interfaces)
+	default:
+		return
+	}
+
+	const remedy = "Set `password` and the AWS end's `aws_config.auth_key` to the same value, or omit the vRouter end's explicit config so Megaport configures both ends with one generated key."
+	for _, entry := range entries {
+		if entry.password.IsUnknown() {
+			continue
+		}
+		passwordPath := path.Root(vrouterEndPath).AtName(vrouterAttr).AtName("interfaces").AtListIndex(entry.interfaceIndex).AtName("bgp_connections").AtListIndex(entry.connectionIndex).AtName("password")
+		// A blank password reaches the API as no password at all, the same
+		// as a null one, because the SDK tags it omitempty.
+		if entry.password.IsNull() || entry.password.ValueString() == "" {
+			diags.AddAttributeError(
+				passwordPath,
+				"Missing BGP password on an MCR to AWS Direct Connect VXC",
+				"AWS receives the MD5 key from `auth_key`, and Megaport generates one when it is blank. The provider cannot copy that key into this BGP connection, so the MCR session comes up without MD5 and BGP stays down. "+remedy,
+			)
+			continue
+		}
+		// The key is not known until the resource it comes from applies,
+		// so the pair cannot be compared yet.
+		if authKey.IsUnknown() {
+			continue
+		}
+		if authKey.IsNull() || entry.password.ValueString() != authKey.ValueString() {
+			diags.AddAttributeError(
+				passwordPath,
+				"BGP password does not match auth_key on an MCR to AWS Direct Connect VXC",
+				"The MCR BGP session uses `password` and the AWS virtual interface uses `auth_key`. BGP only comes up when both carry the same MD5 key. "+remedy,
+			)
+		}
+	}
+}
+
+// vrouterInterfaceBGPPasswords extracts each BGP connection's password from a
+// vrouter_config.interfaces list. The vrouter interface and BGP connection
+// attrs match vxcPartnerConfigInterfaceModel and bgpConnectionConfigModel
+// exactly, so this reuses the same typed decode the rest of the file uses.
+func vrouterInterfaceBGPPasswords(ctx context.Context, interfaces types.List) []bgpPasswordEntry {
+	if interfaces.IsNull() || interfaces.IsUnknown() {
+		return nil
+	}
+	var ifaceModels []*vxcPartnerConfigInterfaceModel
+	if interfaces.ElementsAs(ctx, &ifaceModels, true).HasError() {
+		return nil
+	}
+	var entries []bgpPasswordEntry
+	for i, iface := range ifaceModels {
+		if iface == nil || iface.BgpConnections.IsNull() || iface.BgpConnections.IsUnknown() {
+			continue
+		}
+		var bgpConnections []*bgpConnectionConfigModel
+		if iface.BgpConnections.ElementsAs(ctx, &bgpConnections, true).HasError() {
+			continue
+		}
+		for j, bgpConnection := range bgpConnections {
+			if bgpConnection == nil {
+				continue
+			}
+			entries = append(entries, bgpPasswordEntry{i, j, bgpConnection.Password})
+		}
+	}
+	return entries
+}
+
+// aEndInterfaceBGPPasswords extracts each BGP connection's password from a
+// deprecated partner_a_end_config.interfaces list. Its interface and BGP
+// connection attrs (vxcPartnerConfigAEndInterfaceAttrs, bgpConnectionConfig)
+// are narrower than the vrouter shape's, so the framework's exact
+// struct-to-object field match rejects them against
+// vxcPartnerConfigInterfaceModel/bgpConnectionConfigModel. This reads the one
+// field it needs off each object's attrs map instead of adding structs that
+// would exist only for this check.
+func aEndInterfaceBGPPasswords(ctx context.Context, interfaces types.List) []bgpPasswordEntry {
+	if interfaces.IsNull() || interfaces.IsUnknown() {
+		return nil
+	}
+	var ifaceObjs []types.Object
+	if interfaces.ElementsAs(ctx, &ifaceObjs, true).HasError() {
+		return nil
+	}
+	var entries []bgpPasswordEntry
+	for i, iface := range ifaceObjs {
+		bgpConnections, ok := iface.Attributes()["bgp_connections"].(types.List)
+		if !ok || bgpConnections.IsNull() || bgpConnections.IsUnknown() {
+			continue
+		}
+		var connObjs []types.Object
+		if bgpConnections.ElementsAs(ctx, &connObjs, true).HasError() {
+			continue
+		}
+		for j, conn := range connObjs {
+			password, ok := conn.Attributes()["password"].(types.String)
+			if !ok {
+				continue
+			}
+			entries = append(entries, bgpPasswordEntry{i, j, password})
+		}
+	}
+	return entries
 }
 
 func (r *vxcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -3147,8 +3648,9 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 // never reached the live VXC. Three changes qualify: removing the block, any
 // change to an end whose live config is a cloud partner, and a partner the
 // provider does not send for that end. A cloud partner added to an end that
-// has none in state is recorded instead, and warns.
-func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, diags *diag.Diagnostics) {
+// has none in state is recorded instead, and warns. So is a value set on a
+// cloud partner setting an import left null, which rebuiltOnImport selects.
+func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, rebuiltOnImport bool, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
 	}
@@ -3157,12 +3659,15 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 
 	// A null state with a cloud partner in the plan is the post-import case:
 	// the config is recorded, not sent. Warn here rather than in ModifyPlan,
-	// which Terraform runs on both the plan walk and the apply walk.
-	if statePartnerConfig.IsNull() && planCSP {
+	// which Terraform runs on both the plan walk and the apply walk. A plan
+	// that only fills settings the import left null is the same case. A config
+	// the user wrote, rather than an import rebuilt, left those settings out on
+	// purpose, so filling one there is a change the provider cannot send.
+	if planCSP && (statePartnerConfig.IsNull() || (stateCSP && rebuiltOnImport && onlyFillsNulls(planPartnerConfig, statePartnerConfig))) {
 		diags.AddAttributeWarning(
 			path.Root(partnerConfigPathRoot),
 			"Partner configuration is recorded in state only",
-			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC.", endLabel, planPartner.ValueString()),
+			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC. Check the value against the live service, because state now reports it.", endLabel, planPartner.ValueString()),
 		)
 		return
 	}
@@ -3181,7 +3686,7 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 		diags.AddAttributeError(
 			path.Root(partnerConfigPathRoot),
 			summary,
-			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. To correct a recorded value, remove the VXC from state, import it again, and apply the corrected block. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
+			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case !partnerSendableOnUpdate(endLabel, planPartner):
 		diags.AddAttributeError(
@@ -3190,6 +3695,37 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 			fmt.Sprintf("The provider does not send partner %q on the %s when it updates a VXC, so this change never reaches the live service. Revert the change, or replace the VXC with \"terraform apply -replace=<resource address>\" to build it with the new configuration. %s", planPartner.ValueString(), endLabel, replaceHint),
 		)
 	}
+}
+
+// onlyFillsNulls reports whether plan differs from state only where state is
+// null. Every value set in state must be unchanged in plan. It walks nested
+// objects. A list that differs at all counts as a change, so a plan that fills
+// a null inside a list is not treated as a fill. A whole nested block the state
+// does not have is a change too: the import records every block it read, so one
+// missing from state was never on the live VXC.
+func onlyFillsNulls(plan, state attr.Value) bool {
+	if plan.Equal(state) {
+		return true
+	}
+	if plan.IsNull() || plan.IsUnknown() {
+		return false
+	}
+	planObj, planIsObj := plan.(types.Object)
+	stateObj, stateIsObj := state.(types.Object)
+	if !planIsObj || !stateIsObj {
+		return state.IsNull()
+	}
+	if stateObj.IsNull() {
+		return false
+	}
+	planAttrs := planObj.Attributes()
+	for name, stateVal := range stateObj.Attributes() {
+		planVal, ok := planAttrs[name]
+		if !ok || !onlyFillsNulls(planVal, stateVal) {
+			return false
+		}
+	}
+	return true
 }
 
 // classifyPartner returns the partner held in a partner-config object, and

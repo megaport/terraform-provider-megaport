@@ -65,7 +65,7 @@ func serviceKeyResourceSchema() schema.Schema {
 				},
 			},
 			"pre_approved": schema.BoolAttribute{
-				Description: "Whether the service key is pre-approved for use.",
+				Description: "Whether the service key is pre-approved for use. When false, a VXC ordered against this key is created in a pending-approval state and does not deploy until you approve the order; the ordering party's apply completes with a warning in the meantime.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{

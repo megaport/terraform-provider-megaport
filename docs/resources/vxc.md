@@ -297,12 +297,12 @@ resource "megaport_vxc" "service_key_vxc" {
 
 ### Optional
 
-- `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again. (see [below for nested schema](#nestedatt--a_end_partner_config))
-- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, remove the VXC from state and import it again. (see [below for nested schema](#nestedatt--b_end_partner_config))
+- `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC. (see [below for nested schema](#nestedatt--a_end_partner_config))
+- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, plus prefixes on an AWS configuration when the API reports one, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, and amazon_ip_address on an AWS configuration, those same settings plus type and prefixes on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
-- `service_key` (String, Sensitive) The service key of the VXC.
+- `service_key` (String, Sensitive) The service key used when the VXC is ordered. The API never returns it, so an imported VXC has it null until the next apply records the value from the configuration. That apply only records the key in state: it does not send the key to Megaport, so set it to the key the live VXC was ordered with. Changing a key already in state replaces the VXC. A VXC imported with an earlier provider version plans a replace when the key is added: remove it from state and import it again first.
 - `shutdown` (Boolean) Temporarily shut down and re-enable the VXC. Valid values are true (shut down) and false (enabled). If not provided, it defaults to false (enabled).
 
 ### Read-Only
@@ -324,7 +324,7 @@ resource "megaport_vxc" "service_key_vxc" {
 - `product_id` (Number) The numeric ID of the product.
 - `product_type` (String) The type of the product.
 - `product_uid` (String) The unique identifier for the resource.
-- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
+- `provisioning_status` (String) The provisioning status of the VXC. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the VXC lifecycle. A VXC order that requires approval (for example, a connection to another organization's Port) is created in a pending-approval state. The provider waits for wait_time. If the order is still pending, the apply completes with a warning, and the status advances once the order is approved. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.
 - `secondary_name` (String) The secondary name of the product.
 - `service_id` (Number) The service ID of the VXC.
 - `usage_algorithm` (String) The usage algorithm of the product.
@@ -340,7 +340,7 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the A-End configuration. The Megaport API may change a Partner Port from the Requested Port to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the A-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the A-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the A-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
+- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the A-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the A-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the A-End ordered_vlan is set to -1, the Megaport API will not allow for the A-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the A-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.
 - `vnic_index` (Number) The network interface index of the A-End configuration. Required for MVE connections.
 
 Read-Only:
@@ -360,7 +360,7 @@ Optional:
 
 - `current_product_uid` (String) The current product UID of the B-End configuration. The Megaport API may change a Partner Port on the end configuration from the Requested Port UID to a different Port in the same location and diversity zone.
 - `inner_vlan` (Number) The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.
-- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged.
+- `ordered_vlan` (Number) The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections and when a service key sets the B-End port. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.
 - `requested_product_uid` (String) The Product UID of the B-End product. For partner connections (AWS, Google, etc.), use the `megaport_partner` data source to look up the correct UID. For Google connections this field is especially important: Google exposes multiple partner ports across different locations and diversity zones, so omitting it allows the API to select any available port — which may be in an unexpected region. Set this to a specific Google partner port UID to control the on-ramp location and diversity zone. The value stored in state may differ from the requested UID when Megaport rotates a partner port within the same location and diversity zone.
 - `vnic_index` (Number) The network interface index of the B-End configuration. Required for MVE connections.
 
@@ -404,8 +404,8 @@ Optional:
 
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
-- `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
+- `asn` (Number) The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -416,7 +416,7 @@ Optional:
 
 Required:
 
-- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
+- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'. An import leaves this value null, so set it before the first apply after an import.
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:
@@ -519,7 +519,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -553,6 +553,7 @@ Optional:
 - `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `dhcp_pools` (Attributes List) The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import. (see [below for nested schema](#nestedatt--a_end_partner_config--vrouter_config--interfaces--dhcp_pools))
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
@@ -592,12 +593,28 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--dhcp_pools"></a>
+### Nested Schema for `a_end_partner_config.vrouter_config.interfaces.dhcp_pools`
+
+Required:
+
+- `end_ip_address` (String) Last IPv4 address in the range to assign to DHCP clients.
+- `network` (String) IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.
+- `start_ip_address` (String) First IPv4 address in the range to assign to DHCP clients.
+
+Optional:
+
+- `default_gateway` (String) IPv4 address of a default gateway to offer DHCP clients.
+- `description` (String) Description for the DHCP pool. Maximum 100 characters.
+- `dns_servers` (List of String) IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.
 
 
 <a id="nestedatt--a_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
@@ -661,8 +678,8 @@ Optional:
 
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
-- `asn` (Number) The ASN of the partner configuration.
-- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
+- `asn` (Number) The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
 - `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
@@ -673,7 +690,7 @@ Optional:
 
 Required:
 
-- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'.
+- `port_choice` (String) Which port to choose when building the VXC. Can either be 'primary' or 'secondary'. An import leaves this value null, so set it before the first apply after an import.
 - `service_key` (String, Sensitive) The service key of the partner configuration. Required for Azure partner configurations.
 
 Optional:
@@ -776,7 +793,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -810,6 +827,7 @@ Optional:
 - `bfd` (Attributes, Deprecated) **DEPRECATED**: Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bfd))
 - `bgp_connections` (Attributes List) The BGP connections of the partner configuration interface. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--bgp_connections))
 - `description` (String) Optional human-readable description for the interface. Used by NAT Gateway A-End VXC interfaces.
+- `dhcp_pools` (Attributes List) The DHCP pool to serve on this interface. The API accepts at most one pool per interface. It rejects a pool on an `ipSecTunnel` interface, when this end is not an MCR, and when the far end of the VXC is Transit or IX. Terraform does not refresh the pool into state, so it stays null on import. (see [below for nested schema](#nestedatt--b_end_partner_config--vrouter_config--interfaces--dhcp_pools))
 - `interface_type` (String) Type of the partner configuration interface. One of `subInterface` (default) or `ipSecTunnel`. Used by NAT Gateway A-End VXC interfaces.
 - `ip_addresses` (List of String) The IP addresses of the partner configuration. Each entry must be in CIDR notation (e.g., "169.254.100.6/29").
 - `ip_mtu` (Number) The IP MTU of the partner configuration interface. Defaults to 1500.
@@ -849,12 +867,28 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--dhcp_pools"></a>
+### Nested Schema for `b_end_partner_config.vrouter_config.interfaces.dhcp_pools`
+
+Required:
+
+- `end_ip_address` (String) Last IPv4 address in the range to assign to DHCP clients.
+- `network` (String) IPv4 network the pool serves, in CIDR notation (e.g. `192.168.1.0/24`). The API normalizes host bits to zero.
+- `start_ip_address` (String) First IPv4 address in the range to assign to DHCP clients.
+
+Optional:
+
+- `default_gateway` (String) IPv4 address of a default gateway to offer DHCP clients.
+- `description` (String) Description for the DHCP pool. Maximum 100 characters.
+- `dns_servers` (List of String) IPv4 addresses of DNS resolvers to offer DHCP clients. Up to five, and each must be unique.
 
 
 <a id="nestedatt--b_end_partner_config--vrouter_config--interfaces--ip_routes"></a>
