@@ -298,7 +298,7 @@ resource "megaport_vxc" "service_key_vxc" {
 ### Optional
 
 - `a_end_partner_config` (Attributes) The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC. (see [below for nested schema](#nestedatt--a_end_partner_config))
-- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, amazon_ip_address, and prefixes on an AWS configuration, those same settings plus type on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC. (see [below for nested schema](#nestedatt--b_end_partner_config))
+- `b_end_partner_config` (Attributes) The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, plus prefixes on an AWS configuration when the API reports one, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, and amazon_ip_address on an AWS configuration, those same settings plus type and prefixes on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC. (see [below for nested schema](#nestedatt--b_end_partner_config))
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product.
@@ -405,9 +405,9 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.
-- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `prefixes` (String) The prefixes of the partner configuration. An import leaves this value null.
+- `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
 
 
@@ -519,7 +519,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -593,7 +593,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.
@@ -679,9 +679,9 @@ Optional:
 - `amazon_asn` (Number) The Amazon ASN of the partner configuration.
 - `amazon_ip_address` (String) The Amazon IP address of the partner configuration.
 - `asn` (Number) The ASN of the partner configuration. When the VXC's A-End is an MCR, the API reports the MCR ASN here.
-- `auth_key` (String, Sensitive) The authentication key of the partner configuration.
+- `auth_key` (String, Sensitive) The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `customer_ip_address` (String) The customer IP address of the partner configuration.
-- `prefixes` (String) The prefixes of the partner configuration. An import leaves this value null.
+- `prefixes` (String) The prefixes of the partner configuration.
 - `type` (String) The type of the AWS Virtual Interface. Required for AWS Virtual Interface Partner Configurations (e.g. if the connect_type is "AWS"). Valid values are "private", "public", or "transit".
 
 
@@ -793,7 +793,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `permit_export_to` (List of String) The permitted export to of the BGP connection.
@@ -867,7 +867,7 @@ Optional:
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
-- `password` (String, Sensitive) The password of the BGP connection.
+- `password` (String, Sensitive) The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = "AWS"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key.
 - `peer_asn` (Number) The peer ASN of the BGP connection.
 - `peer_ip_address` (String) The peer IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.1").
 - `peer_type` (String) Defines the default BGP routing policy for this BGP connection. The default depends on the CSP type of the far end of this VXC.

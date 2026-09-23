@@ -971,11 +971,12 @@ func (orm *vxcResourceModel) fillBEndPartnerConfigOnImport(ctx context.Context, 
 			ConnectType:    stringOrNull(conn.ConnectType),
 			Type:           stringOrNull(conn.Type),
 			OwnerAccount:   stringOrNull(conn.OwnerAccount),
+			Prefixes:       stringOrNull(string(conn.Prefixes)),
 			ConnectionName: stringOrNull(conn.Name),
 		})
 		diags.AddWarning(
 			summary,
-			"The import leaves aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, aws_config.amazon_ip_address, and aws_config.prefixes null in b_end_partner_config. AWS assigns those values when the order leaves them out, and the read cannot tell an assigned value from one the configuration set. "+recordsOnNextApply,
+			"The import leaves aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address null in b_end_partner_config. AWS assigns those values when the order leaves them out, and the read cannot tell an assigned value from one the configuration set. "+recordsOnNextApply+" The import records aws_config.prefixes as the API reports it. A configuration that leaves it out fails the next apply, so copy the recorded value into the configuration.",
 		)
 	case megaport.CSPConnectionAWSHC:
 		partnerDiags, _, partnerObj = createAWSPartnerConfig(ctx, vxcPartnerConfigAWSModel{

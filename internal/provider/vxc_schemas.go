@@ -13,6 +13,11 @@ import (
 // the block and each timer inside it read the message from here.
 const bfdDeprecationMessage = "Setting the BFD timers has no effect. MCR always runs BFD at a 300 ms transmit interval, a 300 ms receive interval, and a multiplier of 3. Set `bgp_connections[].bfd_enabled` to turn BFD on."
 
+// Both the vRouter and the deprecated a-end shape repeat the BGP connection
+// password field, and either end can carry the AWS config or the vRouter
+// config, so the description lives here once.
+const awsBGPPasswordDescription = "The MD5 password of the BGP connection. On a VXC to AWS Direct Connect (`connect_type = \"AWS\"`) with an explicit AWS config on the other end, set this to the same value as that end's `aws_config.auth_key`. Omitting this end's explicit config is the alternative, and Megaport then configures both ends with one generated key."
+
 var (
 	awsPartnerConfigSchema = schema.SingleNestedAttribute{
 		Description: "The AWS partner configuration.",
@@ -45,12 +50,12 @@ var (
 				Optional:    true,
 			},
 			"auth_key": schema.StringAttribute{
-				Description: "The authentication key of the partner configuration.",
+				Description: "The BGP MD5 key of the AWS virtual interface. Megaport generates one when it is blank. On a VXC to AWS Direct Connect with an explicit vRouter or deprecated a-end config on the other end, set this to the same value as every `bgp_connections[].password` there. Omitting the other end's explicit config is the alternative, and Megaport then configures both ends with one generated key.",
 				Sensitive:   true,
 				Optional:    true,
 			},
 			"prefixes": schema.StringAttribute{
-				Description: "The prefixes of the partner configuration. An import leaves this value null.",
+				Description: "The prefixes of the partner configuration.",
 				Optional:    true,
 			},
 			"customer_ip_address": schema.StringAttribute{
@@ -371,7 +376,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: awsBGPPasswordDescription,
 										Sensitive:   true,
 										Optional:    true,
 									},
@@ -526,7 +531,7 @@ var (
 										Optional:    true,
 									},
 									"password": schema.StringAttribute{
-										Description: "The password of the BGP connection.",
+										Description: awsBGPPasswordDescription,
 										Sensitive:   true,
 										Optional:    true,
 									},
