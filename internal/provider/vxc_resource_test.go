@@ -5825,8 +5825,9 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantWarnPartner: "aws",
 		},
 		{
-			// An imported AWS VXC records prefixes as null. Setting it fills
-			// the gap: recorded and warned about, like the null-state case.
+			// An imported AWS VXC records prefixes as null when the API reports
+			// none. Setting it fills the gap: recorded and warned about, like the
+			// null-state case.
 			name:            "csp_fills_null_prefixes",
 			rebuiltOnImport: true,
 			state:           ty.awsVal(knownKey("same")),
@@ -6558,7 +6559,10 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 		ConnectType: "AWS", ResourceName: "b_csp_connection", Type: "private",
 		OwnerAccount: "123456789012", ASN: 64555, AmazonASN: 64512, AuthKey: "bgp-secret",
 		CustomerIPAddress: "169.254.0.1/30", AmazonAddress: "169.254.0.2/30", Name: "my-vif",
+		Prefixes: "10.0.1.0/24,10.0.2.0/24",
 	}
+	awsConnNoPrefixes := awsConn
+	awsConnNoPrefixes.Prefixes = ""
 	awsHCConn := megaport.CSPConnectionAWSHC{
 		ConnectType: "AWSHC", ResourceName: "b_csp_connection", OwnerAccount: "123456789012", Name: "my-hc",
 	}
@@ -6602,7 +6606,8 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 		check       func(t *testing.T, partner vxcPartnerConfigurationModel)
 	}{
 		{
-			name: "aws_virtual_interface", vxc: readVXC(awsConn), wantPartner: "aws", wantWarning: "aws_config.prefixes",
+			name: "aws_virtual_interface", vxc: readVXC(awsConn), wantPartner: "aws",
+			wantWarning: "aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address",
 			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
 				var aws vxcPartnerConfigAWSModel
 				decode(t, partner.AWSPartnerConfig, &aws)
@@ -6612,10 +6617,19 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 				wantInt(t, "asn", aws.ASN, 0)
 				wantInt(t, "amazon_asn", aws.AmazonASN, 0)
 				wantString(t, "auth_key", aws.AuthKey, "")
-				wantString(t, "prefixes", aws.Prefixes, "")
+				wantString(t, "prefixes", aws.Prefixes, "10.0.1.0/24,10.0.2.0/24")
 				wantString(t, "customer_ip_address", aws.CustomerIPAddress, "")
 				wantString(t, "amazon_ip_address", aws.AmazonIPAddress, "")
 				wantString(t, "name", aws.ConnectionName, "my-vif")
+			},
+		},
+		{
+			name: "aws_virtual_interface_no_prefixes", vxc: readVXC(awsConnNoPrefixes), wantPartner: "aws",
+			wantWarning: "aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var aws vxcPartnerConfigAWSModel
+				decode(t, partner.AWSPartnerConfig, &aws)
+				wantString(t, "prefixes", aws.Prefixes, "")
 			},
 		},
 		{
