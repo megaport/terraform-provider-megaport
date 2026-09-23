@@ -41,9 +41,13 @@ func (s *createWaitStub) handler(t *testing.T) http.HandlerFunc {
 				writeStubJSON(t, w, http.StatusBadRequest, map[string]any{"message": "the stub rejects the purchase"})
 				return
 			}
+			uidKey := "technicalServiceUid"
+			if s.productType == megaport.PRODUCT_VXC {
+				uidKey = "vxcJTechnicalServiceUid"
+			}
 			writeStubJSON(t, w, http.StatusOK, map[string]any{
 				"message": "ok",
-				"data":    []map[string]any{{"technicalServiceUid": s.uid}},
+				"data":    []map[string]any{{uidKey: s.uid}},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/"+s.uid:
 			product := map[string]any{
@@ -54,7 +58,18 @@ func (s *createWaitStub) handler(t *testing.T) http.HandlerFunc {
 			for k, v := range s.product {
 				product[k] = v
 			}
+			s.mu.Lock()
+			if s.cancelled {
+				product["provisioningStatus"] = megaport.STATUS_DECOMMISSIONED
+			}
+			s.mu.Unlock()
 			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": product})
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/port-uid":
+			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": map[string]any{
+				"productUid":         "port-uid",
+				"productType":        megaport.PRODUCT_MEGAPORT,
+				"provisioningStatus": "LIVE",
+			}})
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/"+s.uid+"/tags":
 			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": map[string]any{"resourceTags": []any{}}})
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/mcr2/"+s.uid+"/prefixLists":
@@ -142,6 +157,25 @@ func createWaitCases() []createWaitCase {
 	}
 }
 
+func vxcWaitCase() createWaitCase {
+	return createWaitCase{
+		name:        "vxc",
+		productType: megaport.PRODUCT_VXC,
+		product:     map[string]any{"provisioningStatus": "DEPLOYABLE"},
+		newResource: func(c *megaport.Client) fwresource.Resource { return &vxcResource{client: c} },
+		setPlan: func(attrs map[string]tftypes.Value, objType tftypes.Object) {
+			attrs["rate_limit"] = tftypes.NewValue(tftypes.Number, 100)
+			attrs["contract_term_months"] = tftypes.NewValue(tftypes.Number, 12)
+			for _, end := range []string{"a_end", "b_end"} {
+				endType, _ := objType.AttributeTypes[end].(tftypes.Object)
+				endAttrs := nullValueMap(endType)
+				endAttrs["requested_product_uid"] = tftypes.NewValue(tftypes.String, "port-uid")
+				attrs[end] = tftypes.NewValue(endType, endAttrs)
+			}
+		},
+	}
+}
+
 // runStubCreate builds a plan for tc and runs Create against a stub API.
 func runStubCreate(ctx context.Context, t *testing.T, tc createWaitCase, stub *createWaitStub) (fwresource.Resource, fwresource.CreateResponse) {
 	t.Helper()
@@ -187,47 +221,64 @@ func TestCreateSavesUIDWhenWaitFails(t *testing.T) {
 	for _, tc := range createWaitCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			stub := &createWaitStub{uid: tc.name + "-uid", productType: tc.productType, product: tc.product}
-
-			// The SDK checks the status every 30 seconds, so the deadline ends the wait first.
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			r, createResp := runStubCreate(ctx, t, tc, stub)
-
-			errs := createResp.Diagnostics.Errors()
-			if len(errs) != 1 || !strings.Contains(errs[0].Summary(), "ordered but not ready") {
-				t.Fatalf("Create errors = %v, want one \"ordered but not ready\" error", errs)
-			}
-			var uid types.String
-			if diags := createResp.State.GetAttribute(context.Background(), path.Root("product_uid"), &uid); diags.HasError() {
-				t.Fatalf("reading product_uid: %v", diags.Errors())
-			}
-			if uid.ValueString() != stub.uid {
-				t.Fatalf("product_uid in state = %q, want %q", uid.ValueString(), stub.uid)
-			}
-
-			readResp := fwresource.ReadResponse{State: createResp.State}
-			r.Read(context.Background(), fwresource.ReadRequest{State: createResp.State}, &readResp)
-			if readResp.Diagnostics.HasError() {
-				t.Fatalf("Read errors: %v", readResp.Diagnostics.Errors())
-			}
-			if readResp.State.Raw.IsNull() {
-				t.Fatal("Read removed the resource from state")
-			}
-
-			deleteResp := fwresource.DeleteResponse{State: readResp.State}
-			r.Delete(context.Background(), fwresource.DeleteRequest{State: readResp.State}, &deleteResp)
-			if deleteResp.Diagnostics.HasError() {
-				t.Fatalf("Delete errors: %v", deleteResp.Diagnostics.Errors())
-			}
-			stub.mu.Lock()
-			defer stub.mu.Unlock()
-			if !stub.cancelled {
-				t.Fatal("Delete did not cancel the product")
-			}
+			checkCreateSavesUID(t, tc)
 		})
 	}
+}
+
+// TestVXCCreateSavesUIDWhenWaitFails is not parallel: it sets waitForTime,
+// which the other parallel tests read.
+func TestVXCCreateSavesUIDWhenWaitFails(t *testing.T) {
+	prev := waitForTime
+	waitForTime = time.Minute
+	t.Cleanup(func() { waitForTime = prev })
+
+	checkCreateSavesUID(t, vxcWaitCase())
+}
+
+// checkCreateSavesUID runs Create until its wait fails, then Read and Delete.
+func checkCreateSavesUID(t *testing.T, tc createWaitCase) {
+	t.Helper()
+
+	stub := &createWaitStub{uid: tc.name + "-uid", productType: tc.productType, product: tc.product}
+
+	// The waits check the status every 30 seconds, so the deadline ends the wait first.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	r, createResp := runStubCreate(ctx, t, tc, stub)
+
+	errs := createResp.Diagnostics.Errors()
+	if len(errs) != 1 || !strings.Contains(errs[0].Summary(), "ordered but not ready") {
+		t.Fatalf("Create errors = %v, want one \"ordered but not ready\" error", errs)
+	}
+	var uid types.String
+	if diags := createResp.State.GetAttribute(context.Background(), path.Root("product_uid"), &uid); diags.HasError() {
+		t.Fatalf("reading product_uid: %v", diags.Errors())
+	}
+	if uid.ValueString() != stub.uid {
+		t.Fatalf("product_uid in state = %q, want %q", uid.ValueString(), stub.uid)
+	}
+
+	readResp := fwresource.ReadResponse{State: createResp.State}
+	r.Read(context.Background(), fwresource.ReadRequest{State: createResp.State}, &readResp)
+	if readResp.Diagnostics.HasError() {
+		t.Fatalf("Read errors: %v", readResp.Diagnostics.Errors())
+	}
+	if readResp.State.Raw.IsNull() {
+		t.Fatal("Read removed the resource from state")
+	}
+
+	deleteResp := fwresource.DeleteResponse{State: readResp.State}
+	r.Delete(context.Background(), fwresource.DeleteRequest{State: readResp.State}, &deleteResp)
+	if deleteResp.Diagnostics.HasError() {
+		t.Fatalf("Delete errors: %v", deleteResp.Diagnostics.Errors())
+	}
+	stub.mu.Lock()
+	defer stub.mu.Unlock()
+	if !stub.cancelled {
+		t.Fatal("Delete did not cancel the product")
+	}
+
 }
 
 // TestCreateWritesNoStateWhenOrderRejected covers an order the API rejects:
@@ -235,7 +286,7 @@ func TestCreateSavesUIDWhenWaitFails(t *testing.T) {
 func TestCreateWritesNoStateWhenOrderRejected(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range createWaitCases() {
+	for _, tc := range append(createWaitCases(), vxcWaitCase()) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
