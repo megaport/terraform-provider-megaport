@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -338,6 +339,77 @@ func TestAccMegaportLAGPort_GrowLagCount(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestAccMegaportLAGPort_UpdateReachesEveryMember renames and reterms a two-port LAG,
+// then reads each member from the API. The API modifies only the port named in the call.
+func TestAccMegaportLAGPort_UpdateReachesEveryMember(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
+	portName := RandomTestName()
+	portNameNew := RandomTestName()
+
+	configFor := func(name string, term int) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_lag_port" "lag_port" {
+			product_name           = "%s"
+			port_speed             = 10000
+			location_id            = data.megaport_location.test_location.id
+			contract_term_months   = %d
+			marketplace_visibility = false
+			lag_count              = 2
+		}`, locationID, name, term)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(portName, 12),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_port_uids.#", "2"),
+					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+				),
+			},
+			{
+				Config: configFor(portNameNew, 24),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
+					checkLagMembersHold("megaport_lag_port.lag_port", portNameNew, 24),
+				),
+			},
+		},
+	})
+}
+
+// checkLagMembersHold fails when a LAG member the API reports has a different name or term.
+func checkLagMembersHold(resourceName, name string, term int) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		uids, err := lagPortUIDsFromState(s, resourceName)
+		if err != nil {
+			return err
+		}
+		client, err := getTestClient()
+		if err != nil {
+			return err
+		}
+
+		for _, uid := range uids {
+			port, err := client.PortService.GetPort(context.Background(), uid)
+			if err != nil {
+				return fmt.Errorf("could not read LAG member %s: %w", uid, err)
+			}
+			if port.Name != name || port.ContractTermMonths != term {
+				return fmt.Errorf("LAG member %s has name %q and term %d, want %q and %d",
+					uid, port.Name, port.ContractTermMonths, name, term)
+			}
+		}
+		return nil
+	}
 }
 
 // lagPortUIDsFromState reads the LAG member UIDs a resource holds in state.
