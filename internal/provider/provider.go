@@ -422,3 +422,20 @@ func diversityZoneFromAPI(current types.String, apiVal, productUID string, diags
 	}
 	return types.StringValue(apiVal)
 }
+
+// saveCreatedUID saves uid to state so a failed create leaves a tainted
+// resource instead of an orphan. It returns false when Create must stop.
+func saveCreatedUID(ctx context.Context, resp *resource.CreateResponse, kind, name, uid string, waitErr error) bool {
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), uid)...)
+	if resp.Diagnostics.HasError() {
+		return false
+	}
+	if waitErr != nil {
+		resp.Diagnostics.AddError(
+			kind+" ordered but not ready",
+			fmt.Sprintf("%s %s (%s) was ordered successfully but did not reach a ready state: %s. Its UID has been saved to state.", kind, name, uid, waitErr),
+		)
+		return false
+	}
+	return true
+}

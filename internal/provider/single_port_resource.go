@@ -423,19 +423,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
-
-	// Persist the UID immediately so any failure below leaves a tracked
-	// (tainted) resource instead of an orphan that later applies try to recreate.
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Port ordered but not ready",
-			"Port "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state.",
-		)
+	if !saveCreatedUID(ctx, resp, "Port", plan.Name.ValueString(), createdID, err) {
 		return
 	}
 
