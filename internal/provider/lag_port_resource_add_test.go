@@ -126,8 +126,8 @@ func TestAddLagPorts(t *testing.T) {
 		wantError     bool
 	}{
 		{
-			// The retry case. An apply can order the ports and still fail waiting for
-			// them, and the live read already holds them.
+			// The retry case. The ports an earlier apply stopped waiting for have since
+			// provisioned, and the live read already holds them.
 			name:          "orders nothing when the LAG already has the ports",
 			aggregationID: 7,
 			memberUIDs:    []string{lagPortStubUID, "lag-uid-2", "lag-uid-3"},

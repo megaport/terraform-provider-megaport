@@ -801,8 +801,8 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 		return nil, diags
 	}
 
-	// Count against the live read, not against state. An earlier apply can order ports
-	// and then fail waiting for them, and a retry would pay for them twice.
+	// Count against the live read, not against state, to count ports that provisioned after
+	// an earlier apply stopped waiting. The read cannot see a port until it has an interface.
 	count := target - primary.LagCount
 	if count < 1 {
 		return primary.LagPortUIDs, diags
@@ -844,7 +844,8 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 	if err != nil {
 		diags.AddError(
 			"Error adding ports to the LAG",
-			fmt.Sprintf("Could not add %d ports to LAG %s: %s", count, plan.UID.ValueString(), err.Error()),
+			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the LAG does not count the new ports until they provision, so applying again before then orders more ports.",
+				count, plan.UID.ValueString(), err.Error()),
 		)
 		return nil, diags
 	}
