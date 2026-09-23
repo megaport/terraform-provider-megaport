@@ -601,9 +601,8 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 
 		planTermChanged := !plan.ContractTermMonths.Equal(state.ContractTermMonths)
 		for _, member := range members {
-			// A cancelled or failed port never reads back ready, so the modify would wait out wait_time.
-			if member.ProvisioningStatus == megaport.STATUS_CANCELLED || member.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED ||
-				member.ProvisioningStatus == "FAILED" {
+			// A cancelled port never reads back ready, so the modify would wait out wait_time.
+			if member.ProvisioningStatus == megaport.STATUS_CANCELLED || member.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 				continue
 			}
 			// Send the term only when the plan changes it. Sending a port the term it already has

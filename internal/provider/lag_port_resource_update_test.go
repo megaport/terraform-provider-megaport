@@ -131,7 +131,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantModified: []string{"lag-2", "lag-1"},
 		},
 		{
-			name:         "cancelled, decommissioned, and failed members are skipped",
+			name:         "cancelled and decommissioned members are skipped",
 			planName:     "lag-new",
 			planTerm:     12,
 			planLagCount: 2,
@@ -139,7 +139,6 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				lagMember("lag-1", "lag-old", 12),
 				{UID: "lag-2", Name: "lag-old", ContractTermMonths: 12, AggregationID: 7, ProvisioningStatus: megaport.STATUS_CANCELLED},
 				{UID: "lag-3", Name: "lag-old", ContractTermMonths: 12, AggregationID: 7, ProvisioningStatus: megaport.STATUS_DECOMMISSIONED},
-				{UID: "lag-4", Name: "lag-old", ContractTermMonths: 12, AggregationID: 7, ProvisioningStatus: "FAILED"},
 			},
 			wantModified: []string{"lag-1"},
 		},
