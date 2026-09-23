@@ -123,13 +123,12 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantModified:   []string{"lag-2", "lag-1"},
 		},
 		{
-			name:         "a name change brings a member on another term back to the planned term",
+			name:         "a name change leaves a member on another term at that term",
 			planName:     "lag-new",
 			planTerm:     12,
 			planLagCount: 2,
 			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 24)},
 			wantModified: []string{"lag-2", "lag-1"},
-			wantTerm:     map[string]int{"lag-2": 12},
 		},
 		{
 			name:         "a cancelled member is skipped",

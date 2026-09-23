@@ -599,13 +599,15 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			return
 		}
 
+		planTermChanged := !plan.ContractTermMonths.Equal(state.ContractTermMonths)
 		for _, member := range members {
 			// A cancelled port never reads back ready, so the modify would wait out wait_time.
 			if member.ProvisioningStatus == megaport.STATUS_CANCELLED || member.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
 				continue
 			}
-			// Sending a port the term it already has extends its contract, or fails on month-to-month.
-			termChanged := member.ContractTermMonths != contractTermMonths
+			// Send the term only when the plan changes it. Sending a port the term it already has
+			// extends its contract, or fails on month-to-month.
+			termChanged := planTermChanged && member.ContractTermMonths != contractTermMonths
 			// Skip ports that already match: ports the grow just ordered, or ports an earlier failed apply reached.
 			if !termChanged && member.Name == name && member.CostCentre == costCentre &&
 				member.MarketplaceVisibility == marketplaceVisibility {
@@ -627,7 +629,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			if _, err := r.client.PortService.ModifyPort(ctx, modifyReq); err != nil {
 				resp.Diagnostics.AddError(
 					"Error modifying port",
-					"Could not modify port "+member.UID+" in LAG "+plan.UID.ValueString()+": "+err.Error()+
+					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed or did not finish: "+err.Error()+
 						". Run the apply again to modify the remaining ports."+lagGrowNote(lagPortUIDs),
 				)
 				return
