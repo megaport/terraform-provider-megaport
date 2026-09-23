@@ -77,6 +77,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 		planName       string
 		planTerm       int64
 		planCostCentre string
+		planVisibility bool
 		planLagCount   int64
 		stateLagCount  int64
 		listed         []*megaport.Port
@@ -111,6 +112,35 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			planLagCount:   2,
 			listed:         []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
 			wantModified:   []string{"lag-2", "lag-1"},
+		},
+		{
+			name:           "a marketplace visibility change reaches every member",
+			planName:       "lag-old",
+			planTerm:       12,
+			planVisibility: true,
+			planLagCount:   2,
+			listed:         []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			wantModified:   []string{"lag-2", "lag-1"},
+		},
+		{
+			name:         "a name change brings a member on another term back to the planned term",
+			planName:     "lag-new",
+			planTerm:     12,
+			planLagCount: 2,
+			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 24)},
+			wantModified: []string{"lag-2", "lag-1"},
+			wantTerm:     map[string]int{"lag-2": 12},
+		},
+		{
+			name:         "a cancelled member is skipped",
+			planName:     "lag-new",
+			planTerm:     12,
+			planLagCount: 2,
+			listed: []*megaport.Port{
+				lagMember("lag-1", "lag-old", 12),
+				{UID: "lag-2", Name: "lag-old", ContractTermMonths: 12, AggregationID: 7, ProvisioningStatus: megaport.STATUS_CANCELLED},
+			},
+			wantModified: []string{"lag-1"},
 		},
 		{
 			// The retry after a failed apply. The member already holds the new term.
@@ -167,7 +197,15 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			planTerm:     12,
 			planLagCount: 2,
 			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12)},
-			wantError:    "reports 1 member ports, and state holds 2",
+			wantError:    "does not hold port lag-2 ",
+		},
+		{
+			name:         "a list read with a grow that misses a state member modifies no port",
+			planName:     "lag-new",
+			planTerm:     12,
+			planLagCount: 3,
+			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-3", "lag-new", 12)},
+			wantError:    "does not hold port lag-2 ",
 		},
 		{
 			name:         "a list read that misses the primary modifies no port",
@@ -208,6 +246,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			if tc.planCostCentre != "" {
 				planModel.CostCentre = types.StringValue(tc.planCostCentre)
 			}
+			planModel.MarketplaceVisibility = types.BoolValue(tc.planVisibility)
 			state := tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil)}
 			plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil)}
 			if diags := state.Set(ctx, &stateModel); diags.HasError() {
@@ -244,6 +283,9 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				}
 				if want := planModel.CostCentre.ValueString(); req.CostCentre != want {
 					t.Errorf("modify %s sent cost centre %q, want %q", req.PortID, req.CostCentre, want)
+				}
+				if req.MarketplaceVisibility == nil || *req.MarketplaceVisibility != tc.planVisibility {
+					t.Errorf("modify %s sent visibility %v, want %t", req.PortID, req.MarketplaceVisibility, tc.planVisibility)
 				}
 				wantTerm, sendsTerm := tc.wantTerm[req.PortID]
 				switch {

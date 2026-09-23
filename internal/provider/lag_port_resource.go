@@ -564,7 +564,6 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Check on changes
 	var name, costCentre string
 	var marketplaceVisibility bool
-	var contractTermMonths *int
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
@@ -578,10 +577,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		months := int(plan.ContractTermMonths.ValueInt64())
-		contractTermMonths = &months
-	}
+	contractTermMonths := int(plan.ContractTermMonths.ValueInt64())
 
 	// The API modifies only the port named in the call, so each member gets its own.
 	if !plan.Name.Equal(state.Name) || !plan.CostCentre.Equal(state.CostCentre) ||
@@ -594,16 +590,28 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			)
 			return
 		}
-		if len(members) < lagMemberCount(&state) {
+		if missing := missingLagMember(members, &state); missing != "" {
 			resp.Diagnostics.AddError(
-				"LAG member count went backwards",
-				fmt.Sprintf("LAG %s reports %d member ports, and state holds %d. A count that drops points to an incomplete read, so this apply modified no port. Run it again.%s",
-					plan.UID.ValueString(), len(members), lagMemberCount(&state), lagGrowNote(lagPortUIDs)),
+				"LAG port missing from the product list",
+				"The product list read does not hold port "+missing+" in LAG "+plan.UID.ValueString()+
+					". This points to an incomplete read, so this apply modified no port. Run it again."+lagGrowNote(lagPortUIDs),
 			)
 			return
 		}
 
 		for _, member := range members {
+			// A cancelled port never reads back ready, so the modify would wait out wait_time.
+			if member.ProvisioningStatus == megaport.STATUS_CANCELLED || member.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+				continue
+			}
+			// Sending a port the term it already has extends its contract, or fails on month-to-month.
+			termChanged := member.ContractTermMonths != contractTermMonths
+			// Skip ports that already match: ports the grow just ordered, or ports an earlier failed apply reached.
+			if !termChanged && member.Name == name && member.CostCentre == costCentre &&
+				member.MarketplaceVisibility == marketplaceVisibility {
+				continue
+			}
+
 			modifyReq := &megaport.ModifyPortRequest{
 				PortID:                member.UID,
 				Name:                  name,
@@ -612,14 +620,8 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 				WaitForUpdate:         true,
 				WaitForTime:           waitForTime,
 			}
-			// Sending a port the term it already has extends its contract, or fails on month-to-month.
-			if contractTermMonths != nil && member.ContractTermMonths != *contractTermMonths {
-				modifyReq.ContractTermMonths = contractTermMonths
-			}
-			// Skip ports that already match: ports the grow just ordered, or ports an earlier failed apply reached.
-			if modifyReq.ContractTermMonths == nil && member.Name == name && member.CostCentre == costCentre &&
-				member.MarketplaceVisibility == marketplaceVisibility {
-				continue
+			if termChanged {
+				modifyReq.ContractTermMonths = &contractTermMonths
 			}
 
 			if _, err := r.client.PortService.ModifyPort(ctx, modifyReq); err != nil {
@@ -827,6 +829,20 @@ func (r *lagPortResource) lagMembers(ctx context.Context, uid string) ([]*megapo
 	}
 	// The primary goes last. Read takes its values from the primary, so a failed apply still shows a diff.
 	return append(members, primary), nil
+}
+
+// missingLagMember returns a port state holds that the member list lacks, or "" when none is missing.
+func missingLagMember(members []*megaport.Port, state *lagPortResourceModel) string {
+	listed := map[string]bool{}
+	for _, m := range members {
+		listed[m.UID] = true
+	}
+	for _, v := range state.LagPortUIDs.Elements() {
+		if uid, ok := v.(types.String); ok && !listed[uid.ValueString()] {
+			return uid.ValueString()
+		}
+	}
+	return ""
 }
 
 // addLagPorts brings the planned LAG up to target ports and returns the members it ends with.
