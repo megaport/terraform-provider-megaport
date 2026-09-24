@@ -648,3 +648,66 @@ func TestWaitForVXCDecommission_ContextCancelled(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled)
 }
+
+func vxcDeleteTestState(t *testing.T, ctx context.Context, r *vxcResource) tfsdk.State {
+	t.Helper()
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	require.True(t, ok, "schema type is not tftypes.Object")
+
+	attrs := nullValueMap(schemaObjType)
+	attrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+	return tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, attrs)}
+}
+
+// The VXC stays live while its cancellation waits for approval.
+func TestVXCDelete_PendingApprovalFailsWithoutWaiting(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var polls atomic.Int32
+	r := waitTestResource(&MockVXCService{
+		DeleteVXCErr: megaport.ErrCancelPendingApproval,
+		GetVXCFunc: func(ctx context.Context, id string) (*megaport.VXC, error) {
+			polls.Add(1)
+			return &megaport.VXC{ProvisioningStatus: megaport.SERVICE_LIVE}, nil
+		},
+	})
+	state := vxcDeleteTestState(t, ctx, r)
+	resp := fwresource.DeleteResponse{State: state}
+
+	r.Delete(ctx, fwresource.DeleteRequest{State: state}, &resp)
+
+	require.Len(t, resp.Diagnostics.Errors(), 1)
+	d := resp.Diagnostics.Errors()[0]
+	assert.Equal(t, "VXC cancellation pending approval", d.Summary())
+	assert.Contains(t, d.Detail(), "vxc-uid-123")
+	assert.Contains(t, d.Detail(), "Megaport Portal")
+	assert.Zero(t, polls.Load(), "a pending-approval cancel must not start the decommission wait")
+
+	var uid string
+	require.False(t, resp.State.GetAttribute(ctx, path.Root("product_uid"), &uid).HasError())
+	assert.Equal(t, "vxc-uid-123", uid)
+}
+
+func TestVXCDelete_CancelWaitsForDecommission(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var polls atomic.Int32
+	r := waitTestResource(&MockVXCService{
+		GetVXCFunc: func(ctx context.Context, id string) (*megaport.VXC, error) {
+			polls.Add(1)
+			return &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}, nil
+		},
+	})
+	state := vxcDeleteTestState(t, ctx, r)
+	resp := fwresource.DeleteResponse{State: state}
+
+	r.Delete(ctx, fwresource.DeleteRequest{State: state}, &resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "expected no errors, got: %v", resp.Diagnostics.Errors())
+	assert.Equal(t, int32(1), polls.Load())
+}
