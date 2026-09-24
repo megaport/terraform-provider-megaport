@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -175,5 +176,46 @@ func TestIXReadClearsStateOnDecommissioned(t *testing.T) {
 			assert.False(t, resp.Diagnostics.HasError(), "expected no diagnostic, got: %v", resp.Diagnostics.Errors())
 			assert.Equal(t, tc.wantAbsent, resp.State.Raw.IsNull(), "unexpected state presence for status %q", tc.status)
 		})
+	}
+}
+
+// readIXResources runs Read and returns the resources object from the new state.
+func readIXResources(t *testing.T, ix *megaport.IX) map[string]attr.Value {
+	t.Helper()
+	resp, _ := runIXRead(t, ix, nil)
+	require.False(t, resp.Diagnostics.HasError(), "expected no diagnostic, got: %v", resp.Diagnostics.Errors())
+
+	var got ixResourceModel
+	require.False(t, resp.State.Get(context.Background(), &got).HasError())
+	require.False(t, got.Resources.IsNull(), "expected resources to be set")
+	require.Len(t, got.Resources.Attributes(), len(resourcesAttrTypes))
+	return got.Resources.Attributes()
+}
+
+func TestIXReadMapsPopulatedResources(t *testing.T) {
+	t.Parallel()
+	ix := &megaport.IX{
+		ProductUID:         ixReadTestUID,
+		ProductName:        "test-ix",
+		ProvisioningStatus: megaport.SERVICE_LIVE,
+		Resources: megaport.IXResources{
+			Interface:      megaport.IXInterface{ResourceName: "interface", ResourceType: "interface", PortSpeed: 10000},
+			BGPConnections: []megaport.IXBGPConnection{{ASN: 65000, CustomerIPAddress: "192.0.2.2/24", ResourceType: "bgp_connection"}},
+			IPAddresses:    []megaport.IXIPAddress{{Address: "192.0.2.2/24", ResourceType: "ip_address", Version: 4}},
+			VPLSInterface:  megaport.IXVPLSInterface{ResourceName: "vpls_interface", ResourceType: "vpls_interface", VLAN: 100},
+		},
+	}
+
+	for name, v := range readIXResources(t, ix) {
+		assert.False(t, v.IsNull(), "expected %s to be set", name)
+	}
+}
+
+func TestIXReadLeavesEmptyResourcesNull(t *testing.T) {
+	t.Parallel()
+	ix := &megaport.IX{ProductUID: ixReadTestUID, ProductName: "test-ix", ProvisioningStatus: megaport.SERVICE_LIVE}
+
+	for name, v := range readIXResources(t, ix) {
+		assert.True(t, v.IsNull(), "expected %s to be null", name)
 	}
 }
