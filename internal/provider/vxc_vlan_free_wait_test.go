@@ -118,7 +118,7 @@ func TestVLANAvailabilityPreflight_DestroyedVLANNeverFrees(t *testing.T) {
 	assert.Contains(t, detail, "ordered_vlan")
 }
 
-// A VLAN no destroy in this process gave up belongs to a live service, so the
+// A VLAN that no VXC destroyed in this process held belongs to a live service, so the
 // preflight fails on the first answer.
 func TestVLANAvailabilityPreflight_UndestroyedVLANFailsWithoutWaiting(t *testing.T) {
 	setFreeWait(t, 200*time.Millisecond)
@@ -152,6 +152,31 @@ func TestWaitForVLANFree_TimeoutReportsLastError(t *testing.T) {
 	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "502 bad gateway")
+}
+
+func TestWaitForVLANFree_TakenAnswerClearsEarlierError(t *testing.T) {
+	svc := &sequencePortService{check: func(call int32) (bool, error) {
+		if call == 1 {
+			return false, errors.New("502 bad gateway")
+		}
+		return false, nil
+	}}
+
+	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "still in use")
+}
+
+// A destroyed VLAN that already reads free needs no wait, and a later pin on it
+// must not wait either.
+func TestVLANAvailabilityPreflight_FreeDestroyedVLANDropsRecord(t *testing.T) {
+	setFreeWait(t, time.Second)
+	recordDestroyed(t, "port-destroyed-free", 920)
+	svc := &sequencePortService{check: func(int32) (bool, error) { return true, nil }}
+
+	require.False(t, vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-destroyed-free")).HasError())
+	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-destroyed-free", vlan: 920})
+	assert.False(t, recorded)
 }
 
 // deleteVXC runs Delete against a state built from the two ends.

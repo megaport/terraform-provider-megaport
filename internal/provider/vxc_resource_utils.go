@@ -1334,7 +1334,7 @@ type vlanPreflightInput struct {
 // an internal id the user cannot map to their config. Only an explicit "taken"
 // answer is acted on: the API answers per port but VLANs are unique across a CSP
 // capacity group, so "available" does not mean the order will be accepted. A taken
-// VLAN that a destroy in this process gave up gets up to wait_time to free.
+// VLAN that a VXC destroyed in this process held gets up to wait_time to free.
 func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -1406,7 +1406,7 @@ type destroyedVLAN struct {
 
 // destroyedVLANs holds the destroyedVLAN keys that Delete records. Terraform runs
 // a replacement's destroy and create in one provider process, so the create can
-// tell a VLAN it just gave up from one a live service holds.
+// tell a VLAN the destroyed VXC held from one a live service holds.
 var destroyedVLANs sync.Map
 
 var vlanFreePollInterval = 15 * time.Second
@@ -1440,7 +1440,7 @@ func waitForVLANFree(ctx context.Context, svc megaport.PortService, portUID stri
 		select {
 		case <-pollCtx.Done():
 			if ctx.Err() != nil {
-				return ctx.Err()
+				return fmt.Errorf("the wait was canceled: %w", ctx.Err())
 			}
 			if lastErr != nil {
 				return fmt.Errorf("the last check after %v failed: %w", timeoutAfter, lastErr)
@@ -1450,7 +1450,10 @@ func waitForVLANFree(ctx context.Context, svc megaport.PortService, portUID stri
 		}
 
 		available, err := svc.CheckPortVLANAvailability(pollCtx, portUID, vlan)
-		lastErr = err
+		// A check the deadline cut off says nothing about the VLAN.
+		if pollCtx.Err() == nil {
+			lastErr = err
+		}
 		if err != nil {
 			tflog.Warn(ctx, "error checking VLAN availability, will retry", map[string]any{
 				"product_uid": portUID, "vlan": vlan, "error": err.Error(),
