@@ -2520,8 +2520,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// An import never rebuilds a cloud partner config on the A-End, so nothing
 	// there can hold a null the provider left.
-	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", false, &resp.Diagnostics)
-	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", rebuilt != nil, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", false, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", rebuilt != nil, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -3650,7 +3650,7 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 // provider does not send for that end. A cloud partner added to an end that
 // has none in state is recorded instead, and warns. So is a value set on a
 // cloud partner setting an import left null, which rebuiltOnImport selects.
-func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, rebuiltOnImport bool, diags *diag.Diagnostics) {
+func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel string, rebuiltOnImport bool, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
 	}
@@ -3664,8 +3664,7 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 	// the user wrote, rather than an import rebuilt, left those settings out on
 	// purpose, so filling one there is a change the provider cannot send.
 	if planCSP && (statePartnerConfig.IsNull() || (stateCSP && rebuiltOnImport && onlyFillsNulls(planPartnerConfig, statePartnerConfig))) {
-		diags.AddAttributeWarning(
-			path.Root(partnerConfigPathRoot),
+		diags.AddWarning(
 			"Partner configuration is recorded in state only",
 			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC. Check the value against the live service, because state now reports it.", endLabel, planPartner.ValueString()),
 		)
@@ -3677,20 +3676,17 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 
 	switch {
 	case planPartnerConfig.IsNull():
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The provider cannot remove a partner configuration from a live VXC, so the %s keeps its %q configuration. Restore the removed block. \"terraform state pull\" prints the recorded block, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case stateCSP:
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case !partnerSendableOnUpdate(endLabel, planPartner):
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The provider does not send partner %q on the %s when it updates a VXC, so this change never reaches the live service. Revert the change, or replace the VXC with \"terraform apply -replace=<resource address>\" to build it with the new configuration. %s", planPartner.ValueString(), endLabel, replaceHint),
 		)
