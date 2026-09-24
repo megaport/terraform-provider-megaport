@@ -29,7 +29,7 @@ resource "megaport_lag_port" "lag_port" {
 
 ### Required
 
-- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.
+- `contract_term_months` (Number) The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply fails with an inconsistent result error.
 - `lag_count` (Number) The number of LAG ports. Valid values are between 1 and 8. Raising it adds ports to the existing LAG and leaves the current ports in place. Lowering it replaces the LAG, because the API has no call to remove a member.
 - `location_id` (Number) The numeric location ID of the product. This value can be retrieved from the data source megaport_location.
 - `marketplace_visibility` (Boolean) Whether the product is visible in the marketplace.
