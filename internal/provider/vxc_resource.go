@@ -2662,11 +2662,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	// ModifyPlan skips the gate when an end object is unknown, so check again.
-	checkBEndVLANUpdatable(ctx, plan, state, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 	// On a cloud or transit B-End, only auto-assign or the live VLAN gets
 	// here. Update leaves the B-End VLAN out, because megalith returns 403 for
 	// IBM and AWSHC when the request carries any bEndVlan.

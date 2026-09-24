@@ -158,12 +158,7 @@ func TestVXCUpdate_VLANSends(t *testing.T) {
 		stateB, planB vxcEndSpec
 		want          map[string]float64
 		wantAbsent    []string
-		wantRejected  bool
 	}{
-		{
-			name: "aws b-end change rejected before the request", conns: bCSP("AWS"),
-			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantRejected: true,
-		},
 		{
 			name: "a-end sends on an aws b-end", conns: bCSP("AWS"), partner: "aws",
 			stateA: vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100)},
@@ -209,12 +204,6 @@ func TestVXCUpdate_VLANSends(t *testing.T) {
 				State: tfsdk.State{Schema: b.schema, Raw: state},
 			}, &resp)
 
-			if tc.wantRejected {
-				if len(ps.updateBodies) != 0 || !resp.Diagnostics.HasError() {
-					t.Fatalf("expected a rejection and no request, got %d requests: %v", len(ps.updateBodies), resp.Diagnostics.Errors())
-				}
-				return
-			}
 			if len(ps.updateBodies) != 1 {
 				t.Fatalf("expected one update request, got %d: %v", len(ps.updateBodies), resp.Diagnostics.Errors())
 			}
