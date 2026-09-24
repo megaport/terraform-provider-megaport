@@ -18,7 +18,7 @@ import (
 )
 
 // lagUpdatePortService answers the port calls Update makes and keeps every modify it receives.
-// The real ModifyPort polls every 30 seconds, which rules out an HTTP stub here.
+// The real BuyPort polls every 30 seconds, which rules out an HTTP stub here.
 type lagUpdatePortService struct {
 	megaport.PortService
 
@@ -189,7 +189,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
 			failUID:      "lag-2",
 			wantModified: []string{"lag-2"},
-			wantError:    "port lag-2 in LAG lag-1 failed or did not finish: the stub rejects the modify. Run the apply again",
+			wantError:    "port lag-2 in LAG lag-1 failed: the stub rejects the modify. Run the apply again",
 		},
 		{
 			name:         "a short list read modifies no port",
@@ -278,8 +278,8 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				if req.PortID != tc.wantModified[i] {
 					t.Errorf("modify %d went to %q, want %q", i, req.PortID, tc.wantModified[i])
 				}
-				if !req.WaitForUpdate {
-					t.Errorf("modify %s does not wait for the update", req.PortID)
+				if req.WaitForUpdate {
+					t.Errorf("modify %s waits for a status change the modify never makes", req.PortID)
 				}
 				if req.Name != tc.planName {
 					t.Errorf("modify %s sent name %q, want %q", req.PortID, req.Name, tc.planName)

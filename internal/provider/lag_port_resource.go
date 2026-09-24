@@ -614,13 +614,12 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 				continue
 			}
 
+			// No wait: the API applies these fields before it responds, and the port's status never changes.
 			modifyReq := &megaport.ModifyPortRequest{
 				PortID:                member.UID,
 				Name:                  name,
 				MarketplaceVisibility: &marketplaceVisibility,
 				CostCentre:            costCentre,
-				WaitForUpdate:         true,
-				WaitForTime:           waitForTime,
 			}
 			if termChanged {
 				modifyReq.ContractTermMonths = &contractTermMonths
@@ -629,7 +628,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			if _, err := r.client.PortService.ModifyPort(ctx, modifyReq); err != nil {
 				resp.Diagnostics.AddError(
 					"Error modifying port",
-					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed or did not finish: "+err.Error()+
+					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed: "+err.Error()+
 						". Run the apply again to modify the remaining ports."+lagGrowNote(lagPortUIDs),
 				)
 				return
