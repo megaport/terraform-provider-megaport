@@ -2662,9 +2662,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	// ModifyPlan rejects a B-End VLAN change on a cloud or transit end. What
-	// reaches here is auto-assign or the live VLAN, and some connect types 403
-	// on any B-End VLAN in the request. The B-End VLAN sends skip these ends.
+	// ModifyPlan skips the gate when an end object is unknown, so check again.
+	checkBEndVLANUpdatable(ctx, plan, state, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// On a cloud or transit B-End, only auto-assign or the live VLAN gets
+	// here. Update leaves the B-End VLAN out, because megalith returns 403 for
+	// IBM and AWSHC when the request carries any bEndVlan.
 	bEndConnectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
@@ -3613,9 +3618,9 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 }
 
 // checkBEndVLANUpdatable rejects a B-End VLAN change that NetAuto refuses.
-// It refuses an outer VLAN change on any cloud or transit B-End, and an inner
-// VLAN on every one of those except Azure. A planned ordered_vlan of 0
-// (auto-assign) or the live VLAN passes.
+// NetAuto refuses any outer VLAN change on a cloud or transit B-End. It also
+// refuses an inner VLAN change on all of them except Azure. A planned
+// ordered_vlan of 0 (auto-assign) or the live VLAN passes.
 func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, diags *diag.Diagnostics) {
 	connectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, diags)
 	if connectType == "" {
@@ -3630,14 +3635,15 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 
 	const summary = "VLAN cannot be changed on this B-End"
 	detail := func(attr string) string {
-		return fmt.Sprintf("The B-End of this VXC is a %s connection, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN. Replacing destroys and rebuilds the service.", connectType, attr)
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN. Replacing destroys and rebuilds the service.", connectType, attr)
 	}
 	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
 		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
 		diags.AddAttributeError(path.Root("b_end").AtName("ordered_vlan"), summary, detail("ordered_vlan"))
 	}
-	if v := planEnd.InnerVLAN; connectType != "AZURE" && !v.IsUnknown() && !v.IsNull() && v.ValueInt64() > 0 &&
-		!v.Equal(stateEnd.InnerVLAN) {
+	// -1 (untagged) is a change only when the live inner VLAN is tagged.
+	if v := planEnd.InnerVLAN; connectType != "AZURE" && !v.IsUnknown() && !v.IsNull() &&
+		(v.ValueInt64() > 0 && !v.Equal(stateEnd.InnerVLAN) || v.ValueInt64() == -1 && stateEnd.InnerVLAN.ValueInt64() > 0) {
 		diags.AddAttributeError(path.Root("b_end").AtName("inner_vlan"), summary, detail("inner_vlan"))
 	}
 }

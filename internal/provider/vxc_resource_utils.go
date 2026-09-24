@@ -1119,9 +1119,9 @@ func movesPort(plan, state *vxcEndConfigurationModel, isCSP bool) bool {
 }
 
 // bEndCSPConnectType returns the connect type of the cloud or transit service
-// on the B-End, or "" when the B-End is a Megaport product. NetAuto refuses a
-// B-End VLAN change on every such connect type. State's b_csp_connection
-// decides, and the planned partner config stands in when state has none.
+// on the B-End, or "" when the B-End is a Megaport product. State's
+// b_csp_connection decides, and the planned partner config stands in when
+// state has none.
 func bEndCSPConnectType(ctx context.Context, stateCSPConnections types.List, planPartnerConfig types.Object, diags *diag.Diagnostics) string {
 	var conns []cspConnectionModel
 	if !stateCSPConnections.IsNull() && !stateCSPConnections.IsUnknown() {

@@ -5109,7 +5109,7 @@ func TestAccMegaportVXC_TransitBEndVLANChangeRejected(t *testing.T) {
 			{
 				Config:      cfg(2345, 3456),
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`(?s)VLAN cannot be changed on this B-End.*TRANSIT connection`),
+				ExpectError: regexp.MustCompile(`(?s)VLAN cannot be changed on this B-End.*connect\s+type\s+TRANSIT`),
 			},
 			{
 				Config:             cfg(2345, 3456),
