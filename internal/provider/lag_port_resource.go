@@ -228,7 +228,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply fails with an inconsistent result error.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
