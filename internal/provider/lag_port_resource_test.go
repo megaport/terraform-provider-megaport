@@ -1,11 +1,15 @@
 package provider
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestAccMegaportLAGPort_Basic(t *testing.T) {
@@ -262,4 +266,200 @@ func TestAccMegaportLAGPort_ContractTermUpdate(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestAccMegaportLAGPort_GrowLagCount covers both directions of a lag_count
+// change. Raising it adds ports to the LAG the customer already has; lowering
+// it still replaces the resource, because the API has no call to remove a
+// member.
+func TestAccMegaportLAGPort_GrowLagCount(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
+	portName := RandomTestName()
+	var initialUIDs []string
+
+	configFor := func(lagCount int) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_lag_port" "lag_port" {
+			product_name           = "%s"
+			port_speed             = 10000
+			location_id            = data.megaport_location.test_location.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+			lag_count              = %d
+		}`, locationID, portName, lagCount)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "2"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_port_uids.#", "2"),
+					captureLagPortUIDs("megaport_lag_port.lag_port", &initialUIDs),
+					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+				),
+			},
+			{
+				Config: configFor(3),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_lag_port.lag_port", plancheck.ResourceActionUpdate),
+						plancheck.ExpectUnknownValue("megaport_lag_port.lag_port", tfjsonpath.New("lag_port_uids")),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_count", "3"),
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_port_uids.#", "3"),
+					checkLagPortUIDsKept("megaport_lag_port.lag_port", &initialUIDs),
+				),
+			},
+			// The configured count now matches the API, so a plan is empty.
+			{
+				Config:   configFor(3),
+				PlanOnly: true,
+			},
+			// A lower count still plans a replacement. Planned only, so the run
+			// does not pay for a destroy and a rebuild.
+			{
+				Config:             configFor(2),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_lag_port.lag_port", plancheck.ResourceActionReplace),
+					},
+				},
+			},
+		},
+	})
+}
+
+// TestAccMegaportLAGPort_UpdateReachesEveryMember renames and reterms a two-port LAG,
+// then reads each member from the API. The API modifies only the port named in the call.
+func TestAccMegaportLAGPort_UpdateReachesEveryMember(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findPortTestLocation(t, 10000)
+	portName := RandomTestName()
+	portNameNew := RandomTestName()
+
+	configFor := func(name string, term int) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		resource "megaport_lag_port" "lag_port" {
+			product_name           = "%s"
+			port_speed             = 10000
+			location_id            = data.megaport_location.test_location.id
+			contract_term_months   = %d
+			marketplace_visibility = false
+			lag_count              = 2
+		}`, locationID, name, term)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configFor(portName, 12),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "lag_port_uids.#", "2"),
+					waitForProvisioningStatus("megaport_lag_port.lag_port"),
+				),
+			},
+			{
+				Config: configFor(portNameNew, 24),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_lag_port.lag_port", "product_name", portNameNew),
+					checkLagMembersHold("megaport_lag_port.lag_port", portNameNew, 24),
+				),
+			},
+		},
+	})
+}
+
+// checkLagMembersHold fails when a LAG member the API reports has a different name or term.
+func checkLagMembersHold(resourceName, name string, term int) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		uids, err := lagPortUIDsFromState(s, resourceName)
+		if err != nil {
+			return err
+		}
+		client, err := getTestClient()
+		if err != nil {
+			return err
+		}
+
+		for _, uid := range uids {
+			port, err := client.PortService.GetPort(context.Background(), uid)
+			if err != nil {
+				return fmt.Errorf("could not read LAG member %s: %w", uid, err)
+			}
+			if port.Name != name || port.ContractTermMonths != term {
+				return fmt.Errorf("LAG member %s has name %q and term %d, want %q and %d",
+					uid, port.Name, port.ContractTermMonths, name, term)
+			}
+		}
+		return nil
+	}
+}
+
+// lagPortUIDsFromState reads the LAG member UIDs a resource holds in state.
+func lagPortUIDsFromState(s *terraform.State, resourceName string) ([]string, error) {
+	rs, ok := s.RootModule().Resources[resourceName]
+	if !ok {
+		return nil, fmt.Errorf("resource %s not found in state", resourceName)
+	}
+
+	count, err := strconv.Atoi(rs.Primary.Attributes["lag_port_uids.#"])
+	if err != nil {
+		return nil, fmt.Errorf("could not read lag_port_uids.# for %s: %w", resourceName, err)
+	}
+
+	uids := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		uids = append(uids, rs.Primary.Attributes[fmt.Sprintf("lag_port_uids.%d", i)])
+	}
+	return uids, nil
+}
+
+// captureLagPortUIDs stores the member UIDs for a later step to compare against.
+func captureLagPortUIDs(resourceName string, into *[]string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		uids, err := lagPortUIDsFromState(s, resourceName)
+		if err != nil {
+			return err
+		}
+		*into = uids
+		return nil
+	}
+}
+
+// checkLagPortUIDsKept fails when a port the LAG already had has left it.
+func checkLagPortUIDsKept(resourceName string, prior *[]string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		uids, err := lagPortUIDsFromState(s, resourceName)
+		if err != nil {
+			return err
+		}
+
+		current := make(map[string]bool, len(uids))
+		for _, uid := range uids {
+			current[uid] = true
+		}
+		for _, uid := range *prior {
+			if !current[uid] {
+				return fmt.Errorf("port %s is no longer in LAG %s, so the grow replaced it", uid, resourceName)
+			}
+		}
+		return nil
+	}
 }

@@ -577,7 +577,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	// Create the IX
 	ixResp, err := r.client.IXService.BuyIX(ctx, buyReq)
-	if err != nil {
+	if err != nil && ixResp == nil {
 		resp.Diagnostics.AddError(
 			"Error creating IX",
 			"Could not create IX, unexpected error: "+err.Error(),
@@ -585,8 +585,13 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	createdID := ixResp.TechnicalServiceUID
+	if !saveCreatedUID(ctx, resp, "IX", plan.ProductName.ValueString(), createdID, err) {
+		return
+	}
+
 	// Get the created IX
-	ix, err := r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
+	ix, err := r.client.IXService.GetIX(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading IX",
