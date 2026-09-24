@@ -2,9 +2,7 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -1314,33 +1312,6 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 		vxc.BEndConfiguration.NetworkInterfaceIndex = *expectedBEnd
 	}
 	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
-}
-
-// vxcLocalAsnIBGPEBGPSentinel is NetAuto's 400 message, passed through by megalith, for a local_asn change that turns iBGP into eBGP.
-const vxcLocalAsnIBGPEBGPSentinel = "localAsn may not change the neighbour relationship"
-
-func isVXCLocalAsnIBGPEBGPError(err error) bool {
-	var apiErr *megaport.ErrorResponse
-	if !errors.As(err, &apiErr) || apiErr.Response == nil {
-		return false
-	}
-	return apiErr.Response.StatusCode == http.StatusBadRequest &&
-		strings.Contains(apiErr.Message+" "+apiErr.Data, vxcLocalAsnIBGPEBGPSentinel)
-}
-
-// mapVXCUpdateError adds the workaround to a known local_asn rejection and keeps the generic diagnostic for anything else.
-func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
-	if isVXCLocalAsnIBGPEBGPError(err) {
-		return "Cannot change VXC local_asn from iBGP to eBGP",
-			fmt.Sprintf(
-				"The Megaport API rejected the local_asn change on VXC %s. "+
-					"The new local ASN no longer matches the peer ASN, which would turn the iBGP session into eBGP. "+
-					"Delete and recreate the VXC to make this change. "+
-					"Original API error: %s",
-				vxcUID, err.Error(),
-			)
-	}
-	return "Error Updating VXC", fmt.Sprintf("Could not update VXC with ID %s: %s", vxcUID, err.Error())
 }
 
 type vlanPreflightInput struct {

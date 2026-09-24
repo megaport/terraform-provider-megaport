@@ -2952,14 +2952,17 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if isChanged {
 		_, err := r.client.VXCService.UpdateVXC(ctx, plan.UID.ValueString(), updateReq)
 		if err != nil {
-			summary, detail := mapVXCUpdateError(err, state.UID.ValueString())
+			detail := "Could not update VXC with ID " + state.UID.ValueString() + ": " + err.Error()
 			// The API rejects network-attribute changes while the order awaits
 			// approval; point at the approval workflow instead of the bare 400.
 			if vxc, getErr := r.client.VXCService.GetVXC(ctx, state.UID.ValueString()); getErr == nil &&
 				vxcOrderPendingApproval(vxc.VXCApproval) && vxc.VXCApproval.Type == vxcApprovalTypeNew {
 				detail += ". The VXC order is still pending approval (" + vxc.VXCApproval.Status + "), and its network attributes cannot be changed until the order is approved."
 			}
-			resp.Diagnostics.AddError(summary, detail)
+			resp.Diagnostics.AddError(
+				"Error Updating VXC",
+				detail,
+			)
 			return
 		}
 
