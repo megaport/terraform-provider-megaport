@@ -35,6 +35,7 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 		productUID       string
 		productType      string
 		orderedVLAN      types.Int64
+		innerVLAN        types.Int64
 		currentVLAN      types.Int64
 		hasPartnerConfig bool
 		available        bool
@@ -84,6 +85,36 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 			productUID:  "port-uid-1",
 			productType: megaport.PRODUCT_MEGAPORT,
 			orderedVLAN: types.Int64Value(2049),
+			available:   false,
+			wantCalls:   1,
+			wantError:   true,
+		},
+		{
+			// The check reads the outer VLAN alone, so a Q-in-Q sibling on it
+			// with a different inner VLAN reads as taken.
+			name:        "q-in-q end is not checked",
+			productUID:  "port-uid-1",
+			productType: megaport.PRODUCT_MEGAPORT,
+			orderedVLAN: types.Int64Value(730),
+			innerVLAN:   types.Int64Value(1020),
+			available:   false,
+		},
+		{
+			name:        "untagged inner vlan is checked",
+			productUID:  "port-uid-1",
+			productType: megaport.PRODUCT_MEGAPORT,
+			orderedVLAN: types.Int64Value(730),
+			innerVLAN:   types.Int64Value(-1),
+			available:   false,
+			wantCalls:   1,
+			wantError:   true,
+		},
+		{
+			name:        "unknown inner vlan is checked",
+			productUID:  "port-uid-1",
+			productType: megaport.PRODUCT_MEGAPORT,
+			orderedVLAN: types.Int64Value(730),
+			innerVLAN:   types.Int64Unknown(),
 			available:   false,
 			wantCalls:   1,
 			wantError:   true,
@@ -187,6 +218,7 @@ func TestVLANAvailabilityPreflight(t *testing.T) {
 				productUID:       tt.productUID,
 				productType:      tt.productType,
 				orderedVLAN:      tt.orderedVLAN,
+				innerVLAN:        tt.innerVLAN,
 				currentVLAN:      tt.currentVLAN,
 				hasPartnerConfig: tt.hasPartnerConfig,
 			})

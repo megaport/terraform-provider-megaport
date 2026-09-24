@@ -36,6 +36,10 @@ type preflightServer struct {
 
 	// serviceKeyBEnd is the port UID a service key lookup resolves to.
 	serviceKeyBEnd string
+
+	// freeFromQuery, when set, makes every VLAN read as free from that VLAN
+	// query number on, to fake NetAuto freeing a VLAN.
+	freeFromQuery int
 }
 
 func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
@@ -54,7 +58,8 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			ps.vlanQueries = append(ps.vlanQueries, vlanQuery{portUID: portUID, vlan: vlan})
 			v, _ := strconv.Atoi(vlan)
 			data := []int{}
-			if taken[portUID] != v {
+			freed := ps.freeFromQuery > 0 && len(ps.vlanQueries) >= ps.freeFromQuery
+			if taken[portUID] != v || freed {
 				data = append(data, v)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
@@ -89,6 +94,8 @@ type vxcEndSpec struct {
 	productUID  string
 	orderedVLAN *int64
 	vlan        *int64
+	innerVLAN   *int64
+	currentUID  string
 }
 
 type vxcValueBuilder struct {
@@ -131,6 +138,12 @@ func (b *vxcValueBuilder) end(spec vxcEndSpec) tftypes.Value {
 	}
 	if spec.vlan != nil {
 		attrs["vlan"] = tftypes.NewValue(tftypes.Number, *spec.vlan)
+	}
+	if spec.innerVLAN != nil {
+		attrs["inner_vlan"] = tftypes.NewValue(tftypes.Number, *spec.innerVLAN)
+	}
+	if spec.currentUID != "" {
+		attrs["current_product_uid"] = tftypes.NewValue(tftypes.String, spec.currentUID)
 	}
 	return tftypes.NewValue(b.endType, attrs)
 }
@@ -192,6 +205,27 @@ func TestVXCCreate_VLANPreflightBlocksTakenAEndVLAN(t *testing.T) {
 	}
 	if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-a", "730"}) {
 		t.Fatalf("expected one VLAN query for port-a/730, got %v", got)
+	}
+}
+
+func TestVXCCreate_VLANPreflightSkipsQinQAEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ps := newPreflightServer(t, map[string]int{"port-a": 730})
+	b := newVXCValueBuilder(t)
+
+	plan := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(730), innerVLAN: int64p(1020)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(100)}),
+		nil,
+	)
+
+	resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+	ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+	// The B-End query proves Create went past the A-End preflight.
+	if got := ps.vlanQueries; len(got) != 1 || got[0].portUID != "port-b" {
+		t.Fatalf("expected only the B-End VLAN query, got %v", got)
 	}
 }
 
