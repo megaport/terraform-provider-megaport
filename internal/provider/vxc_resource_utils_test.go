@@ -494,9 +494,6 @@ func TestVerifyUpdateApplied(t *testing.T) {
 	}
 }
 
-// TestFromAPICSPConnection covers the VROUTER case of fromAPICSPConnection:
-// ip_addresses must reflect the API-returned addresses, be an empty (non-null)
-// list when the API returns none, and the scalar fields must map through.
 func TestFromAPICSPConnection(t *testing.T) {
 	ctx := context.Background()
 
@@ -548,11 +545,7 @@ func TestFromAPICSPConnection(t *testing.T) {
 			var gotIPs []string
 			diags = model.IPAddresses.ElementsAs(ctx, &gotIPs, false)
 			require.False(t, diags.HasError(), "reading ip_addresses: %v", diags)
-			if len(tc.wantIPs) == 0 {
-				assert.Empty(t, gotIPs)
-			} else {
-				assert.Equal(t, tc.wantIPs, gotIPs)
-			}
+			assert.Equal(t, tc.wantIPs, gotIPs)
 		})
 	}
 }
