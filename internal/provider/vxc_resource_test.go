@@ -6769,3 +6769,42 @@ func errorsWithoutUninitializedPrivateState(diags diag.Diagnostics) []diag.Diagn
 	}
 	return errs
 }
+
+var testAccVXCPartnerConfigBlockMismatchConfig = providerConfig + `
+resource "megaport_vxc" "partner_config_mismatch" {
+  product_name         = "tf-acc-test-partner-config-mismatch"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = "00000000-0000-0000-0000-000000000000"
+  }
+
+  b_end = {}
+
+  b_end_partner_config = {
+    partner = "azure"
+    azure_config = {
+      service_key = "00000000-0000-0000-0000-000000000000"
+      port_choice = "primary"
+    }
+    vrouter_config = {
+      interfaces = []
+    }
+  }
+}
+`
+
+// The plan fails before the provider is configured, so no VXC is ordered.
+func TestAccMegaportVXC_PartnerConfigBlockMismatch(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccVXCPartnerConfigBlockMismatchConfig,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)b_end_partner_config sets\s+vrouter_config`),
+			},
+		},
+	})
+}
