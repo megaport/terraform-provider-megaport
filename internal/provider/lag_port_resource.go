@@ -804,8 +804,8 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 		return nil, diags
 	}
 
-	// Count against the live read, not against state, to count ports that provisioned after
-	// an earlier apply stopped waiting. The read cannot see a port until it has an interface.
+	// Count against the live read, not against state, to count ports an earlier apply ordered.
+	// A new port gets its interface in the order call, so the read counts it at once.
 	count := target - primary.LagCount
 	if count < 1 {
 		return primary.LagPortUIDs, diags

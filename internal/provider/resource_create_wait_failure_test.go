@@ -26,6 +26,8 @@ type createWaitStub struct {
 	productType string
 	product     map[string]any
 	rejectBuy   bool
+	// memberUIDs are the other ports a LAG order returns after uid.
+	memberUIDs []string
 
 	mu        sync.Mutex
 	cancelled bool
@@ -46,10 +48,17 @@ func (s *createWaitStub) handler(t *testing.T) http.HandlerFunc {
 			if s.productType == megaport.PRODUCT_VXC {
 				uidKey = "vxcJTechnicalServiceUid"
 			}
-			writeStubJSON(t, w, http.StatusOK, map[string]any{
-				"message": "ok",
-				"data":    []map[string]any{{uidKey: s.uid}},
-			})
+			data := []map[string]any{{uidKey: s.uid}}
+			for _, uid := range s.memberUIDs {
+				data = append(data, map[string]any{uidKey: uid})
+			}
+			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": data})
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/products":
+			var ports []map[string]any
+			for _, uid := range append([]string{s.uid}, s.memberUIDs...) {
+				ports = append(ports, map[string]any{"productUid": uid, "productType": s.productType, "aggregationId": s.product["aggregationId"]})
+			}
+			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": ports})
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/"+s.uid:
 			s.mu.Lock()
 			failRead := s.failRead
@@ -98,6 +107,7 @@ type createWaitCase struct {
 	name        string
 	productType string
 	product     map[string]any
+	memberUIDs  []string
 	newResource func(*megaport.Client) fwresource.Resource
 	setPlan     func(attrs map[string]tftypes.Value, objType tftypes.Object)
 }
@@ -117,6 +127,8 @@ func createWaitCases() []createWaitCase {
 		{
 			name:        "lag_port",
 			productType: megaport.PRODUCT_MEGAPORT,
+			product:     map[string]any{"aggregationId": 7},
+			memberUIDs:  []string{"lag_port-uid-2"},
 			newResource: func(c *megaport.Client) fwresource.Resource { return &lagPortResource{client: c} },
 			setPlan: func(attrs map[string]tftypes.Value, _ tftypes.Object) {
 				attrs["port_speed"] = tftypes.NewValue(tftypes.Number, 10000)
@@ -248,7 +260,7 @@ func TestVXCCreateSavesUIDWhenWaitFails(t *testing.T) {
 func checkCreateSavesUID(t *testing.T, tc createWaitCase) {
 	t.Helper()
 
-	stub := &createWaitStub{uid: tc.name + "-uid", productType: tc.productType, product: tc.product}
+	stub := &createWaitStub{uid: tc.name + "-uid", productType: tc.productType, product: tc.product, memberUIDs: tc.memberUIDs}
 
 	// The waits check the status every 30 seconds, so the deadline ends the wait first.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -274,6 +286,15 @@ func checkCreateSavesUID(t *testing.T, tc createWaitCase) {
 	}
 	if readResp.State.Raw.IsNull() {
 		t.Fatal("Read removed the resource from state")
+	}
+	if len(stub.memberUIDs) > 0 {
+		var members types.List
+		if diags := readResp.State.GetAttribute(context.Background(), path.Root("lag_port_uids"), &members); diags.HasError() {
+			t.Fatalf("reading lag_port_uids: %v", diags.Errors())
+		}
+		if got, want := len(members.Elements()), 1+len(stub.memberUIDs); got != want {
+			t.Fatalf("lag_port_uids holds %d ports, want %d", got, want)
+		}
 	}
 
 	deleteResp := fwresource.DeleteResponse{State: readResp.State}
