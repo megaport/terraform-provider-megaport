@@ -1316,17 +1316,9 @@ func (r *vxcResource) waitForVnicIndex(ctx context.Context, uid string, expected
 	return vxc, fmt.Errorf("vnic_index propagation timed out after %v for VXC %s — using expected values", timeout, uid)
 }
 
-// vxcLocalAsnIBGPEBGPSentinel is the substring NetAuto returns (verbatim,
-// surfaced through Megalith's NetAutoErrorDecoder) in either the .Message or
-// .Data field of a 400 when an in-place VXC update would flip a BGP session
-// from iBGP to eBGP: the new local_asn no longer matches the peer's ASN.
+// vxcLocalAsnIBGPEBGPSentinel is NetAuto's 400 message, passed through by megalith, for a local_asn change that turns iBGP into eBGP.
 const vxcLocalAsnIBGPEBGPSentinel = "localAsn may not change the neighbour relationship"
 
-// isVXCLocalAsnIBGPEBGPError reports whether err is the platform's HTTP 400
-// rejecting an in-place local_asn change that would flip a BGP session between
-// iBGP and eBGP. Anything that is not a 400 *megaport.ErrorResponse (e.g. a
-// WaitForUpdate poll timeout) returns false and falls through to the generic
-// diagnostic.
 func isVXCLocalAsnIBGPEBGPError(err error) bool {
 	var apiErr *megaport.ErrorResponse
 	if !errors.As(err, &apiErr) || apiErr.Response == nil {
@@ -1336,21 +1328,14 @@ func isVXCLocalAsnIBGPEBGPError(err error) bool {
 		strings.Contains(apiErr.Message+" "+apiErr.Data, vxcLocalAsnIBGPEBGPSentinel)
 }
 
-// mapVXCUpdateError turns an error from VXCService.UpdateVXC into a Terraform
-// diagnostic (summary, detail). The known iBGP/eBGP local_asn constraint gets
-// richer provider-side guidance; everything else (including WaitForUpdate poll
-// timeouts) falls through to the historical generic Update diagnostic so we
-// don't hide novel failure modes from users. err must be non-nil; callers
-// invoke this only on the error path.
+// mapVXCUpdateError adds the workaround to a known local_asn rejection and keeps the generic diagnostic for anything else.
 func mapVXCUpdateError(err error, vxcUID string) (summary, detail string) {
 	if isVXCLocalAsnIBGPEBGPError(err) {
-		return "Cannot change VXC BGP local_asn (iBGP/eBGP transition)",
+		return "Cannot change VXC local_asn from iBGP to eBGP",
 			fmt.Sprintf(
-				"The Megaport platform rejected the local_asn update on VXC %s because the change "+
-					"would flip the BGP session from iBGP (matching local/peer ASN) to eBGP, or vice versa. "+
-					"NetAuto does not currently support that transition on an in-place VXC update. "+
-					"To change the ASN today, the VXC must be deleted and recreated. This is a "+
-					"platform-side constraint that the Terraform provider cannot work around. "+
+				"The Megaport API rejected the local_asn change on VXC %s. "+
+					"The new local ASN no longer matches the peer ASN, which would turn the iBGP session into eBGP. "+
+					"Delete and recreate the VXC to make this change. "+
 					"Original API error: %s",
 				vxcUID, err.Error(),
 			)

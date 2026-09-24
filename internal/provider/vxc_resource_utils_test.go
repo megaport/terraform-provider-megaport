@@ -18,15 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMapVXCUpdateError covers the diagnostic wrapping that turns NetAuto's
-// raw 400 message ("VRouter: localAsn may not change the neighbour
-// relationship from IBGP to EBGP…") into provider-side guidance the operator
-// can act on. See ESD-1185.
 func TestMapVXCUpdateError(t *testing.T) {
 	const vxcUID = "36cfd12e-ba4a-465e-8c05-c0803ee8bc22"
 
-	// The verbatim 400 NetAuto returns (surfaced through Megalith) when the
-	// local_asn change would flip iBGP <-> eBGP, as reported in github issue #383.
+	// Verbatim 400 from NetAuto, passed through by megalith.
 	ibgpEbgpAPIErr := newMegaportAPIError(
 		"/v3/product/vxc/"+vxcUID, http.StatusBadRequest,
 		"7a7670f5b04e2af7d0837fc4d7f27309",
@@ -46,8 +41,6 @@ func TestMapVXCUpdateError(t *testing.T) {
 		if !strings.Contains(detail, "iBGP") && !strings.Contains(detail, "IBGP") {
 			t.Errorf("detail should explain the iBGP/eBGP constraint, got %q", detail)
 		}
-		// The original API message must remain so trace_id and underlying
-		// cause stay visible.
 		if !strings.Contains(detail, "localAsn may not change the neighbour relationship") {
 			t.Errorf("detail should retain the original API error message, got %q", detail)
 		}
@@ -57,9 +50,6 @@ func TestMapVXCUpdateError(t *testing.T) {
 	})
 
 	t.Run("wrapped API error is still unwrapped and matched", func(t *testing.T) {
-		// A caller that wraps the SDK error (fmt.Errorf("...: %w", apiErr))
-		// must still get the rich diagnostic; this is why the matcher uses
-		// errors.As rather than a plain type assertion.
 		wrapped := fmt.Errorf("update VXC %s: %w", vxcUID, ibgpEbgpAPIErr)
 		summary, detail := mapVXCUpdateError(wrapped, vxcUID)
 
@@ -75,8 +65,6 @@ func TestMapVXCUpdateError(t *testing.T) {
 	})
 
 	t.Run("non-API error (e.g. WaitForUpdate timeout) falls through to generic", func(t *testing.T) {
-		// UpdateVXC runs with WaitForUpdate=true; poll timeouts are plain
-		// errors, not *megaport.ErrorResponse, so they must not match.
 		timeoutErr := errors.New("time expired waiting for VXC " + vxcUID + " to update")
 		summary, detail := mapVXCUpdateError(timeoutErr, vxcUID)
 
@@ -92,8 +80,6 @@ func TestMapVXCUpdateError(t *testing.T) {
 	})
 
 	t.Run("sentinel message on a non-400 status falls through to generic", func(t *testing.T) {
-		// The rich diagnostic is gated on HTTP 400; a 500 carrying the same
-		// text is some other failure and must not be misreported.
 		wrongStatus := newMegaportAPIError(
 			"/v3/product/vxc/"+vxcUID, http.StatusInternalServerError,
 			"9a8b7c6d", "VRouter: localAsn may not change the neighbour relationship from IBGP to EBGP",
@@ -106,8 +92,6 @@ func TestMapVXCUpdateError(t *testing.T) {
 	})
 
 	t.Run("sentinel carried in .Data instead of .Message is still matched", func(t *testing.T) {
-		// NetAuto sometimes surfaces the descriptive text via .Data with a
-		// generic .Message; the matcher must check both fields.
 		dataOnlyErr := newMegaportAPIErrorWithData(
 			"/v3/product/vxc/"+vxcUID, http.StatusBadRequest,
 			"2b3c4d5e", "Bad Request",
