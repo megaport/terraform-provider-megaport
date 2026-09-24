@@ -3615,7 +3615,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 // checkBEndVLANUpdatable rejects a B-End VLAN change that NetAuto refuses.
 // NetAuto refuses any outer VLAN change on a cloud or transit B-End. It also
 // refuses an inner VLAN change on all of them except Azure. A planned
-// ordered_vlan of 0 (auto-assign) or the live VLAN passes.
+// ordered_vlan of 0 (auto-assign) or the live VLAN passes. It warns when
+// state holds an AWS or transit B-End VLAN that older versions saved unsent.
 func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, diags *diag.Diagnostics) {
 	connectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, diags)
 	if connectType == "" {
@@ -3640,6 +3641,15 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	if v := planEnd.InnerVLAN; connectType != "AZURE" && !v.IsUnknown() && !v.IsNull() &&
 		(v.ValueInt64() > 0 && !v.Equal(stateEnd.InnerVLAN) || v.ValueInt64() == -1 && stateEnd.InnerVLAN.ValueInt64() > 0) {
 		diags.AddAttributeError(path.Root("b_end").AtName("inner_vlan"), summary, detail("inner_vlan"))
+	}
+	if connectType != "AWS" && connectType != "AWSHC" && connectType != "TRANSIT" {
+		return
+	}
+	if v, live := stateEnd.OrderedVLAN, stateEnd.VLAN; v.Equal(planEnd.OrderedVLAN) && !live.IsUnknown() && !live.IsNull() &&
+		(v.ValueInt64() > 0 && !v.Equal(live) || v.ValueInt64() == -1 && live.ValueInt64() > 0) {
+		diags.AddAttributeWarning(path.Root("b_end").AtName("ordered_vlan"), "B-End VLAN was never applied",
+			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN.",
+				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64()))
 	}
 }
 

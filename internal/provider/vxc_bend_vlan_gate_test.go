@@ -74,6 +74,7 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 		stateB, planB vxcEndSpec
 		wantAttrs     []string
 		wantType      string
+		wantWarning   bool
 	}{
 		{name: "aws ordered_vlan change rejected", conns: bCSP("AWS"),
 			stateB: live, planB: bEndAt(300, nil), wantAttrs: []string{"ordered_vlan"}, wantType: "AWS"},
@@ -97,7 +98,13 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 		{name: "auto-assign permitted", conns: bCSP("AWS"), stateB: live, planB: bEndAt(0, nil)},
 		{name: "live vlan after import permitted", conns: bCSP("AWS"),
 			stateB: vxcEndSpec{vlan: int64p(200)}, planB: live},
-		{name: "unsent ordered_vlan already in state permitted", conns: bCSP("AWS"),
+		{name: "unsent ordered_vlan already in state warned", conns: bCSP("AWS"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantWarning: true},
+		{name: "unsent untagged ordered_vlan warned", partner: "transit",
+			stateB: bEndAt(-1, nil), planB: bEndAt(-1, nil), wantWarning: true},
+		{name: "reverting an unsent ordered_vlan to the live vlan permitted", conns: bCSP("AWS"),
+			stateB: bEndAt(300, nil), planB: bEndAt(200, nil)},
+		{name: "azure ordered_vlan differing from live not warned", conns: bCSP("AZURE"),
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil)},
 		{name: "unknown ordered_vlan permitted", conns: bCSP("AWS"),
 			stateB: live, planB: vxcEndSpec{orderedVLANUnknown: true, vlan: int64p(200)}},
@@ -122,6 +129,9 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 				Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
 			}, &resp)
 
+			if warns := len(resp.Diagnostics.Warnings()); tc.wantWarning != (warns == 1) || warns > 1 {
+				t.Errorf("expected warning %v, got %v", tc.wantWarning, resp.Diagnostics.Warnings())
+			}
 			errs := resp.Diagnostics.Errors()
 			if len(errs) != len(tc.wantAttrs) {
 				t.Fatalf("expected %d errors, got %v", len(tc.wantAttrs), errs)

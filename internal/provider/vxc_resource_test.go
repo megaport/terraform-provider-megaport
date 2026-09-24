@@ -5100,7 +5100,10 @@ func TestAccMegaportVXC_TransitBEndVLANChangeRejected(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: cfg(0, 0),
-				Check:  resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "b_end.vlan"),
+				),
 			},
 			{
 				Config: cfg(2345, 0),
