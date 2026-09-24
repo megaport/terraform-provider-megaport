@@ -36,6 +36,10 @@ type preflightServer struct {
 
 	// serviceKeyBEnd is the port UID a service key lookup resolves to.
 	serviceKeyBEnd string
+
+	// freeFromQuery, when set, makes every VLAN read as free from that VLAN
+	// query number on, to fake NetAuto releasing a VLAN.
+	freeFromQuery int
 }
 
 func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
@@ -54,7 +58,8 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			ps.vlanQueries = append(ps.vlanQueries, vlanQuery{portUID: portUID, vlan: vlan})
 			v, _ := strconv.Atoi(vlan)
 			data := []int{}
-			if taken[portUID] != v {
+			released := ps.freeFromQuery > 0 && len(ps.vlanQueries) >= ps.freeFromQuery
+			if taken[portUID] != v || released {
 				data = append(data, v)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
@@ -89,6 +94,7 @@ type vxcEndSpec struct {
 	productUID  string
 	orderedVLAN *int64
 	vlan        *int64
+	currentUID  string
 }
 
 type vxcValueBuilder struct {
@@ -131,6 +137,9 @@ func (b *vxcValueBuilder) end(spec vxcEndSpec) tftypes.Value {
 	}
 	if spec.vlan != nil {
 		attrs["vlan"] = tftypes.NewValue(tftypes.Number, *spec.vlan)
+	}
+	if spec.currentUID != "" {
+		attrs["current_product_uid"] = tftypes.NewValue(tftypes.String, spec.currentUID)
 	}
 	return tftypes.NewValue(b.endType, attrs)
 }

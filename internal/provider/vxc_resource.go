@@ -3172,6 +3172,7 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		)
 		return
 	}
+	recordReleasedVLANs(ctx, state.AEndConfiguration, state.BEndConfiguration)
 }
 
 // Configure adds the provider configured client to the resource.

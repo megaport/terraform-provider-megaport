@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -1366,13 +1367,89 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 		})
 		return diags
 	}
-	if !available {
-		diags.AddError(
-			fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end),
-			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
-		)
+	if available {
+		return diags
 	}
+
+	summary := fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end)
+	if _, released := releasedVLANs.Load(releasedVLAN{portUID: in.productUID, vlan: vlan}); released {
+		tflog.Info(ctx, "Waiting for a VLAN freed by a destroyed VXC", map[string]any{
+			"end": in.end, "product_uid": in.productUID, "vlan": vlan,
+		})
+		err := waitForVLANRelease(ctx, in.svc, in.productUID, vlan, waitForTime, vlanReleasePollInterval)
+		if err == nil {
+			return diags
+		}
+		diags.AddError(summary,
+			fmt.Sprintf("Terraform destroyed the VXC that held VLAN %d on %s port %s, but the VLAN did not free: %s. Megaport usually frees a VLAN a minute or two after the destroy. Run the apply again, or pick a different %s ordered_vlan.", vlan, in.end, in.productUID, err, in.end),
+		)
+		return diags
+	}
+
+	diags.AddError(summary,
+		fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
+	)
 	return diags
+}
+
+// releasedVLAN is a port VLAN that a VXC destroyed by this provider process held.
+type releasedVLAN struct {
+	portUID string
+	vlan    int
+}
+
+// releasedVLANs holds the releasedVLAN keys that Delete records. Terraform runs
+// a replacement's destroy and create in one provider process, so the create can
+// tell a VLAN it just freed from one a live service holds.
+var releasedVLANs sync.Map
+
+var vlanReleasePollInterval = 15 * time.Second
+
+// recordReleasedVLANs records the port VLAN each end of a destroyed VXC held.
+func recordReleasedVLANs(ctx context.Context, ends ...types.Object) {
+	for _, obj := range ends {
+		var end vxcEndConfigurationModel
+		if obj.IsNull() || obj.IsUnknown() || obj.As(ctx, &end, basetypes.ObjectAsOptions{}).HasError() {
+			continue
+		}
+		if end.CurrentProductUID.ValueString() != "" && end.VLAN.ValueInt64() > 0 {
+			releasedVLANs.Store(releasedVLAN{portUID: end.CurrentProductUID.ValueString(), vlan: int(end.VLAN.ValueInt64())}, struct{}{})
+		}
+	}
+}
+
+// waitForVLANRelease polls until a port VLAN reads as available. NetAuto frees
+// the VLAN when its deploy-agent finishes, after megalith already reports the
+// VXC DECOMMISSIONED, and megalith exposes no status for that step.
+func waitForVLANRelease(ctx context.Context, svc megaport.PortService, portUID string, vlan int, timeoutAfter, pollInterval time.Duration) error {
+	// The checks share this deadline so a stalled request can't hang the wait.
+	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("still in use after %v", timeoutAfter)
+		case <-ticker.C:
+		}
+
+		available, err := svc.CheckPortVLANAvailability(pollCtx, portUID, vlan)
+		if err != nil {
+			tflog.Warn(ctx, "error checking VLAN availability, will retry", map[string]any{
+				"product_uid": portUID, "vlan": vlan, "error": err.Error(),
+			})
+			continue
+		}
+		if available {
+			return nil
+		}
+	}
 }
 
 // prefixFilterIDToName resolves a prefix filter list ID to its description.
