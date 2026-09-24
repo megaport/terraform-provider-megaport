@@ -7,8 +7,10 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +20,7 @@ import (
 
 // MockIXService is a mock of the IX service for testing
 type MockIXService struct {
+	BuyIXResult *megaport.BuyIXResponse
 	GetIXResult *megaport.IX
 	GetIXErr    error
 }
@@ -28,7 +31,7 @@ func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, err
 
 // Implement other required methods of the IXService interface with minimal stubs
 func (m *MockIXService) BuyIX(ctx context.Context, req *megaport.BuyIXRequest) (*megaport.BuyIXResponse, error) {
-	return nil, nil
+	return m.BuyIXResult, nil
 }
 
 func (m *MockIXService) ValidateIXOrder(ctx context.Context, req *megaport.BuyIXRequest) error {
@@ -176,4 +179,104 @@ func TestIXReadClearsStateOnDecommissioned(t *testing.T) {
 			assert.Equal(t, tc.wantAbsent, resp.State.Raw.IsNull(), "unexpected state presence for status %q", tc.status)
 		})
 	}
+}
+
+// readIXResources runs Read and returns the resources object from the new state.
+func readIXResources(t *testing.T, ix *megaport.IX) map[string]attr.Value {
+	t.Helper()
+	resp, _ := runIXRead(t, ix, nil)
+	require.False(t, resp.Diagnostics.HasError(), "expected no diagnostic, got: %v", resp.Diagnostics.Errors())
+
+	var got ixResourceModel
+	require.False(t, resp.State.Get(context.Background(), &got).HasError())
+	require.False(t, got.Resources.IsNull(), "expected resources to be set")
+	require.Len(t, got.Resources.Attributes(), len(resourcesAttrTypes))
+	return got.Resources.Attributes()
+}
+
+func TestIXReadMapsPopulatedResources(t *testing.T) {
+	t.Parallel()
+	ix := &megaport.IX{
+		ProductUID:         ixReadTestUID,
+		ProductName:        "test-ix",
+		ProvisioningStatus: megaport.SERVICE_LIVE,
+		Resources: megaport.IXResources{
+			Interface:      megaport.IXInterface{ResourceName: "interface", ResourceType: "interface", PortSpeed: 10000},
+			BGPConnections: []megaport.IXBGPConnection{{ASN: 65000, CustomerIPAddress: "192.0.2.2/24", ResourceType: "bgp_connection"}},
+			IPAddresses:    []megaport.IXIPAddress{{Address: "192.0.2.2/24", ResourceType: "ip_address", Version: 4}},
+			VPLSInterface:  megaport.IXVPLSInterface{ResourceName: "vpls_interface", ResourceType: "vpls_interface", VLAN: 100},
+		},
+	}
+
+	for name, v := range readIXResources(t, ix) {
+		assert.False(t, v.IsNull(), "expected %s to be set", name)
+	}
+}
+
+func TestIXReadLeavesEmptyResourcesNull(t *testing.T) {
+	t.Parallel()
+	ix := &megaport.IX{ProductUID: ixReadTestUID, ProductName: "test-ix", ProvisioningStatus: megaport.SERVICE_LIVE}
+
+	for name, v := range readIXResources(t, ix) {
+		assert.True(t, v.IsNull(), "expected %s to be null", name)
+	}
+}
+
+// Not parallel: it breaks a package-level attr type map to force a conversion error.
+func TestIXConversionErrorDoesNotSaveState(t *testing.T) {
+	saved := interfaceAttrTypes
+	t.Cleanup(func() { interfaceAttrTypes = saved })
+	interfaceAttrTypes = map[string]attr.Type{"demarcation": types.StringType}
+
+	ctx := context.Background()
+	ix := &megaport.IX{
+		ProductUID:         ixReadTestUID,
+		ProductName:        "test-ix",
+		ProvisioningStatus: megaport.SERVICE_LIVE,
+		Resources:          megaport.IXResources{Interface: megaport.IXInterface{ResourceType: "interface"}},
+	}
+
+	t.Run("read", func(t *testing.T) {
+		resp, stateVal := runIXRead(t, ix, nil)
+		require.True(t, resp.Diagnostics.HasError(), "expected a conversion diagnostic")
+		assert.True(t, resp.State.Raw.Equal(stateVal), "expected state to be left untouched")
+	})
+
+	r := &ixResource{client: &megaport.Client{IXService: &MockIXService{
+		BuyIXResult: &megaport.BuyIXResponse{TechnicalServiceUID: ixReadTestUID},
+		GetIXResult: ix,
+	}}}
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+	s := schemaResp.Schema
+	schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	require.True(t, ok, "schema type is not tftypes.Object")
+
+	t.Run("create", func(t *testing.T) {
+		planAttrs := nullValueMap(schemaObjType)
+		planAttrs["product_name"] = tftypes.NewValue(tftypes.String, "test-ix")
+		resp := &fwresource.CreateResponse{State: tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, nil)}}
+		r.Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: s, Raw: tftypes.NewValue(schemaObjType, planAttrs)}}, resp)
+
+		require.True(t, resp.Diagnostics.HasError(), "expected a conversion diagnostic")
+		var got ixResourceModel
+		require.False(t, resp.State.Get(ctx, &got).HasError())
+		assert.Equal(t, ixReadTestUID, got.ProductUID.ValueString(), "expected the UID to stay in state")
+		assert.True(t, got.Resources.IsNull(), "expected resources not to be saved")
+	})
+
+	t.Run("update", func(t *testing.T) {
+		stateAttrs := nullValueMap(schemaObjType)
+		stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, ixReadTestUID)
+		stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
+
+		resp := &fwresource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: stateVal}}
+		r.Update(ctx, fwresource.UpdateRequest{
+			Plan:  tfsdk.Plan{Schema: s, Raw: stateVal},
+			State: tfsdk.State{Schema: s, Raw: stateVal},
+		}, resp)
+
+		require.True(t, resp.Diagnostics.HasError(), "expected a conversion diagnostic")
+		assert.True(t, resp.State.Raw.Equal(stateVal), "expected state to be left untouched")
+	})
 }
