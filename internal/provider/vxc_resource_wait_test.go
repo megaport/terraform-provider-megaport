@@ -662,8 +662,7 @@ func vxcDeleteTestState(t *testing.T, ctx context.Context, r *vxcResource) tfsdk
 	return tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, attrs)}
 }
 
-// A cancel that the API parks for approval leaves the VXC live, so the destroy
-// must fail before the decommission wait and keep the VXC in state.
+// The VXC stays live while its cancellation waits for approval.
 func TestVXCDelete_PendingApprovalFailsWithoutWaiting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
