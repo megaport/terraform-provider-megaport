@@ -33,9 +33,14 @@ type preflightServer struct {
 	mu           sync.Mutex
 	vlanQueries  []vlanQuery
 	productTypes []string
+	// updateBodies holds each VXC update request body. The update still
+	// returns 500.
+	updateBodies []map[string]any
 
 	// serviceKeyBEnd is the port UID a service key lookup resolves to.
 	serviceKeyBEnd string
+	// productTypeOf overrides the MEGAPORT product type for a UID.
+	productTypeOf map[string]string
 }
 
 func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
@@ -62,7 +67,17 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productUid": ps.serviceKeyBEnd}})
 		case isGetV2 && len(parts) == 3 && parts[1] == "product":
 			ps.productTypes = append(ps.productTypes, parts[2])
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productType": megaport.PRODUCT_MEGAPORT}})
+			productType := megaport.PRODUCT_MEGAPORT
+			if pt, ok := ps.productTypeOf[parts[2]]; ok {
+				productType = pt
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productType": productType}})
+		case r.Method == http.MethodPut && len(parts) == 4 && parts[1] == "product" && parts[2] == "vxc":
+			body := map[string]any{}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			ps.updateBodies = append(ps.updateBodies, body)
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"message":"not faked"}`))
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"message":"not faked"}`))
@@ -84,11 +99,15 @@ func (ps *preflightServer) resource(t *testing.T) *vxcResource {
 	return &vxcResource{client: client}
 }
 
-// vxcEndSpec is the subset of a_end / b_end the preflight reads.
+// vxcEndSpec is the subset of a_end / b_end the preflight and the VLAN gate
+// read. A nil field stays null.
 type vxcEndSpec struct {
-	productUID  string
-	orderedVLAN *int64
-	vlan        *int64
+	productUID         string
+	orderedVLAN        *int64
+	orderedVLANUnknown bool
+	vlan               *int64
+	innerVLAN          *int64
+	vnicIndex          *int64
 }
 
 type vxcValueBuilder struct {
@@ -129,28 +148,45 @@ func (b *vxcValueBuilder) end(spec vxcEndSpec) tftypes.Value {
 	if spec.orderedVLAN != nil {
 		attrs["ordered_vlan"] = tftypes.NewValue(tftypes.Number, *spec.orderedVLAN)
 	}
+	if spec.orderedVLANUnknown {
+		attrs["ordered_vlan"] = tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)
+	}
 	if spec.vlan != nil {
 		attrs["vlan"] = tftypes.NewValue(tftypes.Number, *spec.vlan)
+	}
+	if spec.innerVLAN != nil {
+		attrs["inner_vlan"] = tftypes.NewValue(tftypes.Number, *spec.innerVLAN)
+	}
+	if spec.vnicIndex != nil {
+		attrs["vnic_index"] = tftypes.NewValue(tftypes.Number, *spec.vnicIndex)
 	}
 	return tftypes.NewValue(b.endType, attrs)
 }
 
-// transitPartner is the simplest non-null partner config: no nested object.
-func (b *vxcValueBuilder) transitPartner() tftypes.Value {
+// partner is a partner config with only the partner name set.
+func (b *vxcValueBuilder) partner(name string) tftypes.Value {
 	attrs := nullValueMap(b.partnerTyp)
-	attrs["partner"] = tftypes.NewValue(tftypes.String, "transit")
+	attrs["partner"] = tftypes.NewValue(tftypes.String, name)
 	return tftypes.NewValue(b.partnerTyp, attrs)
 }
 
-// withServiceKey returns v with service_key set. The builder leaves it null.
-func (b *vxcValueBuilder) withServiceKey(t *testing.T, v tftypes.Value, key string) tftypes.Value {
+// with returns v with the given top-level attributes set.
+func (b *vxcValueBuilder) with(t *testing.T, v tftypes.Value, set map[string]tftypes.Value) tftypes.Value {
 	t.Helper()
 	attrs := map[string]tftypes.Value{}
 	if err := v.As(&attrs); err != nil {
 		t.Fatalf("unpacking vxc value: %v", err)
 	}
-	attrs["service_key"] = tftypes.NewValue(tftypes.String, key)
+	for name, val := range set {
+		attrs[name] = val
+	}
 	return tftypes.NewValue(b.objType, attrs)
+}
+
+// withServiceKey returns v with service_key set. The builder leaves it null.
+func (b *vxcValueBuilder) withServiceKey(t *testing.T, v tftypes.Value, key string) tftypes.Value {
+	t.Helper()
+	return b.with(t, v, map[string]tftypes.Value{"service_key": tftypes.NewValue(tftypes.String, key)})
 }
 
 func (b *vxcValueBuilder) vxc(aEnd, bEnd tftypes.Value, bEndPartner *tftypes.Value) tftypes.Value {
@@ -201,7 +237,7 @@ func TestVXCCreate_VLANPreflightSkipsPartnerConfiguredBEnd(t *testing.T) {
 	ps := newPreflightServer(t, map[string]int{"port-b": 100})
 	b := newVXCValueBuilder(t)
 
-	partner := b.transitPartner()
+	partner := b.partner("transit")
 	plan := b.vxc(
 		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(730)}),
 		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(100)}),

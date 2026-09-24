@@ -1281,7 +1281,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"ordered_vlan": schema.Int64Attribute{
-						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections and when a service key sets the B-End port. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group.",
+						Description: "The customer-ordered unique VLAN ID of the B-End configuration. Values can range from 2 to 4093. If this value is set to 0, or not included, the Megaport system allocates a valid VLAN ID to the B-End configuration.  To set this VLAN to untagged, set the VLAN value to -1. Please note that if the B-End ordered_vlan is set to -1, the Megaport API will not allow for the B-End inner_vlan field to be set as the VLAN for this end configuration will be untagged. Before ordering, the provider fails early if this VLAN is already taken on the B-End port. That check covers Megaport ports only, not MCR or MVE ends, and is skipped for partner-configured connections and when a service key sets the B-End port. It is per-port, so an order can still be rejected when the VLAN is in use on a sibling port in a partner's capacity group. A cloud or transit B-End cannot change this VLAN after the order, and a plan that changes it fails.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1)},
@@ -1294,7 +1294,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Computed:    true,
 					},
 					"inner_vlan": schema.Int64Attribute{
-						Description: "The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release.",
+						Description: "The inner VLAN of the B-End configuration. This field is also used to specify the customer-side VLAN for Azure ExpressRoute single peering configurations. If the B-End ordered_vlan is untagged and set as -1, this field cannot be set by the API, as the VLAN of the B-End is designated as untagged. Note: Setting inner_vlan to 0 for auto-assignment is not currently supported by the provider. This is a known limitation that will be resolved in a future release. A cloud or transit B-End other than Azure cannot change this VLAN after the order, and a plan that changes it fails.",
 						Optional:    true,
 						Computed:    true,
 						Validators:  []validator.Int64{int64validator.Between(-1, 4093), int64validator.NoneOf(1), int64validator.NoneOf(0)},
@@ -2662,12 +2662,12 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		updateReq.Name = megaport.PtrTo(plan.Name.ValueString())
 	}
 
-	var aEndPartnerType, bEndPartnerType string
-	if !plan.AEndPartnerConfig.IsNull() && aEndPartnerPlan != nil {
-		aEndPartnerType = aEndPartnerPlan.Partner.ValueString()
-	}
-	if !plan.BEndPartnerConfig.IsNull() && bEndPartnerPlan != nil {
-		bEndPartnerType = bEndPartnerPlan.Partner.ValueString()
+	// On a cloud or transit B-End, only auto-assign or the live VLAN gets
+	// here. Update leaves the B-End VLAN out, because megalith returns 403 for
+	// IBM and AWSHC when the request carries any bEndVlan.
+	bEndConnectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	aEndMovesPort := movesPort(aEndPlan, aEndState, aEndCSP)
@@ -2680,14 +2680,14 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// unrelated update (e.g. resource_tags). Compare to state.OrderedVLAN instead.
 	aEndVLANChanged := !aEndPlan.OrderedVLAN.IsUnknown() && !aEndPlan.OrderedVLAN.IsNull() &&
 		!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN)
-	if aEndVLANChanged && supportVLANUpdates(aEndPartnerType) {
+	if aEndVLANChanged {
 		updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
 	}
 
 	// A move re-requests a VLAN on a different port, so it needs the check too.
 	// The API validates the VLAN in the request, or the VLAN the VXC already
 	// holds when the request carries none, against the destination port alone.
-	if (aEndVLANChanged || aEndMovesPort) && supportVLANUpdates(aEndPartnerType) {
+	if aEndVLANChanged || aEndMovesPort {
 		aEndOrderedVLAN, aEndCurrentVLAN := aEndPlan.OrderedVLAN, aEndState.VLAN
 		if aEndMovesPort {
 			aEndCurrentVLAN = types.Int64Null()
@@ -2714,18 +2714,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.AVnicIndex = megaport.PtrTo(int(aEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
-		if supportVLANUpdates(aEndPartnerType) &&
-			(!aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex)) {
-			// Only include VLAN if we need it for validation but don't already have it set correctly
-			if !aEndPlan.OrderedVLAN.IsNull() &&
-				!aEndPlan.OrderedVLAN.Equal(aEndState.OrderedVLAN) {
-				updateReq.AEndVLAN = megaport.PtrTo(int(aEndPlan.OrderedVLAN.ValueInt64()))
-			} else if !aEndState.VLAN.IsNull() &&
-				updateReq.AEndVLAN == nil {
-				// Only include the current VLAN if we haven't already added a VLAN update
-				updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
-			}
+		// A vNIC index change resends the current VLAN, unless the request
+		// already carries a changed one.
+		if !aEndPlan.NetworkInterfaceIndex.Equal(aEndState.NetworkInterfaceIndex) &&
+			!aEndState.VLAN.IsNull() && updateReq.AEndVLAN == nil {
+			updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 		}
 	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
@@ -2742,7 +2735,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// Same plan-vs-state.OrderedVLAN comparison as A-end above.
 	bEndVLANChanged := !bEndPlan.OrderedVLAN.IsUnknown() && !bEndPlan.OrderedVLAN.IsNull() &&
 		!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN)
-	if bEndVLANChanged && supportVLANUpdates(bEndPartnerType) {
+	if bEndVLANChanged && bEndConnectType == "" {
 		updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
 	}
 
@@ -2750,7 +2743,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	// config is not the one the VXC uses. Create skips the check for the same
 	// reason.
 	hasServiceKey := !plan.ServiceKey.IsNull() && !plan.ServiceKey.IsUnknown()
-	if (bEndVLANChanged || bEndMovesPort) && supportVLANUpdates(bEndPartnerType) && !hasServiceKey {
+	if (bEndVLANChanged || bEndMovesPort) && !hasServiceKey {
 		bEndOrderedVLAN, bEndCurrentVLAN := bEndPlan.OrderedVLAN, bEndState.VLAN
 		if bEndMovesPort {
 			bEndCurrentVLAN = types.Int64Null()
@@ -2773,10 +2766,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 	bEndState.OrderedVLAN = bEndPlan.OrderedVLAN
 
-	// Prevent setting inner_vlan during updates for partners that don't support VLAN changes
 	if !aEndPlan.InnerVLAN.IsUnknown() && !aEndPlan.InnerVLAN.IsNull() &&
-		!aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) &&
-		supportVLANUpdates(aEndPartnerType) {
+		!aEndPlan.InnerVLAN.Equal(aEndState.InnerVLAN) {
 		updateReq.AEndInnerVLAN = megaport.PtrTo(int(aEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
@@ -2784,10 +2775,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		aEndState.InnerVLAN = types.Int64Value(-1)
 	}
 
-	// Similarly add for B-End
+	// Azure is the one cloud end that takes an inner VLAN change.
 	if !bEndPlan.InnerVLAN.IsUnknown() && !bEndPlan.InnerVLAN.IsNull() &&
 		!bEndPlan.InnerVLAN.Equal(bEndState.InnerVLAN) &&
-		supportVLANUpdates(bEndPartnerType) {
+		(bEndConnectType == "" || bEndConnectType == "AZURE") {
 		updateReq.BEndInnerVLAN = megaport.PtrTo(int(bEndPlan.InnerVLAN.ValueInt64()))
 	}
 	// Prevent setting inner_vlan to null during updates - keep it as -1, this will prevent state drift as the API returns null instead of -1 when untagging. Only prematurely set state if the planned value is -1.
@@ -2799,18 +2790,11 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) {
 		updateReq.BVnicIndex = megaport.PtrTo(int(bEndPlan.NetworkInterfaceIndex.ValueInt64()))
 
-		// Only include the VLAN when VNIC index changes AND the VLAN isn't already set correctly
-		if supportVLANUpdates(bEndPartnerType) &&
-			(!bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex)) {
-			// Only include VLAN if we need it for validation but don't already have it set correctly
-			if !bEndPlan.OrderedVLAN.IsNull() &&
-				!bEndPlan.OrderedVLAN.Equal(bEndState.OrderedVLAN) {
-				updateReq.BEndVLAN = megaport.PtrTo(int(bEndPlan.OrderedVLAN.ValueInt64()))
-			} else if !bEndState.VLAN.IsNull() &&
-				updateReq.BEndVLAN == nil {
-				// Only include the current VLAN if we haven't already added a VLAN update
-				updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
-			}
+		// A vNIC index change resends the current VLAN, unless the request
+		// already carries a changed one.
+		if !bEndPlan.NetworkInterfaceIndex.Equal(bEndState.NetworkInterfaceIndex) &&
+			!bEndState.VLAN.IsNull() && updateReq.BEndVLAN == nil {
+			updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 		}
 	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
 		// Error case for MVE with null VNIC index
@@ -3598,6 +3582,11 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				return
 			}
 
+			checkBEndVLANUpdatable(ctx, plan, state, &resp.Diagnostics)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
 			_, aEndPlanCSP := classifyPartner(ctx, plan.AEndPartnerConfig, &resp.Diagnostics)
 			_, bEndPlanCSP := classifyPartner(ctx, plan.BEndPartnerConfig, &resp.Diagnostics)
 
@@ -3620,6 +3609,47 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 			}
 		}
+	}
+}
+
+// checkBEndVLANUpdatable rejects a B-End VLAN change that NetAuto refuses.
+// NetAuto refuses any outer VLAN change on a cloud or transit B-End. It also
+// refuses an inner VLAN change on all of them except Azure. A planned
+// ordered_vlan of 0 (auto-assign) or the live VLAN passes. It warns when
+// state holds an AWS or transit B-End VLAN that older versions saved unsent.
+func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, diags *diag.Diagnostics) {
+	connectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, diags)
+	if connectType == "" {
+		return
+	}
+	var planEnd, stateEnd vxcEndConfigurationModel
+	*diags = append(*diags, plan.BEndConfiguration.As(ctx, &planEnd, basetypes.ObjectAsOptions{})...)
+	*diags = append(*diags, state.BEndConfiguration.As(ctx, &stateEnd, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return
+	}
+
+	const summary = "VLAN cannot be changed on this B-End"
+	detail := func(attr string) string {
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN. Replacing destroys and rebuilds the service.", connectType, attr)
+	}
+	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
+		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
+		diags.AddAttributeError(path.Root("b_end").AtName("ordered_vlan"), summary, detail("ordered_vlan"))
+	}
+	// -1 (untagged) is a change only when the live inner VLAN is tagged.
+	if v := planEnd.InnerVLAN; connectType != "AZURE" && !v.IsUnknown() && !v.IsNull() &&
+		(v.ValueInt64() > 0 && !v.Equal(stateEnd.InnerVLAN) || v.ValueInt64() == -1 && stateEnd.InnerVLAN.ValueInt64() > 0) {
+		diags.AddAttributeError(path.Root("b_end").AtName("inner_vlan"), summary, detail("inner_vlan"))
+	}
+	if connectType != "AWS" && connectType != "AWSHC" && connectType != "TRANSIT" {
+		return
+	}
+	if v, live := stateEnd.OrderedVLAN, stateEnd.VLAN; v.Equal(planEnd.OrderedVLAN) && !live.IsUnknown() && !live.IsNull() &&
+		(v.ValueInt64() > 0 && !v.Equal(live) || v.ValueInt64() == -1 && live.ValueInt64() > 0) {
+		diags.AddAttributeWarning(path.Root("b_end").AtName("ordered_vlan"), "B-End VLAN was never applied",
+			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN.",
+				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64()))
 	}
 }
 

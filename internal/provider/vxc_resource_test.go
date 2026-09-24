@@ -5047,6 +5047,83 @@ func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
 	})
 }
 
+// A transit B-End refuses a VLAN change, so the plan fails on b_end.ordered_vlan.
+// An A-End VLAN change on the same VXC still applies, and a tainted VXC plans
+// the replace.
+func TestAccMegaportVXC_TransitBEndVLANChangeRejected(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	mcrLocationID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	cfg := func(aEndVLAN, bEndVLAN int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "mcr_loc" {
+				id = %d
+			}
+
+			data "megaport_partner" "internet_port" {
+				connect_type = "TRANSIT"
+				location_id  = data.megaport_location.mcr_loc.id
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.mcr_loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+
+			resource "megaport_vxc" "transit_vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = %d
+				}
+
+				b_end = {
+					requested_product_uid = data.megaport_partner.internet_port.product_uid
+					ordered_vlan          = %d
+				}
+			}
+		`, mcrLocationID, mcrName, vxcName, aEndVLAN, bEndVLAN)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: cfg(0, 0),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "b_end.vlan"),
+				),
+			},
+			{
+				Config: cfg(2345, 0),
+				Check:  resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "2345"),
+			},
+			{
+				Config:      cfg(2345, 3456),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)VLAN cannot be changed on this B-End.*connect\s+type\s+TRANSIT`),
+			},
+			{
+				Config:             cfg(2345, 3456),
+				Taint:              []string{"megaport_vxc.transit_vxc"},
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_TransitInternetTagsUpdate is a regression test for
 // https://github.com/megaport/terraform-provider-megaport/issues/372 (ESD-1101).
 //
