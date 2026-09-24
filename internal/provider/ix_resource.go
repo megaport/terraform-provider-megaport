@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -577,7 +579,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	// Create the IX
 	ixResp, err := r.client.IXService.BuyIX(ctx, buyReq)
-	if err != nil {
+	if err != nil && ixResp == nil {
 		resp.Diagnostics.AddError(
 			"Error creating IX",
 			"Could not create IX, unexpected error: "+err.Error(),
@@ -585,8 +587,13 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	createdID := ixResp.TechnicalServiceUID
+	if !saveCreatedUID(ctx, resp, "IX", plan.ProductName.ValueString(), createdID, err) {
+		return
+	}
+
 	// Get the created IX
-	ix, err := r.client.IXService.GetIX(ctx, ixResp.TechnicalServiceUID)
+	ix, err := r.client.IXService.GetIX(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading IX",
@@ -620,7 +627,18 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	ix, err := r.client.IXService.GetIX(ctx, state.ProductUID.ValueString())
 	if err != nil {
 		// IX has been deleted or is not found
-		resp.State.RemoveResource(ctx)
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
+
+		resp.Diagnostics.AddError(
+			"Error Reading IX",
+			"Could not read IX with ID "+state.ProductUID.ValueString()+": "+err.Error(),
+		)
 		return
 	}
 

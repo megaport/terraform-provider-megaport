@@ -407,7 +407,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
-	if err != nil {
+	if err != nil && createdPort == nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
@@ -424,6 +424,9 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
+	if !saveCreatedUID(ctx, resp, "LAG port", plan.Name.ValueString(), createdID, err) {
+		return
+	}
 
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
@@ -880,8 +883,8 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 		return nil, diags
 	}
 
-	// Count against the live read, not against state, to count ports that provisioned after
-	// an earlier apply stopped waiting. The read cannot see a port until it has an interface.
+	// Count against the live read, not against state, to count ports an earlier apply ordered.
+	// A new port gets its interface in the order call, so the read counts it at once.
 	count := target - primary.LagCount
 	if count < 1 {
 		return primary.LagPortUIDs, diags
@@ -923,7 +926,7 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 	if err != nil {
 		diags.AddError(
 			"Error adding ports to the LAG",
-			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the LAG does not count the new ports until they provision, so applying again before then orders more ports.",
+			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the next refresh counts the new ports, and applying again does not order more.",
 				count, plan.UID.ValueString(), err.Error()),
 		)
 		return nil, diags

@@ -2084,25 +2084,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdID := createdVXC.TechnicalServiceUID
-
-	// Persist the UID immediately so any failure below leaves a tracked
-	// (tainted) resource instead of an orphan that later applies try to recreate.
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
-	if resp.Diagnostics.HasError() {
-		return
+	waitErr := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second)
+	var pending *vxcPendingApprovalError
+	if errors.As(waitErr, &pending) {
+		resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
+		waitErr = nil
 	}
-
-	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
-		var pending *vxcPendingApprovalError
-		if errors.As(err, &pending) {
-			resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
-		} else {
-			resp.Diagnostics.AddError(
-				"VXC ordered but not ready",
-				"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
-			)
-			return
-		}
+	if !saveCreatedUID(ctx, resp, "VXC", plan.Name.ValueString(), createdID, waitErr) {
+		return
 	}
 
 	// get the created VXC
