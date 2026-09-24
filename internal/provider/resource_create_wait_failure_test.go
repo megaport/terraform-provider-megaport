@@ -29,6 +29,7 @@ type createWaitStub struct {
 
 	mu        sync.Mutex
 	cancelled bool
+	failRead  bool
 }
 
 func (s *createWaitStub) handler(t *testing.T) http.HandlerFunc {
@@ -50,6 +51,13 @@ func (s *createWaitStub) handler(t *testing.T) http.HandlerFunc {
 				"data":    []map[string]any{{uidKey: s.uid}},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/product/"+s.uid:
+			s.mu.Lock()
+			failRead := s.failRead
+			s.mu.Unlock()
+			if failRead {
+				writeStubJSON(t, w, http.StatusInternalServerError, map[string]any{"message": "the stub fails the read"})
+				return
+			}
 			product := map[string]any{
 				"productUid":         s.uid,
 				"productType":        s.productType,
@@ -278,7 +286,37 @@ func checkCreateSavesUID(t *testing.T, tc createWaitCase) {
 	if !stub.cancelled {
 		t.Fatal("Delete did not cancel the product")
 	}
+}
 
+// TestIXReadKeepsStateWhenReadFails covers a read that fails for a reason other than a missing IX.
+func TestIXReadKeepsStateWhenReadFails(t *testing.T) {
+	t.Parallel()
+
+	var tc createWaitCase
+	for _, c := range createWaitCases() {
+		if c.name == "ix" {
+			tc = c
+		}
+	}
+	stub := &createWaitStub{uid: tc.name + "-uid", productType: tc.productType}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	r, createResp := runStubCreate(ctx, t, tc, stub)
+	if createResp.State.Raw.IsNull() {
+		t.Fatal("Create wrote no state")
+	}
+
+	stub.mu.Lock()
+	stub.failRead = true
+	stub.mu.Unlock()
+	readResp := fwresource.ReadResponse{State: createResp.State}
+	r.Read(context.Background(), fwresource.ReadRequest{State: createResp.State}, &readResp)
+	if !readResp.Diagnostics.HasError() {
+		t.Fatal("Read returned no error")
+	}
+	if readResp.State.Raw.IsNull() {
+		t.Fatal("Read removed the resource from state")
+	}
 }
 
 // TestCreateWritesNoStateWhenOrderRejected covers an order the API rejects:

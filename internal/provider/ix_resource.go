@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -625,7 +627,18 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	ix, err := r.client.IXService.GetIX(ctx, state.ProductUID.ValueString())
 	if err != nil {
 		// IX has been deleted or is not found
-		resp.State.RemoveResource(ctx)
+		if mpErr, ok := err.(*megaport.ErrorResponse); ok {
+			if mpErr.Response.StatusCode == http.StatusNotFound ||
+				(mpErr.Response.StatusCode == http.StatusBadRequest && strings.Contains(mpErr.Message, "Could not find a service with UID")) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
+
+		resp.Diagnostics.AddError(
+			"Error Reading IX",
+			"Could not read IX with ID "+state.ProductUID.ValueString()+": "+err.Error(),
+		)
 		return
 	}
 
