@@ -29,31 +29,31 @@ func (s *sequencePortService) CheckPortVLANAvailability(_ context.Context, _ str
 	return s.check(s.calls.Add(1))
 }
 
-// setReleaseWait sets the release wait budget and a 1ms poll for one test.
+// setFreeWait sets the VLAN free wait budget and a 1ms poll for one test.
 // Tests that call it must not run in parallel, because both are package state.
-func setReleaseWait(t *testing.T, timeout time.Duration) {
+func setFreeWait(t *testing.T, timeout time.Duration) {
 	t.Helper()
-	prevTimeout, prevInterval := waitForTime, vlanReleasePollInterval
-	waitForTime, vlanReleasePollInterval = timeout, time.Millisecond
-	t.Cleanup(func() { waitForTime, vlanReleasePollInterval = prevTimeout, prevInterval })
+	prevTimeout, prevInterval := waitForTime, vlanFreePollInterval
+	waitForTime, vlanFreePollInterval = timeout, time.Millisecond
+	t.Cleanup(func() { waitForTime, vlanFreePollInterval = prevTimeout, prevInterval })
 }
 
-func recordReleased(t *testing.T, portUID string, vlan int) {
+func recordDestroyed(t *testing.T, portUID string, vlan int) {
 	t.Helper()
-	key := releasedVLAN{portUID: portUID, vlan: vlan}
-	releasedVLANs.Store(key, struct{}{})
-	t.Cleanup(func() { releasedVLANs.Delete(key) })
+	key := destroyedVLAN{portUID: portUID, vlan: vlan}
+	destroyedVLANs.Store(key, struct{}{})
+	t.Cleanup(func() { destroyedVLANs.Delete(key) })
 }
 
-func TestWaitForVLANRelease_FreesAfterPolls(t *testing.T) {
+func TestWaitForVLANFree_FreesAfterPolls(t *testing.T) {
 	svc := &sequencePortService{check: func(call int32) (bool, error) { return call >= 3, nil }}
 
-	err := waitForVLANRelease(context.Background(), svc, "port-uid", 920, time.Second, time.Millisecond)
+	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, time.Second, time.Millisecond)
 	require.NoError(t, err)
 	assert.Equal(t, int32(3), svc.calls.Load())
 }
 
-func TestWaitForVLANRelease_RetriesTransientErrors(t *testing.T) {
+func TestWaitForVLANFree_RetriesTransientErrors(t *testing.T) {
 	svc := &sequencePortService{check: func(call int32) (bool, error) {
 		if call <= 2 {
 			return false, errors.New("502 bad gateway")
@@ -61,29 +61,29 @@ func TestWaitForVLANRelease_RetriesTransientErrors(t *testing.T) {
 		return true, nil
 	}}
 
-	err := waitForVLANRelease(context.Background(), svc, "port-uid", 920, time.Second, time.Millisecond)
+	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, time.Second, time.Millisecond)
 	require.NoError(t, err)
 	assert.Equal(t, int32(3), svc.calls.Load())
 }
 
-func TestWaitForVLANRelease_TimesOut(t *testing.T) {
+func TestWaitForVLANFree_TimesOut(t *testing.T) {
 	svc := &sequencePortService{check: func(int32) (bool, error) { return false, nil }}
 
-	err := waitForVLANRelease(context.Background(), svc, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
+	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "still in use")
 }
 
-func TestWaitForVLANRelease_ContextCancelled(t *testing.T) {
+func TestWaitForVLANFree_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	svc := &sequencePortService{check: func(int32) (bool, error) { return false, nil }}
 
-	err := waitForVLANRelease(ctx, svc, "port-uid", 920, time.Second, time.Millisecond)
+	err := waitForVLANFree(ctx, svc, "port-uid", 920, time.Second, time.Millisecond)
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
-func releasedPreflightInput(svc megaport.PortService, portUID string) vlanPreflightInput {
+func destroyedPreflightInput(svc megaport.PortService, portUID string) vlanPreflightInput {
 	return vlanPreflightInput{
 		svc:         svc,
 		end:         "A-End",
@@ -94,41 +94,64 @@ func releasedPreflightInput(svc megaport.PortService, portUID string) vlanPrefli
 	}
 }
 
-func TestVLANAvailabilityPreflight_WaitsForReleasedVLAN(t *testing.T) {
-	setReleaseWait(t, time.Second)
-	recordReleased(t, "port-released-frees", 920)
+func TestVLANAvailabilityPreflight_WaitsForDestroyedVLAN(t *testing.T) {
+	setFreeWait(t, time.Second)
+	recordDestroyed(t, "port-destroyed-frees", 920)
 	svc := &sequencePortService{check: func(call int32) (bool, error) { return call >= 3, nil }}
 
-	diags := vlanAvailabilityPreflight(context.Background(), releasedPreflightInput(svc, "port-released-frees"))
+	diags := vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-destroyed-frees"))
 	assert.False(t, diags.HasError(), "unexpected error: %v", diags)
 	assert.Equal(t, int32(3), svc.calls.Load())
 }
 
-func TestVLANAvailabilityPreflight_ReleasedVLANNeverFrees(t *testing.T) {
-	setReleaseWait(t, 20*time.Millisecond)
-	recordReleased(t, "port-released-held", 920)
+func TestVLANAvailabilityPreflight_DestroyedVLANNeverFrees(t *testing.T) {
+	setFreeWait(t, 20*time.Millisecond)
+	recordDestroyed(t, "port-destroyed-held", 920)
 	svc := &sequencePortService{check: func(int32) (bool, error) { return false, nil }}
 
-	diags := vlanAvailabilityPreflight(context.Background(), releasedPreflightInput(svc, "port-released-held"))
+	diags := vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-destroyed-held"))
 	require.True(t, diags.HasError())
 	assert.Equal(t, "VLAN 920 is not available on the A-End port", diags.Errors()[0].Summary())
 	detail := diags.Errors()[0].Detail()
-	assert.Contains(t, detail, "port-released-held")
+	assert.Contains(t, detail, "port-destroyed-held")
 	assert.Contains(t, detail, "still in use")
 	assert.Contains(t, detail, "ordered_vlan")
 }
 
-// A VLAN no destroy in this process freed belongs to a live service, so the
-// preflight fails on the first answer, even with a long wait budget.
-func TestVLANAvailabilityPreflight_UnreleasedVLANFailsWithoutWaiting(t *testing.T) {
-	setReleaseWait(t, time.Hour)
-	recordReleased(t, "port-unrelated", 921)
+// A VLAN no destroy in this process gave up belongs to a live service, so the
+// preflight fails on the first answer.
+func TestVLANAvailabilityPreflight_UndestroyedVLANFailsWithoutWaiting(t *testing.T) {
+	setFreeWait(t, 200*time.Millisecond)
+	recordDestroyed(t, "port-unrelated", 921)
 	svc := &sequencePortService{check: func(int32) (bool, error) { return false, nil }}
 
-	diags := vlanAvailabilityPreflight(context.Background(), releasedPreflightInput(svc, "port-unrelated"))
+	diags := vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-unrelated"))
 	require.True(t, diags.HasError())
 	assert.Equal(t, int32(1), svc.calls.Load())
 	assert.Contains(t, diags.Errors()[0].Detail(), "already in use")
+}
+
+// Two creates that pin the same destroyed VLAN cannot both hold it, so only the
+// first waits.
+func TestVLANAvailabilityPreflight_SecondPinOnDestroyedVLANFailsWithoutWaiting(t *testing.T) {
+	setFreeWait(t, 200*time.Millisecond)
+	recordDestroyed(t, "port-destroyed-twice", 920)
+	first := &sequencePortService{check: func(call int32) (bool, error) { return call >= 2, nil }}
+	require.False(t, vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(first, "port-destroyed-twice")).HasError())
+
+	second := &sequencePortService{check: func(int32) (bool, error) { return false, nil }}
+	diags := vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(second, "port-destroyed-twice"))
+	require.True(t, diags.HasError())
+	assert.Equal(t, int32(1), second.calls.Load())
+	assert.Contains(t, diags.Errors()[0].Detail(), "already in use")
+}
+
+func TestWaitForVLANFree_TimeoutReportsLastError(t *testing.T) {
+	svc := &sequencePortService{check: func(int32) (bool, error) { return false, errors.New("502 bad gateway") }}
+
+	err := waitForVLANFree(context.Background(), svc, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "502 bad gateway")
 }
 
 // deleteVXC runs Delete against a state built from the two ends.
@@ -146,11 +169,11 @@ func deleteVXC(t *testing.T, b *vxcValueBuilder, mock *MockVXCService, aEnd, bEn
 	return resp
 }
 
-func TestVXCDelete_RecordsReleasedVLANs(t *testing.T) {
+func TestVXCDelete_RecordsDestroyedVLANs(t *testing.T) {
 	b := newVXCValueBuilder(t)
 	t.Cleanup(func() {
-		releasedVLANs.Delete(releasedVLAN{portUID: "port-del-a", vlan: 920})
-		releasedVLANs.Delete(releasedVLAN{portUID: "port-del-b", vlan: 0})
+		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-a", vlan: 920})
+		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-b", vlan: 0})
 	})
 
 	resp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}},
@@ -159,18 +182,18 @@ func TestVXCDelete_RecordsReleasedVLANs(t *testing.T) {
 	)
 	require.False(t, resp.Diagnostics.HasError(), "unexpected error: %v", resp.Diagnostics)
 
-	_, aRecorded := releasedVLANs.Load(releasedVLAN{portUID: "port-del-a", vlan: 920})
+	_, aRecorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-a", vlan: 920})
 	assert.True(t, aRecorded, "the A-End VLAN should be recorded")
-	_, bRecorded := releasedVLANs.Load(releasedVLAN{portUID: "port-del-b", vlan: 0})
+	_, bRecorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-b", vlan: 0})
 	assert.False(t, bRecorded, "an auto-assigned VLAN of 0 should not be recorded")
 }
 
 // A VXC that never reached DECOMMISSIONED may still hold its VLAN, so a later
 // create must not wait on it.
 func TestVXCDelete_DoesNotRecordWhenNotDecommissioned(t *testing.T) {
-	setReleaseWait(t, 0)
+	setFreeWait(t, 0)
 	b := newVXCValueBuilder(t)
-	t.Cleanup(func() { releasedVLANs.Delete(releasedVLAN{portUID: "port-del-live", vlan: 920}) })
+	t.Cleanup(func() { destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-live", vlan: 920}) })
 
 	resp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_CANCELLED}},
 		vxcEndSpec{productUID: "port-del-live", currentUID: "port-del-live", vlan: int64p(920)},
@@ -178,16 +201,19 @@ func TestVXCDelete_DoesNotRecordWhenNotDecommissioned(t *testing.T) {
 	)
 	require.True(t, resp.Diagnostics.HasError())
 
-	_, recorded := releasedVLANs.Load(releasedVLAN{portUID: "port-del-live", vlan: 920})
+	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-live", vlan: 920})
 	assert.False(t, recorded)
 }
 
 // A replacement destroys the old VXC and then creates the new one with the same
 // pinned VLAN while the port still reports it taken.
 func TestVXCReplace_CreateWaitsForVLANFreedByDelete(t *testing.T) {
-	setReleaseWait(t, time.Second)
+	setFreeWait(t, time.Second)
 	b := newVXCValueBuilder(t)
-	t.Cleanup(func() { releasedVLANs.Delete(releasedVLAN{portUID: "port-replace", vlan: 920}) })
+	t.Cleanup(func() {
+		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-replace", vlan: 920})
+		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-replace-b", vlan: 100})
+	})
 
 	delResp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}},
 		vxcEndSpec{productUID: "port-replace", currentUID: "port-replace", orderedVLAN: int64p(920), vlan: int64p(920)},

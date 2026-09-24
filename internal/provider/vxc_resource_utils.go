@@ -1333,7 +1333,8 @@ type vlanPreflightInput struct {
 // and the port, instead of the backend's "VLAN N not available on service <id>",
 // an internal id the user cannot map to their config. Only an explicit "taken"
 // answer is acted on: the API answers per port but VLANs are unique across a CSP
-// capacity group, so "available" does not mean the order will be accepted.
+// capacity group, so "available" does not mean the order will be accepted. A taken
+// VLAN that a destroy in this process gave up gets up to wait_time to free.
 func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -1367,21 +1368,26 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 		})
 		return diags
 	}
+	// The first create to check a destroyed VLAN takes the record, so a second
+	// pin on the same VLAN fails at once.
+	_, destroyed := destroyedVLANs.LoadAndDelete(destroyedVLAN{portUID: in.productUID, vlan: vlan})
 	if available {
 		return diags
 	}
 
 	summary := fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end)
-	if _, released := releasedVLANs.Load(releasedVLAN{portUID: in.productUID, vlan: vlan}); released {
-		tflog.Info(ctx, "Waiting for a VLAN freed by a destroyed VXC", map[string]any{
-			"end": in.end, "product_uid": in.productUID, "vlan": vlan,
-		})
-		err := waitForVLANRelease(ctx, in.svc, in.productUID, vlan, waitForTime, vlanReleasePollInterval)
+	if destroyed {
+		logFields := map[string]any{"end": in.end, "product_uid": in.productUID, "vlan": vlan}
+		tflog.Info(ctx, "Waiting for the VLAN a destroyed VXC held to free", logFields)
+		start := time.Now()
+		err := waitForVLANFree(ctx, in.svc, in.productUID, vlan, waitForTime, vlanFreePollInterval)
+		logFields["waited"] = time.Since(start).String()
 		if err == nil {
+			tflog.Info(ctx, "The VLAN a destroyed VXC held is free", logFields)
 			return diags
 		}
 		diags.AddError(summary,
-			fmt.Sprintf("Terraform destroyed the VXC that held VLAN %d on %s port %s, but the VLAN did not free: %s. Megaport usually frees a VLAN a minute or two after the destroy. Run the apply again, or pick a different %s ordered_vlan.", vlan, in.end, in.productUID, err, in.end),
+			fmt.Sprintf("Terraform destroyed the VXC that held VLAN %d on %s port %s and waited for the VLAN to free, but %s. Run the apply again, or pick a different %s ordered_vlan.", vlan, in.end, in.productUID, err, in.end),
 		)
 		return diags
 	}
@@ -1392,36 +1398,36 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	return diags
 }
 
-// releasedVLAN is a port VLAN that a VXC destroyed by this provider process held.
-type releasedVLAN struct {
+// destroyedVLAN is a port VLAN that a VXC destroyed by this provider process held.
+type destroyedVLAN struct {
 	portUID string
 	vlan    int
 }
 
-// releasedVLANs holds the releasedVLAN keys that Delete records. Terraform runs
+// destroyedVLANs holds the destroyedVLAN keys that Delete records. Terraform runs
 // a replacement's destroy and create in one provider process, so the create can
-// tell a VLAN it just freed from one a live service holds.
-var releasedVLANs sync.Map
+// tell a VLAN it just gave up from one a live service holds.
+var destroyedVLANs sync.Map
 
-var vlanReleasePollInterval = 15 * time.Second
+var vlanFreePollInterval = 15 * time.Second
 
-// recordReleasedVLANs records the port VLAN each end of a destroyed VXC held.
-func recordReleasedVLANs(ctx context.Context, ends ...types.Object) {
+// recordDestroyedVLANs records the port VLAN each end of a destroyed VXC held.
+func recordDestroyedVLANs(ctx context.Context, ends ...types.Object) {
 	for _, obj := range ends {
 		var end vxcEndConfigurationModel
 		if obj.IsNull() || obj.IsUnknown() || obj.As(ctx, &end, basetypes.ObjectAsOptions{}).HasError() {
 			continue
 		}
 		if end.CurrentProductUID.ValueString() != "" && end.VLAN.ValueInt64() > 0 {
-			releasedVLANs.Store(releasedVLAN{portUID: end.CurrentProductUID.ValueString(), vlan: int(end.VLAN.ValueInt64())}, struct{}{})
+			destroyedVLANs.Store(destroyedVLAN{portUID: end.CurrentProductUID.ValueString(), vlan: int(end.VLAN.ValueInt64())}, struct{}{})
 		}
 	}
 }
 
-// waitForVLANRelease polls until a port VLAN reads as available. NetAuto frees
+// waitForVLANFree polls until a port VLAN reads as available. NetAuto frees
 // the VLAN when its deploy-agent finishes, after megalith already reports the
 // VXC DECOMMISSIONED, and megalith exposes no status for that step.
-func waitForVLANRelease(ctx context.Context, svc megaport.PortService, portUID string, vlan int, timeoutAfter, pollInterval time.Duration) error {
+func waitForVLANFree(ctx context.Context, svc megaport.PortService, portUID string, vlan int, timeoutAfter, pollInterval time.Duration) error {
 	// The checks share this deadline so a stalled request can't hang the wait.
 	pollCtx, cancel := context.WithTimeout(ctx, timeoutAfter)
 	defer cancel()
@@ -1429,17 +1435,22 @@ func waitForVLANRelease(ctx context.Context, svc megaport.PortService, portUID s
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
+	var lastErr error
 	for {
 		select {
 		case <-pollCtx.Done():
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return fmt.Errorf("still in use after %v", timeoutAfter)
+			if lastErr != nil {
+				return fmt.Errorf("the last check after %v failed: %w", timeoutAfter, lastErr)
+			}
+			return fmt.Errorf("it is still in use after %v", timeoutAfter)
 		case <-ticker.C:
 		}
 
 		available, err := svc.CheckPortVLANAvailability(pollCtx, portUID, vlan)
+		lastErr = err
 		if err != nil {
 			tflog.Warn(ctx, "error checking VLAN availability, will retry", map[string]any{
 				"product_uid": portUID, "vlan": vlan, "error": err.Error(),

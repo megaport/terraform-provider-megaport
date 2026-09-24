@@ -38,7 +38,7 @@ type preflightServer struct {
 	serviceKeyBEnd string
 
 	// freeFromQuery, when set, makes every VLAN read as free from that VLAN
-	// query number on, to fake NetAuto releasing a VLAN.
+	// query number on, to fake NetAuto freeing a VLAN.
 	freeFromQuery int
 }
 
@@ -58,8 +58,8 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			ps.vlanQueries = append(ps.vlanQueries, vlanQuery{portUID: portUID, vlan: vlan})
 			v, _ := strconv.Atoi(vlan)
 			data := []int{}
-			released := ps.freeFromQuery > 0 && len(ps.vlanQueries) >= ps.freeFromQuery
-			if taken[portUID] != v || released {
+			freed := ps.freeFromQuery > 0 && len(ps.vlanQueries) >= ps.freeFromQuery
+			if taken[portUID] != v || freed {
 				data = append(data, v)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
