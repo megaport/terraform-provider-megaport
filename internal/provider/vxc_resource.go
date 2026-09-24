@@ -3156,6 +3156,14 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 			DeleteNow: true,
 		})
 	})
+	if errors.Is(err, megaport.ErrCancelPendingApproval) {
+		resp.Diagnostics.AddError(
+			"VXC cancellation pending approval",
+			"VXC "+state.UID.ValueString()+" is still live: the API created an order approval request instead of canceling it. "+
+				"Approve or reject the request in the Megaport Portal. After approval, the next refresh removes the VXC from state.",
+		)
+		return
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting VXC",
