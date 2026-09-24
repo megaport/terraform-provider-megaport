@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -61,6 +62,7 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 			Bfd:                types.ObjectNull(bfdConfigAttrs),
 			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
 			IpSecTunnelOptions: tunnel,
+			DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 		}
 	}
 
@@ -112,6 +114,86 @@ func TestCreateVrouterPartnerConfig_IPsecTunnelOptions(t *testing.T) {
 	assert.Nil(t, vrouterConfig.Interfaces[2].IpSecTunnelOptions)
 }
 
+// TestCreateVrouterPartnerConfig_DhcpPools verifies the model -> SDK mapping for
+// dhcp_pools: every field the configuration sets reaches the order, the optional
+// fields stay empty when unset, and an interface with no pool sends no slice.
+func TestCreateVrouterPartnerConfig_DhcpPools(t *testing.T) {
+	ctx := context.Background()
+
+	poolType := types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)
+
+	dnsServers, diags := types.ListValueFrom(ctx, types.StringType, []string{"1.1.1.1", "8.8.8.8"})
+	require.False(t, diags.HasError(), "building dns_servers list: %v", diags)
+
+	fullPool := dhcpPoolModel{
+		Network:        types.StringValue("192.168.1.0/24"),
+		StartIPAddress: types.StringValue("192.168.1.10"),
+		EndIPAddress:   types.StringValue("192.168.1.100"),
+		DefaultGateway: types.StringValue("192.168.1.1"),
+		Description:    types.StringValue("Office LAN DHCP pool"),
+		DNSServers:     dnsServers,
+	}
+	// Only the three required fields; the optionals stay out of the order.
+	minimalPool := dhcpPoolModel{
+		Network:        types.StringValue("192.168.2.0/24"),
+		StartIPAddress: types.StringValue("192.168.2.10"),
+		EndIPAddress:   types.StringValue("192.168.2.100"),
+		DefaultGateway: types.StringNull(),
+		Description:    types.StringNull(),
+		DNSServers:     types.ListNull(types.StringType),
+	}
+
+	fullList, diags := types.ListValueFrom(ctx, poolType, []dhcpPoolModel{fullPool})
+	require.False(t, diags.HasError(), "building full pool list: %v", diags)
+	minimalList, diags := types.ListValueFrom(ctx, poolType, []dhcpPoolModel{minimalPool})
+	require.False(t, diags.HasError(), "building minimal pool list: %v", diags)
+
+	newIface := func(pools types.List) vxcPartnerConfigInterfaceModel {
+		return vxcPartnerConfigInterfaceModel{
+			IPAddresses:        types.ListNull(types.StringType),
+			IPRoutes:           types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+			NatIPAddresses:     types.ListNull(types.StringType),
+			Bfd:                types.ObjectNull(bfdConfigAttrs),
+			BgpConnections:     types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpVrouterConnectionConfig)),
+			IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+			DhcpPools:          pools,
+		}
+	}
+
+	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{
+		newIface(fullList),
+		newIface(minimalList),
+		newIface(types.ListNull(poolType)),
+	})
+	require.False(t, diags.HasError(), "building interface list: %v", diags)
+
+	model := vxcPartnerConfigVrouterModel{Interfaces: ifaceList}
+
+	diags, vrouterConfig, _ := createVrouterPartnerConfig(ctx, model, nil, nil)
+	require.False(t, diags.HasError(), "createVrouterPartnerConfig: %v", diags)
+	require.Len(t, vrouterConfig.Interfaces, 3)
+
+	require.Len(t, vrouterConfig.Interfaces[0].DhcpPools, 1)
+	full := vrouterConfig.Interfaces[0].DhcpPools[0]
+	assert.Equal(t, "192.168.1.0/24", full.Network)
+	assert.Equal(t, "192.168.1.10", full.StartIpAddress)
+	assert.Equal(t, "192.168.1.100", full.EndIpAddress)
+	assert.Equal(t, "192.168.1.1", full.DefaultGateway)
+	assert.Equal(t, "Office LAN DHCP pool", full.Description)
+	assert.Equal(t, []string{"1.1.1.1", "8.8.8.8"}, full.DnsServers)
+
+	require.Len(t, vrouterConfig.Interfaces[1].DhcpPools, 1)
+	minimal := vrouterConfig.Interfaces[1].DhcpPools[0]
+	assert.Equal(t, "192.168.2.0/24", minimal.Network)
+	assert.Equal(t, "192.168.2.10", minimal.StartIpAddress)
+	assert.Equal(t, "192.168.2.100", minimal.EndIpAddress)
+	assert.Empty(t, minimal.DefaultGateway)
+	assert.Empty(t, minimal.Description)
+	assert.Nil(t, minimal.DnsServers)
+
+	assert.Nil(t, vrouterConfig.Interfaces[2].DhcpPools)
+}
+
 // TestCreateVrouterPartnerConfig_BgpAsOverride verifies the model -> SDK mapping
 // for the optional as_override BGP field: set true/false round-trips the value,
 // and unset (null) leaves the pointer nil so the API default applies.
@@ -143,6 +225,7 @@ func TestCreateVrouterPartnerConfig_BgpAsOverride(t *testing.T) {
 		Bfd:                types.ObjectNull(bfdConfigAttrs),
 		BgpConnections:     bgpList,
 		IpSecTunnelOptions: types.ObjectNull(ipSecTunnelOptionsAttrs),
+		DhcpPools:          types.ListNull(types.ObjectType{}.WithAttributeTypes(dhcpPoolAttrs)),
 	}
 	ifaceList, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(vxcVrouterInterfaceAttrs), []vxcPartnerConfigInterfaceModel{iface})
 	require.False(t, diags.HasError(), "building interface list: %v", diags)
@@ -162,6 +245,109 @@ func TestCreateVrouterPartnerConfig_BgpAsOverride(t *testing.T) {
 	assert.False(t, *conns[1].AsOverride)
 
 	assert.Nil(t, conns[2].AsOverride, "unset as_override must stay nil so the API default applies")
+}
+
+// TestCreateAEndPartnerConfig_Interfaces covers the deprecated A-End block. The
+// values are built from the attr maps rather than from a Go model, so the test
+// decodes the same shape Terraform hands the resource.
+func TestCreateAEndPartnerConfig_Interfaces(t *testing.T) {
+	ctx := context.Background()
+
+	bgpObj, diags := types.ObjectValue(bgpConnectionConfig, map[string]attr.Value{
+		"peer_asn":              types.Int64Value(65000),
+		"local_asn":             types.Int64Value(64512),
+		"local_ip_address":      types.StringValue("169.254.1.1"),
+		"peer_ip_address":       types.StringValue("169.254.1.2"),
+		"password":              types.StringValue("test-bgp-password"),
+		"shutdown":              types.BoolValue(false),
+		"description":           types.StringValue("peering"),
+		"med_in":                types.Int64Value(100),
+		"med_out":               types.Int64Value(200),
+		"bfd_enabled":           types.BoolValue(true),
+		"as_override":           types.BoolValue(true),
+		"export_policy":         types.StringValue("permit"),
+		"permit_export_to":      types.ListNull(types.StringType),
+		"deny_export_to":        types.ListNull(types.StringType),
+		"import_whitelist":      types.StringNull(),
+		"import_blacklist":      types.StringNull(),
+		"export_whitelist":      types.StringNull(),
+		"export_blacklist":      types.StringNull(),
+		"as_path_prepend_count": types.Int64Value(2),
+	})
+	require.False(t, diags.HasError(), "building bgp object: %v", diags)
+	bgpList, diags := types.ListValue(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig), []attr.Value{bgpObj})
+	require.False(t, diags.HasError(), "building bgp list: %v", diags)
+
+	ipRouteObj, diags := types.ObjectValue(ipRouteAttrs, map[string]attr.Value{
+		"prefix":      types.StringValue("10.0.0.0/24"),
+		"description": types.StringValue("route"),
+		"next_hop":    types.StringValue("10.0.0.1"),
+	})
+	require.False(t, diags.HasError(), "building ip route object: %v", diags)
+	ipRoutes, diags := types.ListValue(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), []attr.Value{ipRouteObj})
+	require.False(t, diags.HasError(), "building ip route list: %v", diags)
+
+	bfdObj, diags := types.ObjectValue(bfdConfigAttrs, map[string]attr.Value{
+		"tx_interval": types.Int64Value(300),
+		"rx_interval": types.Int64Value(300),
+		"multiplier":  types.Int64Value(3),
+	})
+	require.False(t, diags.HasError(), "building bfd object: %v", diags)
+
+	ipAddresses, diags := types.ListValue(types.StringType, []attr.Value{types.StringValue("10.0.0.2/30")})
+	require.False(t, diags.HasError(), "building ip address list: %v", diags)
+	natIPAddresses, diags := types.ListValue(types.StringType, []attr.Value{types.StringValue("10.0.0.3")})
+	require.False(t, diags.HasError(), "building nat ip address list: %v", diags)
+
+	fullIface, diags := types.ObjectValue(vxcPartnerConfigAEndInterfaceAttrs, map[string]attr.Value{
+		"ip_addresses":     ipAddresses,
+		"ip_routes":        ipRoutes,
+		"nat_ip_addresses": natIPAddresses,
+		"bfd":              bfdObj,
+		"bgp_connections":  bgpList,
+	})
+	require.False(t, diags.HasError(), "building full interface object: %v", diags)
+
+	// A second interface with everything unset proves the order carries each
+	// interface, not just the populated one.
+	minimalIface, diags := types.ObjectValue(vxcPartnerConfigAEndInterfaceAttrs, map[string]attr.Value{
+		"ip_addresses":     types.ListNull(types.StringType),
+		"ip_routes":        types.ListNull(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses": types.ListNull(types.StringType),
+		"bfd":              types.ObjectNull(bfdConfigAttrs),
+		"bgp_connections":  types.ListNull(types.ObjectType{}.WithAttributeTypes(bgpConnectionConfig)),
+	})
+	require.False(t, diags.HasError(), "building minimal interface object: %v", diags)
+
+	ifaceList, diags := types.ListValue(types.ObjectType{}.WithAttributeTypes(vxcPartnerConfigAEndInterfaceAttrs), []attr.Value{fullIface, minimalIface})
+	require.False(t, diags.HasError(), "building interface list: %v", diags)
+
+	diags, aEndConfig, _ := createAEndPartnerConfig(ctx, vxcPartnerConfigAEndModel{Interfaces: ifaceList}, nil)
+	require.False(t, diags.HasError(), "createAEndPartnerConfig: %v", diags)
+	require.Len(t, aEndConfig.Interfaces, 2)
+
+	iface := aEndConfig.Interfaces[0]
+	assert.Equal(t, []string{"10.0.0.2/30"}, iface.IpAddresses)
+	assert.Equal(t, []string{"10.0.0.3"}, iface.NatIpAddresses)
+	require.Len(t, iface.IpRoutes, 1)
+	assert.Equal(t, "10.0.0.0/24", iface.IpRoutes[0].Prefix)
+	assert.Equal(t, "10.0.0.1", iface.IpRoutes[0].NextHop)
+	assert.Equal(t, 300, iface.Bfd.TxInterval)
+	assert.Equal(t, 3, iface.Bfd.Multiplier)
+
+	require.Len(t, iface.BgpConnections, 1)
+	bgp := iface.BgpConnections[0]
+	assert.Equal(t, 65000, bgp.PeerAsn)
+	assert.Equal(t, "169.254.1.2", bgp.PeerIpAddress)
+	assert.Equal(t, "test-bgp-password", bgp.Password)
+	assert.Equal(t, 2, bgp.AsPathPrependCount)
+	require.NotNil(t, bgp.LocalAsn)
+	assert.Equal(t, 64512, *bgp.LocalAsn)
+	require.NotNil(t, bgp.AsOverride)
+	assert.True(t, *bgp.AsOverride)
+
+	assert.Empty(t, aEndConfig.Interfaces[1].IpAddresses)
+	assert.Empty(t, aEndConfig.Interfaces[1].BgpConnections)
 }
 
 // TestIPSecPhaseLifetimeValidator covers the cross-field rule that phase2 must
@@ -574,6 +760,7 @@ func TestBuildVrouterPartnerConfigFromAPI_InterfaceFields(t *testing.T) {
 	assert.True(t, ifaces[0].PacketFilterIn.IsNull())
 	assert.True(t, ifaces[0].PacketFilterOut.IsNull())
 	assert.True(t, ifaces[0].IpSecTunnelOptions.IsNull(), "the PSK is write-only, so no tunnel options come back")
+	assert.True(t, ifaces[0].DhcpPools.IsNull(), "megaportgo drops the pools the API returns")
 	assert.True(t, ifaces[0].NatIPAddresses.IsNull())
 }
 
@@ -692,7 +879,7 @@ func TestFillVrouterPartnerConfigsOnImport_AmbiguousEnd(t *testing.T) {
 	// A user writing this end by hand cannot see these either, so the warning
 	// has to reach a skipped end as well as a rebuilt one.
 	assert.Equal(t, "Import complete, some settings need adding by hand", diags.Warnings()[1].Summary())
-	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
+	for _, attr := range []string{"ip_mtu", "vlan", "description", "interface_type", "packet_filter_in", "packet_filter_out", "dhcp_pools", "IPsec tunnel", "permit_export_to", "deny_export_to"} {
 		assert.Contains(t, diags.Warnings()[1].Detail(), attr)
 	}
 	assert.True(t, state.AEndPartnerConfig.IsNull(), "an ambiguous end must be left for the user to fill in")

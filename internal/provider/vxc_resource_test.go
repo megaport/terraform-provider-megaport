@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	fwschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -1181,7 +1180,7 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config.aws_config.asn", "b_end_partner_config.aws_config.amazon_asn"},
 			},
 			// ImportState testing
 			{
@@ -1201,7 +1200,7 @@ func TestAccMegaportMCRVXCWithCSPs_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config.azure_config.port_choice"},
 			},
 		},
 	})
@@ -1527,6 +1526,26 @@ func TestAccMegaportVXC_GCPProductUID(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_vxc.gcp_vxc", "b_end.product_name"),
 				),
 			},
+			// ImportState testing
+			{
+				ResourceName:                         "megaport_vxc.gcp_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.gcp_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config"},
+			},
 		},
 	})
 }
@@ -1535,7 +1554,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortAndMCRTestLocations(t, 1, 2500)
-	oracleVCID := pickOracleVirtualCircuitID(t)
+	oracle := pickOracleVirtualCircuitID(t)
 	mcrName := RandomTestName()
 	mcrCostCentreName := RandomTestName()
 	oracleCostCentreName := RandomTestName()
@@ -1548,11 +1567,6 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 				Config: providerConfig + fmt.Sprintf(`
 				data "megaport_location" "loc1" {
 					id = %d
-				  }
-
-				data "megaport_partner" "oracle_port" {
-  					connect_type = "ORACLE"
-  					location_id  = 147
 				  }
 
 				  resource "megaport_mcr" "mcr" {
@@ -1576,7 +1590,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
 					}
 
 					b_end = {
-					  requested_product_uid = data.megaport_partner.oracle_port.product_uid
+					  requested_product_uid = "%s"
 					}
 
 					b_end_partner_config = {
@@ -1586,7 +1600,7 @@ func TestAccMegaportOracleVXCWithProductUID(t *testing.T) {
                         }
                     }
 				  }
-                  `, locs[0], mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, oracleVCID),
+                  `, locs[0], mcrName, mcrCostCentreName, oracleVXCName, oracleCostCentreName, oracle.PartnerPortUID, oracle.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
@@ -2035,7 +2049,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortTestLocationsWithPartner(t, 1, "ORACLE")
-	oracleVCID := pickOracleVirtualCircuitID(t)
+	oracle := pickOracleVirtualCircuitID(t)
 	portName := RandomTestName()
 	oracleVXCName := RandomTestName()
 
@@ -2075,7 +2089,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
                         }
                     }
                 }
-                `, locs[0], portName, oracleVXCName, oracleVCID),
+                `, locs[0], portName, oracleVXCName, oracle.Key),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_port.port", "product_name", portName),
 					resource.TestCheckResourceAttr("megaport_port.port", "port_speed", "1000"),
@@ -2087,7 +2101,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "rate_limit", "100"),
 					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "contract_term_months", "1"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.oracle_vxc", "product_uid"),
-					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracleVCID),
+					resource.TestCheckResourceAttr("megaport_vxc.oracle_vxc", "b_end_partner_config.oracle_config.virtual_circuit_id", oracle.Key),
 				),
 			},
 			// ImportState testing
@@ -2108,7 +2122,7 @@ func TestAccMegaportOracleVXC_Basic(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config"},
 			},
 		},
 	})
@@ -2665,7 +2679,7 @@ func TestAccMegaportMVEAWS_VXC(t *testing.T) {
 						name          = "%s"
 						asn           = 65121
 						type          = "private"
-						connect_type  = "AWSHC"
+						connect_type  = "AWS"
 						amazon_asn    = 64512
 						owner_account = "123456789012"
 					  }
@@ -2704,7 +2718,7 @@ func TestAccMegaportMVEAWS_VXC(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
-				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config.aws_config.asn", "b_end_partner_config.aws_config.amazon_asn"},
 			},
 			// Update
 			{
@@ -2777,7 +2791,7 @@ func TestAccMegaportMVEAWS_VXC(t *testing.T) {
 						name          = "%s"
 						asn           = 65121
 						type          = "private"
-						connect_type  = "AWSHC"
+						connect_type  = "AWS"
 						amazon_asn    = 64512
 						owner_account = "123456789012"
 					  }
@@ -3880,6 +3894,165 @@ func TestAccMegaportVXC_ImportDrift_Basic(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_ImportDrift_ServiceKey covers the post-import case for
+// service_key. The API never returns the key, so an imported VXC holds it null;
+// adding it back to the configuration has to record it in place rather than
+// destroy the live VXC, because a single-use key cannot be ordered twice.
+func TestAccMegaportVXC_ImportDrift_ServiceKey(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	keyDescription := RandomTestName()
+	vxcName := RandomTestName()
+
+	// baseConfig holds everything the VXC needs, so the forget step below can
+	// drop the VXC alone and leave the ports and the key in state.
+	baseConfig := providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+			resource "megaport_port" "port_1" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_port" "port_2" {
+				product_name           = "%s"
+				port_speed             = 1000
+				location_id            = data.megaport_location.loc.id
+				contract_term_months   = 1
+				marketplace_visibility = false
+			}
+			resource "megaport_service_key" "key" {
+				product_uid = megaport_port.port_2.product_uid
+				description = "%s"
+				max_speed   = 500
+				single_use  = true
+				active      = true
+				vlan        = 200
+			}
+		`, locs[0], portName1, portName2, keyDescription)
+
+	vxcConfig := baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 500
+				contract_term_months = 1
+				service_key          = megaport_service_key.key.key
+
+				a_end = {
+					requested_product_uid = megaport_port.port_1.product_uid
+					ordered_vlan          = 100
+				}
+
+				b_end = {}
+			}
+		`, vxcName)
+
+	// The forget step drops the VXC from state and leaves the live service
+	// alone, which is the only way to reach a genuine import here: the
+	// framework rejects importing over a resource the same test case created.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: order the VXC against the service key
+			{
+				Config: vxcConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "service_key"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "b_end.current_product_uid"),
+					captureUID,
+				),
+			},
+			// Step 2: forget the VXC. The live service stays up and Terraform
+			// stops managing it, so step 3 can import it for real.
+			{
+				Config: forgetConfig,
+			},
+			// Step 3: import the VXC. The API does not return the key, so the
+			// imported state holds it null.
+			{
+				Config:                               vxcConfig,
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					for _, st := range states {
+						if st.Attributes["product_uid"] != vxcUID {
+							continue
+						}
+						if key, ok := st.Attributes["service_key"]; ok && key != "" {
+							return fmt.Errorf("imported service_key = %q, want none", key)
+						}
+						return nil
+					}
+					return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+				},
+			},
+			// Step 4: apply the config the key is in. The key is recorded in
+			// place, and the UID proves the live VXC was not replaced.
+			{
+				Config: vxcConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "service_key"),
+					func(state *terraform.State) error {
+						rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+						if !ok {
+							return fmt.Errorf("megaport_vxc.vxc not found in state")
+						}
+						if got := rs.Primary.Attributes["product_uid"]; got != vxcUID {
+							return fmt.Errorf("product_uid = %q, want %q: the VXC was replaced", got, vxcUID)
+						}
+						return nil
+					},
+				),
+			},
+			// Step 5: plan-only to confirm the recorded key leaves no drift
+			{
+				Config:   vxcConfig,
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_ImportDrift_WithPartnerConfig tests that a VXC with partner configs
 // does not cause drift after import. This is the scenario from the original bug report
 // where MCR VXCs with vrouter partner configs would continuously show changes.
@@ -4349,8 +4522,9 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 	portName := RandomTestName()
 	vxcName := RandomTestName()
 
-	vxcConfig := func() string {
-		return providerConfig + fmt.Sprintf(`
+	// baseConfig is everything except the VXC, so forgetConfig below can drop
+	// the resource block entirely while the removed block still references it.
+	baseConfig := providerConfig + fmt.Sprintf(`
 			data "megaport_location" "loc" {
 				id = %d
 			}
@@ -4367,7 +4541,10 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 				contract_term_months   = 1
 				marketplace_visibility = false
 			}
+		`, locs[0], portName)
 
+	vxcConfig := func() string {
+		return baseConfig + fmt.Sprintf(`
 			resource "megaport_vxc" "vxc" {
 				product_name         = "%s"
 				rate_limit           = 500
@@ -4392,7 +4569,36 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 					}
 				}
 			}
-		`, locs[0], portName, vxcName, vxcName)
+		`, vxcName, vxcName)
+	}
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import. That is the
+	// customer's situation, and it is the only way to reach a real first apply
+	// after an import here: ImportStatePersist cannot import over a resource
+	// the same test case already created.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -4408,28 +4614,66 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.connect_type", "AWSHC"),
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					captureUID,
 				),
 			},
-			// Step 2: Import the VXC (simulates the bug scenario)
+			// Step 2: Forget the VXC. The live service stays up and Terraform
+			// stops managing it, so step 3 imports it the way a customer does.
 			{
+				Config: forgetConfig,
+			},
+			// Step 3: Import the VXC. The read rebuilds b_end_partner_config
+			// from the hosted connection, which carries no type.
+			// ImportStatePersist keeps that state for the steps below.
+			{
+				Config:                               vxcConfig(),
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
-				ImportStateVerify:                    false, // We expect differences initially
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
-				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					resourceName := "megaport_vxc.vxc"
-					var rawState map[string]string
-					for _, m := range state.Modules {
-						if len(m.Resources) > 0 {
-							if v, ok := m.Resources[resourceName]; ok {
-								rawState = v.Primary.Attributes
-							}
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					// ImportStatePersist runs the import in the test case's own
+					// working directory, so the check gets every resource in
+					// that state, not only the imported VXC.
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
 						}
 					}
-					return rawState["product_uid"], nil
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
+					want := map[string]string{
+						"b_end_partner_config.partner":                  "aws",
+						"b_end_partner_config.aws_config.connect_type":  "AWSHC",
+						"b_end_partner_config.aws_config.owner_account": "123456789012",
+						"b_end_partner_config.aws_config.name":          vxcName,
+					}
+					for k, v := range want {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					// The hosted connection read carries no type, so the
+					// import leaves it for the configuration to set.
+					if got := attrs["b_end_partner_config.aws_config.type"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", "b_end_partner_config.aws_config.type", got)
+					}
+					return nil
 				},
 			},
-			// Step 3: Apply the same config - first apply after import
+			// Step 4: Apply the config against the imported state. It sets
+			// type, which the import left null, so the apply records it and
+			// warns instead of failing.
 			{
 				Config: vxcConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -4437,9 +4681,10 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "aws"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.aws_config.type", "private"),
 				),
 			},
-			// Step 4: Plan-only to verify NO drift - THIS IS THE BUG FIX VALIDATION
+			// Step 5: Plan-only to verify NO drift - THIS IS THE BUG FIX VALIDATION
 			// Before the fix, this would fail because the plan would show changes
 			// for b_end_partner_config even though nothing changed.
 			{
@@ -4450,10 +4695,170 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_ImportDrift_Azure imports an Azure VXC and applies a
+// configuration that sets port_choice, which the import leaves null. The apply
+// records the value and plans no further change.
+func TestAccMegaportVXC_ImportDrift_Azure(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	azure := pickAzureServiceKey(t)
+	mcrLocationID, _ := findMCRTestLocation(t, 5000)
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	// baseConfig is everything except the VXC, so forgetConfig below can drop
+	// the resource block entirely while the removed block still references it.
+	baseConfig := providerConfig + fmt.Sprintf(`
+			data "megaport_location" "loc" {
+				id = %d
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.loc.id
+				contract_term_months = 1
+				port_speed           = 5000
+				asn                  = 64555
+			}
+		`, mcrLocationID, mcrName)
+
+	vxcConfig := func() string {
+		return baseConfig + fmt.Sprintf(`
+			resource "megaport_vxc" "vxc" {
+				product_name         = "%s"
+				rate_limit           = 200
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = 2192
+				}
+
+				b_end = {
+					requested_product_uid = "%s"
+				}
+
+				b_end_partner_config = {
+					partner = "azure"
+					azure_config = {
+						port_choice = "primary"
+						service_key = "%s"
+					}
+				}
+			}
+		`, vxcName, azure.PartnerPortUID, azure.Key)
+	}
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import.
+	forgetConfig := baseConfig + `
+			removed {
+				from = megaport_vxc.vxc
+				lifecycle {
+					destroy = false
+				}
+			}
+		`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.vxc has no product_uid")
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create the Azure VXC.
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "azure"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.port_choice", "primary"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
+					captureUID,
+				),
+			},
+			// Step 2: Forget the VXC. The live service stays up and Terraform
+			// stops managing it, so step 3 imports it the way a customer does.
+			{
+				Config: forgetConfig,
+			},
+			// Step 3: Import the VXC. The read rebuilds b_end_partner_config
+			// from the Azure connection, which carries the service key but not
+			// the port choice.
+			{
+				Config:                               vxcConfig(),
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
+						}
+					}
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
+					if got := attrs["b_end_partner_config.partner"]; got != "azure" {
+						return fmt.Errorf("imported state %q = %q, want %q", "b_end_partner_config.partner", got, "azure")
+					}
+					if got := attrs["b_end_partner_config.azure_config.service_key"]; got != azure.Key {
+						return fmt.Errorf("imported state %q = %q, want %q", "b_end_partner_config.azure_config.service_key", got, azure.Key)
+					}
+					// Azure assigns the port, so the import leaves port_choice
+					// for the configuration to set.
+					if got := attrs["b_end_partner_config.azure_config.port_choice"]; got != "" {
+						return fmt.Errorf("imported state %q = %q, want it unset", "b_end_partner_config.azure_config.port_choice", got)
+					}
+					return nil
+				},
+			},
+			// Step 4: Apply the config against the imported state. It sets
+			// port_choice, which the import left null, so the apply records it
+			// and warns instead of failing.
+			{
+				Config: vxcConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "azure"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.port_choice", "primary"),
+					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.azure_config.service_key", azure.Key),
+				),
+			},
+			// Step 5: Plan-only to verify no drift after the first apply.
+			{
+				Config:   vxcConfig(),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccMegaportVXC_ImportDrift_WithVnicIndex tests that a VXC connected to an
-// MVE with a vnic_index does not cause drift after import. The API does not
-// return the user-configured vnic_index on read, so the provider must preserve
-// it from state/plan to avoid an infinite update loop.
+// MVE vNIC imports without drift. The import reads vnic_index back, and the
+// first apply after it plans no change.
 func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
@@ -4531,11 +4936,11 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_vxc.vxc", "product_uid"),
 				),
 			},
-			// Step 2: Import the VXC (vnic_index will be lost from state)
+			// Step 2: Import the VXC
 			{
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
-				ImportStateVerify:                    false,
+				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "product_uid",
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					resourceName := "megaport_vxc.vxc"
@@ -4549,6 +4954,7 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 					}
 					return rawState["product_uid"], nil
 				},
+				ImportStateVerifyIgnore: []string{"last_updated", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config"},
 			},
 			// Step 3: Apply the same config - reconciles state after import
 			{
@@ -5040,9 +5446,10 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 }
 
 // assertOneDiag asserts diags holds exactly one diagnostic, with the wanted
-// summary, attribute path, and every mustContain string in the detail. An
-// empty want asserts diags is empty.
-func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.Path, mustContain ...string) {
+// summary and every mustContain string in the detail. An empty want asserts
+// diags is empty. The diagnostic must carry no attribute path, because
+// Terraform renders an attribute-scoped one as the whole config block.
+func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, mustContain ...string) {
 	t.Helper()
 	if want == "" {
 		if len(diags) != 0 {
@@ -5061,12 +5468,8 @@ func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.P
 			t.Errorf("detail does not name %s: %q", want, diags[0].Detail())
 		}
 	}
-	withPath, ok := diags[0].(diag.DiagnosticWithPath)
-	if !ok {
-		t.Fatalf("diagnostic %q is not attribute-scoped", diags[0].Summary())
-	}
-	if !withPath.Path().Equal(at) {
-		t.Errorf("path = %s, want %s", withPath.Path(), at)
+	if withPath, ok := diags[0].(diag.DiagnosticWithPath); ok {
+		t.Errorf("diagnostic %q carries attribute path %s, so Terraform prints the whole config block", diags[0].Summary(), withPath.Path())
 	}
 }
 
@@ -5078,6 +5481,7 @@ type vxcPartnerTestTypes struct {
 	end     tftypes.Object
 	partner tftypes.Object
 	aws     tftypes.Object
+	azure   tftypes.Object
 	vrouter tftypes.Object
 	aEnd    tftypes.Object
 	// endVal is a minimal valid a_end/b_end value.
@@ -5114,6 +5518,7 @@ func newVXCPartnerTestTypes(ctx context.Context, t *testing.T) vxcPartnerTestTyp
 		end:     endType,
 		partner: partnerType,
 		aws:     nested(partnerType, "aws_config"),
+		azure:   nested(partnerType, "azure_config"),
 		vrouter: nested(partnerType, "vrouter_config"),
 		aEnd:    nested(partnerType, "partner_a_end_config"),
 		endVal:  tftypes.NewValue(endType, endAttrs),
@@ -5130,11 +5535,32 @@ func (ty vxcPartnerTestTypes) partnerVal(name string) tftypes.Value {
 // awsVal builds the shape behind the reported outage: a BGP auth key edit
 // inside an aws_config block.
 func (ty vxcPartnerTestTypes) awsVal(authKey tftypes.Value) tftypes.Value {
+	return ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": authKey})
+}
+
+// awsFieldsVal builds an "aws" partner config whose aws_config sets only the
+// given fields.
+func (ty vxcPartnerTestTypes) awsFieldsVal(fields map[string]tftypes.Value) tftypes.Value {
 	aws := nullValueMap(ty.aws)
-	aws["auth_key"] = authKey
+	for name, val := range fields {
+		aws[name] = val
+	}
 	attrs := nullValueMap(ty.partner)
 	attrs["partner"] = tftypes.NewValue(tftypes.String, "aws")
 	attrs["aws_config"] = tftypes.NewValue(ty.aws, aws)
+	return tftypes.NewValue(ty.partner, attrs)
+}
+
+// azureFieldsVal builds an "azure" partner config whose azure_config sets only
+// the given fields.
+func (ty vxcPartnerTestTypes) azureFieldsVal(fields map[string]tftypes.Value) tftypes.Value {
+	azure := nullValueMap(ty.azure)
+	for name, val := range fields {
+		azure[name] = val
+	}
+	attrs := nullValueMap(ty.partner)
+	attrs["partner"] = tftypes.NewValue(tftypes.String, "azure")
+	attrs["azure_config"] = tftypes.NewValue(ty.azure, azure)
 	return tftypes.NewValue(ty.partner, attrs)
 }
 
@@ -5270,8 +5696,8 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 				if len(resp.RequiresReplace) != 0 {
 					t.Errorf("expected no RequiresReplace, got %v", resp.RequiresReplace)
 				}
-				assertOneDiag(t, resp.Diagnostics.Errors(), "", path.Root(root))
-				assertOneDiag(t, resp.Diagnostics.Warnings(), "", path.Root(root))
+				assertOneDiag(t, resp.Diagnostics.Errors(), "")
+				assertOneDiag(t, resp.Diagnostics.Warnings(), "")
 			})
 		}
 	}
@@ -5292,11 +5718,13 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 
 	// wantAEnd and wantBEnd name the partner the error must quote, or are empty
 	// when that end accepts the change. wantWarnPartner names the partner the
-	// post-import warning must quote, on both ends.
+	// post-import warning must quote, on both ends. rebuiltOnImport marks a
+	// state the import rebuilt, which is the only state a null may be filled in.
 	tests := []struct {
 		name            string
 		state           tftypes.Value
 		plan            tftypes.Value
+		rebuiltOnImport bool
 		wantAEnd        string
 		wantBEnd        string
 		wantWarnPartner string
@@ -5393,6 +5821,80 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 			wantWarnPartner: "aws",
 		},
 		{
+			// An imported AWS VXC records prefixes as null when the API reports
+			// none. Setting it fills the gap: recorded and warned about, like the
+			// null-state case.
+			name:            "csp_fills_null_prefixes",
+			rebuiltOnImport: true,
+			state:           ty.awsVal(knownKey("same")),
+			plan:            ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": knownKey("same"), "prefixes": knownKey("10.0.0.0/24")}),
+			wantWarnPartner: "aws",
+		},
+		{
+			// The same fill on a state the user wrote, not one the import
+			// rebuilt, is a change the provider cannot send.
+			name:     "csp_fills_null_without_import",
+			state:    ty.awsVal(knownKey("same")),
+			plan:     ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": knownKey("same"), "prefixes": knownKey("10.0.0.0/24")}),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "csp_fills_null_and_changes_value",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.awsFieldsVal(map[string]tftypes.Value{"auth_key": knownKey("new-key"), "prefixes": knownKey("10.0.0.0/24")}),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			// Unsetting a recorded value is a change, not a fill.
+			name:     "csp_value_to_null",
+			state:    ty.awsVal(knownKey("old-key")),
+			plan:     ty.awsFieldsVal(nil),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			name:     "csp_fills_null_under_partner_swap",
+			state:    ty.awsVal(knownKey("same")),
+			plan:     ty.azureFieldsVal(map[string]tftypes.Value{"port_choice": knownKey("primary")}),
+			wantAEnd: "aws", wantBEnd: "aws",
+		},
+		{
+			// The shape the import records for an AWS VIF, against the
+			// configuration the user then writes. The cloud-assigned values
+			// are null in state, so the apply records them and warns.
+			name:            "csp_import_shape_then_user_config",
+			rebuiltOnImport: true,
+			state: ty.awsFieldsVal(map[string]tftypes.Value{
+				"connect_type": knownKey("AWS"), "type": knownKey("private"),
+				"owner_account": knownKey("123456789012"), "name": knownKey("my-vif"),
+			}),
+			plan: ty.awsFieldsVal(map[string]tftypes.Value{
+				"connect_type": knownKey("AWS"), "type": knownKey("private"),
+				"owner_account": knownKey("123456789012"), "name": knownKey("my-vif"),
+				"auth_key": knownKey("bgp-secret"), "customer_ip_address": knownKey("169.254.0.1/30"),
+			}),
+			wantWarnPartner: "aws",
+		},
+		{
+			// An AWS hosted connection import leaves type null.
+			name:            "csp_fills_null_awshc_type",
+			rebuiltOnImport: true,
+			state: ty.awsFieldsVal(map[string]tftypes.Value{
+				"connect_type": knownKey("AWSHC"), "owner_account": knownKey("123456789012"), "name": knownKey("my-hc"),
+			}),
+			plan: ty.awsFieldsVal(map[string]tftypes.Value{
+				"connect_type": knownKey("AWSHC"), "owner_account": knownKey("123456789012"),
+				"name": knownKey("my-hc"), "type": knownKey("private"),
+			}),
+			wantWarnPartner: "aws",
+		},
+		{
+			name:            "csp_fills_null_port_choice",
+			rebuiltOnImport: true,
+			state:           ty.azureFieldsVal(map[string]tftypes.Value{"service_key": knownKey("svc")}),
+			plan:            ty.azureFieldsVal(map[string]tftypes.Value{"service_key": knownKey("svc"), "port_choice": knownKey("primary")}),
+			wantWarnPartner: "azure",
+		},
+		{
 			// Not the recorded-only case: the provider does try to send this,
 			// and the B-End cannot.
 			name:     "null_state_transit",
@@ -5429,7 +5931,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 				checkPartnerConfigUpdatable(ctx,
 					ty.objectValue(ctx, t, tc.plan),
 					ty.objectValue(ctx, t, tc.state),
-					endLabel, root, &diags)
+					endLabel, tc.rebuiltOnImport, &diags)
 
 				wantError := ""
 				mustContain := []string{endLabel}
@@ -5437,7 +5939,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 					wantError = "Partner configuration cannot be changed on a live VXC"
 					mustContain = append(mustContain, fmt.Sprintf("%q", wantPartner))
 				}
-				assertOneDiag(t, diags.Errors(), wantError, path.Root(root), mustContain...)
+				assertOneDiag(t, diags.Errors(), wantError, mustContain...)
 
 				wantWarn := ""
 				warnContain := []string{endLabel}
@@ -5445,7 +5947,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 					wantWarn = "Partner configuration is recorded in state only"
 					warnContain = append(warnContain, fmt.Sprintf("%q", tc.wantWarnPartner))
 				}
-				assertOneDiag(t, diags.Warnings(), wantWarn, path.Root(root), warnContain...)
+				assertOneDiag(t, diags.Warnings(), wantWarn, warnContain...)
 			})
 		}
 	}
@@ -5512,6 +6014,86 @@ func TestFromAPIVXC_PreservesPlanPartnerConfig(t *testing.T) {
 	}
 	if !orm.BEndPartnerConfig.Equal(keptBEnd) {
 		t.Errorf("b_end_partner_config = %v, want it kept as %v", orm.BEndPartnerConfig, keptBEnd)
+	}
+}
+
+// TestFromAPIVXC_ImportLeavesRequestedProductUIDNull pins requested_product_uid
+// on the import read. Recording the port the order landed on pins a cloud end to
+// it, because ModifyPlan holds a cloud end at the value state already carries,
+// and the order does not always land on the port the configuration asked for.
+func TestFromAPIVXC_ImportLeavesRequestedProductUIDNull(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	vxc := &megaport.VXC{
+		UID:               "vxc-uid-123",
+		AEndConfiguration: megaport.VXCEndConfiguration{UID: "a-end-port-uid"},
+		BEndConfiguration: megaport.VXCEndConfiguration{UID: "b-end-partner-uid"},
+	}
+
+	requestedUID := func(t *testing.T, end types.Object) types.String {
+		t.Helper()
+		var cfg vxcEndConfigurationModel
+		if diags := end.As(ctx, &cfg, basetypes.ObjectAsOptions{}); diags.HasError() {
+			t.Fatalf("decode end config: %v", diags.Errors())
+		}
+		return cfg.RequestedProductUID
+	}
+
+	imported := &vxcResourceModel{}
+	if diags := imported.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
+	}
+	if got := requestedUID(t, imported.AEndConfiguration); !got.IsNull() {
+		t.Errorf("a_end.requested_product_uid = %q after import, want it null", got.ValueString())
+	}
+	if got := requestedUID(t, imported.BEndConfiguration); !got.IsNull() {
+		t.Errorf("b_end.requested_product_uid = %q after import, want it null", got.ValueString())
+	}
+
+	// A refresh after an import keeps it null. A managed refresh keeps the value
+	// state already holds, even an empty one: a cloud end that never requested a
+	// port has an empty value on purpose, and turning that into null would let
+	// ModifyPlan's state-and-plan-both-null case backfill it from the current
+	// product UID, proposing a diff on a resource nothing actually changed on.
+	end, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
+		RequestedProductUID: types.StringNull(),
+	})
+	if diags.HasError() {
+		t.Fatalf("build end config: %v", diags.Errors())
+	}
+	managed, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
+		RequestedProductUID: types.StringValue("configured-port-uid"),
+	})
+	if diags.HasError() {
+		t.Fatalf("build end config: %v", diags.Errors())
+	}
+	neverRequested, diags := types.ObjectValueFrom(ctx, vxcEndConfigurationAttrs, &vxcEndConfigurationModel{
+		RequestedProductUID: types.StringValue(""),
+	})
+	if diags.HasError() {
+		t.Fatalf("build end config: %v", diags.Errors())
+	}
+	refreshed := &vxcResourceModel{AEndConfiguration: end, BEndConfiguration: managed}
+	if diags := refreshed.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
+	}
+	if got := requestedUID(t, refreshed.AEndConfiguration); !got.IsNull() {
+		t.Errorf("a_end.requested_product_uid = %q after refresh, want it left null", got.ValueString())
+	}
+	if got := requestedUID(t, refreshed.BEndConfiguration); got.ValueString() != "configured-port-uid" {
+		t.Errorf("b_end.requested_product_uid = %q after refresh, want the value state holds", got.ValueString())
+	}
+
+	neverRequestedRefreshed := &vxcResourceModel{AEndConfiguration: neverRequested, BEndConfiguration: neverRequested}
+	if diags := neverRequestedRefreshed.fromAPIVXC(ctx, vxc, nil, nil); diags.HasError() {
+		t.Fatalf("fromAPIVXC returned errors: %v", diags.Errors())
+	}
+	if got := requestedUID(t, neverRequestedRefreshed.AEndConfiguration); got.IsNull() || got.ValueString() != "" {
+		t.Errorf("a_end.requested_product_uid = %v after refresh, want the empty value state holds", got)
+	}
+	if got := requestedUID(t, neverRequestedRefreshed.BEndConfiguration); got.IsNull() || got.ValueString() != "" {
+		t.Errorf("b_end.requested_product_uid = %v after refresh, want the empty value state holds", got)
 	}
 }
 
@@ -5691,6 +6273,132 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	})
 }
 
+// TestAccMegaportVXC_DhcpPool orders an MCR to Port VXC whose A-End vrouter
+// config carries one subInterface with an address range and a DHCP pool inside
+// it, then changes the pool. It proves the API accepts both orders and that the
+// attribute produces no drift. State is built from the plan, never from a read,
+// so these attribute checks do not prove the request mapping;
+// TestCreateVrouterPartnerConfig_DhcpPools covers that. The B-End is a Port:
+// the API rejects a pool when the far end is Transit or IX.
+func TestAccMegaportVXC_DhcpPool(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortAndMCRTestLocations(t, 1, 1000)
+	mcrName := RandomTestName()
+	portName := RandomTestName()
+	vxcName := RandomTestName()
+
+	mkConfig := func(pool string) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+
+		resource "megaport_mcr" "mcr" {
+			product_name         = "%s"
+			location_id          = data.megaport_location.loc.id
+			contract_term_months = 1
+			port_speed           = 1000
+			asn                  = 64555
+		}
+
+		resource "megaport_port" "port" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+
+		resource "megaport_vxc" "dhcp_vxc" {
+			product_name         = "%s"
+			rate_limit           = 100
+			contract_term_months = 1
+
+			a_end = {
+				requested_product_uid = megaport_mcr.mcr.product_uid
+			}
+
+			a_end_partner_config = {
+				partner = "vrouter"
+				vrouter_config = {
+					interfaces = [
+						{
+							interface_type = "subInterface"
+							ip_addresses   = ["192.168.1.1/24"]
+							dhcp_pools = [%s
+							]
+						},
+					]
+				}
+			}
+
+			b_end = {
+				requested_product_uid = megaport_port.port.product_uid
+				ordered_vlan          = 100
+			}
+		}
+	`, locs[0], mcrName, portName, vxcName, pool)
+	}
+
+	initialPool := `
+								{
+									network          = "192.168.1.0/24"
+									start_ip_address = "192.168.1.10"
+									end_ip_address   = "192.168.1.100"
+									default_gateway  = "192.168.1.1"
+									description      = "tf acc test pool"
+									dns_servers      = ["1.1.1.1", "8.8.8.8"]
+								},`
+
+	updatedPool := `
+								{
+									network          = "192.168.1.0/24"
+									start_ip_address = "192.168.1.20"
+									end_ip_address   = "192.168.1.200"
+									default_gateway  = "192.168.1.1"
+									description      = "tf acc test pool updated"
+									dns_servers      = ["9.9.9.9"]
+								},`
+
+	poolAttr := func(name string) string {
+		return "a_end_partner_config.vrouter_config.interfaces.0.dhcp_pools." + name
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: mkConfig(initialPool),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_mcr.mcr", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.dhcp_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.network"), "192.168.1.0/24"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.start_ip_address"), "192.168.1.10"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.end_ip_address"), "192.168.1.100"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.default_gateway"), "192.168.1.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.description"), "tf acc test pool"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.#"), "2"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.0"), "1.1.1.1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.1"), "8.8.8.8"),
+				),
+			},
+			{
+				Config: mkConfig(updatedPool),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.start_ip_address"), "192.168.1.20"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.end_ip_address"), "192.168.1.200"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.description"), "tf acc test pool updated"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.#"), "1"),
+					resource.TestCheckResourceAttr("megaport_vxc.dhcp_vxc", poolAttr("0.dns_servers.0"), "9.9.9.9"),
+				),
+			},
+		},
+	})
+}
+
 // TestVXCModifyPlan_PartnerConfigWarningSkipsCreateAndDestroy pins the two
 // guards that keep the partner-config warning off the create and destroy
 // walks. Without them a first apply warns about a config it is about to send,
@@ -5780,6 +6488,7 @@ func TestVXCRead_RecordsTransitPartnerConfigOnImport(t *testing.T) {
 		{name: "import_transit_a_end_only", vxc: readVXC(transitConn("a_csp_connection"))},
 		{name: "import_no_csp_connection", vxc: readVXC()},
 		{name: "import_two_transit_b_ends_warns", vxc: readVXC(transitConn("b_csp_connection"), transitConn("b_csp_connection")), wantWarning: true},
+		{name: "import_transit_and_cloud_b_ends_warns", vxc: readVXC(transitConn("b_csp_connection"), megaport.CSPConnectionAWS{ConnectType: "AWS", ResourceName: "b_csp_connection"}), wantWarning: true},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(transitConn("b_csp_connection"))},
 	}
 
@@ -5829,4 +6538,273 @@ func TestVXCRead_RecordsTransitPartnerConfigOnImport(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	readVXC := func(conns ...megaport.CSPConnectionConfig) *megaport.VXC {
+		return &megaport.VXC{
+			AEndConfiguration: megaport.VXCEndConfiguration{UID: "a-end-uid"},
+			BEndConfiguration: megaport.VXCEndConfiguration{UID: "b-end-uid"},
+			Resources:         &megaport.VXCResources{CSPConnection: &megaport.CSPConnection{CSPConnection: conns}},
+		}
+	}
+	awsConn := megaport.CSPConnectionAWS{
+		ConnectType: "AWS", ResourceName: "b_csp_connection", Type: "private",
+		OwnerAccount: "123456789012", ASN: 64555, AmazonASN: 64512, AuthKey: "bgp-secret",
+		CustomerIPAddress: "169.254.0.1/30", AmazonAddress: "169.254.0.2/30", Name: "my-vif",
+		Prefixes: "10.0.1.0/24,10.0.2.0/24",
+	}
+	awsConnNoPrefixes := awsConn
+	awsConnNoPrefixes.Prefixes = ""
+	awsHCConn := megaport.CSPConnectionAWSHC{
+		ConnectType: "AWSHC", ResourceName: "b_csp_connection", OwnerAccount: "123456789012", Name: "my-hc",
+	}
+	azureConn := megaport.CSPConnectionAzure{
+		ConnectType: "AZURE", ResourceName: "b_csp_connection", ServiceKey: "svc-key",
+		Peers: []megaport.CSPConnectionAzurePeeringConfig{{
+			Type: "private", PeerASN: 64512, PrimarySubnet: "10.0.0.0/30", SecondarySubnet: "10.0.0.4/30", VLAN: 100,
+		}},
+	}
+	googleConn := megaport.CSPConnectionGoogle{ConnectType: "GOOGLE", ResourceName: "b_csp_connection", PairingKey: "pair-key"}
+	oracleConn := megaport.CSPConnectionOracle{ConnectType: "ORACLE", ResourceName: "b_csp_connection", VirtualCircuitId: "ocid1.vc"}
+
+	decode := func(t *testing.T, obj types.Object, target any) {
+		t.Helper()
+		if diags := obj.As(ctx, target, basetypes.ObjectAsOptions{}); diags.HasError() {
+			t.Fatalf("decoding %T: %v", target, diags.Errors())
+		}
+	}
+	wantString := func(t *testing.T, name string, got types.String, want string) {
+		t.Helper()
+		if got.ValueString() != want || got.IsNull() != (want == "") {
+			t.Errorf("%s = %v, want %q", name, got, want)
+		}
+	}
+	wantInt := func(t *testing.T, name string, got types.Int64, want int64) {
+		t.Helper()
+		if got.ValueInt64() != want || got.IsNull() != (want == 0) {
+			t.Errorf("%s = %v, want %d", name, got, want)
+		}
+	}
+
+	tests := []struct {
+		name string
+		// ImportState writes product_uid and nothing else, so a null
+		// product_name is what marks a read as the one after an import.
+		stateName   string
+		vxc         *megaport.VXC
+		wantPartner string
+		// wantWarning is a substring of the one warning, or empty for none.
+		wantWarning string
+		check       func(t *testing.T, partner vxcPartnerConfigurationModel)
+	}{
+		{
+			name: "aws_virtual_interface", vxc: readVXC(awsConn), wantPartner: "aws",
+			wantWarning: "aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var aws vxcPartnerConfigAWSModel
+				decode(t, partner.AWSPartnerConfig, &aws)
+				wantString(t, "connect_type", aws.ConnectType, "AWS")
+				wantString(t, "type", aws.Type, "private")
+				wantString(t, "owner_account", aws.OwnerAccount, "123456789012")
+				wantInt(t, "asn", aws.ASN, 0)
+				wantInt(t, "amazon_asn", aws.AmazonASN, 0)
+				wantString(t, "auth_key", aws.AuthKey, "")
+				wantString(t, "prefixes", aws.Prefixes, "10.0.1.0/24,10.0.2.0/24")
+				wantString(t, "customer_ip_address", aws.CustomerIPAddress, "")
+				wantString(t, "amazon_ip_address", aws.AmazonIPAddress, "")
+				wantString(t, "name", aws.ConnectionName, "my-vif")
+			},
+		},
+		{
+			name: "aws_virtual_interface_no_prefixes", vxc: readVXC(awsConnNoPrefixes), wantPartner: "aws",
+			wantWarning: "aws_config.asn, aws_config.amazon_asn, aws_config.auth_key, aws_config.customer_ip_address, and aws_config.amazon_ip_address",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var aws vxcPartnerConfigAWSModel
+				decode(t, partner.AWSPartnerConfig, &aws)
+				wantString(t, "prefixes", aws.Prefixes, "")
+			},
+		},
+		{
+			name: "aws_hosted_connection", vxc: readVXC(awsHCConn), wantPartner: "aws", wantWarning: "aws_config.type, aws_config.asn",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var aws vxcPartnerConfigAWSModel
+				decode(t, partner.AWSPartnerConfig, &aws)
+				wantString(t, "connect_type", aws.ConnectType, "AWSHC")
+				wantString(t, "type", aws.Type, "")
+				wantString(t, "owner_account", aws.OwnerAccount, "123456789012")
+				wantInt(t, "asn", aws.ASN, 0)
+				wantInt(t, "amazon_asn", aws.AmazonASN, 0)
+				wantString(t, "name", aws.ConnectionName, "my-hc")
+			},
+		},
+		{
+			name: "azure", vxc: readVXC(azureConn), wantPartner: "azure", wantWarning: "azure_config.port_choice",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var azure vxcPartnerConfigAzureModel
+				decode(t, partner.AzurePartnerConfig, &azure)
+				wantString(t, "service_key", azure.ServiceKey, "svc-key")
+				wantString(t, "port_choice", azure.PortChoice, "")
+				if !azure.Peers.IsNull() {
+					t.Errorf("peers = %v, want null", azure.Peers)
+				}
+			},
+		},
+		{
+			name: "azure_read_without_peers", wantPartner: "azure", wantWarning: "azure_config.port_choice",
+			vxc: readVXC(megaport.CSPConnectionAzure{ConnectType: "AZURE", ResourceName: "b_csp_connection", ServiceKey: "svc-key"}),
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var azure vxcPartnerConfigAzureModel
+				decode(t, partner.AzurePartnerConfig, &azure)
+				if !azure.Peers.IsNull() {
+					t.Errorf("peers = %v, want null", azure.Peers)
+				}
+			},
+		},
+		{
+			name: "google", vxc: readVXC(googleConn), wantPartner: "google",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var google vxcPartnerConfigGoogleModel
+				decode(t, partner.GooglePartnerConfig, &google)
+				wantString(t, "pairing_key", google.PairingKey, "pair-key")
+			},
+		},
+		{
+			name: "oracle", vxc: readVXC(oracleConn), wantPartner: "oracle",
+			check: func(t *testing.T, partner vxcPartnerConfigurationModel) {
+				var oracle vxcPartnerConfigOracleModel
+				decode(t, partner.OraclePartnerConfig, &oracle)
+				wantString(t, "virtual_circuit_id", oracle.VirtualCircuitId, "ocid1.vc")
+			},
+		},
+		{
+			name: "a_end_only",
+			vxc:  readVXC(megaport.CSPConnectionGoogle{ConnectType: "GOOGLE", ResourceName: "a_csp_connection", PairingKey: "pair-key"}),
+		},
+		{name: "two_cloud_b_ends_warns", vxc: readVXC(awsConn, googleConn), wantWarning: "not recorded"},
+		{name: "transit_and_cloud_b_ends_warns", vxc: readVXC(awsConn, megaport.CSPConnectionTransit{ConnectType: "TRANSIT", ResourceName: "b_csp_connection"}), wantWarning: "not recorded"},
+		{
+			// A caller without permission on the B-End reads the connection
+			// stripped back to its resource name and connect type.
+			name:        "stripped_b_end_warns",
+			vxc:         readVXC(megaport.CSPConnectionAWS{ConnectType: "AWS", ResourceName: "b_csp_connection"}),
+			wantWarning: "none of the settings",
+		},
+		{
+			// A partner the import cannot rebuild, such as IBM, still has a
+			// B-End the user has to write by hand.
+			name:        "unsupported_partner_warns",
+			vxc:         readVXC(megaport.CSPConnectionIBM{ConnectType: "IBM", ResourceName: "b_csp_connection"}),
+			wantWarning: "cannot rebuild",
+		},
+		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(awsConn)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &vxcResource{client: &megaport.Client{VXCService: &MockVXCService{GetVXCResult: tc.vxc}}}
+
+			schemaResp := fwresource.SchemaResponse{}
+			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+			s := schemaResp.Schema
+			schemaObjType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+			if !ok {
+				t.Fatal("schema type is not tftypes.Object")
+			}
+			stateAttrs := nullValueMap(schemaObjType)
+			stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid-123")
+			if tc.stateName != "" {
+				stateAttrs["product_name"] = tftypes.NewValue(tftypes.String, tc.stateName)
+			}
+			state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, stateAttrs)}
+
+			resp := fwresource.ReadResponse{State: state}
+			r.Read(ctx, fwresource.ReadRequest{State: state}, &resp)
+			if errs := errorsWithoutUninitializedPrivateState(resp.Diagnostics); len(errs) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", errs)
+			}
+			warnings := resp.Diagnostics.Warnings()
+			switch {
+			case tc.wantWarning == "" && len(warnings) != 0:
+				t.Errorf("expected no warnings, got %v", warnings)
+			case tc.wantWarning != "" && len(warnings) != 1:
+				t.Errorf("expected 1 warning, got %d: %v", len(warnings), warnings)
+			case tc.wantWarning != "" && !strings.Contains(warnings[0].Summary()+warnings[0].Detail(), tc.wantWarning):
+				t.Errorf("warning does not name %s: %v", tc.wantWarning, warnings[0])
+			}
+
+			var got vxcResourceModel
+			if diags := resp.State.Get(ctx, &got); diags.HasError() {
+				t.Fatalf("reading state back: %v", diags.Errors())
+			}
+			if tc.wantPartner == "" {
+				if !got.BEndPartnerConfig.IsNull() {
+					t.Fatalf("b_end_partner_config = %v, want null", got.BEndPartnerConfig)
+				}
+				return
+			}
+			var partner vxcPartnerConfigurationModel
+			decode(t, got.BEndPartnerConfig, &partner)
+			if partner.Partner.ValueString() != tc.wantPartner {
+				t.Fatalf("b_end_partner_config.partner = %q, want %q", partner.Partner.ValueString(), tc.wantPartner)
+			}
+			tc.check(t, partner)
+		})
+	}
+}
+
+// errorsWithoutUninitializedPrivateState drops the diagnostic a private state
+// write raises when nothing initialized the store. The framework initializes it
+// on every real call, however its type is internal, so a unit test cannot.
+func errorsWithoutUninitializedPrivateState(diags diag.Diagnostics) []diag.Diagnostic {
+	var errs []diag.Diagnostic
+	for _, d := range diags.Errors() {
+		if d.Summary() == "Uninitialized ProviderData" {
+			continue
+		}
+		errs = append(errs, d)
+	}
+	return errs
+}
+
+var testAccVXCPartnerConfigBlockMismatchConfig = providerConfig + `
+resource "megaport_vxc" "partner_config_mismatch" {
+  product_name         = "tf-acc-test-partner-config-mismatch"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = "00000000-0000-0000-0000-000000000000"
+  }
+
+  b_end = {}
+
+  b_end_partner_config = {
+    partner = "azure"
+    azure_config = {
+      service_key = "00000000-0000-0000-0000-000000000000"
+      port_choice = "primary"
+    }
+    vrouter_config = {
+      interfaces = []
+    }
+  }
+}
+`
+
+// The plan fails before the provider is configured, so no VXC is ordered.
+func TestAccMegaportVXC_PartnerConfigBlockMismatch(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccVXCPartnerConfigBlockMismatchConfig,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)b_end_partner_config sets\s+vrouter_config`),
+			},
+		},
+	})
 }

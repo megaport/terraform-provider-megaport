@@ -799,6 +799,7 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.AddError(
 			"vendor config required", "vendor config required",
 		)
+		return
 	}
 	vcModel := &vendorConfigModel{}
 	vcDiags := plan.VendorConfig.As(ctx, vcModel, basetypes.ObjectAsOptions{})
@@ -839,16 +840,18 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdMVE, err := r.client.MVEService.BuyMVE(ctx, mveReq)
-
-	if err != nil {
+	if err != nil && createdMVE == nil {
 		resp.Diagnostics.AddError(
-			"Error Reading MVE",
+			"Error Creating MVE",
 			"Could not create MVE with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	createdID := createdMVE.TechnicalServiceUID
+	if !saveCreatedUID(ctx, resp, "MVE", plan.Name.ValueString(), createdID, err) {
+		return
+	}
 
 	// get the created MVE
 	mve, err := getMVEWithVnics(ctx, r.client.MVEService, createdID)

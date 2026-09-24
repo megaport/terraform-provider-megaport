@@ -117,14 +117,22 @@ func TestDiversityZoneRecoveryViaImport(t *testing.T) {
 // resource is planned for replacement.
 func requiresReplaceOnChange(t *testing.T, r resource.Resource, stateVal, planVal types.String) bool {
 	t.Helper()
+	return requiresReplaceOnAttrChange(t, r, "diversity_zone", stateVal, planVal)
+}
+
+// requiresReplaceOnAttrChange runs every plan modifier declared on one string
+// attribute of the resource for a state->plan transition and reports whether the
+// resource is planned for replacement.
+func requiresReplaceOnAttrChange(t *testing.T, r resource.Resource, attrName string, stateVal, planVal types.String) bool {
+	t.Helper()
 	ctx := context.Background()
 
 	schemaResp := &resource.SchemaResponse{}
 	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
 
-	attr, ok := schemaResp.Schema.Attributes["diversity_zone"].(schema.StringAttribute)
+	attr, ok := schemaResp.Schema.Attributes[attrName].(schema.StringAttribute)
 	if !ok {
-		t.Fatalf("diversity_zone attribute missing or not a StringAttribute")
+		t.Fatalf("%s attribute missing or not a StringAttribute", attrName)
 	}
 
 	// Non-null Raw values mark this as an update (not create/destroy), which is

@@ -693,15 +693,18 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdMCR, err := r.client.MCRService.BuyMCR(ctx, buyReq)
-	if err != nil {
+	if err != nil && createdMCR == nil {
 		resp.Diagnostics.AddError(
 			"Error creating mcr",
-			"Could not mcr with name "+plan.Name.ValueString()+": "+err.Error(),
+			"Could not create mcr with name "+plan.Name.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	createdID := createdMCR.TechnicalServiceUID
+	if !saveCreatedUID(ctx, resp, "MCR", plan.Name.ValueString(), createdID, err) {
+		return
+	}
 
 	// get the created MCR
 	mcr, err := r.client.MCRService.GetMCR(ctx, createdID)
