@@ -33,6 +33,9 @@ type preflightServer struct {
 	mu           sync.Mutex
 	vlanQueries  []vlanQuery
 	productTypes []string
+	// updateBodies holds each VXC update request body. The update still
+	// returns 500.
+	updateBodies []map[string]any
 
 	// serviceKeyBEnd is the port UID a service key lookup resolves to.
 	serviceKeyBEnd string
@@ -63,6 +66,12 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 		case isGetV2 && len(parts) == 3 && parts[1] == "product":
 			ps.productTypes = append(ps.productTypes, parts[2])
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productType": megaport.PRODUCT_MEGAPORT}})
+		case r.Method == http.MethodPut && len(parts) == 4 && parts[1] == "product" && parts[2] == "vxc":
+			body := map[string]any{}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			ps.updateBodies = append(ps.updateBodies, body)
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"message":"not faked"}`))
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"message":"not faked"}`))
