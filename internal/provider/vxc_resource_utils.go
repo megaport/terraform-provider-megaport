@@ -1321,6 +1321,7 @@ type vlanPreflightInput struct {
 	productUID  string
 	productType string
 	orderedVLAN types.Int64
+	innerVLAN   types.Int64
 	// currentVLAN is what this end already holds, so pinning an API-allocated
 	// VLAN is not mistaken for requesting a taken one. Null on create.
 	currentVLAN types.Int64
@@ -1348,6 +1349,11 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	}
 	// Asking to keep the VLAN this end already holds always reads as unavailable.
 	if !in.currentVLAN.IsNull() && !in.currentVLAN.IsUnknown() && int(in.currentVLAN.ValueInt64()) == vlan {
+		return diags
+	}
+	// The check reads the outer VLAN alone, so a Q-in-Q sibling on the same
+	// outer VLAN with a different inner VLAN reads as taken.
+	if !in.innerVLAN.IsUnknown() && in.innerVLAN.ValueInt64() > 0 {
 		return diags
 	}
 	// The API may rotate a Partner Port to a sibling in the same location and
@@ -1418,7 +1424,8 @@ func recordDestroyedVLANs(ctx context.Context, ends ...types.Object) {
 		if obj.IsNull() || obj.IsUnknown() || obj.As(ctx, &end, basetypes.ObjectAsOptions{}).HasError() {
 			continue
 		}
-		if end.CurrentProductUID.ValueString() != "" && end.VLAN.ValueInt64() > 0 {
+		// A Q-in-Q end skips the preflight, so no create would take its record.
+		if end.CurrentProductUID.ValueString() != "" && end.VLAN.ValueInt64() > 0 && end.InnerVLAN.ValueInt64() <= 0 {
 			destroyedVLANs.Store(destroyedVLAN{portUID: end.CurrentProductUID.ValueString(), vlan: int(end.VLAN.ValueInt64())}, struct{}{})
 		}
 	}

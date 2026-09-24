@@ -213,6 +213,22 @@ func TestVXCDelete_RecordsDestroyedVLANs(t *testing.T) {
 	assert.False(t, bRecorded, "an auto-assigned VLAN of 0 should not be recorded")
 }
 
+// A Q-in-Q end skips the preflight, so its record would wait out a later
+// unrelated create on the same outer VLAN.
+func TestVXCDelete_DoesNotRecordQinQEnd(t *testing.T) {
+	b := newVXCValueBuilder(t)
+	t.Cleanup(func() { destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-qinq", vlan: 920}) })
+
+	resp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}},
+		vxcEndSpec{productUID: "port-del-qinq", currentUID: "port-del-qinq", vlan: int64p(920), innerVLAN: int64p(1020)},
+		vxcEndSpec{productUID: "port-del-qinq-b", currentUID: "port-del-qinq-b"},
+	)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected error: %v", resp.Diagnostics)
+
+	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-qinq", vlan: 920})
+	assert.False(t, recorded)
+}
+
 // A VXC that never reached DECOMMISSIONED may still hold its VLAN, so a later
 // create must not wait on it.
 func TestVXCDelete_DoesNotRecordWhenNotDecommissioned(t *testing.T) {

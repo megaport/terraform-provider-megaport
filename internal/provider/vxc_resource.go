@@ -1530,6 +1530,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		productUID:       a.RequestedProductUID.ValueString(),
 		productType:      productType,
 		orderedVLAN:      a.OrderedVLAN,
+		innerVLAN:        a.InnerVLAN,
 		currentVLAN:      types.Int64Null(),
 		hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
 	})...)
@@ -1868,6 +1869,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 			productUID:       b.RequestedProductUID.ValueString(),
 			productType:      productType,
 			orderedVLAN:      b.OrderedVLAN,
+			innerVLAN:        b.InnerVLAN,
 			currentVLAN:      types.Int64Null(),
 			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
 		})...)
@@ -2701,6 +2703,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			productUID:       aEndPlan.RequestedProductUID.ValueString(),
 			productType:      aEndProductType,
 			orderedVLAN:      aEndOrderedVLAN,
+			innerVLAN:        aEndPlan.InnerVLAN,
 			currentVLAN:      aEndCurrentVLAN,
 			hasPartnerConfig: !plan.AEndPartnerConfig.IsNull(),
 		})...)
@@ -2764,6 +2767,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			productUID:       bEndPlan.RequestedProductUID.ValueString(),
 			productType:      bEndProductType,
 			orderedVLAN:      bEndOrderedVLAN,
+			innerVLAN:        bEndPlan.InnerVLAN,
 			currentVLAN:      bEndCurrentVLAN,
 			hasPartnerConfig: !plan.BEndPartnerConfig.IsNull(),
 		})...)
