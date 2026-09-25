@@ -16,41 +16,6 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// MockIXService is a mock of the IX service for testing
-type MockIXService struct {
-	GetIXResult *megaport.IX
-	GetIXErr    error
-}
-
-func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, error) {
-	return m.GetIXResult, m.GetIXErr
-}
-
-// Implement other required methods of the IXService interface with minimal stubs
-func (m *MockIXService) BuyIX(ctx context.Context, req *megaport.BuyIXRequest) (*megaport.BuyIXResponse, error) {
-	return nil, nil
-}
-
-func (m *MockIXService) ValidateIXOrder(ctx context.Context, req *megaport.BuyIXRequest) error {
-	return nil
-}
-
-func (m *MockIXService) UpdateIX(ctx context.Context, id string, req *megaport.UpdateIXRequest) (*megaport.IX, error) {
-	return nil, nil
-}
-
-func (m *MockIXService) DeleteIX(ctx context.Context, id string, req *megaport.DeleteIXRequest) error {
-	return nil
-}
-
-func (m *MockIXService) ListIXs(ctx context.Context, req *megaport.ListIXsRequest) ([]*megaport.IX, error) {
-	return nil, nil
-}
-
-func (m *MockIXService) ListIXPs(ctx context.Context, req *megaport.ListIXPsRequest) ([]*megaport.IXP, error) {
-	return nil, nil
-}
-
 const ixReadTestUID = "ix-uid-123"
 
 // ErrorResponse.Error() dereferences Response.Request, so both have to be set.
