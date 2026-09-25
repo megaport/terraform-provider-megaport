@@ -1320,7 +1320,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"a_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
+				Description: `The partner configuration of the A-End order configuration. Contains CSP and/or BGP Configuration settings. Set only the nested configuration block that "partner" names. The plan fails on any other block. The provider sends a change to a "vrouter", "transit", or "a-end" configuration. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. Other partner types are not populated on import. Adding a cloud partner configuration after an import records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1340,7 +1340,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"b_end_partner_config": schema.SingleNestedAttribute{
-				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, plus prefixes on an AWS configuration when the API reports one, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, and amazon_ip_address on an AWS configuration, those same settings plus type and prefixes on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
+				Description: `The partner configuration of the B-End order configuration. Contains CSP and/or BGP Configuration settings. Set only the nested configuration block that "partner" names. The plan fails on any other block. The provider sends a change to a "vrouter" configuration only. A "vrouter" configuration added or changed after an import is sent to the API and applied in place. The provider does not send a cloud partner or "transit" configuration on update, so changing one fails the apply and leaves the VXC alone. Removing this block from a live VXC also fails the apply. On import, the provider rebuilds a "vrouter" configuration from the API. It leaves the BGP password out of that rebuild, records peer_type and local_asn as the API reports them, so a configuration that omits either shows a change on the next plan, and some interface and BGP settings cannot be read at all. The import warns about each one, so read those warnings before the next apply. The import also records a "transit" configuration when the B-End is a transit connection, and rebuilds an "aws", "azure", "google", or "oracle" configuration from the API. That rebuild records the settings a configuration has to carry, plus prefixes on an AWS configuration when the API reports one, and leaves the ones the cloud assigns null: asn, amazon_asn, auth_key, customer_ip_address, and amazon_ip_address on an AWS configuration, those same settings plus type and prefixes on an AWS hosted connection, and port_choice and peers on an Azure configuration. The import warns about each group, so read those warnings before the next apply. An "ibm" configuration is not populated on import. Adding a cloud partner configuration after an import, or setting a value the import left null, records it in Terraform state, and the provider warns that it does not send it. To change a recorded cloud partner configuration, replace the VXC.`,
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"partner": schema.StringAttribute{
@@ -1360,6 +1360,71 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 		},
+	}
+}
+
+// The nested block each partner value configures. "transit" configures none.
+var vxcPartnerConfigBlocks = map[string]string{
+	"aws":     "aws_config",
+	"azure":   "azure_config",
+	"google":  "google_config",
+	"ibm":     "ibm_config",
+	"oracle":  "oracle_config",
+	"vrouter": "vrouter_config",
+	"a-end":   "partner_a_end_config",
+	"transit": "",
+}
+
+// The order never sends a block the partner value does not configure, and the
+// state the provider records leaves it out, so the apply fails after the buy.
+func validateVXCPartnerConfigBlocks(ctx context.Context, attribute string, partnerConfig types.Object, diags *diag.Diagnostics) {
+	if partnerConfig.IsNull() || partnerConfig.IsUnknown() {
+		return
+	}
+
+	var model vxcPartnerConfigurationModel
+	modelDiags := partnerConfig.As(ctx, &model, basetypes.ObjectAsOptions{})
+	diags.Append(modelDiags...)
+	if modelDiags.HasError() {
+		return
+	}
+
+	if model.Partner.IsNull() || model.Partner.IsUnknown() {
+		return
+	}
+	partner := model.Partner.ValueString()
+	expected, known := vxcPartnerConfigBlocks[partner]
+	if !known {
+		// An unrecognized partner is the OneOf validator's error to report.
+		return
+	}
+
+	blocks := []struct {
+		name  string
+		value types.Object
+	}{
+		{"aws_config", model.AWSPartnerConfig},
+		{"azure_config", model.AzurePartnerConfig},
+		{"google_config", model.GooglePartnerConfig},
+		{"ibm_config", model.IBMPartnerConfig},
+		{"oracle_config", model.OraclePartnerConfig},
+		{"vrouter_config", model.VrouterPartnerConfig},
+		{"partner_a_end_config", model.PartnerAEndConfig},
+	}
+
+	uses := fmt.Sprintf("Partner %q uses %s.", partner, expected)
+	if expected == "" {
+		uses = fmt.Sprintf("Partner %q uses no configuration block.", partner)
+	}
+
+	for _, block := range blocks {
+		if block.name == expected || block.value.IsNull() || block.value.IsUnknown() {
+			continue
+		}
+		diags.AddError(
+			"Invalid VXC partner configuration",
+			fmt.Sprintf("%s sets %s. %s Remove %s, or change partner.", attribute, block.name, uses, block.name),
+		)
 	}
 }
 
@@ -2084,25 +2149,14 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdID := createdVXC.TechnicalServiceUID
-
-	// Persist the UID immediately so any failure below leaves a tracked
-	// (tainted) resource instead of an orphan that later applies try to recreate.
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_uid"), createdID)...)
-	if resp.Diagnostics.HasError() {
-		return
+	waitErr := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second)
+	var pending *vxcPendingApprovalError
+	if errors.As(waitErr, &pending) {
+		resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
+		waitErr = nil
 	}
-
-	if err := r.waitForVXCProvision(ctx, createdID, waitForTime, 30*time.Second); err != nil {
-		var pending *vxcPendingApprovalError
-		if errors.As(err, &pending) {
-			resp.Diagnostics.AddWarning("VXC pending approval", vxcPendingApprovalWarning(plan.Name.ValueString(), createdID, pending.approval))
-		} else {
-			resp.Diagnostics.AddError(
-				"VXC ordered but not ready",
-				"VXC "+plan.Name.ValueString()+" ("+createdID+") was ordered successfully but did not reach a ready state: "+err.Error()+". Its UID has been saved to state and Terraform will replace it on the next apply.",
-			)
-			return
-		}
+	if !saveCreatedUID(ctx, resp, "VXC", plan.Name.ValueString(), createdID, waitErr) {
+		return
 	}
 
 	// get the created VXC
@@ -2520,8 +2574,8 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// An import never rebuilds a cloud partner config on the A-End, so nothing
 	// there can hold a null the provider left.
-	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", "a_end_partner_config", false, &resp.Diagnostics)
-	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", "b_end_partner_config", rebuilt != nil, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.AEndPartnerConfig, state.AEndPartnerConfig, "A-End", false, &resp.Diagnostics)
+	checkPartnerConfigUpdatable(ctx, plan.BEndPartnerConfig, state.BEndPartnerConfig, "B-End", rebuilt != nil, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -3147,6 +3201,8 @@ func (r *vxcResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	validateVXCPartnerConfigBlocks(ctx, "a_end_partner_config", config.AEndPartnerConfig, &resp.Diagnostics)
+	validateVXCPartnerConfigBlocks(ctx, "b_end_partner_config", config.BEndPartnerConfig, &resp.Diagnostics)
 	checkAWSBGPPassword(ctx, config.AEndPartnerConfig, config.BEndPartnerConfig, &resp.Diagnostics)
 }
 
@@ -3650,7 +3706,7 @@ func partnerSendableOnUpdate(endLabel string, partner types.String) bool {
 // provider does not send for that end. A cloud partner added to an end that
 // has none in state is recorded instead, and warns. So is a value set on a
 // cloud partner setting an import left null, which rebuiltOnImport selects.
-func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel, partnerConfigPathRoot string, rebuiltOnImport bool, diags *diag.Diagnostics) {
+func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePartnerConfig types.Object, endLabel string, rebuiltOnImport bool, diags *diag.Diagnostics) {
 	if planPartnerConfig.Equal(statePartnerConfig) {
 		return
 	}
@@ -3664,8 +3720,7 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 	// the user wrote, rather than an import rebuilt, left those settings out on
 	// purpose, so filling one there is a change the provider cannot send.
 	if planCSP && (statePartnerConfig.IsNull() || (stateCSP && rebuiltOnImport && onlyFillsNulls(planPartnerConfig, statePartnerConfig))) {
-		diags.AddAttributeWarning(
-			path.Root(partnerConfigPathRoot),
+		diags.AddWarning(
 			"Partner configuration is recorded in state only",
 			fmt.Sprintf("Terraform records the %s partner configuration (partner %q) in state. The provider does not send a cloud partner configuration on update, so this does not change the live VXC. Check the value against the live service, because state now reports it.", endLabel, planPartner.ValueString()),
 		)
@@ -3677,20 +3732,17 @@ func checkPartnerConfigUpdatable(ctx context.Context, planPartnerConfig, statePa
 
 	switch {
 	case planPartnerConfig.IsNull():
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The provider cannot remove a partner configuration from a live VXC, so the %s keeps its %q configuration. Restore the removed block. \"terraform state pull\" prints the recorded block, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case stateCSP:
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The %s of this VXC uses cloud partner %q. The provider does not send a cloud partner configuration on update, so it can neither change nor remove one. Restore the recorded configuration. \"terraform state pull\" prints it, sensitive values included. Or replace the VXC with \"terraform apply -replace=<resource address>\". %s", endLabel, statePartner.ValueString(), replaceHint),
 		)
 	case !partnerSendableOnUpdate(endLabel, planPartner):
-		diags.AddAttributeError(
-			path.Root(partnerConfigPathRoot),
+		diags.AddError(
 			summary,
 			fmt.Sprintf("The provider does not send partner %q on the %s when it updates a VXC, so this change never reaches the live service. Revert the change, or replace the VXC with \"terraform apply -replace=<resource address>\" to build it with the new configuration. %s", planPartner.ValueString(), endLabel, replaceHint),
 		)

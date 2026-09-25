@@ -357,7 +357,7 @@ var (
 										Optional:    true,
 									},
 									"local_asn": schema.Int64Attribute{
-										Description: "The local ASN of the BGP connection.",
+										Description: "The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.",
 										Optional:    true,
 									},
 									"peer_type": schema.StringAttribute{
@@ -519,7 +519,7 @@ var (
 										Optional:    true,
 									},
 									"local_asn": schema.Int64Attribute{
-										Description: "The local ASN of the BGP connection.",
+										Description: "The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.",
 										Optional:    true,
 									},
 									"local_ip_address": schema.StringAttribute{

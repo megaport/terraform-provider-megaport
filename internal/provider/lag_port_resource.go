@@ -228,7 +228,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply fails with an inconsistent result error.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
@@ -407,7 +407,7 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
-	if err != nil {
+	if err != nil && createdPort == nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
@@ -424,6 +424,9 @@ func (r *lagPortResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
+	if !saveCreatedUID(ctx, resp, "LAG port", plan.Name.ValueString(), createdID, err) {
+		return
+	}
 
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
@@ -564,7 +567,6 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Check on changes
 	var name, costCentre string
 	var marketplaceVisibility bool
-	var contractTermMonths *int
 	if !plan.Name.Equal(state.Name) {
 		name = plan.Name.ValueString()
 	} else {
@@ -578,27 +580,63 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		marketplaceVisibility = state.MarketplaceVisibility.ValueBool()
 	}
 
-	if !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
-		months := int(plan.ContractTermMonths.ValueInt64())
-		contractTermMonths = &months
-	}
+	contractTermMonths := int(plan.ContractTermMonths.ValueInt64())
 
-	_, err := r.client.PortService.ModifyPort(ctx, &megaport.ModifyPortRequest{
-		PortID:                plan.UID.ValueString(),
-		Name:                  name,
-		MarketplaceVisibility: &marketplaceVisibility,
-		CostCentre:            costCentre,
-		ContractTermMonths:    contractTermMonths,
-		WaitForUpdate:         true,
-		WaitForTime:           waitForTime,
-	})
+	// The API modifies only the port named in the call, so each member gets its own.
+	if !plan.Name.Equal(state.Name) || !plan.CostCentre.Equal(state.CostCentre) ||
+		!plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) || !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
+		members, err := r.lagMembers(ctx, plan.UID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading LAG ports",
+				"Could not read the ports in LAG "+plan.UID.ValueString()+": "+err.Error()+lagGrowNote(lagPortUIDs),
+			)
+			return
+		}
+		if missing := missingLagMember(members, &state); missing != "" {
+			resp.Diagnostics.AddError(
+				"LAG port missing from the product list",
+				"The product list read does not hold port "+missing+" in LAG "+plan.UID.ValueString()+
+					". This points to an incomplete read, so this apply modified no port. Run it again."+lagGrowNote(lagPortUIDs),
+			)
+			return
+		}
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error modifying port",
-			"Could not modify port with ID "+state.UID.ValueString()+": "+err.Error()+lagGrowNote(lagPortUIDs),
-		)
-		return
+		planTermChanged := !plan.ContractTermMonths.Equal(state.ContractTermMonths)
+		for _, member := range members {
+			// A cancelled port never reads back ready, so the modify would wait out wait_time.
+			if member.ProvisioningStatus == megaport.STATUS_CANCELLED || member.ProvisioningStatus == megaport.STATUS_DECOMMISSIONED {
+				continue
+			}
+			// Send the term only when the plan changes it. Sending a port the term it already has
+			// extends its contract, or fails on month-to-month.
+			termChanged := planTermChanged && member.ContractTermMonths != contractTermMonths
+			// Skip ports that already match: ports the grow just ordered, or ports an earlier failed apply reached.
+			if !termChanged && member.Name == name && member.CostCentre == costCentre &&
+				member.MarketplaceVisibility == marketplaceVisibility {
+				continue
+			}
+
+			// No wait: the API applies these fields before it responds, and the port's status never changes.
+			modifyReq := &megaport.ModifyPortRequest{
+				PortID:                member.UID,
+				Name:                  name,
+				MarketplaceVisibility: &marketplaceVisibility,
+				CostCentre:            costCentre,
+			}
+			if termChanged {
+				modifyReq.ContractTermMonths = &contractTermMonths
+			}
+
+			if _, err := r.client.PortService.ModifyPort(ctx, modifyReq); err != nil {
+				resp.Diagnostics.AddError(
+					"Error modifying port",
+					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed: "+err.Error()+
+						". Run the apply again to modify the remaining ports."+lagGrowNote(lagPortUIDs),
+				)
+				return
+			}
+		}
 	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
@@ -616,7 +654,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		err = r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
+		err := r.client.PortService.UpdatePortResourceTags(ctx, plan.UID.ValueString(), tagMap)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating port tags",
@@ -767,6 +805,50 @@ func lagMemberCount(state *lagPortResourceModel) int {
 	return len(state.LagPortUIDs.Elements())
 }
 
+// lagMembers returns every port in the LAG. The product list read supplies the members,
+// because it carries the values each one holds.
+func (r *lagPortResource) lagMembers(ctx context.Context, uid string) ([]*megaport.Port, error) {
+	ports, err := r.client.PortService.ListPorts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var primary *megaport.Port
+	for _, p := range ports {
+		if p.UID == uid {
+			primary = p
+		}
+	}
+	if primary == nil {
+		return nil, fmt.Errorf("port %s is not in the product list", uid)
+	}
+
+	members := []*megaport.Port{}
+	if primary.AggregationID != 0 {
+		for _, p := range ports {
+			if p.AggregationID == primary.AggregationID && p.UID != uid {
+				members = append(members, p)
+			}
+		}
+	}
+	// The primary goes last. Read takes its values from the primary, so a failed apply still shows a diff.
+	return append(members, primary), nil
+}
+
+// missingLagMember returns a port state holds that the member list lacks, or "" when none is missing.
+func missingLagMember(members []*megaport.Port, state *lagPortResourceModel) string {
+	listed := map[string]bool{}
+	for _, m := range members {
+		listed[m.UID] = true
+	}
+	for _, v := range state.LagPortUIDs.Elements() {
+		if uid, ok := v.(types.String); ok && !listed[uid.ValueString()] {
+			return uid.ValueString()
+		}
+	}
+	return ""
+}
+
 // addLagPorts brings the planned LAG up to target ports and returns the members it ends with.
 // The API builds each new port from this request rather than from the primary, so the LAG's own
 // location and speed have to be sent.
@@ -801,8 +883,8 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 		return nil, diags
 	}
 
-	// Count against the live read, not against state, to count ports that provisioned after
-	// an earlier apply stopped waiting. The read cannot see a port until it has an interface.
+	// Count against the live read, not against state, to count ports an earlier apply ordered.
+	// A new port gets its interface in the order call, so the read counts it at once.
 	count := target - primary.LagCount
 	if count < 1 {
 		return primary.LagPortUIDs, diags
@@ -844,7 +926,7 @@ func (r *lagPortResource) addLagPorts(ctx context.Context, plan *lagPortResource
 	if err != nil {
 		diags.AddError(
 			"Error adding ports to the LAG",
-			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the LAG does not count the new ports until they provision, so applying again before then orders more ports.",
+			fmt.Sprintf("Could not add %d ports to LAG %s: %s. If the order went through, the next refresh counts the new ports, and applying again does not order more.",
 				count, plan.UID.ValueString(), err.Error()),
 		)
 		return nil, diags

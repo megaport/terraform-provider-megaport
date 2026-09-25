@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	fwschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -5447,9 +5446,10 @@ func TestReconcileVXCEnd_RequestedProductUID(t *testing.T) {
 }
 
 // assertOneDiag asserts diags holds exactly one diagnostic, with the wanted
-// summary, attribute path, and every mustContain string in the detail. An
-// empty want asserts diags is empty.
-func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.Path, mustContain ...string) {
+// summary and every mustContain string in the detail. An empty want asserts
+// diags is empty. The diagnostic must carry no attribute path, because
+// Terraform renders an attribute-scoped one as the whole config block.
+func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, mustContain ...string) {
 	t.Helper()
 	if want == "" {
 		if len(diags) != 0 {
@@ -5468,12 +5468,8 @@ func assertOneDiag(t *testing.T, diags []diag.Diagnostic, want string, at path.P
 			t.Errorf("detail does not name %s: %q", want, diags[0].Detail())
 		}
 	}
-	withPath, ok := diags[0].(diag.DiagnosticWithPath)
-	if !ok {
-		t.Fatalf("diagnostic %q is not attribute-scoped", diags[0].Summary())
-	}
-	if !withPath.Path().Equal(at) {
-		t.Errorf("path = %s, want %s", withPath.Path(), at)
+	if withPath, ok := diags[0].(diag.DiagnosticWithPath); ok {
+		t.Errorf("diagnostic %q carries attribute path %s, so Terraform prints the whole config block", diags[0].Summary(), withPath.Path())
 	}
 }
 
@@ -5700,8 +5696,8 @@ func TestVXCModifyPlan_PartnerConfigNeverReplaces(t *testing.T) {
 				if len(resp.RequiresReplace) != 0 {
 					t.Errorf("expected no RequiresReplace, got %v", resp.RequiresReplace)
 				}
-				assertOneDiag(t, resp.Diagnostics.Errors(), "", path.Root(root))
-				assertOneDiag(t, resp.Diagnostics.Warnings(), "", path.Root(root))
+				assertOneDiag(t, resp.Diagnostics.Errors(), "")
+				assertOneDiag(t, resp.Diagnostics.Warnings(), "")
 			})
 		}
 	}
@@ -5935,7 +5931,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 				checkPartnerConfigUpdatable(ctx,
 					ty.objectValue(ctx, t, tc.plan),
 					ty.objectValue(ctx, t, tc.state),
-					endLabel, root, tc.rebuiltOnImport, &diags)
+					endLabel, tc.rebuiltOnImport, &diags)
 
 				wantError := ""
 				mustContain := []string{endLabel}
@@ -5943,7 +5939,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 					wantError = "Partner configuration cannot be changed on a live VXC"
 					mustContain = append(mustContain, fmt.Sprintf("%q", wantPartner))
 				}
-				assertOneDiag(t, diags.Errors(), wantError, path.Root(root), mustContain...)
+				assertOneDiag(t, diags.Errors(), wantError, mustContain...)
 
 				wantWarn := ""
 				warnContain := []string{endLabel}
@@ -5951,7 +5947,7 @@ func TestCheckPartnerConfigUpdatable(t *testing.T) {
 					wantWarn = "Partner configuration is recorded in state only"
 					warnContain = append(warnContain, fmt.Sprintf("%q", tc.wantWarnPartner))
 				}
-				assertOneDiag(t, diags.Warnings(), wantWarn, path.Root(root), warnContain...)
+				assertOneDiag(t, diags.Warnings(), wantWarn, warnContain...)
 			})
 		}
 	}
@@ -6772,4 +6768,43 @@ func errorsWithoutUninitializedPrivateState(diags diag.Diagnostics) []diag.Diagn
 		errs = append(errs, d)
 	}
 	return errs
+}
+
+var testAccVXCPartnerConfigBlockMismatchConfig = providerConfig + `
+resource "megaport_vxc" "partner_config_mismatch" {
+  product_name         = "tf-acc-test-partner-config-mismatch"
+  rate_limit           = 100
+  contract_term_months = 1
+
+  a_end = {
+    requested_product_uid = "00000000-0000-0000-0000-000000000000"
+  }
+
+  b_end = {}
+
+  b_end_partner_config = {
+    partner = "azure"
+    azure_config = {
+      service_key = "00000000-0000-0000-0000-000000000000"
+      port_choice = "primary"
+    }
+    vrouter_config = {
+      interfaces = []
+    }
+  }
+}
+`
+
+// The plan fails before the provider is configured, so no VXC is ordered.
+func TestAccMegaportVXC_PartnerConfigBlockMismatch(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccVXCPartnerConfigBlockMismatchConfig,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)b_end_partner_config sets\s+vrouter_config`),
+			},
+		},
+	})
 }

@@ -406,7 +406,7 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	createdPort, err := r.client.PortService.BuyPort(ctx, buyPortReq)
-	if err != nil {
+	if err != nil && createdPort == nil {
 		resp.Diagnostics.AddError(
 			"Error buying port",
 			"Could not create port with name "+plan.Name.ValueString()+": "+err.Error(),
@@ -423,6 +423,9 @@ func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	createdID := createdPort.TechnicalServiceUIDs[0]
+	if !saveCreatedUID(ctx, resp, "Port", plan.Name.ValueString(), createdID, err) {
+		return
+	}
 
 	// get the created port
 	port, err := r.client.PortService.GetPort(ctx, createdID)
