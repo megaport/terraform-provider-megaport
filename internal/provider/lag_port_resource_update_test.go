@@ -26,6 +26,7 @@ type lagUpdatePortService struct {
 	listed    []*megaport.Port
 	boughtUID string
 	failUID   string
+	pending   map[string]bool
 	listErr   error
 
 	mu       sync.Mutex
@@ -47,6 +48,9 @@ func (s *lagUpdatePortService) ModifyPort(_ context.Context, req *megaport.Modif
 	s.modified = append(s.modified, *req)
 	if req.PortID == s.failUID {
 		return nil, errors.New("the stub rejects the modify")
+	}
+	if s.pending[req.PortID] {
+		return nil, megaport.ErrModifyPendingApproval
 	}
 	return &megaport.ModifyPortResponse{IsUpdated: true}, nil
 }
@@ -83,9 +87,11 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 		listed         []*megaport.Port
 		listErr        error
 		failUID        string
+		pending        map[string]bool
 		wantModified   []string
 		wantTerm       map[string]int
 		wantError      string
+		wantWarning    string
 	}{
 		{
 			name:         "a name change reaches every member, the primary last",
@@ -216,6 +222,41 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantError:    "port lag-1 is not in the product list",
 		},
 		{
+			name:         "a member pending approval does not stop the modify of the rest",
+			planName:     "lag-new",
+			planTerm:     24,
+			planLagCount: 2,
+			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:      map[string]bool{"lag-2": true},
+			wantModified: []string{"lag-2", "lag-1"},
+			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
+			wantWarning:  "term increase on port lag-2 in LAG lag-1 needs order approval",
+		},
+		{
+			name:         "every member pending approval gives one warning",
+			planName:     "lag-new",
+			planTerm:     24,
+			planLagCount: 2,
+			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:      map[string]bool{"lag-1": true, "lag-2": true},
+			wantModified: []string{"lag-2", "lag-1"},
+			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
+			wantWarning:  "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
+		},
+		{
+			name:         "a failed modify after a pending member still warns about the pending one",
+			planName:     "lag-old",
+			planTerm:     24,
+			planLagCount: 2,
+			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:      map[string]bool{"lag-2": true},
+			failUID:      "lag-1",
+			wantModified: []string{"lag-2", "lag-1"},
+			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
+			wantError:    "The modify of port lag-1 in LAG lag-1 failed",
+			wantWarning:  "term increase on port lag-2 in LAG lag-1 needs order approval",
+		},
+		{
 			name:         "a failed list read modifies no port",
 			planName:     "lag-new",
 			planTerm:     12,
@@ -231,7 +272,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			ctx := context.Background()
 
 			primary := megaport.Port{UID: "lag-1", Name: "lag-old", ContractTermMonths: 12, CostCentre: "cc-1", AggregationID: 7, LagCount: 2}
-			svc := &lagUpdatePortService{primary: primary, listed: tc.listed, listErr: tc.listErr, boughtUID: "lag-3", failUID: tc.failUID}
+			svc := &lagUpdatePortService{primary: primary, listed: tc.listed, listErr: tc.listErr, boughtUID: "lag-3", failUID: tc.failUID, pending: tc.pending}
 			r := &lagPortResource{client: &megaport.Client{PortService: svc}}
 
 			schemaResp := fwresource.SchemaResponse{}
@@ -268,6 +309,27 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				}
 				if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, tc.wantError) {
 					t.Errorf("error %q does not contain %q", detail, tc.wantError)
+				}
+			}
+
+			warnings := resp.Diagnostics.Warnings()
+			switch {
+			case tc.wantWarning == "" && len(warnings) > 0:
+				t.Errorf("unexpected warnings: %v", warnings)
+			case tc.wantWarning != "" && len(warnings) != 1:
+				t.Errorf("got %d warnings (%v), want 1", len(warnings), warnings)
+			case tc.wantWarning != "" && !strings.Contains(warnings[0].Detail(), tc.wantWarning):
+				t.Errorf("warning %q does not contain %q", warnings[0].Detail(), tc.wantWarning)
+			}
+			// The API reads back the old values while the approval is pending, so state must keep the plan.
+			if tc.wantWarning != "" && tc.wantError == "" {
+				var got lagPortResourceModel
+				if diags := resp.State.Get(ctx, &got); diags.HasError() {
+					t.Fatalf("reading state: %v", diags.Errors())
+				}
+				if got.Name.ValueString() != tc.planName || got.ContractTermMonths.ValueInt64() != tc.planTerm {
+					t.Errorf("state holds name %s and term %d, want the planned %s and %d",
+						got.Name, got.ContractTermMonths.ValueInt64(), tc.planName, tc.planTerm)
 				}
 			}
 
