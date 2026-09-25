@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -228,7 +229,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply fails with an inconsistent result error.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`. The apply completes with a warning.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
@@ -581,6 +582,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	contractTermMonths := int(plan.ContractTermMonths.ValueInt64())
+	var pendingUIDs []string
 
 	// The API modifies only the port named in the call, so each member gets its own.
 	if !plan.Name.Equal(state.Name) || !plan.CostCentre.Equal(state.CostCentre) ||
@@ -628,7 +630,14 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 				modifyReq.ContractTermMonths = &contractTermMonths
 			}
 
-			if _, err := r.client.PortService.ModifyPort(ctx, modifyReq); err != nil {
+			_, err := r.client.PortService.ModifyPort(ctx, modifyReq)
+			// Each port gets its own approval request, so the loop still modifies the rest.
+			if errors.Is(err, megaport.ErrModifyPendingApproval) {
+				pendingUIDs = append(pendingUIDs, member.UID)
+				continue
+			}
+			if err != nil {
+				warnLagPendingApproval(&resp.Diagnostics, plan.UID.ValueString(), pendingUIDs)
 				resp.Diagnostics.AddError(
 					"Error modifying port",
 					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed: "+err.Error()+
@@ -638,6 +647,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 	}
+	warnLagPendingApproval(&resp.Diagnostics, plan.UID.ValueString(), pendingUIDs)
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
 	if portErr != nil {
@@ -681,6 +691,14 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode
 
+	// The read returns the old values until the approval, and Terraform rejects them as an inconsistent result.
+	if len(pendingUIDs) > 0 {
+		state.Name = plan.Name
+		state.CostCentre = plan.CostCentre
+		state.MarketplaceVisibility = plan.MarketplaceVisibility
+		state.ContractTermMonths = plan.ContractTermMonths
+	}
+
 	if len(lagPortUIDs) > 0 {
 		uidList, listDiags := types.ListValueFrom(ctx, types.StringType, lagPortUIDs)
 		resp.Diagnostics.Append(listDiags...)
@@ -696,6 +714,19 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// warnLagPendingApproval adds one warning for the LAG members whose modify waits on order approval.
+func warnLagPendingApproval(diags *diag.Diagnostics, lagUID string, pendingUIDs []string) {
+	if len(pendingUIDs) == 0 {
+		return
+	}
+	ports := "port "
+	if len(pendingUIDs) > 1 {
+		ports = "ports "
+	}
+	diags.AddWarning("LAG port change pending approval",
+		portPendingApprovalWarning(ports+strings.Join(pendingUIDs, ", ")+" in LAG "+lagUID))
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
