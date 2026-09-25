@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ type singlePortUpdateService struct {
 
 	port      megaport.Port
 	modifyErr error
+	getErr    error
 	modified  []megaport.ModifyPortRequest
 }
 
@@ -34,6 +36,9 @@ func (s *singlePortUpdateService) ModifyPort(_ context.Context, req *megaport.Mo
 }
 
 func (s *singlePortUpdateService) GetPort(_ context.Context, _ string) (*megaport.Port, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
 	port := s.port
 	return &port, nil
 }
@@ -48,13 +53,22 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 	tests := []struct {
 		name        string
 		modifyErr   error
+		getErr      error
 		apiPort     megaport.Port
+		wantError   string
 		wantWarning bool
 	}{
 		{
 			name:        "a term increase pending approval completes with a warning and keeps the plan",
 			modifyErr:   megaport.ErrModifyPendingApproval,
 			apiPort:     megaport.Port{UID: "port-1", Name: "port-old", ContractTermMonths: 12, CostCentre: "cc-1"},
+			wantWarning: true,
+		},
+		{
+			name:        "a failed read after a pending modify still warns",
+			modifyErr:   megaport.ErrModifyPendingApproval,
+			getErr:      errors.New("the stub rejects the read"),
+			wantError:   "the stub rejects the read",
 			wantWarning: true,
 		},
 		{
@@ -68,7 +82,7 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 
-			svc := &singlePortUpdateService{port: tc.apiPort, modifyErr: tc.modifyErr}
+			svc := &singlePortUpdateService{port: tc.apiPort, modifyErr: tc.modifyErr, getErr: tc.getErr}
 			r := &portResource{client: &megaport.Client{PortService: svc}}
 
 			schemaResp := fwresource.SchemaResponse{}
@@ -88,8 +102,13 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 			resp := fwresource.UpdateResponse{State: state}
 			r.Update(ctx, fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
 
-			if resp.Diagnostics.HasError() {
+			switch {
+			case tc.wantError == "" && resp.Diagnostics.HasError():
 				t.Fatalf("unexpected errors: %v", resp.Diagnostics.Errors())
+			case tc.wantError != "" && !resp.Diagnostics.HasError():
+				t.Fatal("expected an error, got none")
+			case tc.wantError != "" && !strings.Contains(resp.Diagnostics.Errors()[0].Detail(), tc.wantError):
+				t.Errorf("error %q does not contain %q", resp.Diagnostics.Errors()[0].Detail(), tc.wantError)
 			}
 			if len(svc.modified) != 1 {
 				t.Fatalf("got %d modify calls, want 1", len(svc.modified))
@@ -106,6 +125,11 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 				t.Fatalf("got %d warnings (%v), want 1", len(warnings), warnings)
 			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "term increase on port port-1 needs order approval"):
 				t.Errorf("warning %q does not name the port", warnings[0].Detail())
+			}
+
+			// A failed read keeps the prior state, which the framework already holds.
+			if tc.wantError != "" {
+				return
 			}
 
 			var got singlePortResourceModel

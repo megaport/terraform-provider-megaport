@@ -28,12 +28,16 @@ type lagUpdatePortService struct {
 	failUID   string
 	pending   map[string]bool
 	listErr   error
+	getErr    error
 
 	mu       sync.Mutex
 	modified []megaport.ModifyPortRequest
 }
 
 func (s *lagUpdatePortService) GetPort(_ context.Context, _ string) (*megaport.Port, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
 	port := s.primary
 	return &port, nil
 }
@@ -86,6 +90,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 		stateLagCount  int64
 		listed         []*megaport.Port
 		listErr        error
+		getErr         error
 		failUID        string
 		pending        map[string]bool
 		wantModified   []string
@@ -233,14 +238,29 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantWarning:  "term increase on port lag-2 in LAG lag-1 needs order approval",
 		},
 		{
-			name:         "every member pending approval gives one warning",
+			name:           "every member pending approval gives one warning",
+			planName:       "lag-new",
+			planTerm:       24,
+			planCostCentre: "cc-2",
+			planVisibility: true,
+			planLagCount:   2,
+			listed:         []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:        map[string]bool{"lag-1": true, "lag-2": true},
+			wantModified:   []string{"lag-2", "lag-1"},
+			wantTerm:       map[string]int{"lag-1": 24, "lag-2": 24},
+			wantWarning:    "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
+		},
+		{
+			name:         "a failed read after a pending modify still warns",
 			planName:     "lag-new",
 			planTerm:     24,
 			planLagCount: 2,
 			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
 			pending:      map[string]bool{"lag-1": true, "lag-2": true},
+			getErr:       errors.New("the stub rejects the read"),
 			wantModified: []string{"lag-2", "lag-1"},
 			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
+			wantError:    "the stub rejects the read",
 			wantWarning:  "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
 		},
 		{
@@ -272,7 +292,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			ctx := context.Background()
 
 			primary := megaport.Port{UID: "lag-1", Name: "lag-old", ContractTermMonths: 12, CostCentre: "cc-1", AggregationID: 7, LagCount: 2}
-			svc := &lagUpdatePortService{primary: primary, listed: tc.listed, listErr: tc.listErr, boughtUID: "lag-3", failUID: tc.failUID, pending: tc.pending}
+			svc := &lagUpdatePortService{primary: primary, listed: tc.listed, listErr: tc.listErr, boughtUID: "lag-3", failUID: tc.failUID, pending: tc.pending, getErr: tc.getErr}
 			r := &lagPortResource{client: &megaport.Client{PortService: svc}}
 
 			schemaResp := fwresource.SchemaResponse{}
@@ -327,9 +347,10 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				if diags := resp.State.Get(ctx, &got); diags.HasError() {
 					t.Fatalf("reading state: %v", diags.Errors())
 				}
-				if got.Name.ValueString() != tc.planName || got.ContractTermMonths.ValueInt64() != tc.planTerm {
-					t.Errorf("state holds name %s and term %d, want the planned %s and %d",
-						got.Name, got.ContractTermMonths.ValueInt64(), tc.planName, tc.planTerm)
+				if !got.Name.Equal(planModel.Name) || !got.ContractTermMonths.Equal(planModel.ContractTermMonths) ||
+					!got.CostCentre.Equal(planModel.CostCentre) || !got.MarketplaceVisibility.Equal(planModel.MarketplaceVisibility) {
+					t.Errorf("state holds name %s, term %s, cost centre %s, visibility %s; want the planned values",
+						got.Name, got.ContractTermMonths, got.CostCentre, got.MarketplaceVisibility)
 				}
 			}
 

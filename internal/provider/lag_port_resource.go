@@ -229,7 +229,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply completes with a warning.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`. The apply completes with a warning.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
@@ -647,6 +647,7 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 	}
+	warnLagPendingApproval(&resp.Diagnostics, plan.UID.ValueString(), pendingUIDs)
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
 	if portErr != nil {
@@ -696,7 +697,6 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 		state.CostCentre = plan.CostCentre
 		state.MarketplaceVisibility = plan.MarketplaceVisibility
 		state.ContractTermMonths = plan.ContractTermMonths
-		warnLagPendingApproval(&resp.Diagnostics, plan.UID.ValueString(), pendingUIDs)
 	}
 
 	if len(lagPortUIDs) > 0 {

@@ -241,7 +241,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live port creates an approval request. Until approval, the port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`, and the apply completes with a warning.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live port creates an approval request. Until approval, the port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`. The apply completes with a warning.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
@@ -563,6 +563,9 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		)
 		return
 	}
+	if pendingApproval {
+		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString()))
+	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
 	if portErr != nil {
@@ -613,7 +616,6 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		state.CostCentre = plan.CostCentre
 		state.MarketplaceVisibility = plan.MarketplaceVisibility
 		state.ContractTermMonths = plan.ContractTermMonths
-		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString()))
 	}
 
 	// Set state to fully populated data
@@ -626,9 +628,8 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 // portPendingApprovalWarning explains a port modify that the API holds for order approval.
 func portPendingApprovalWarning(ports string) string {
-	return "The term increase on " + ports + " needs order approval. The API holds the whole change, " +
-		"including any name, cost centre, or marketplace visibility change, and applies it when the approval is granted. " +
-		"Terraform saves the planned values. " +
+	return "The term increase on " + ports + " needs order approval. " +
+		"The API holds any `name`, `cost_centre`, or `marketplace_visibility` change in the same request, and applies it with the approval. " +
 		"Until the approval, a plan shows the change again, and an apply of it fails because an approval is already pending."
 }
 
