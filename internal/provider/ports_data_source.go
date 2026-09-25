@@ -197,12 +197,12 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 							Computed:    true,
 						},
 						"lag_count": schema.Int64Attribute{
-							Description: "The number of ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; always 0 when listing all ports.",
+							Description: "The number of ports in the LAG. Zero if the port is not part of a LAG.",
 							Computed:    true,
 						},
 						"lag_port_uids": schema.ListAttribute{
 							ElementType: types.StringType,
-							Description: "The unique identifiers of the ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; empty when listing all ports.",
+							Description: "The unique identifiers of the ports in the LAG. Null if the port is not part of a LAG.",
 							Computed:    true,
 						},
 						"company_uid": schema.StringAttribute{
@@ -330,10 +330,25 @@ func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			)
 			return
 		}
+		// ListPorts leaves LagPortUIDs and LagCount unset. Derive them from
+		// AggregationID the way GetPort does, before the status filter.
+		lagPortUIDs := map[int][]string{}
+		for _, p := range all {
+			if p != nil && p.AggregationID != 0 {
+				lagPortUIDs[p.AggregationID] = append(lagPortUIDs[p.AggregationID], p.UID)
+			}
+		}
+		for _, uids := range lagPortUIDs {
+			sort.Strings(uids)
+		}
 		ports = make([]*megaport.Port, 0, len(all))
 		for _, p := range all {
 			if p == nil || isPortInactive(p) {
 				continue
+			}
+			if uids, ok := lagPortUIDs[p.AggregationID]; ok {
+				p.LagPortUIDs = uids
+				p.LagCount = len(uids)
 			}
 			ports = append(ports, p)
 		}

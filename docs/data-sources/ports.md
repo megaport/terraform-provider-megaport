@@ -41,9 +41,9 @@ Read-Only:
 - `create_date` (String) The date the port was created.
 - `created_by` (String) The user who created the port.
 - `diversity_zone` (String) The diversity zone of the port.
-- `lag_count` (Number) The number of ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; always 0 when listing all ports.
+- `lag_count` (Number) The number of ports in the LAG. Zero if the port is not part of a LAG.
 - `lag_id` (Number) Numeric ID of the LAG this port belongs to. Zero if the port is not part of a LAG.
-- `lag_port_uids` (List of String) The unique identifiers of the ports in the LAG. Only populated by the megaportgo SDK when looking up this port directly via product_uid; empty when listing all ports.
+- `lag_port_uids` (List of String) The unique identifiers of the ports in the LAG. Null if the port is not part of a LAG.
 - `lag_primary` (Boolean) Whether the port is a LAG primary.
 - `live_date` (String) The date the port went live.
 - `location_id` (Number) The numeric location ID of the port.

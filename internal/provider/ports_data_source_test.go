@@ -286,6 +286,45 @@ func TestReadPorts_ListSkipsInactive(t *testing.T) {
 	assert.Equal(t, "port-live", details[1].UID.ValueString())
 }
 
+func TestReadPorts_ListDerivesLagMembers(t *testing.T) {
+	ctx := context.Background()
+	mockPortService := &MockPortService{
+		ListPortsResult: []*megaport.Port{
+			{UID: "port-lag-b", ProvisioningStatus: "LIVE", AggregationID: 7},
+			{UID: "port-solo", ProvisioningStatus: "LIVE"},
+			{UID: "port-lag-a", ProvisioningStatus: "LIVE", AggregationID: 7, LAGPrimary: true},
+			{UID: "port-lag-c", ProvisioningStatus: megaport.STATUS_CANCELLED, AggregationID: 7},
+		},
+	}
+	ds := &portsDataSource{client: &megaport.Client{PortService: mockPortService}}
+
+	req, resp := portsReadRequest(t, ds, nil, nil)
+	ds.Read(ctx, req, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var state portsModel
+	require.False(t, resp.State.Get(ctx, &state).HasError())
+
+	var details []portDetailModel
+	require.False(t, state.Ports.ElementsAs(ctx, &details, false).HasError())
+	require.Len(t, details, 3)
+
+	// The cancelled member is filtered from the list but still counts in the
+	// LAG, matching GetPort.
+	wantLag := []string{"port-lag-a", "port-lag-b", "port-lag-c"}
+	for _, d := range details[:2] {
+		var uids []string
+		require.False(t, d.LagPortUIDs.ElementsAs(ctx, &uids, false).HasError())
+		assert.Equal(t, wantLag, uids, d.UID.ValueString())
+		assert.Equal(t, int64(3), d.LagCount.ValueInt64(), d.UID.ValueString())
+	}
+
+	assert.Equal(t, "port-solo", details[2].UID.ValueString())
+	assert.True(t, details[2].LagPortUIDs.IsNull())
+	assert.Equal(t, int64(0), details[2].LagCount.ValueInt64())
+}
+
 func TestReadPorts_GetByUIDReturnsInactive(t *testing.T) {
 	ctx := context.Background()
 	// A direct UID lookup returns the port regardless of status, matching the
