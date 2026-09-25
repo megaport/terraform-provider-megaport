@@ -515,7 +515,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.
+- `local_asn` (Number) The local ASN of the BGP connection. Leave it unset when peer_asn equals the MCR ASN. Otherwise it must differ from peer_asn. The API applies both rules on create and update.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -589,7 +589,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.
+- `local_asn` (Number) The local ASN of the BGP connection. Leave it unset when peer_asn equals the MCR ASN. Otherwise it must differ from peer_asn. The API applies both rules on create and update.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -789,7 +789,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.
+- `local_asn` (Number) The local ASN of the BGP connection. Leave it unset when peer_asn equals the MCR ASN. Otherwise it must differ from peer_asn. The API applies both rules on create and update.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
@@ -863,7 +863,7 @@ Optional:
 - `export_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes must match the prefix list to be advertised on this connection.
 - `import_blacklist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer that match the prefix list are discarded.
 - `import_whitelist` (String) Description of a prefix filter list on the vrouter endpoint (MCR or NAT Gateway). BGP prefixes received from this peer must match the prefix list to be accepted.
-- `local_asn` (Number) The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.
+- `local_asn` (Number) The local ASN of the BGP connection. Leave it unset when peer_asn equals the MCR ASN. Otherwise it must differ from peer_asn. The API applies both rules on create and update.
 - `local_ip_address` (String) The local IP address of the BGP connection. Must be an IP address without a CIDR mask (e.g., "169.254.100.6").
 - `med_in` (Number) The MED in of the BGP connection.
 - `med_out` (Number) The MED out of the BGP connection.
