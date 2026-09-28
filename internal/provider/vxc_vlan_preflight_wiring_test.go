@@ -229,6 +229,60 @@ func TestVXCCreate_VLANPreflightSkipsQinQAEnd(t *testing.T) {
 	}
 }
 
+func TestVXCCreate_VLANPreflightSkipsQinQBEnd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ps := newPreflightServer(t, map[string]int{"port-b": 100})
+	b := newVXCValueBuilder(t)
+
+	plan := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(730)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(100), innerVLAN: int64p(1020)}),
+		nil,
+	)
+
+	resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+	ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+	if !slices.Contains(ps.productTypes, "port-b") {
+		t.Fatalf("expected a B-End product type lookup, got %v", ps.productTypes)
+	}
+	if got := ps.vlanQueries; len(got) != 1 || got[0].portUID != "port-a" {
+		t.Fatalf("expected only the A-End VLAN query, got %v", got)
+	}
+}
+
+func TestVXCUpdate_VLANPreflightSkipsQinQEnds(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ps := newPreflightServer(t, map[string]int{"port-a": 300, "port-b": 400})
+	b := newVXCValueBuilder(t)
+
+	state := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(100), vlan: int64p(100), innerVLAN: int64p(1020)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(200), vlan: int64p(200), innerVLAN: int64p(1030)}),
+		nil,
+	)
+	plan := b.vxc(
+		b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(300), vlan: int64p(100), innerVLAN: int64p(1020)}),
+		b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(400), vlan: int64p(200), innerVLAN: int64p(1030)}),
+		nil,
+	)
+
+	resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+	ps.resource(t).Update(ctx, fwresource.UpdateRequest{
+		Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+		State: tfsdk.State{Schema: b.schema, Raw: state},
+	}, &resp)
+
+	if !slices.Contains(ps.productTypes, "port-b") {
+		t.Fatalf("expected a B-End product type lookup, got %v", ps.productTypes)
+	}
+	if len(ps.vlanQueries) != 0 {
+		t.Fatalf("expected no VLAN queries, got %v", ps.vlanQueries)
+	}
+}
+
 func TestVXCCreate_VLANPreflightSkipsPartnerConfiguredBEnd(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

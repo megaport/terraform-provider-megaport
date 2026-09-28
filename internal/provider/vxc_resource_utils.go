@@ -1368,16 +1368,16 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	}
 
 	available, err := in.svc.CheckPortVLANAvailability(ctx, in.productUID, vlan)
-	if err != nil {
+	// The first create to check a destroyed VLAN takes the record, so a second
+	// pin on the same VLAN fails at once.
+	_, destroyed := destroyedVLANs.LoadAndDelete(destroyedVLAN{portUID: in.productUID, vlan: vlan})
+	if err != nil && !destroyed {
 		tflog.Debug(ctx, "VLAN availability preflight skipped", map[string]any{
 			"end": in.end, "product_uid": in.productUID, "vlan": vlan, "error": err.Error(),
 		})
 		return diags
 	}
-	// The first create to check a destroyed VLAN takes the record, so a second
-	// pin on the same VLAN fails at once.
-	_, destroyed := destroyedVLANs.LoadAndDelete(destroyedVLAN{portUID: in.productUID, vlan: vlan})
-	if available {
+	if err == nil && available {
 		return diags
 	}
 
@@ -1424,7 +1424,7 @@ func recordDestroyedVLANs(ctx context.Context, ends ...types.Object) {
 		if obj.IsNull() || obj.IsUnknown() || obj.As(ctx, &end, basetypes.ObjectAsOptions{}).HasError() {
 			continue
 		}
-		// A Q-in-Q end skips the preflight, so no create would take its record.
+		// Q-in-Q siblings can still hold the outer VLAN, so a later create must not wait on it.
 		if end.CurrentProductUID.ValueString() != "" && end.VLAN.ValueInt64() > 0 && end.InnerVLAN.ValueInt64() <= 0 {
 			destroyedVLANs.Store(destroyedVLAN{portUID: end.CurrentProductUID.ValueString(), vlan: int(end.VLAN.ValueInt64())}, struct{}{})
 		}

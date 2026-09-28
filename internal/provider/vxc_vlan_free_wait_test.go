@@ -29,7 +29,15 @@ func (s *sequencePortService) CheckPortVLANAvailability(_ context.Context, _ str
 	return s.check(s.calls.Add(1))
 }
 
-// setFreeWait sets the VLAN free wait budget and a 1ms poll for one test.
+// blockingPortService answers no check until the check's context ends.
+type blockingPortService struct{ megaport.PortService }
+
+func (blockingPortService) CheckPortVLANAvailability(ctx context.Context, _ string, _ int) (bool, error) {
+	<-ctx.Done()
+	return false, ctx.Err()
+}
+
+// setFreeWait sets how long the VLAN wait runs, and a 1ms poll, for one test.
 // Tests that call it must not run in parallel, because both are package state.
 func setFreeWait(t *testing.T, timeout time.Duration) {
 	t.Helper()
@@ -154,6 +162,17 @@ func TestWaitForVLANFree_TimeoutReportsLastError(t *testing.T) {
 	assert.Contains(t, err.Error(), "502 bad gateway")
 }
 
+// The parent context outlives the wait, so only the wait's own deadline can end
+// the check.
+func TestWaitForVLANFree_CheckCutOffByDeadlineIsNotLastError(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := waitForVLANFree(ctx, blockingPortService{}, "port-uid", 920, 20*time.Millisecond, time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "still in use")
+}
+
 func TestWaitForVLANFree_TakenAnswerClearsEarlierError(t *testing.T) {
 	svc := &sequencePortService{check: func(call int32) (bool, error) {
 		if call == 1 {
@@ -175,7 +194,25 @@ func TestVLANAvailabilityPreflight_FreeDestroyedVLANDropsRecord(t *testing.T) {
 	svc := &sequencePortService{check: func(int32) (bool, error) { return true, nil }}
 
 	require.False(t, vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-destroyed-free")).HasError())
+	assert.Equal(t, int32(1), svc.calls.Load())
 	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-destroyed-free", vlan: 920})
+	assert.False(t, recorded)
+}
+
+func TestVLANAvailabilityPreflight_FirstCheckErrorOnDestroyedVLANWaits(t *testing.T) {
+	setFreeWait(t, time.Second)
+	recordDestroyed(t, "port-destroyed-error", 920)
+	svc := &sequencePortService{check: func(call int32) (bool, error) {
+		if call == 1 {
+			return false, errors.New("502 bad gateway")
+		}
+		return true, nil
+	}}
+
+	diags := vlanAvailabilityPreflight(context.Background(), destroyedPreflightInput(svc, "port-destroyed-error"))
+	assert.False(t, diags.HasError(), "unexpected error: %v", diags)
+	assert.Equal(t, int32(2), svc.calls.Load())
+	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-destroyed-error", vlan: 920})
 	assert.False(t, recorded)
 }
 
@@ -198,23 +235,37 @@ func TestVXCDelete_RecordsDestroyedVLANs(t *testing.T) {
 	b := newVXCValueBuilder(t)
 	t.Cleanup(func() {
 		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-a", vlan: 920})
-		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-b", vlan: 0})
+		destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-b", vlan: 921})
 	})
 
 	resp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}},
 		vxcEndSpec{productUID: "port-del-a", currentUID: "port-del-a", vlan: int64p(920)},
-		vxcEndSpec{productUID: "port-del-b", currentUID: "port-del-b", vlan: int64p(0)},
+		vxcEndSpec{productUID: "port-del-b", currentUID: "port-del-b", vlan: int64p(921)},
 	)
 	require.False(t, resp.Diagnostics.HasError(), "unexpected error: %v", resp.Diagnostics)
 
 	_, aRecorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-a", vlan: 920})
 	assert.True(t, aRecorded, "the A-End VLAN should be recorded")
-	_, bRecorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-b", vlan: 0})
-	assert.False(t, bRecorded, "an auto-assigned VLAN of 0 should not be recorded")
+	_, bRecorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-b", vlan: 921})
+	assert.True(t, bRecorded, "the B-End VLAN should be recorded")
 }
 
-// A Q-in-Q end skips the preflight, so its record would wait out a later
-// unrelated create on the same outer VLAN.
+func TestVXCDelete_DoesNotRecordVLANZero(t *testing.T) {
+	b := newVXCValueBuilder(t)
+	t.Cleanup(func() { destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-zero", vlan: 0}) })
+
+	resp := deleteVXC(t, b, &MockVXCService{GetVXCResult: &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}},
+		vxcEndSpec{productUID: "port-del-zero", currentUID: "port-del-zero", vlan: int64p(0)},
+		vxcEndSpec{productUID: "port-del-zero-b", currentUID: "port-del-zero-b"},
+	)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected error: %v", resp.Diagnostics)
+
+	_, recorded := destroyedVLANs.Load(destroyedVLAN{portUID: "port-del-zero", vlan: 0})
+	assert.False(t, recorded)
+}
+
+// Q-in-Q siblings can still hold the outer VLAN, so a record would make a later
+// create on it wait out wait_time.
 func TestVXCDelete_DoesNotRecordQinQEnd(t *testing.T) {
 	b := newVXCValueBuilder(t)
 	t.Cleanup(func() { destroyedVLANs.Delete(destroyedVLAN{portUID: "port-del-qinq", vlan: 920}) })
