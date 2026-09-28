@@ -41,6 +41,9 @@ type preflightServer struct {
 	serviceKeyBEnd string
 	// productTypeOf overrides the MEGAPORT product type for a UID.
 	productTypeOf map[string]string
+
+	// validateData, when set, makes order validation return 400 with it.
+	validateData string
 }
 
 func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
@@ -78,6 +81,9 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			ps.updateBodies = append(ps.updateBodies, body)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"message":"not faked"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v3/networkdesign/validate" && ps.validateData != "":
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "Validation failed", "data": ps.validateData})
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"message":"not faked"}`))
@@ -226,8 +232,51 @@ func TestVXCCreate_VLANPreflightBlocksTakenAEndVLAN(t *testing.T) {
 	if summary != "VLAN 730 is not available on the A-End port" {
 		t.Fatalf("unexpected error summary: %q", summary)
 	}
+	if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.HasSuffix(detail, vlanFreeHint) {
+		t.Fatalf("expected the VLAN free hint, got %q", detail)
+	}
 	if got := ps.vlanQueries; len(got) != 1 || got[0] != (vlanQuery{"port-a", "730"}) {
 		t.Fatalf("expected one VLAN query for port-a/730, got %v", got)
+	}
+}
+
+func TestVXCCreate_ValidateVLANErrorGetsFreeHint(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		data     string
+		wantHint bool
+	}{
+		{"taken VLAN", "VLAN 730 not available on service 878042", true},
+		{"other validation error", "Invalid rate limit", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			ps := newPreflightServer(t, nil)
+			ps.validateData = tc.data
+			b := newVXCValueBuilder(t)
+
+			plan := b.vxc(
+				b.end(vxcEndSpec{productUID: "port-a", orderedVLAN: int64p(730)}),
+				b.end(vxcEndSpec{productUID: "port-b", orderedVLAN: int64p(100)}),
+				nil,
+			)
+
+			resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+			ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+			if !resp.Diagnostics.HasError() {
+				t.Fatal("expected Create to fail validation")
+			}
+			d := resp.Diagnostics.Errors()[0]
+			if d.Summary() != "Validation error while attempting to create VXC" {
+				t.Fatalf("unexpected error summary: %q", d.Summary())
+			}
+			if got := strings.HasSuffix(d.Detail(), vlanFreeHint); got != tc.wantHint {
+				t.Fatalf("hint present = %v, want %v: %q", got, tc.wantHint, d.Detail())
+			}
+		})
 	}
 }
 
