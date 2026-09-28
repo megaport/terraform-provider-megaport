@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -86,6 +87,8 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 			stateB: live, planB: bEndAt(200, int64p(10)), wantAttrs: []string{"inner_vlan"}, wantType: "AWS"},
 		{name: "aws untagging a tagged inner_vlan rejected", conns: bCSP("AWS"),
 			stateB: bEndAt(200, int64p(10)), planB: bEndAt(200, int64p(-1)), wantAttrs: []string{"inner_vlan"}, wantType: "AWS"},
+		{name: "aws untagging a tagged vlan rejected", conns: bCSP("AWS"),
+			stateB: live, planB: bEndAt(-1, nil), wantAttrs: []string{"ordered_vlan"}, wantType: "AWS"},
 		{name: "outer and inner both reported", conns: bCSP("ORACLE"),
 			stateB: live, planB: bEndAt(300, int64p(10)), wantAttrs: []string{"ordered_vlan", "inner_vlan"}, wantType: "ORACLE"},
 
@@ -102,6 +105,12 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantWarning: true},
 		{name: "unsent untagged ordered_vlan warned", partner: "transit",
 			stateB: bEndAt(-1, nil), planB: bEndAt(-1, nil), wantWarning: true},
+		{name: "awshc unsent ordered_vlan warned", conns: bCSP("AWSHC"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantWarning: true},
+		{name: "auto-assigned aws vlan not warned", conns: bCSP("AWS"),
+			stateB: bEndAt(0, nil), planB: bEndAt(0, nil)},
+		{name: "ordered_vlan with no live vlan not warned", conns: bCSP("AWS"),
+			stateB: vxcEndSpec{orderedVLAN: int64p(300)}, planB: vxcEndSpec{orderedVLAN: int64p(300)}},
 		{name: "reverting an unsent ordered_vlan to the live vlan permitted", conns: bCSP("AWS"),
 			stateB: bEndAt(300, nil), planB: bEndAt(200, nil)},
 		{name: "azure ordered_vlan differing from live not warned", conns: bCSP("AZURE"),
@@ -184,17 +193,51 @@ func TestVXCUpdate_VLANSends(t *testing.T) {
 			wantAbsent: []string{"bEndVlan"},
 		},
 		{
+			name: "ibm b-end sends neither vlan", conns: bCSP("IBM"),
+			stateB: bEndAt(200, int64p(10)), planB: bEndAt(300, int64p(20)),
+			wantAbsent: []string{"bEndVlan", "bEndInnerVlan"},
+		},
+		{
+			name: "azure b-end sends no auto-assign vlan", conns: bCSP("AZURE"),
+			stateB: bEndAt(200, nil), planB: bEndAt(0, nil),
+			wantAbsent: []string{"bEndVlan"},
+		},
+		{
 			name:   "megaport b-end sends vlan",
 			stateB: bEndAt(200, nil), planB: bEndAt(300, nil),
 			want: map[string]float64{"bEndVlan": 300},
 		},
 		{
 			name: "vnic change resends the live vlan on both ends", mve: true,
-			stateA: vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100), vnicIndex: int64p(0)},
-			planA:  vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100), vnicIndex: int64p(1)},
-			stateB: vxcEndSpec{orderedVLAN: int64p(200), vlan: int64p(200), vnicIndex: int64p(0)},
-			planB:  vxcEndSpec{orderedVLAN: int64p(200), vlan: int64p(200), vnicIndex: int64p(1)},
+			stateA: vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(100), vnicIndex: int64p(0)},
+			planA:  vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(100), vnicIndex: int64p(1)},
+			stateB: vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(200), vnicIndex: int64p(0)},
+			planB:  vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(200), vnicIndex: int64p(1)},
 			want:   map[string]float64{"aEndVlan": 100, "bEndVlan": 200, "aVnicIndex": 1, "bVnicIndex": 1},
+		},
+		{
+			name: "vnic and vlan change together send the new vlan", mve: true,
+			stateA: vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100), vnicIndex: int64p(0)},
+			planA:  vxcEndSpec{orderedVLAN: int64p(150), vlan: int64p(100), vnicIndex: int64p(1)},
+			stateB: vxcEndSpec{orderedVLAN: int64p(200), vlan: int64p(200), vnicIndex: int64p(0)},
+			planB:  vxcEndSpec{orderedVLAN: int64p(250), vlan: int64p(200), vnicIndex: int64p(1)},
+			want:   map[string]float64{"aEndVlan": 150, "bEndVlan": 250},
+		},
+		{
+			name: "unchanged vnic sends no vlan", mve: true,
+			stateA:     vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100), vnicIndex: int64p(1)},
+			planA:      vxcEndSpec{orderedVLAN: int64p(100), vlan: int64p(100), vnicIndex: int64p(1)},
+			stateB:     vxcEndSpec{orderedVLAN: int64p(200), vlan: int64p(200), vnicIndex: int64p(1)},
+			planB:      vxcEndSpec{orderedVLAN: int64p(200), vlan: int64p(200), vnicIndex: int64p(1)},
+			wantAbsent: []string{"aEndVlan", "bEndVlan"},
+		},
+		{
+			name: "vnic change on untagged ends sends no vlan", mve: true,
+			stateA:     vxcEndSpec{orderedVLAN: int64p(-1), vnicIndex: int64p(0)},
+			planA:      vxcEndSpec{orderedVLAN: int64p(-1), vnicIndex: int64p(1)},
+			stateB:     vxcEndSpec{orderedVLAN: int64p(-1), vnicIndex: int64p(0)},
+			planB:      vxcEndSpec{orderedVLAN: int64p(-1), vnicIndex: int64p(1)},
+			wantAbsent: []string{"aEndVlan", "bEndVlan"},
 		},
 	}
 
@@ -227,6 +270,61 @@ func TestVXCUpdate_VLANSends(t *testing.T) {
 				if v, ok := body[field]; ok {
 					t.Errorf("expected no %s, got %v", field, v)
 				}
+			}
+		})
+	}
+}
+
+// Each case lets the update succeed and checks the state Update writes after
+// the read-back. The API does not return ordered_vlan or an untagged inner
+// VLAN, so a value missing from state here fails a real apply.
+func TestVXCUpdate_BEndVLANStateAfterReadBack(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+
+	tests := []struct {
+		name          string
+		conns         [][2]string
+		stateB, planB vxcEndSpec
+		attr          string
+		want          int64
+	}{
+		{name: "aws ordered_vlan follows the plan", conns: bCSP("AWS"),
+			stateB: bEndAt(300, nil), planB: bEndAt(200, nil), attr: "ordered_vlan", want: 200},
+		{name: "azure untagged inner_vlan stays -1", conns: bCSP("AZURE"),
+			stateB: bEndAt(200, int64p(10)), planB: bEndAt(200, int64p(-1)), attr: "inner_vlan", want: -1},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := &vxcResource{client: &megaport.Client{
+				VXCService: &MockVXCService{GetVXCResult: &megaport.VXC{
+					UID:               "vxc-uid",
+					Name:              "test-vxc",
+					RateLimit:         1000,
+					AEndConfiguration: megaport.VXCEndConfiguration{UID: "port-a"},
+					BEndConfiguration: megaport.VXCEndConfiguration{UID: "port-b", VLAN: 200},
+				}},
+				ProductService: &stubProductService{},
+			}}
+			state := b.liveVXC(t, vxcEndSpec{}, tc.stateB, tc.conns, "")
+			plan := b.liveVXC(t, vxcEndSpec{}, tc.planB, tc.conns, "")
+
+			resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
+			r.Update(ctx, fwresource.UpdateRequest{
+				Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+				State: tfsdk.State{Schema: b.schema, Raw: state},
+			}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("Update failed: %v", resp.Diagnostics.Errors())
+			}
+
+			var got types.Int64
+			resp.Diagnostics.Append(resp.State.GetAttribute(ctx, path.Root("b_end").AtName(tc.attr), &got)...)
+			if got.ValueInt64() != tc.want || got.IsNull() {
+				t.Errorf("expected b_end.%s %d, got %s", tc.attr, tc.want, got)
 			}
 		})
 	}

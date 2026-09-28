@@ -3612,11 +3612,8 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	}
 }
 
-// checkBEndVLANUpdatable rejects a B-End VLAN change that NetAuto refuses.
-// NetAuto refuses any outer VLAN change on a cloud or transit B-End. It also
-// refuses an inner VLAN change on all of them except Azure. A planned
-// ordered_vlan of 0 (auto-assign) or the live VLAN passes. It warns when
-// state holds an AWS or transit B-End VLAN that older versions saved unsent.
+// checkBEndVLANUpdatable rejects a VLAN change that a cloud or transit B-End
+// refuses. It warns when state holds a VLAN that older versions never sent.
 func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, diags *diag.Diagnostics) {
 	connectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, diags)
 	if connectType == "" {
@@ -3631,7 +3628,7 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 
 	const summary = "VLAN cannot be changed on this B-End"
 	detail := func(attr string) string {
-		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN. Replacing destroys and rebuilds the service.", connectType, attr)
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the planned %s.", connectType, attr, attr)
 	}
 	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
 		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
@@ -3639,16 +3636,16 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	}
 	// -1 (untagged) is a change only when the live inner VLAN is tagged.
 	if v := planEnd.InnerVLAN; connectType != "AZURE" && !v.IsUnknown() && !v.IsNull() &&
-		(v.ValueInt64() > 0 && !v.Equal(stateEnd.InnerVLAN) || v.ValueInt64() == -1 && stateEnd.InnerVLAN.ValueInt64() > 0) {
+		((v.ValueInt64() > 0 && !v.Equal(stateEnd.InnerVLAN)) || (v.ValueInt64() == -1 && stateEnd.InnerVLAN.ValueInt64() > 0)) {
 		diags.AddAttributeError(path.Root("b_end").AtName("inner_vlan"), summary, detail("inner_vlan"))
 	}
 	if connectType != "AWS" && connectType != "AWSHC" && connectType != "TRANSIT" {
 		return
 	}
 	if v, live := stateEnd.OrderedVLAN, stateEnd.VLAN; v.Equal(planEnd.OrderedVLAN) && !live.IsUnknown() && !live.IsNull() &&
-		(v.ValueInt64() > 0 && !v.Equal(live) || v.ValueInt64() == -1 && live.ValueInt64() > 0) {
+		((v.ValueInt64() > 0 && !v.Equal(live)) || (v.ValueInt64() == -1 && live.ValueInt64() > 0)) {
 		diags.AddAttributeWarning(path.Root("b_end").AtName("ordered_vlan"), "B-End VLAN was never applied",
-			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d, or run \"terraform taint <resource address>\" and apply to order a new VXC with that VLAN.",
+			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d, or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the configured ordered_vlan.",
 				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64()))
 	}
 }
