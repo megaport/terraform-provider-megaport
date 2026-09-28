@@ -2133,7 +2133,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Validation error while attempting to create VXC",
-			"Validation error while attempting to create VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+			withVLANFreeHint("Validation error while attempting to create VXC with name "+plan.Name.ValueString()+": "+err.Error(), err),
 		)
 		return
 	}
@@ -2142,7 +2142,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating VXC",
-			"Could not order VXC with name "+plan.Name.ValueString()+": "+err.Error(),
+			withVLANFreeHint("Could not order VXC with name "+plan.Name.ValueString()+": "+err.Error(), err),
 		)
 		return
 	}
