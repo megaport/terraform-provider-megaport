@@ -685,6 +685,7 @@ func TestVXCDelete_PendingApprovalFailsWithoutWaiting(t *testing.T) {
 	assert.Equal(t, "VXC cancellation pending approval", d.Summary())
 	assert.Contains(t, d.Detail(), "vxc-uid-123")
 	assert.Contains(t, d.Detail(), "Megaport Portal")
+	assert.Contains(t, d.Detail(), "Run the same Terraform command again")
 	assert.Zero(t, polls.Load(), "a pending-approval cancel must not start the decommission wait")
 
 	var uid string
@@ -692,13 +693,22 @@ func TestVXCDelete_PendingApprovalFailsWithoutWaiting(t *testing.T) {
 	assert.Equal(t, "vxc-uid-123", uid)
 }
 
+// TestVXCDelete_CancelWaitsForDecommission is not parallel: it sets waitForTime,
+// which the other parallel tests read.
 func TestVXCDelete_CancelWaitsForDecommission(t *testing.T) {
+	prev := waitForTime
+	waitForTime = time.Minute
+	t.Cleanup(func() { waitForTime = prev })
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	var polls atomic.Int32
 	r := waitTestResource(&MockVXCService{
 		GetVXCFunc: func(ctx context.Context, id string) (*megaport.VXC, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			polls.Add(1)
 			return &megaport.VXC{ProvisioningStatus: megaport.STATUS_DECOMMISSIONED}, nil
 		},

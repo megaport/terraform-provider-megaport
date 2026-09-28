@@ -3174,8 +3174,8 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	if errors.Is(err, megaport.ErrCancelPendingApproval) {
 		resp.Diagnostics.AddError(
 			"VXC cancellation pending approval",
-			"VXC "+state.UID.ValueString()+" is still live: the API created an order approval request instead of canceling the VXC. "+
-				"An approver can approve or reject the request in the Megaport Portal. Run destroy again after approval.",
+			"VXC "+state.UID.ValueString()+" is still live. Your partner must approve the cancellation request in the Megaport Portal. "+
+				"Run the same Terraform command again after approval.",
 		)
 		return
 	}
