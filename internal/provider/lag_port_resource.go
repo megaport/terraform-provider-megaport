@@ -637,11 +637,16 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 				continue
 			}
 			if err != nil {
+				retry := ". Run the apply again to modify the remaining ports."
+				// A retry reaches the pending ports first, and the API rejects their modify until the approval.
+				if len(pendingUIDs) > 0 {
+					retry = ". Run the apply again after the pending approval to modify the remaining ports."
+				}
 				warnLagPendingApproval(&resp.Diagnostics, plan.UID.ValueString(), pendingUIDs)
 				resp.Diagnostics.AddError(
 					"Error modifying port",
 					"The modify of port "+member.UID+" in LAG "+plan.UID.ValueString()+" failed: "+err.Error()+
-						". Run the apply again to modify the remaining ports."+lagGrowNote(lagPortUIDs),
+						retry+lagGrowNote(lagPortUIDs),
 				)
 				return
 			}

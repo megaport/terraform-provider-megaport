@@ -630,7 +630,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 func portPendingApprovalWarning(ports string) string {
 	return "The term increase on " + ports + " needs order approval. " +
 		"The API holds any `name`, `cost_centre`, or `marketplace_visibility` change in the same request, and applies it with the approval. " +
-		"Until the approval, a plan shows the change again, and an apply of it fails because an approval is already pending."
+		"Until the approval, the API rejects any other modify of " + ports + "."
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

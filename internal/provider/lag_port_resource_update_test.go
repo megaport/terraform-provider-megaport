@@ -200,7 +200,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
 			failUID:      "lag-2",
 			wantModified: []string{"lag-2"},
-			wantError:    "port lag-2 in LAG lag-1 failed: the stub rejects the modify. Run the apply again",
+			wantError:    "port lag-2 in LAG lag-1 failed: the stub rejects the modify. Run the apply again to modify the remaining ports",
 		},
 		{
 			name:         "a short list read modifies no port",
@@ -273,7 +273,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			failUID:      "lag-1",
 			wantModified: []string{"lag-2", "lag-1"},
 			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
-			wantError:    "The modify of port lag-1 in LAG lag-1 failed",
+			wantError:    "port lag-1 in LAG lag-1 failed: the stub rejects the modify. Run the apply again after the pending approval",
 			wantWarning:  "term increase on port lag-2 in LAG lag-1 needs order approval",
 		},
 		{
