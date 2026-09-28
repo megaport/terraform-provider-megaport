@@ -335,14 +335,16 @@ func (r *mcrIpsecAddonResource) deleteAddOnAwaitingTunnels(ctx context.Context, 
 // isIPsecTunnelsConfiguredError reports whether err is the API refusing to lower
 // an IPsec add-on's tunnel limit below the number of tunnels still configured on
 // the MCR (HTTP 400). This is transient during destroy: it clears once the VXC
-// carrying the tunnel finishes deprovisioning.
+// carrying the tunnel finishes deprovisioning. The API has used both "configured
+// tunnels" and "tunnels configured" wording, so match either.
 func isIPsecTunnelsConfiguredError(err error) bool {
 	var apiErr *megaport.ErrorResponse
 	if !errors.As(err, &apiErr) || apiErr.Response == nil {
 		return false
 	}
 	return apiErr.Response.StatusCode == http.StatusBadRequest &&
-		strings.Contains(apiErr.Message, "configured tunnels")
+		(strings.Contains(apiErr.Message, "configured tunnels") ||
+			strings.Contains(apiErr.Message, "tunnels configured"))
 }
 
 // ImportState seeds the identifiers. The framework calls Read next, which
