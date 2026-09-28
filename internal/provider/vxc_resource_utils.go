@@ -1369,10 +1369,22 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	if !available {
 		diags.AddError(
 			fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end),
-			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
+			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one. %s", vlan, in.end, in.productUID, in.end, vlanFreeHint),
 		)
 	}
 	return diags
+}
+
+// vlanFreeHint covers the one taken-VLAN case a re-run fixes. Megaport frees a
+// destroyed VXC's VLAN a few minutes after the destroy returns.
+const vlanFreeHint = "If a VXC using this VLAN was just destroyed, Megaport can take a few minutes to free the VLAN. Run the apply again after that."
+
+// withVLANFreeHint appends vlanFreeHint when err is the backend's taken-VLAN error.
+func withVLANFreeHint(detail string, err error) string {
+	if strings.Contains(err.Error(), "not available on service") {
+		return detail + " " + vlanFreeHint
+	}
+	return detail
 }
 
 // prefixFilterIDToName resolves a prefix filter list ID to its description.
