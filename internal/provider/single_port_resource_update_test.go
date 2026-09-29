@@ -125,6 +125,8 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 				t.Fatalf("got %d warnings (%v), want 1", len(warnings), warnings)
 			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "term increase on port port-1 needs order approval"):
 				t.Errorf("warning %q does not name the port", warnings[0].Detail())
+			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "a refresh brings the old values back into the plan"):
+				t.Errorf("warning %q does not say a refresh brings the old values back", warnings[0].Detail())
 			}
 
 			// A failed read keeps the prior state, which the framework already holds.

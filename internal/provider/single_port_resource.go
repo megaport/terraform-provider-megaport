@@ -564,7 +564,8 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 	if pendingApproval {
-		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString()))
+		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString())+
+			" Until the approval completes, a refresh brings the old values back into the plan.")
 	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
