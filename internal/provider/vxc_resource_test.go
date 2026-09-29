@@ -1780,11 +1780,13 @@ func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "vrouter"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
+					// A-End MCR interface
 					resource.TestCheckTypeSetElemNestedAttrs("megaport_vxc.vxc", "csp_connections.*", map[string]string{
 						"connect_type":   "VROUTER",
 						"ip_addresses.#": "1",
 						"ip_addresses.0": "10.0.0.1/30",
 					}),
+					// B-End MCR interface
 					resource.TestCheckTypeSetElemNestedAttrs("megaport_vxc.vxc", "csp_connections.*", map[string]string{
 						"connect_type":   "VROUTER",
 						"ip_addresses.#": "1",
