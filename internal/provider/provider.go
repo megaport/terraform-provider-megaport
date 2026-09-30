@@ -397,6 +397,8 @@ func (p *megaportProvider) Resources(_ context.Context) []func() resource.Resour
 	}
 }
 
+const resourceTagsDescription = "The resource tags associated with the product. Keys must be lowercase: 1 to 128 characters from a-z, 0-9, and `_ : . / \\ -`. Values can be 1 to 256 characters and also allow uppercase letters, spaces, `@`, and `+`. A product can have at most 50 tags."
+
 func toResourceTagMap(ctx context.Context, in types.Map) (map[string]string, diag.Diagnostics) {
 	tags := map[string]string{}
 	diags := in.ElementsAs(ctx, &tags, false)

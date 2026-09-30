@@ -45,7 +45,7 @@ resource "megaport_nat_gateway" "example" {
 - `auto_renew_term` (Boolean) Whether the NAT Gateway contract will auto-renew.
 - `bgp_shutdown_default` (Boolean) Whether BGP sessions are shut down by default on the NAT Gateway.
 - `promo_code` (String) A promotional code for the NAT Gateway order. Changing this value requires the resource to be replaced, as promo codes can only be applied during initial provisioning.
-- `resource_tags` (Map of String) Resource tags for the NAT Gateway.
+- `resource_tags` (Map of String) The resource tags associated with the product. Keys must be lowercase: 1 to 128 characters from a-z, 0-9, and `_ : . / \ -`. Values can be 1 to 256 characters and also allow uppercase letters, spaces, `@`, and `+`. A product can have at most 50 tags.
 
 ### Read-Only
 

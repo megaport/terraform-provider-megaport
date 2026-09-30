@@ -39,7 +39,7 @@ resource "megaport_mcr" "mcr" {
 - `marketplace_visibility` (Boolean) Whether the product is visible in the Marketplace. Defaults to the API's own default when not set.
 - `prefix_filter_lists` (Attributes List, Deprecated) **DEPRECATED**: Prefix filter list associated with the product. Use the `megaport_mcr_prefix_filter_list` resource instead for better resource management. This attribute will be removed in a future version. (see [below for nested schema](#nestedatt--prefix_filter_lists))
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
-- `resource_tags` (Map of String) The resource tags associated with the product.
+- `resource_tags` (Map of String) The resource tags associated with the product. Keys must be lowercase: 1 to 128 characters from a-z, 0-9, and `_ : . / \ -`. Values can be 1 to 256 characters and also allow uppercase letters, spaces, `@`, and `+`. A product can have at most 50 tags.
 
 ### Read-Only
 

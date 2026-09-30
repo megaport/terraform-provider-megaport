@@ -225,7 +225,7 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"resource_tags": schema.MapAttribute{
-				Description: "Resource tags for the NAT Gateway.",
+				Description: resourceTagsDescription,
 				Optional:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
