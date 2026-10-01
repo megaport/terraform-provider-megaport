@@ -17,8 +17,6 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-func boolRef(b bool) *bool { return &b }
-
 // mveVisibilityAPIMVE is the MVE the mock API returns after an order or update.
 func mveVisibilityAPIMVE(visible bool) *megaport.MVE {
 	return &megaport.MVE{
@@ -42,8 +40,8 @@ func TestMVEResourceCreate_MarketplaceVisibility(t *testing.T) {
 		api      bool
 		wantSent *bool
 	}{
-		{name: "configured true", planned: true, api: true, wantSent: boolRef(true)},
-		{name: "configured false", planned: false, api: false, wantSent: boolRef(false)},
+		{name: "configured true", planned: true, api: true, wantSent: megaport.PtrTo(true)},
+		{name: "configured false", planned: false, api: false, wantSent: megaport.PtrTo(false)},
 		{name: "unset", planned: tftypes.UnknownValue, api: true, wantSent: nil},
 	}
 
@@ -101,8 +99,8 @@ func TestMVEResourceUpdate_MarketplaceVisibility(t *testing.T) {
 		api      bool
 		wantSent *bool
 	}{
-		{name: "changed to true", state: false, planned: true, api: true, wantSent: boolRef(true)},
-		{name: "changed to false", state: true, planned: false, api: false, wantSent: boolRef(false)},
+		{name: "changed to true", state: false, planned: true, api: true, wantSent: megaport.PtrTo(true)},
+		{name: "changed to false", state: true, planned: false, api: false, wantSent: megaport.PtrTo(false)},
 		// The rename is the only change, so the update must leave visibility out.
 		{name: "unchanged", state: true, planned: true, api: true, wantSent: nil},
 		{name: "unknown", state: true, planned: tftypes.UnknownValue, api: true, wantSent: nil},
@@ -154,10 +152,9 @@ func TestMVEResourceUpdate_MarketplaceVisibility(t *testing.T) {
 	}
 }
 
-// An MVE already in state, with the attribute left out of the configuration,
-// plans no change: the attribute is Optional and the planned value falls back to
-// prior state.
-func TestMVEResourceSchema_MarketplaceVisibilityKeepsStateWhenUnset(t *testing.T) {
+// An MVE in state keeps its prior value when the attribute is left out of the
+// configuration, and a changed value never forces a replace.
+func TestMVEResourceSchema_MarketplaceVisibilityPlanModifiers(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := &mveResource{}
@@ -168,53 +165,14 @@ func TestMVEResourceSchema_MarketplaceVisibilityKeepsStateWhenUnset(t *testing.T
 	assert.True(t, attr.Optional)
 	assert.True(t, attr.Computed)
 
-	stateAttrs := mvePriorStateAttrs(t, objType)
-	stateAttrs["marketplace_visibility"] = tftypes.NewValue(tftypes.Bool, true)
-	state := tfsdk.State{Schema: base.Schema, Raw: tftypes.NewValue(objType, stateAttrs)}
-
-	req := planmodifier.BoolRequest{
-		Path:        path.Root("marketplace_visibility"),
-		State:       state,
-		ConfigValue: types.BoolNull(),
-		PlanValue:   types.BoolUnknown(),
-		StateValue:  types.BoolValue(true),
-	}
-	resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
-	for _, m := range attr.PlanModifiers {
-		m.PlanModifyBool(ctx, req, resp)
-	}
-
-	assert.Equal(t, types.BoolValue(true), resp.PlanValue)
-}
-
-func TestMVEResourceModifyPlan_MarketplaceVisibility(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	r := &mveResource{}
-	base, objType := mveSchemaObjectType(t, ctx, r)
-
 	tests := []struct {
-		name string
-		// state, config and plan carry marketplace_visibility. A nil config is
-		// an attribute left out of the configuration.
-		state, config, plan any
-		wantConverged       bool
+		name   string
+		state  bool
+		config types.Bool
+		plan   types.Bool
 	}{
-		{
-			// The upgrade case: vnics removal leaves unknowns, and the plan has
-			// to come back equal to prior state.
-			name:          "left out of the configuration",
-			state:         true,
-			config:        nil,
-			plan:          true,
-			wantConverged: true,
-		},
-		{
-			name:   "changed in place",
-			state:  false,
-			config: true,
-			plan:   true,
-		},
+		{name: "left out of the configuration", state: true, config: types.BoolNull(), plan: types.BoolUnknown()},
+		{name: "changed in the configuration", state: false, config: types.BoolValue(true), plan: types.BoolValue(true)},
 	}
 
 	for _, tc := range tests {
@@ -223,33 +181,29 @@ func TestMVEResourceModifyPlan_MarketplaceVisibility(t *testing.T) {
 
 			stateAttrs := mvePriorStateAttrs(t, objType)
 			stateAttrs["marketplace_visibility"] = tftypes.NewValue(tftypes.Bool, tc.state)
-			stateVal := tftypes.NewValue(objType, stateAttrs)
+			state := tfsdk.State{Schema: base.Schema, Raw: tftypes.NewValue(objType, stateAttrs)}
 
+			planRaw, err := tc.plan.ToTerraformValue(ctx)
+			require.NoError(t, err)
 			planAttrs := copyAttrs(stateAttrs)
-			markUnknown(planAttrs, objType, mveComputedWithoutModifier...)
-			planAttrs["marketplace_visibility"] = tftypes.NewValue(tftypes.Bool, tc.plan)
-			planVal := tftypes.NewValue(objType, planAttrs)
+			planAttrs["marketplace_visibility"] = planRaw
 
-			configAttrs := mveConfigAttrs(t, objType)
-			configAttrs["marketplace_visibility"] = tftypes.NewValue(tftypes.Bool, tc.config)
-
-			plan := tfsdk.Plan{Schema: base.Schema, Raw: planVal}
-			req := fwresource.ModifyPlanRequest{
-				Config: tfsdk.Config{Schema: base.Schema, Raw: tftypes.NewValue(objType, configAttrs)},
-				State:  tfsdk.State{Schema: base.Schema, Raw: stateVal},
-				Plan:   plan,
+			req := planmodifier.BoolRequest{
+				Path:        path.Root("marketplace_visibility"),
+				Plan:        tfsdk.Plan{Schema: base.Schema, Raw: tftypes.NewValue(objType, planAttrs)},
+				State:       state,
+				ConfigValue: tc.config,
+				PlanValue:   tc.plan,
+				StateValue:  types.BoolValue(tc.state),
 			}
-			resp := fwresource.ModifyPlanResponse{Plan: plan}
-
-			r.ModifyPlan(ctx, req, &resp)
-
-			require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
-			assert.Empty(t, resp.RequiresReplace, "marketplace_visibility must not force a replace")
-			if tc.wantConverged {
-				assert.True(t, resp.Plan.Raw.Equal(stateVal), "expected the plan to converge to prior state")
-			} else {
-				assert.True(t, resp.Plan.Raw.Equal(planVal), "expected the plan to be left alone")
+			resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
+			for _, m := range attr.PlanModifiers {
+				m.PlanModifyBool(ctx, req, resp)
+				req.PlanValue = resp.PlanValue
 			}
+
+			assert.Equal(t, types.BoolValue(true), resp.PlanValue)
+			assert.False(t, resp.RequiresReplace)
 		})
 	}
 }

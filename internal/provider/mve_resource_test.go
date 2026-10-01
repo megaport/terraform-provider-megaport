@@ -1345,7 +1345,7 @@ func mveMarketplaceVisibilityConfig(locationID int, mveName, mveKey, visibility 
 		resource "megaport_mve" "mve" {
 			product_name = "%s"
 			location_id = data.megaport_location.test_location.id
-			contract_term_months = 12
+			contract_term_months = 1
 			diversity_zone = "red"
 			%s
 			vendor_config = {
@@ -1446,7 +1446,7 @@ func TestAccMegaportMVEAruba_MarketplaceVisibilityUnset(t *testing.T) {
 			{
 				Config: config,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("megaport_mve.mve", "marketplace_visibility"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "marketplace_visibility", "false"),
 				),
 			},
 			// Plan-only to confirm no drift after create.
