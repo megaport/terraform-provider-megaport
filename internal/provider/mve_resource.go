@@ -520,7 +520,8 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the MVE is visible in the marketplace.",
+				Description: "Whether the MVE is visible in the Marketplace. Defaults to the API's own default when not set.",
+				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -811,6 +812,13 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 		WaitForTime:      waitForTime,
 	}
 
+	// An unset value arrives as Unknown (no config, no prior state). Send it
+	// only when the practitioner configured a value.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		mveReq.MarketplaceVisibility = &marketplaceVisibility
+	}
+
 	if !plan.ResourceTags.IsNull() {
 		tagMap, tagDiags := toResourceTagMap(ctx, plan.ResourceTags)
 		resp.Diagnostics.Append(tagDiags...)
@@ -1006,6 +1014,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		ContractTermMonths: contractTermMonths,
 		WaitForUpdate:      true,
 		WaitForTime:        waitForTime,
+	}
+
+	// UseStateForUnknown keeps the planned value equal to state unless the
+	// practitioner changed it, so a difference means a configured change.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() &&
+		!plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		modifyReq.MarketplaceVisibility = &marketplaceVisibility
 	}
 
 	// Forward vNIC description changes. vnics is Optional+Computed, so the
