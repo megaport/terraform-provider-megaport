@@ -119,7 +119,7 @@ func (ps *preflightServer) resource(t *testing.T) *vxcResource {
 	return &vxcResource{client: client}
 }
 
-// vxcOrderEnds is the a_end and b_end of one VXC in an order body.
+// vxcOrderEnds is the aEnd and bEnd of one VXC in an order body.
 type vxcOrderEnds struct {
 	AEnd map[string]any `json:"aEnd"`
 	BEnd map[string]any `json:"bEnd"`
@@ -631,17 +631,20 @@ func TestVXCCreate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
 // Terraform plans an omitted vnic_index as unknown, not null.
 func TestVXCCreate_MVEVNICIndex(t *testing.T) {
 	t.Parallel()
-	port := func(uid string) vxcEndSpec { return vxcEndSpec{productUID: uid, orderedVLAN: int64p(100)} }
+	portA := vxcEndSpec{productUID: "port-a"}
+	portB := vxcEndSpec{productUID: "port-b"}
 	omitted := vxcEndSpec{productUID: "mve-1", vnicIndexUnknown: true}
+	index1 := vxcEndSpec{productUID: "mve-1", vnicIndex: int64p(1)}
 	for _, tc := range []struct {
 		name       string
 		aEnd, bEnd vxcEndSpec
 		mveOnBEnd  bool
 		wantIndex  float64
 	}{
-		{"a-end index omitted", omitted, port("port-b"), false, 0},
-		{"b-end index omitted", port("port-a"), omitted, true, 0},
-		{"a-end index 1", vxcEndSpec{productUID: "mve-1", vnicIndex: int64p(1)}, port("port-b"), false, 1},
+		{"a-end index omitted", omitted, portB, false, 0},
+		{"b-end index omitted", portA, omitted, true, 0},
+		{"a-end index 1", index1, portB, false, 1},
+		{"b-end index 1", portA, index1, true, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
