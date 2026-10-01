@@ -164,6 +164,7 @@ func TestMVEResourceSchema_MarketplaceVisibilityPlanModifiers(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, attr.Optional)
 	assert.True(t, attr.Computed)
+	assert.Nil(t, attr.Default, "a Default would plan false for an unset value")
 
 	tests := []struct {
 		name   string
@@ -196,14 +197,18 @@ func TestMVEResourceSchema_MarketplaceVisibilityPlanModifiers(t *testing.T) {
 				PlanValue:   tc.plan,
 				StateValue:  types.BoolValue(tc.state),
 			}
-			resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
+			// Each modifier gets its own response and sees the previous plan value, as in the framework.
+			replace := false
 			for _, m := range attr.PlanModifiers {
+				resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
 				m.PlanModifyBool(ctx, req, resp)
+				require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
 				req.PlanValue = resp.PlanValue
+				replace = replace || resp.RequiresReplace
 			}
 
-			assert.Equal(t, types.BoolValue(true), resp.PlanValue)
-			assert.False(t, resp.RequiresReplace)
+			assert.Equal(t, types.BoolValue(true), req.PlanValue)
+			assert.False(t, replace)
 		})
 	}
 }
