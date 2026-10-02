@@ -36,6 +36,8 @@ type preflightServer struct {
 	// updateBodies holds each VXC update request body. The update still
 	// returns 500.
 	updateBodies []map[string]any
+	// validatedEnds holds the ends of each VXC in an order validation body.
+	validatedEnds []vxcOrderEnds
 
 	// serviceKeyBEnd is the port UID a service key lookup resolves to.
 	serviceKeyBEnd string
@@ -81,7 +83,19 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			ps.updateBodies = append(ps.updateBodies, body)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"message":"not faked"}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/v3/networkdesign/validate" && ps.validateData != "":
+		case r.Method == http.MethodPost && r.URL.Path == "/v3/networkdesign/validate":
+			var orders []struct {
+				AssociatedVXCs []vxcOrderEnds `json:"associatedVxcs"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&orders)
+			for _, o := range orders {
+				ps.validatedEnds = append(ps.validatedEnds, o.AssociatedVXCs...)
+			}
+			if ps.validateData == "" {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"message":"not faked"}`))
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]any{"message": "Validation failed", "data": ps.validateData})
 		default:
@@ -105,6 +119,12 @@ func (ps *preflightServer) resource(t *testing.T) *vxcResource {
 	return &vxcResource{client: client}
 }
 
+// vxcOrderEnds is the aEnd and bEnd of one VXC in an order body.
+type vxcOrderEnds struct {
+	AEnd map[string]any `json:"aEnd"`
+	BEnd map[string]any `json:"bEnd"`
+}
+
 // vxcEndSpec is the subset of a_end / b_end the preflight and the VLAN gate
 // read. A nil field stays null.
 type vxcEndSpec struct {
@@ -114,6 +134,7 @@ type vxcEndSpec struct {
 	vlan               *int64
 	innerVLAN          *int64
 	vnicIndex          *int64
+	vnicIndexUnknown   bool
 }
 
 type vxcValueBuilder struct {
@@ -165,6 +186,9 @@ func (b *vxcValueBuilder) end(spec vxcEndSpec) tftypes.Value {
 	}
 	if spec.vnicIndex != nil {
 		attrs["vnic_index"] = tftypes.NewValue(tftypes.Number, *spec.vnicIndex)
+	}
+	if spec.vnicIndexUnknown {
+		attrs["vnic_index"] = tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)
 	}
 	return tftypes.NewValue(b.endType, attrs)
 }
@@ -601,5 +625,48 @@ func TestVXCCreate_VLANPreflightSkipsServiceKeyBEnd(t *testing.T) {
 	want := []vlanQuery{{"port-a", "100"}}
 	if !slices.Equal(ps.vlanQueries, want) {
 		t.Fatalf("expected queries %v, got %v", want, ps.vlanQueries)
+	}
+}
+
+// Terraform plans an omitted vnic_index as unknown, not null.
+func TestVXCCreate_MVEVNICIndex(t *testing.T) {
+	t.Parallel()
+	portA := vxcEndSpec{productUID: "port-a"}
+	portB := vxcEndSpec{productUID: "port-b"}
+	omitted := vxcEndSpec{productUID: "mve-1", vnicIndexUnknown: true}
+	index1 := vxcEndSpec{productUID: "mve-1", vnicIndex: int64p(1)}
+	for _, tc := range []struct {
+		name       string
+		aEnd, bEnd vxcEndSpec
+		mveOnBEnd  bool
+		wantIndex  float64
+	}{
+		{"a-end index omitted", omitted, portB, false, 0},
+		{"b-end index omitted", portA, omitted, true, 0},
+		{"a-end index 1", index1, portB, false, 1},
+		{"b-end index 1", portA, index1, true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			ps := newPreflightServer(t, nil)
+			ps.productTypeOf = map[string]string{"mve-1": megaport.PRODUCT_MVE}
+			b := newVXCValueBuilder(t)
+
+			plan := b.vxc(b.end(tc.aEnd), b.end(tc.bEnd), nil)
+			resp := fwresource.CreateResponse{State: tfsdk.State{Schema: b.schema}}
+			ps.resource(t).Create(ctx, fwresource.CreateRequest{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}, &resp)
+
+			if len(ps.validatedEnds) != 1 {
+				t.Fatalf("expected one validated VXC, got %d: %v", len(ps.validatedEnds), resp.Diagnostics)
+			}
+			end := ps.validatedEnds[0].AEnd
+			if tc.mveOnBEnd {
+				end = ps.validatedEnds[0].BEnd
+			}
+			if got, ok := end["vNicIndex"]; !ok || got != tc.wantIndex {
+				t.Fatalf("expected vNicIndex %v, got %v (present %v)", tc.wantIndex, got, ok)
+			}
+		})
 	}
 }
