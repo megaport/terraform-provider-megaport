@@ -85,8 +85,8 @@ func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 			for i, elem := range got.Elements() {
 				gotEntry, ok := elem.(types.Object)
 				priorEntry, priorOK := prior.Elements()[i].(types.Object)
-				if !ok || !priorOK {
-					t.Fatalf("csp_connections[%d] = %T, want types.Object", i, elem)
+				if !ok || !priorOK || gotEntry.IsNull() || gotEntry.IsUnknown() {
+					t.Fatalf("csp_connections[%d] = %v, want a known object", i, elem)
 				}
 				for name, v := range gotEntry.Attributes() {
 					if tc.wantUnknown && conns[i][1] == "VROUTER" && (name == "interfaces" || name == "ip_addresses") {
