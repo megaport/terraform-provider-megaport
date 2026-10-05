@@ -72,6 +72,11 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 			wantWarning: true,
 		},
 		{
+			name:      "a modify that fails for another reason errors with no warning",
+			modifyErr: errors.New("the stub rejects the modify"),
+			wantError: "Could not update port with ID port-1: the stub rejects the modify",
+		},
+		{
 			name:    "a term increase with no approval completes with no warning",
 			apiPort: megaport.Port{UID: "port-1", Name: "port-new", ContractTermMonths: 24, CostCentre: "cc-2", MarketplaceVisibility: true},
 		},
@@ -125,7 +130,7 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 				t.Fatalf("got %d warnings (%v), want 1", len(warnings), warnings)
 			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "term increase on port port-1 needs order approval"):
 				t.Errorf("warning %q does not name the port", warnings[0].Detail())
-			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "a refresh brings the old values back into the plan"):
+			case tc.wantWarning && !strings.Contains(warnings[0].Detail(), "refresh also brings the old values back into the plan"):
 				t.Errorf("warning %q does not say a refresh brings the old values back", warnings[0].Detail())
 			}
 

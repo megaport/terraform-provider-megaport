@@ -341,6 +341,12 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			case tc.wantWarning != "" && !strings.Contains(warnings[0].Detail(), tc.wantWarning):
 				t.Errorf("warning %q does not contain %q", warnings[0].Detail(), tc.wantWarning)
 			}
+			// Only a pending primary brings the old values back on refresh.
+			if tc.wantWarning != "" && len(warnings) == 1 {
+				if got, want := strings.Contains(warnings[0].Detail(), pendingApprovalRefreshNote), tc.pending["lag-1"]; got != want {
+					t.Errorf("warning %q has the refresh note: %t, want %t", warnings[0].Detail(), got, want)
+				}
+			}
 			// The API reads back the old values while the approval is pending, so state must keep the plan.
 			if tc.wantWarning != "" && tc.wantError == "" {
 				var got lagPortResourceModel

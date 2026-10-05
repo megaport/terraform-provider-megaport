@@ -564,8 +564,8 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 	if pendingApproval {
-		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString())+
-			" Until the approval completes, a refresh brings the old values back into the plan.")
+		resp.Diagnostics.AddWarning("Port change pending approval",
+			portPendingApprovalWarning("port "+plan.UID.ValueString())+pendingApprovalRefreshNote)
 	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
@@ -633,6 +633,8 @@ func portPendingApprovalWarning(ports string) string {
 		"The API holds any `name`, `cost_centre`, or `marketplace_visibility` change in the same request, and applies it with the approval. " +
 		"Until the approval, the API rejects any other modify of " + ports + "."
 }
+
+const pendingApprovalRefreshNote = " A refresh also brings the old values back into the plan until then."
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *portResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

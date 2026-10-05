@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -727,8 +728,12 @@ func warnLagPendingApproval(diags *diag.Diagnostics, lagUID string, pendingUIDs 
 	if len(pendingUIDs) > 1 {
 		ports = "ports "
 	}
-	diags.AddWarning("LAG port change pending approval",
-		portPendingApprovalWarning(ports+strings.Join(pendingUIDs, ", ")+" in LAG "+lagUID))
+	msg := portPendingApprovalWarning(ports + strings.Join(pendingUIDs, ", ") + " in LAG " + lagUID)
+	// Read returns the primary port only, so the old values come back only when the primary is pending.
+	if slices.Contains(pendingUIDs, lagUID) {
+		msg += pendingApprovalRefreshNote
+	}
+	diags.AddWarning("LAG port change pending approval", msg)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
