@@ -187,10 +187,10 @@ var (
 		"bfd_enabled":           types.BoolType,
 		"as_override":           types.BoolType,
 		"export_policy":         types.StringType,
-		"import_whitelist":      types.Int64Type,
-		"import_blacklist":      types.Int64Type,
-		"export_whitelist":      types.Int64Type,
-		"export_blacklist":      types.Int64Type,
+		"import_whitelist_id":   types.Int64Type,
+		"import_blacklist_id":   types.Int64Type,
+		"export_whitelist_id":   types.Int64Type,
+		"export_blacklist_id":   types.Int64Type,
 		"as_path_prepend_count": types.Int64Type,
 	}
 
@@ -471,10 +471,10 @@ type cspConnectionBGPConnectionModel struct {
 	BFDEnabled         types.Bool   `tfsdk:"bfd_enabled"`
 	AsOverride         types.Bool   `tfsdk:"as_override"`
 	ExportPolicy       types.String `tfsdk:"export_policy"`
-	ImportWhitelist    types.Int64  `tfsdk:"import_whitelist"`
-	ImportBlacklist    types.Int64  `tfsdk:"import_blacklist"`
-	ExportWhitelist    types.Int64  `tfsdk:"export_whitelist"`
-	ExportBlacklist    types.Int64  `tfsdk:"export_blacklist"`
+	ImportWhitelistID  types.Int64  `tfsdk:"import_whitelist_id"`
+	ImportBlacklistID  types.Int64  `tfsdk:"import_blacklist_id"`
+	ExportWhitelistID  types.Int64  `tfsdk:"export_whitelist_id"`
+	ExportBlacklistID  types.Int64  `tfsdk:"export_blacklist_id"`
 	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
 }
 
@@ -1233,19 +1233,19 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													Description: "The export policy of the BGP connection.",
 													Computed:    true,
 												},
-												"import_whitelist": schema.Int64Attribute{
+												"import_whitelist_id": schema.Int64Attribute{
 													Description: "The ID of the prefix filter list that permits imported routes.",
 													Computed:    true,
 												},
-												"import_blacklist": schema.Int64Attribute{
+												"import_blacklist_id": schema.Int64Attribute{
 													Description: "The ID of the prefix filter list that denies imported routes.",
 													Computed:    true,
 												},
-												"export_whitelist": schema.Int64Attribute{
+												"export_whitelist_id": schema.Int64Attribute{
 													Description: "The ID of the prefix filter list that permits exported routes.",
 													Computed:    true,
 												},
-												"export_blacklist": schema.Int64Attribute{
+												"export_blacklist_id": schema.Int64Attribute{
 													Description: "The ID of the prefix filter list that denies exported routes.",
 													Computed:    true,
 												},
@@ -3793,10 +3793,10 @@ func fromAPICSPConnectionInterfaces(ctx context.Context, interfaces []megaport.C
 				BFDEnabled:         types.BoolValue(bgp.BfdEnabled),
 				AsOverride:         types.BoolPointerValue(bgp.AsOverride),
 				ExportPolicy:       stringOrNull(bgp.ExportPolicy),
-				ImportWhitelist:    int64OrNull(bgp.ImportWhitelist),
-				ImportBlacklist:    int64OrNull(bgp.ImportBlacklist),
-				ExportWhitelist:    int64OrNull(bgp.ExportWhitelist),
-				ExportBlacklist:    int64OrNull(bgp.ExportBlacklist),
+				ImportWhitelistID:  int64OrNull(bgp.ImportWhitelist),
+				ImportBlacklistID:  int64OrNull(bgp.ImportBlacklist),
+				ExportWhitelistID:  int64OrNull(bgp.ExportWhitelist),
+				ExportBlacklistID:  int64OrNull(bgp.ExportBlacklist),
 				AsPathPrependCount: int64OrNull(bgp.AsPathPrependCount),
 			})
 		}

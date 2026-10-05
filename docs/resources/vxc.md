@@ -983,11 +983,11 @@ Read-Only:
 - `as_path_prepend_count` (Number) The number of times the router prepends the local ASN to the routes it advertises on this BGP connection.
 - `bfd_enabled` (Boolean) Whether BFD is enabled on the BGP connection.
 - `description` (String) The description of the BGP connection.
-- `export_blacklist` (Number) The ID of the prefix filter list that denies exported routes.
+- `export_blacklist_id` (Number) The ID of the prefix filter list that denies exported routes.
 - `export_policy` (String) The export policy of the BGP connection.
-- `export_whitelist` (Number) The ID of the prefix filter list that permits exported routes.
-- `import_blacklist` (Number) The ID of the prefix filter list that denies imported routes.
-- `import_whitelist` (Number) The ID of the prefix filter list that permits imported routes.
+- `export_whitelist_id` (Number) The ID of the prefix filter list that permits exported routes.
+- `import_blacklist_id` (Number) The ID of the prefix filter list that denies imported routes.
+- `import_whitelist_id` (Number) The ID of the prefix filter list that permits imported routes.
 - `local_asn` (Number) The local ASN of the BGP connection.
 - `local_ip_address` (String) The local IP address of the BGP connection.
 - `med_in` (Number) The MED applied to routes received from the peer.

@@ -641,10 +641,10 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 		BFDEnabled:         types.BoolValue(true),
 		AsOverride:         types.BoolValue(true),
 		ExportPolicy:       types.StringValue("permit"),
-		ImportWhitelist:    types.Int64Value(11),
-		ImportBlacklist:    types.Int64Value(12),
-		ExportWhitelist:    types.Int64Value(21),
-		ExportBlacklist:    types.Int64Value(22),
+		ImportWhitelistID:  types.Int64Value(11),
+		ImportBlacklistID:  types.Int64Value(12),
+		ExportWhitelistID:  types.Int64Value(21),
+		ExportBlacklistID:  types.Int64Value(22),
 		AsPathPrependCount: types.Int64Value(2),
 	}, bgps[0])
 	assert.Equal(t, cspConnectionBGPConnectionModel{
@@ -660,10 +660,10 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 		BFDEnabled:         types.BoolValue(false),
 		AsOverride:         types.BoolNull(),
 		ExportPolicy:       types.StringNull(),
-		ImportWhitelist:    types.Int64Null(),
-		ImportBlacklist:    types.Int64Null(),
-		ExportWhitelist:    types.Int64Null(),
-		ExportBlacklist:    types.Int64Null(),
+		ImportWhitelistID:  types.Int64Null(),
+		ImportBlacklistID:  types.Int64Null(),
+		ExportWhitelistID:  types.Int64Null(),
+		ExportBlacklistID:  types.Int64Null(),
 		AsPathPrependCount: types.Int64Null(),
 	}, bgps[1])
 
