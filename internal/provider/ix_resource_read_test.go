@@ -234,13 +234,39 @@ func TestIXConversionErrorDoesNotSaveState(t *testing.T) {
 		stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, ixReadTestUID)
 		stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
 
-		resp := &fwresource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: stateVal}}
+		// The framework starts Update with a null response state.
+		resp := &fwresource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, nil)}}
 		r.Update(ctx, fwresource.UpdateRequest{
 			Plan:  tfsdk.Plan{Schema: s, Raw: stateVal},
 			State: tfsdk.State{Schema: s, Raw: stateVal},
 		}, resp)
 
 		require.True(t, resp.Diagnostics.HasError(), "expected a conversion diagnostic")
-		assert.True(t, resp.State.Raw.Equal(stateVal), "expected state to be left untouched")
+		assert.True(t, resp.State.Raw.IsNull(), "expected no state to be set")
 	})
+}
+
+// Not parallel: it edits the package-level attr type maps in place.
+func TestIXFromAPIReturnsNestedConversionErrors(t *testing.T) {
+	ix := &megaport.IX{Resources: megaport.IXResources{
+		Interface:      megaport.IXInterface{ResourceType: "interface"},
+		BGPConnections: []megaport.IXBGPConnection{{}},
+		IPAddresses:    []megaport.IXIPAddress{{}},
+		VPLSInterface:  megaport.IXVPLSInterface{ResourceType: "vpls_interface"},
+	}}
+	for name, m := range map[string]map[string]attr.Type{
+		"interface":       interfaceAttrTypes,
+		"bgp_connections": bgpConnectionAttrTypes,
+		"ip_addresses":    ipAddressAttrTypes,
+		"vpls_interface":  vplsInterfaceAttrTypes,
+	} {
+		t.Run(name, func(t *testing.T) {
+			saved := m["resource_type"]
+			t.Cleanup(func() { m["resource_type"] = saved })
+			delete(m, "resource_type")
+
+			var got ixResourceModel
+			assert.True(t, got.fromAPI(context.Background(), ix).HasError(), "expected a %s conversion diagnostic", name)
+		})
+	}
 }
