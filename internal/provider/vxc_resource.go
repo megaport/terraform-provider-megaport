@@ -3740,27 +3740,19 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 
 // vrouterInterfacesUnknown marks interfaces and ip_addresses unknown on each VROUTER entry.
 // The other entries stay known: an unknown value there can force replacement of a resource that reads it.
-func vrouterInterfacesUnknown(conns types.List, diags *diag.Diagnostics) types.List {
-	if conns.IsNull() || conns.IsUnknown() {
+func vrouterInterfacesUnknown(ctx context.Context, conns types.List, diags *diag.Diagnostics) types.List {
+	if conns.IsUnknown() {
 		return conns
 	}
-	elems := conns.Elements()
-	for i, elem := range elems {
-		obj, ok := elem.(types.Object)
-		if !ok || obj.IsNull() || obj.IsUnknown() {
-			continue
+	var models []cspConnectionModel
+	diags.Append(conns.ElementsAs(ctx, &models, false)...)
+	for i := range models {
+		if models[i].ConnectType.ValueString() == "VROUTER" {
+			models[i].Interfaces = types.ListUnknown(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
+			models[i].IPAddresses = types.ListUnknown(types.StringType)
 		}
-		attrs := obj.Attributes()
-		if connectType, ok := attrs["connect_type"].(types.String); !ok || connectType.ValueString() != "VROUTER" {
-			continue
-		}
-		attrs["interfaces"] = types.ListUnknown(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
-		attrs["ip_addresses"] = types.ListUnknown(types.StringType)
-		vrouterObj, objDiags := types.ObjectValue(cspConnectionFullAttrs, attrs)
-		diags.Append(objDiags...)
-		elems[i] = vrouterObj
 	}
-	list, listDiags := types.ListValue(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), elems)
+	list, listDiags := types.ListValueFrom(ctx, conns.ElementType(ctx), models)
 	diags.Append(listDiags...)
 	return list
 }
@@ -3853,7 +3845,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 
 			// A partner config change can change the interfaces the read call returns in csp_connections.
 			if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) || !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-				plan.CSPConnections = vrouterInterfacesUnknown(plan.CSPConnections, &resp.Diagnostics)
+				plan.CSPConnections = vrouterInterfacesUnknown(ctx, plan.CSPConnections, &resp.Diagnostics)
 				resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("csp_connections"), plan.CSPConnections)...)
 			}
 
