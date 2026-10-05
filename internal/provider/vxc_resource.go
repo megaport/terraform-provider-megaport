@@ -3740,6 +3740,33 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
 }
 
+// vrouterInterfacesUnknown marks interfaces and ip_addresses unknown on each VROUTER entry.
+// The other entries stay known: an unknown value there can force replacement of a resource that reads it.
+func vrouterInterfacesUnknown(conns types.List, diags *diag.Diagnostics) types.List {
+	if conns.IsNull() || conns.IsUnknown() {
+		return conns
+	}
+	elems := conns.Elements()
+	for i, elem := range elems {
+		obj, ok := elem.(types.Object)
+		if !ok || obj.IsNull() || obj.IsUnknown() {
+			continue
+		}
+		attrs := obj.Attributes()
+		if connectType, ok := attrs["connect_type"].(types.String); !ok || connectType.ValueString() != "VROUTER" {
+			continue
+		}
+		attrs["interfaces"] = types.ListUnknown(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
+		attrs["ip_addresses"] = types.ListUnknown(types.StringType)
+		vrouterObj, objDiags := types.ObjectValue(cspConnectionFullAttrs, attrs)
+		diags.Append(objDiags...)
+		elems[i] = vrouterObj
+	}
+	list, listDiags := types.ListValue(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs), elems)
+	diags.Append(listDiags...)
+	return list
+}
+
 // fromAPICSPConnectionInterfaces leaves out the BGP password, which the read call returns in plain text.
 func fromAPICSPConnectionInterfaces(ctx context.Context, interfaces []megaport.CSPConnectionVirtualRouterInterface) (types.List, diag.Diagnostics) {
 	apiDiags := diag.Diagnostics{}
@@ -3828,7 +3855,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 
 			// A partner config change can change the interfaces the read call returns in csp_connections.
 			if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) || !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
-				plan.CSPConnections = types.ListUnknown(types.ObjectType{}.WithAttributeTypes(cspConnectionFullAttrs))
+				plan.CSPConnections = vrouterInterfacesUnknown(plan.CSPConnections, &resp.Diagnostics)
 				resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("csp_connections"), plan.CSPConnections)...)
 			}
 

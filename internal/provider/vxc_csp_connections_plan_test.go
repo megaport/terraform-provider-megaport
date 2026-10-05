@@ -12,13 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-func TestVXCModifyPlan_CSPConnectionsUnknownOnPartnerChange(t *testing.T) {
+func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	b := newVXCValueBuilder(t)
 	ty := newVXCPartnerTestTypes(ctx, t)
 	live := bEndAt(200, nil)
-	conns := [][2]string{{"a_csp_connection", "VROUTER"}}
+	conns := [][2]string{{"a_csp_connection", "VROUTER"}, {"b_csp_connection", "AWS"}}
 
 	aEndPartner := func(t *testing.T, v tftypes.Value, name string) tftypes.Value {
 		t.Helper()
@@ -67,14 +67,28 @@ func TestVXCModifyPlan_CSPConnectionsUnknownOnPartnerChange(t *testing.T) {
 				t.Fatalf("ModifyPlan: %v", resp.Diagnostics)
 			}
 
-			var got types.List
-			if diags := resp.Plan.GetAttribute(ctx, path.Root("csp_connections"), &got); diags.HasError() {
+			var got, prior types.List
+			diags := resp.Plan.GetAttribute(ctx, path.Root("csp_connections"), &got)
+			diags.Append(tfsdk.State{Schema: b.schema, Raw: state}.GetAttribute(ctx, path.Root("csp_connections"), &prior)...)
+			if diags.HasError() {
 				t.Fatalf("reading csp_connections: %v", diags)
 			}
-			if got.IsUnknown() != tc.wantUnknown {
-				t.Errorf("csp_connections unknown = %v, want %v", got.IsUnknown(), tc.wantUnknown)
+			if len(got.Elements()) != len(conns) {
+				t.Fatalf("csp_connections = %v, want %d known entries", got, len(conns))
 			}
-			if !tc.wantUnknown && len(got.Elements()) != len(conns) {
+			vrouter, ok := got.Elements()[0].(types.Object)
+			if !ok {
+				t.Fatalf("VROUTER entry = %T, want types.Object", got.Elements()[0])
+			}
+			for _, name := range []string{"interfaces", "ip_addresses"} {
+				if v := vrouter.Attributes()[name]; v.IsUnknown() != tc.wantUnknown {
+					t.Errorf("VROUTER %s unknown = %v, want %v", name, v.IsUnknown(), tc.wantUnknown)
+				}
+			}
+			if !got.Elements()[1].Equal(prior.Elements()[1]) {
+				t.Errorf("AWS entry = %v, want the state value", got.Elements()[1])
+			}
+			if !tc.wantUnknown && !got.Equal(prior) {
 				t.Errorf("csp_connections = %v, want the state value", got)
 			}
 		})
