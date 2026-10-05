@@ -546,8 +546,111 @@ func TestFromAPICSPConnection(t *testing.T) {
 			diags = model.IPAddresses.ElementsAs(ctx, &gotIPs, false)
 			require.False(t, diags.HasError(), "reading ip_addresses: %v", diags)
 			assert.Equal(t, tc.wantIPs, gotIPs)
+
+			assert.False(t, model.Interfaces.IsNull(), "interfaces should be an empty list, not null")
+			assert.Empty(t, model.Interfaces.Elements())
 		})
 	}
+}
+
+func TestFromAPICSPConnection_Interfaces(t *testing.T) {
+	ctx := context.Background()
+	localASN := 64600
+	asOverride := true
+	conn := megaport.CSPConnectionVirtualRouter{
+		ConnectType:       "VROUTER",
+		ResourceName:      "a_csp_connection",
+		ResourceType:      "a_csp_connection",
+		VLAN:              300,
+		VirtualRouterName: "mcr-vrouter",
+		IPAddresses:       []string{"10.0.0.1/30"},
+		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{{
+			IPAddresses:    []string{"10.0.0.1/30", "2001:db8::1/126"},
+			IPRoutes:       []megaport.IpRoute{{Prefix: "192.0.2.0/24", Description: "static", NextHop: "10.0.0.2"}},
+			NatIPAddresses: []string{"198.51.100.10"},
+			BGPConnections: []megaport.BgpConnectionConfig{
+				{
+					PeerAsn:            64512,
+					LocalAsn:           &localASN,
+					LocalIpAddress:     "10.0.0.1",
+					PeerIpAddress:      "10.0.0.2",
+					Password:           "test-bgp-password",
+					Description:        "primary",
+					MedIn:              100,
+					MedOut:             200,
+					BfdEnabled:         true,
+					ExportPolicy:       "permit",
+					ImportWhitelist:    11,
+					ExportBlacklist:    22,
+					AsPathPrependCount: 2,
+					PeerType:           "NON_CLOUD",
+					AsOverride:         &asOverride,
+				},
+				{
+					PeerAsn:        64513,
+					LocalIpAddress: "10.0.0.1",
+					PeerIpAddress:  "10.0.0.3",
+					Shutdown:       true,
+				},
+			},
+		}},
+	}
+
+	obj, diags := fromAPICSPConnection(ctx, conn)
+	require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+	assert.NotContains(t, obj.String(), "test-bgp-password")
+
+	var model cspConnectionModel
+	require.False(t, obj.As(ctx, &model, basetypes.ObjectAsOptions{}).HasError())
+	var ifaces []cspConnectionInterfaceModel
+	require.False(t, model.Interfaces.ElementsAs(ctx, &ifaces, false).HasError())
+	require.Len(t, ifaces, 1)
+
+	var ips, natIPs []string
+	require.False(t, ifaces[0].IPAddresses.ElementsAs(ctx, &ips, false).HasError())
+	require.False(t, ifaces[0].NatIPAddresses.ElementsAs(ctx, &natIPs, false).HasError())
+	assert.Equal(t, []string{"10.0.0.1/30", "2001:db8::1/126"}, ips)
+	assert.Equal(t, []string{"198.51.100.10"}, natIPs)
+
+	var routes []ipRouteModel
+	require.False(t, ifaces[0].IPRoutes.ElementsAs(ctx, &routes, false).HasError())
+	require.Len(t, routes, 1)
+	assert.Equal(t, "192.0.2.0/24", routes[0].Prefix.ValueString())
+	assert.Equal(t, "static", routes[0].Description.ValueString())
+	assert.Equal(t, "10.0.0.2", routes[0].NextHop.ValueString())
+
+	var bgps []cspConnectionBGPConnectionModel
+	require.False(t, ifaces[0].BGPConnections.ElementsAs(ctx, &bgps, false).HasError())
+	require.Len(t, bgps, 2)
+	assert.Equal(t, cspConnectionBGPConnectionModel{
+		PeerType:           types.StringValue("NON_CLOUD"),
+		PeerASN:            types.Int64Value(64512),
+		LocalASN:           types.Int64Value(64600),
+		LocalIPAddress:     types.StringValue("10.0.0.1"),
+		PeerIPAddress:      types.StringValue("10.0.0.2"),
+		Shutdown:           types.BoolValue(false),
+		Description:        types.StringValue("primary"),
+		MedIn:              types.Int64Value(100),
+		MedOut:             types.Int64Value(200),
+		BFDEnabled:         types.BoolValue(true),
+		AsOverride:         types.BoolValue(true),
+		ExportPolicy:       types.StringValue("permit"),
+		ImportWhitelist:    types.Int64Value(11),
+		ImportBlacklist:    types.Int64Null(),
+		ExportWhitelist:    types.Int64Null(),
+		ExportBlacklist:    types.Int64Value(22),
+		AsPathPrependCount: types.Int64Value(2),
+	}, bgps[0])
+	assert.Equal(t, int64(64513), bgps[1].PeerASN.ValueInt64())
+	assert.True(t, bgps[1].LocalASN.IsNull())
+	assert.True(t, bgps[1].AsOverride.IsNull())
+	assert.True(t, bgps[1].Shutdown.ValueBool())
+}
+
+func TestFromAPICSPConnection_NonVrouterInterfacesNull(t *testing.T) {
+	obj, diags := fromAPICSPConnection(context.Background(), megaport.CSPConnectionAWS{ConnectType: "AWS"})
+	require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+	assert.True(t, obj.Attributes()["interfaces"].IsNull())
 }
 
 // vrouterInterfacesFromObject decodes a partner config object down to its
