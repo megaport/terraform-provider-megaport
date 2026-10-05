@@ -556,7 +556,7 @@ func TestFromAPICSPConnection(t *testing.T) {
 func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 	ctx := context.Background()
 	localASN := 64600
-	asOverride := true
+	asOverride, noASOverride := true, false
 	conn := megaport.CSPConnectionVirtualRouter{
 		ConnectType:       "VROUTER",
 		ResourceName:      "a_csp_connection",
@@ -597,6 +597,12 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 					PeerIpAddress:  "10.0.0.3",
 					Shutdown:       true,
 				},
+				{
+					PeerAsn:        64514,
+					LocalIpAddress: "10.0.0.1",
+					PeerIpAddress:  "10.0.0.4",
+					AsOverride:     &noASOverride,
+				},
 			},
 		}, {}},
 	}
@@ -627,7 +633,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 
 	var bgps []cspConnectionBGPConnectionModel
 	require.False(t, ifaces[0].BGPConnections.ElementsAs(ctx, &bgps, false).HasError())
-	require.Len(t, bgps, 2)
+	require.Len(t, bgps, 3)
 	assert.Equal(t, cspConnectionBGPConnectionModel{
 		PeerType:           types.StringValue("NON_CLOUD"),
 		PeerASN:            types.Int64Value(64512),
@@ -666,6 +672,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 		ExportBlacklistID:  types.Int64Null(),
 		AsPathPrependCount: types.Int64Null(),
 	}, bgps[1])
+	assert.Equal(t, types.BoolValue(false), bgps[2].AsOverride)
 
 	for name, list := range map[string]types.List{
 		"ip_addresses":     ifaces[1].IPAddresses,

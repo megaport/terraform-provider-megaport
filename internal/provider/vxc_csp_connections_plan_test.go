@@ -35,6 +35,7 @@ func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 		stateBPartner, planBPartner string
 		vrouterConfigEnd            string
 		unknownBEnd                 bool
+		rateLimitChange             bool
 		wantUnknown                 bool
 	}{
 		{name: "a-end partner config change", stateAPartner: "vrouter", planAPartner: "transit", wantUnknown: true},
@@ -45,6 +46,7 @@ func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 		{name: "vrouter config change with two VROUTER entries", conns: [][2]string{{"a_csp_connection", "VROUTER"}, {"b_csp_connection", "VROUTER"}}, stateBPartner: "vrouter", planBPartner: "vrouter", vrouterConfigEnd: "b_end_partner_config", wantUnknown: true},
 		{name: "partner config change with unknown b-end", stateAPartner: "vrouter", planAPartner: "transit", unknownBEnd: true, wantUnknown: true},
 		{name: "partner configs unchanged", stateAPartner: "vrouter", planAPartner: "vrouter", stateBPartner: "transit", planBPartner: "transit"},
+		{name: "rate limit change with partner configs unchanged", stateAPartner: "vrouter", planAPartner: "vrouter", stateBPartner: "transit", planBPartner: "transit", rateLimitChange: true},
 		{name: "no partner configs"},
 	}
 
@@ -62,6 +64,9 @@ func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 			}
 			if tc.unknownBEnd {
 				plan = b.with(t, plan, map[string]tftypes.Value{"b_end": tftypes.NewValue(b.endType, tftypes.UnknownValue)})
+			}
+			if tc.rateLimitChange {
+				plan = b.with(t, plan, map[string]tftypes.Value{"rate_limit": tftypes.NewValue(tftypes.Number, 500)})
 			}
 
 			resp := fwresource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}
