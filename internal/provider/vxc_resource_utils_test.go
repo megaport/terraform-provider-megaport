@@ -556,7 +556,7 @@ func TestFromAPICSPConnection(t *testing.T) {
 func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 	ctx := context.Background()
 	localASN := 64600
-	asOverride, noASOverride := true, false
+	asOverride, noAsOverride := true, false
 	conn := megaport.CSPConnectionVirtualRouter{
 		ConnectType:       "VROUTER",
 		ResourceName:      "a_csp_connection",
@@ -601,7 +601,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 					PeerAsn:        64514,
 					LocalIpAddress: "10.0.0.1",
 					PeerIpAddress:  "10.0.0.4",
-					AsOverride:     &noASOverride,
+					AsOverride:     &noAsOverride,
 				},
 			},
 		}, {}},
