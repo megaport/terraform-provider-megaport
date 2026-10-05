@@ -15,6 +15,7 @@ func TestVXCModifyPlan_CSPConnectionsUnknownOnPartnerChange(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	b := newVXCValueBuilder(t)
+	ty := newVXCPartnerTestTypes(ctx, t)
 	live := bEndAt(200, nil)
 	conns := [][2]string{{"a_csp_connection", "VROUTER"}}
 
@@ -30,14 +31,15 @@ func TestVXCModifyPlan_CSPConnectionsUnknownOnPartnerChange(t *testing.T) {
 		name                        string
 		stateAPartner, planAPartner string
 		stateBPartner, planBPartner string
-		planBVrouterConfig          bool
+		vrouterConfigEnd            string
 		unknownBEnd                 bool
 		wantUnknown                 bool
 	}{
 		{name: "a-end partner config change", stateAPartner: "vrouter", planAPartner: "transit", wantUnknown: true},
 		{name: "a-end partner config added", planAPartner: "vrouter", wantUnknown: true},
 		{name: "b-end partner config change", stateBPartner: "vrouter", planBPartner: "transit", wantUnknown: true},
-		{name: "b-end vrouter config change", stateBPartner: "vrouter", planBPartner: "vrouter", planBVrouterConfig: true, wantUnknown: true},
+		{name: "a-end vrouter config change", stateAPartner: "vrouter", planAPartner: "vrouter", vrouterConfigEnd: "a_end_partner_config", wantUnknown: true},
+		{name: "b-end vrouter config change", stateBPartner: "vrouter", planBPartner: "vrouter", vrouterConfigEnd: "b_end_partner_config", wantUnknown: true},
 		{name: "partner config change with unknown b-end", stateAPartner: "vrouter", planAPartner: "transit", unknownBEnd: true, wantUnknown: true},
 		{name: "partner configs unchanged", stateAPartner: "vrouter", planAPartner: "vrouter", stateBPartner: "transit", planBPartner: "transit"},
 		{name: "no partner configs"},
@@ -48,17 +50,8 @@ func TestVXCModifyPlan_CSPConnectionsUnknownOnPartnerChange(t *testing.T) {
 			t.Parallel()
 			state := aEndPartner(t, b.liveVXC(t, vxcEndSpec{}, live, conns, tc.stateBPartner), tc.stateAPartner)
 			plan := aEndPartner(t, b.liveVXC(t, vxcEndSpec{}, live, conns, tc.planBPartner), tc.planAPartner)
-			if tc.planBVrouterConfig {
-				attrs := map[string]tftypes.Value{}
-				if err := b.partner(tc.planBPartner).As(&attrs); err != nil {
-					t.Fatalf("unpacking partner config: %v", err)
-				}
-				vrouterType, ok := b.partnerTyp.AttributeTypes["vrouter_config"].(tftypes.Object)
-				if !ok {
-					t.Fatal("vrouter_config type is not tftypes.Object")
-				}
-				attrs["vrouter_config"] = tftypes.NewValue(vrouterType, nullValueMap(vrouterType))
-				plan = b.with(t, plan, map[string]tftypes.Value{"b_end_partner_config": tftypes.NewValue(b.partnerTyp, attrs)})
+			if tc.vrouterConfigEnd != "" {
+				plan = b.with(t, plan, map[string]tftypes.Value{tc.vrouterConfigEnd: ty.vrouterVal(true)})
 			}
 			if tc.unknownBEnd {
 				plan = b.with(t, plan, map[string]tftypes.Value{"b_end": tftypes.NewValue(b.endType, tftypes.UnknownValue)})
