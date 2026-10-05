@@ -446,7 +446,7 @@ Optional:
 
 Required:
 
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+- `pairing_key` (String, Sensitive) The pairing key of the partner configuration. Required for Google partner configurations.
 
 
 <a id="nestedatt--a_end_partner_config--ibm_config"></a>
@@ -720,7 +720,7 @@ Optional:
 
 Required:
 
-- `pairing_key` (String) The pairing key of the partner configuration. Required for Google partner configurations.
+- `pairing_key` (String, Sensitive) The pairing key of the partner configuration. Required for Google partner configurations.
 
 
 <a id="nestedatt--b_end_partner_config--ibm_config"></a>
@@ -931,7 +931,7 @@ Optional:
 - `account_id` (String) The account ID of the CSP connection.
 - `amazon_address` (String) The Amazon address of the CSP connection.
 - `asn` (Number) The ASN of the CSP connection.
-- `auth_key` (String) The authentication key of the CSP connection.
+- `auth_key` (String, Sensitive) The authentication key of the CSP connection.
 - `bandwidth` (Number) The bandwidth of the CSP connection.
 - `bandwidths` (List of Number) The bandwidths of the CSP connection.
 - `connect_type` (String) The connection type of the CSP connection.
@@ -949,7 +949,7 @@ Optional:
 - `managed` (Boolean) Whether the CSP connection is managed.
 - `name` (String) The name of the CSP connection.
 - `owner_account` (String) The owner's AWS account of the CSP connection.
-- `pairing_key` (String) The pairing key of the Google Cloud connection.
+- `pairing_key` (String, Sensitive) The pairing key of the Google Cloud connection.
 - `peer_asn` (Number) The peer ASN of the CSP connection.
 - `provider_ip_address` (String) The provider IP address of the CSP connection.
 - `resource_name` (String) The resource name of the CSP connection.

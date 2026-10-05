@@ -134,6 +134,7 @@ var (
 			"pairing_key": schema.StringAttribute{
 				Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
 				Required:    true,
+				Sensitive:   true,
 			},
 		},
 	}

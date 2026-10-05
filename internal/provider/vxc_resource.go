@@ -963,6 +963,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The authentication key of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							Sensitive:   true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 							},
@@ -1044,6 +1045,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The pairing key of the Google Cloud connection.",
 							Optional:    true,
 							Computed:    true,
+							Sensitive:   true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 							},
