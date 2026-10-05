@@ -2717,13 +2717,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			!aEndState.VLAN.IsNull() && updateReq.AEndVLAN == nil {
 			updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 		}
-	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
-		return
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
@@ -2793,13 +2786,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			!bEndState.VLAN.IsNull() && updateReq.BEndVLAN == nil {
 			updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 		}
-	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
-		return
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		bEndState.NetworkInterfaceIndex = types.Int64Null()
