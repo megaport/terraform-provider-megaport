@@ -598,9 +598,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 					Shutdown:       true,
 				},
 			},
-		}, {
-			IPAddresses: []string{"10.0.1.1/30"},
-		}},
+		}, {}},
 	}
 
 	obj, diags := fromAPICSPConnection(ctx, conn)
@@ -670,6 +668,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 	}, bgps[1])
 
 	for name, list := range map[string]types.List{
+		"ip_addresses":     ifaces[1].IPAddresses,
 		"nat_ip_addresses": ifaces[1].NatIPAddresses,
 		"ip_routes":        ifaces[1].IPRoutes,
 		"bgp_connections":  ifaces[1].BGPConnections,
