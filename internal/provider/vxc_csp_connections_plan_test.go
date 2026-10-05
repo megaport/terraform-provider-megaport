@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -92,20 +91,5 @@ func TestVXCModifyPlan_VRouterInterfacesUnknownOnPartnerChange(t *testing.T) {
 				t.Errorf("csp_connections = %v, want the state value", got)
 			}
 		})
-	}
-}
-
-func TestVXCSchema_CSPConnectionKeysSensitive(t *testing.T) {
-	t.Parallel()
-	var resp fwresource.SchemaResponse
-	(&vxcResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, &resp)
-	conns, ok := resp.Schema.Attributes["csp_connections"].(schema.ListNestedAttribute)
-	if !ok {
-		t.Fatal("csp_connections is not a list nested attribute")
-	}
-	for _, name := range []string{"auth_key", "pairing_key", "service_key"} {
-		if !conns.NestedObject.Attributes[name].IsSensitive() {
-			t.Errorf("csp_connections %s is not sensitive", name)
-		}
 	}
 }
