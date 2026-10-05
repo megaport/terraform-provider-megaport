@@ -1105,7 +1105,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							},
 						},
 						"ip_addresses": schema.ListAttribute{
-							Description: "The IP addresses of the Virtual Router. The API does not return this list for an MCR or NAT Gateway end. Read the addresses from `interfaces` instead.",
+							Description: "The IP addresses of the Virtual Router.",
 							Optional:    true,
 							Computed:    true,
 							ElementType: types.StringType,
