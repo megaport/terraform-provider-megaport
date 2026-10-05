@@ -943,7 +943,7 @@ Optional:
 - `customer_ip6_network` (String) The customer IPv6 network of the Transit VXC connection.
 - `customer_ip_address` (String) The customer IP address of the CSP connection.
 - `id` (Number) The ID of the CSP connection.
-- `ip_addresses` (List of String) The IP addresses of the Virtual Router.
+- `ip_addresses` (List of String) The IP addresses of the Virtual Router. The API does not return this list for an MCR or NAT Gateway end. Read the addresses from `interfaces` instead.
 - `ipv4_gateway_address` (String) The IPv4 gateway address of the Transit VXC connection.
 - `ipv6_gateway_address` (String) The IPv6 gateway address of the Transit VXC connection.
 - `managed` (Boolean) Whether the CSP connection is managed.
