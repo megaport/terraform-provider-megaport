@@ -511,7 +511,7 @@ type vxcPartnerConfigAEndModel struct {
 
 type vxcPartnerConfigIbmModel struct {
 	vxcPartnerConfig  `tfsdk:"-"`
-	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Acount ID.  32 Hexadecimal Characters. REQUIRED
+	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Account ID.  32 Hexadecimal Characters. REQUIRED
 	CustomerASN       types.Int64  `tfsdk:"customer_asn"`        // Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
 	Name              types.String `tfsdk:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".
 	CustomerIPAddress types.String `tfsdk:"customer_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.

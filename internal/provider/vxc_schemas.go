@@ -143,7 +143,7 @@ var (
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"account_id": schema.StringAttribute{
-				Description: "Customer's IBM Acount ID. Required for all IBM partner configurations.",
+				Description: "Customer's IBM Account ID. Required for all IBM partner configurations.",
 				Required:    true,
 			},
 			"customer_asn": schema.Int64Attribute{

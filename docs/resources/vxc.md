@@ -454,7 +454,7 @@ Required:
 
 Required:
 
-- `account_id` (String) Customer's IBM Acount ID. Required for all IBM partner configurations.
+- `account_id` (String) Customer's IBM Account ID. Required for all IBM partner configurations.
 
 Optional:
 
@@ -728,7 +728,7 @@ Required:
 
 Required:
 
-- `account_id` (String) Customer's IBM Acount ID. Required for all IBM partner configurations.
+- `account_id` (String) Customer's IBM Account ID. Required for all IBM partner configurations.
 
 Optional:
 
