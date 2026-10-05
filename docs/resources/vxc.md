@@ -969,10 +969,10 @@ Read-Only:
 
 Read-Only:
 
-- `bgp_connections` (Attributes List) The BGP connections of the interface. The BGP password is not included. (see [below for nested schema](#nestedatt--csp_connections--interfaces--bgp_connections))
+- `bgp_connections` (Attributes List) The BGP connections of the interface. The provider leaves out the BGP password. (see [below for nested schema](#nestedatt--csp_connections--interfaces--bgp_connections))
 - `ip_addresses` (List of String) The IP addresses of the interface, in CIDR notation.
 - `ip_routes` (Attributes List) The static routes of the interface. (see [below for nested schema](#nestedatt--csp_connections--interfaces--ip_routes))
-- `nat_ip_addresses` (List of String) The NAT IP addresses of the interface.
+- `nat_ip_addresses` (List of String) The NAT IP addresses of an MCR interface. The provider does not read NAT Gateway address pools.
 
 <a id="nestedatt--csp_connections--interfaces--bgp_connections"></a>
 ### Nested Schema for `csp_connections.interfaces.bgp_connections`
@@ -980,7 +980,7 @@ Read-Only:
 Read-Only:
 
 - `as_override` (Boolean) Whether AS override is enabled on the BGP connection.
-- `as_path_prepend_count` (Number) The number of times the local ASN is prepended to the AS path.
+- `as_path_prepend_count` (Number) The number of times the router prepends the local ASN to the routes it advertises on this BGP connection.
 - `bfd_enabled` (Boolean) Whether BFD is enabled on the BGP connection.
 - `description` (String) The description of the BGP connection.
 - `export_blacklist` (Number) The ID of the prefix filter list that denies exported routes.
@@ -994,7 +994,7 @@ Read-Only:
 - `med_out` (Number) The MED applied to routes advertised to the peer.
 - `peer_asn` (Number) The ASN of the BGP peer.
 - `peer_ip_address` (String) The IP address of the BGP peer.
-- `peer_type` (String) The type of the BGP peer.
+- `peer_type` (String) The default BGP routing policy of the BGP connection: `NON_CLOUD`, `PRIV_CLOUD`, or `PUB_CLOUD`.
 - `shutdown` (Boolean) Whether the BGP connection is shut down.
 
 

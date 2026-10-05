@@ -565,8 +565,11 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 		VirtualRouterName: "mcr-vrouter",
 		IPAddresses:       []string{"10.0.0.1/30"},
 		Interfaces: []megaport.CSPConnectionVirtualRouterInterface{{
-			IPAddresses:    []string{"10.0.0.1/30", "2001:db8::1/126"},
-			IPRoutes:       []megaport.IpRoute{{Prefix: "192.0.2.0/24", Description: "static", NextHop: "10.0.0.2"}},
+			IPAddresses: []string{"10.0.0.1/30", "2001:db8::1/126"},
+			IPRoutes: []megaport.IpRoute{
+				{Prefix: "192.0.2.0/24", Description: "static", NextHop: "10.0.0.2"},
+				{Prefix: "203.0.113.0/24", NextHop: "10.0.0.2"},
+			},
 			NatIPAddresses: []string{"198.51.100.10"},
 			BGPConnections: []megaport.BgpConnectionConfig{
 				{
@@ -581,6 +584,8 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 					BfdEnabled:         true,
 					ExportPolicy:       "permit",
 					ImportWhitelist:    11,
+					ImportBlacklist:    12,
+					ExportWhitelist:    21,
 					ExportBlacklist:    22,
 					AsPathPrependCount: 2,
 					PeerType:           "NON_CLOUD",
@@ -593,6 +598,8 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 					Shutdown:       true,
 				},
 			},
+		}, {
+			IPAddresses: []string{"10.0.1.1/30"},
 		}},
 	}
 
@@ -604,7 +611,7 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 	require.False(t, obj.As(ctx, &model, basetypes.ObjectAsOptions{}).HasError())
 	var ifaces []cspConnectionInterfaceModel
 	require.False(t, model.Interfaces.ElementsAs(ctx, &ifaces, false).HasError())
-	require.Len(t, ifaces, 1)
+	require.Len(t, ifaces, 2)
 
 	var ips, natIPs []string
 	require.False(t, ifaces[0].IPAddresses.ElementsAs(ctx, &ips, false).HasError())
@@ -614,10 +621,11 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 
 	var routes []ipRouteModel
 	require.False(t, ifaces[0].IPRoutes.ElementsAs(ctx, &routes, false).HasError())
-	require.Len(t, routes, 1)
+	require.Len(t, routes, 2)
 	assert.Equal(t, "192.0.2.0/24", routes[0].Prefix.ValueString())
 	assert.Equal(t, "static", routes[0].Description.ValueString())
 	assert.Equal(t, "10.0.0.2", routes[0].NextHop.ValueString())
+	assert.True(t, routes[1].Description.IsNull())
 
 	var bgps []cspConnectionBGPConnectionModel
 	require.False(t, ifaces[0].BGPConnections.ElementsAs(ctx, &bgps, false).HasError())
@@ -636,21 +644,55 @@ func TestFromAPICSPConnection_Interfaces(t *testing.T) {
 		AsOverride:         types.BoolValue(true),
 		ExportPolicy:       types.StringValue("permit"),
 		ImportWhitelist:    types.Int64Value(11),
-		ImportBlacklist:    types.Int64Null(),
-		ExportWhitelist:    types.Int64Null(),
+		ImportBlacklist:    types.Int64Value(12),
+		ExportWhitelist:    types.Int64Value(21),
 		ExportBlacklist:    types.Int64Value(22),
 		AsPathPrependCount: types.Int64Value(2),
 	}, bgps[0])
-	assert.Equal(t, int64(64513), bgps[1].PeerASN.ValueInt64())
-	assert.True(t, bgps[1].LocalASN.IsNull())
-	assert.True(t, bgps[1].AsOverride.IsNull())
-	assert.True(t, bgps[1].Shutdown.ValueBool())
+	assert.Equal(t, cspConnectionBGPConnectionModel{
+		PeerType:           types.StringNull(),
+		PeerASN:            types.Int64Value(64513),
+		LocalASN:           types.Int64Null(),
+		LocalIPAddress:     types.StringValue("10.0.0.1"),
+		PeerIPAddress:      types.StringValue("10.0.0.3"),
+		Shutdown:           types.BoolValue(true),
+		Description:        types.StringNull(),
+		MedIn:              types.Int64Null(),
+		MedOut:             types.Int64Null(),
+		BFDEnabled:         types.BoolValue(false),
+		AsOverride:         types.BoolNull(),
+		ExportPolicy:       types.StringNull(),
+		ImportWhitelist:    types.Int64Null(),
+		ImportBlacklist:    types.Int64Null(),
+		ExportWhitelist:    types.Int64Null(),
+		ExportBlacklist:    types.Int64Null(),
+		AsPathPrependCount: types.Int64Null(),
+	}, bgps[1])
+
+	for name, list := range map[string]types.List{
+		"nat_ip_addresses": ifaces[1].NatIPAddresses,
+		"ip_routes":        ifaces[1].IPRoutes,
+		"bgp_connections":  ifaces[1].BGPConnections,
+	} {
+		assert.False(t, list.IsNull(), name)
+		assert.Empty(t, list.Elements(), name)
+	}
 }
 
 func TestFromAPICSPConnection_NonVrouterInterfacesNull(t *testing.T) {
-	obj, diags := fromAPICSPConnection(context.Background(), megaport.CSPConnectionAWS{ConnectType: "AWS"})
-	require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
-	assert.True(t, obj.Attributes()["interfaces"].IsNull())
+	for _, conn := range []megaport.CSPConnectionConfig{
+		megaport.CSPConnectionAWS{ConnectType: "AWS"},
+		megaport.CSPConnectionAWSHC{ConnectType: "AWSHC"},
+		megaport.CSPConnectionAzure{ConnectType: "AZURE"},
+		megaport.CSPConnectionGoogle{ConnectType: "GOOGLE"},
+		megaport.CSPConnectionTransit{ConnectType: "TRANSIT"},
+		megaport.CSPConnectionOracle{ConnectType: "ORACLE"},
+		megaport.CSPConnectionIBM{ConnectType: "IBM"},
+	} {
+		obj, diags := fromAPICSPConnection(context.Background(), conn)
+		require.False(t, diags.HasError(), "fromAPICSPConnection(%T): %v", conn, diags)
+		assert.True(t, obj.Attributes()["interfaces"].IsNull(), "%T", conn)
+	}
 }
 
 // vrouterInterfacesFromObject decodes a partner config object down to its

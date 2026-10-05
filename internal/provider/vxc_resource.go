@@ -1176,17 +1176,17 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 										},
 									},
 									"nat_ip_addresses": schema.ListAttribute{
-										Description: "The NAT IP addresses of the interface.",
+										Description: "The NAT IP addresses of an MCR interface. The provider does not read NAT Gateway address pools.",
 										Computed:    true,
 										ElementType: types.StringType,
 									},
 									"bgp_connections": schema.ListNestedAttribute{
-										Description: "The BGP connections of the interface. The BGP password is not included.",
+										Description: "The BGP connections of the interface. The provider leaves out the BGP password.",
 										Computed:    true,
 										NestedObject: schema.NestedAttributeObject{
 											Attributes: map[string]schema.Attribute{
 												"peer_type": schema.StringAttribute{
-													Description: "The type of the BGP peer.",
+													Description: "The default BGP routing policy of the BGP connection: `NON_CLOUD`, `PRIV_CLOUD`, or `PUB_CLOUD`.",
 													Computed:    true,
 												},
 												"peer_asn": schema.Int64Attribute{
@@ -1250,7 +1250,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 													Computed:    true,
 												},
 												"as_path_prepend_count": schema.Int64Attribute{
-													Description: "The number of times the local ASN is prepended to the AS path.",
+													Description: "The number of times the router prepends the local ASN to the routes it advertises on this BGP connection.",
 													Computed:    true,
 												},
 											},
@@ -3752,7 +3752,7 @@ func fromAPICSPConnectionInterfaces(ctx context.Context, interfaces []megaport.C
 		for _, route := range iface.IPRoutes {
 			routeModels = append(routeModels, ipRouteModel{
 				Prefix:      types.StringValue(route.Prefix),
-				Description: types.StringValue(route.Description),
+				Description: stringOrNull(route.Description),
 				NextHop:     types.StringValue(route.NextHop),
 			})
 		}
@@ -3762,23 +3762,23 @@ func fromAPICSPConnectionInterfaces(ctx context.Context, interfaces []megaport.C
 		bgpModels := []cspConnectionBGPConnectionModel{}
 		for _, bgp := range iface.BGPConnections {
 			bgpModels = append(bgpModels, cspConnectionBGPConnectionModel{
-				PeerType:           types.StringValue(bgp.PeerType),
+				PeerType:           stringOrNull(bgp.PeerType),
 				PeerASN:            types.Int64Value(int64(bgp.PeerAsn)),
 				LocalASN:           int64PtrOrNull(bgp.LocalAsn),
 				LocalIPAddress:     types.StringValue(bgp.LocalIpAddress),
 				PeerIPAddress:      types.StringValue(bgp.PeerIpAddress),
 				Shutdown:           types.BoolValue(bgp.Shutdown),
-				Description:        types.StringValue(bgp.Description),
-				MedIn:              types.Int64Value(int64(bgp.MedIn)),
-				MedOut:             types.Int64Value(int64(bgp.MedOut)),
+				Description:        stringOrNull(bgp.Description),
+				MedIn:              int64OrNull(bgp.MedIn),
+				MedOut:             int64OrNull(bgp.MedOut),
 				BFDEnabled:         types.BoolValue(bgp.BfdEnabled),
 				AsOverride:         types.BoolPointerValue(bgp.AsOverride),
-				ExportPolicy:       types.StringValue(bgp.ExportPolicy),
+				ExportPolicy:       stringOrNull(bgp.ExportPolicy),
 				ImportWhitelist:    int64OrNull(bgp.ImportWhitelist),
 				ImportBlacklist:    int64OrNull(bgp.ImportBlacklist),
 				ExportWhitelist:    int64OrNull(bgp.ExportWhitelist),
 				ExportBlacklist:    int64OrNull(bgp.ExportBlacklist),
-				AsPathPrependCount: types.Int64Value(int64(bgp.AsPathPrependCount)),
+				AsPathPrependCount: int64OrNull(bgp.AsPathPrependCount),
 			})
 		}
 		bgpConnections, bgpDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionBGPConnectionAttrs), bgpModels)
