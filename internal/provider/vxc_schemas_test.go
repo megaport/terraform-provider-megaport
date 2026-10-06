@@ -86,3 +86,31 @@ func TestVXCSchema_InterfaceBFDIsDeprecated(t *testing.T) {
 		}
 	}
 }
+
+// Terraform prints a key in plan and show output unless the schema marks it Sensitive.
+func TestVXCSchema_CSPKeysSensitive(t *testing.T) {
+	resp := &resource.SchemaResponse{}
+	(&vxcResource{}).Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	for _, end := range []string{"a_end_partner_config", "b_end_partner_config"} {
+		google := singleNestedAttr(t, singleNestedAttr(t, resp.Schema.Attributes, end).Attributes, "google_config")
+		pairingKey, ok := google.Attributes["pairing_key"]
+		if !ok {
+			t.Fatalf("expected a pairing_key attribute inside %s.google_config", end)
+		}
+		if !pairingKey.IsSensitive() {
+			t.Errorf("expected %s.google_config.pairing_key to be sensitive", end)
+		}
+	}
+
+	conns := listNestedAttr(t, resp.Schema.Attributes, "csp_connections")
+	for _, name := range []string{"auth_key", "pairing_key"} {
+		attr, ok := conns.NestedObject.Attributes[name]
+		if !ok {
+			t.Fatalf("expected a %q attribute inside csp_connections", name)
+		}
+		if !attr.IsSensitive() {
+			t.Errorf("expected csp_connections.%s to be sensitive", name)
+		}
+	}
+}
