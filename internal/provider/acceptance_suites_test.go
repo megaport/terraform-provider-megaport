@@ -13,8 +13,8 @@ import (
 	"testing"
 )
 
-// The acceptance CI harness reads this file to pick the job that runs each
-// TestAcc function.
+// Puts each TestAcc function in one acceptance CI suite, or excludes it with
+// a reason.
 const acceptanceSuitesPath = "testdata/acceptance-suites.json"
 
 type acceptanceSuites struct {

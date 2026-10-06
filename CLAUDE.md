@@ -77,7 +77,7 @@ Uses `diag.Diagnostics` for error reporting. HTTP 404 responses in `Read` should
 All resources support a `resource_tags` map attribute. Use `toResourceTagMap()` helper for conversion.
 
 ### Testing
-Tests use `testify/suite` with `ProviderTestSuite`. Acceptance tests use `testAccProtoV6ProviderFactories` and the `providerConfig` template from `provider_test.go`. Test names follow `TestAccMegaport{Resource}_Basic`. The `RandomTestName()` helper generates prefixed test names (`tf-acc-test-`).
+Tests use `testify/suite` with `ProviderTestSuite`. Acceptance tests use `testAccProtoV6ProviderFactories` and the `providerConfig` template from `provider_test.go`. Test names follow `TestAccMegaport{Resource}_Basic`. The `RandomTestName()` helper generates prefixed test names (`tf-acc-test-`). Each `TestAcc` function needs a CI suite in `internal/provider/testdata/acceptance-suites.json`, or an `excluded` entry with a reason. A unit test enforces this.
 
 ### VXC Partner Configurations
 VXC resources support multiple cloud partner types (AWS, Azure, Google, Oracle, Aruba, Fortinet, Versa, etc.), each with unique nested config schemas defined in `vxc_schemas.go`. Partner port UIDs can change via rotation — handle via `requested_product_uid` vs `current_product_uid`.
