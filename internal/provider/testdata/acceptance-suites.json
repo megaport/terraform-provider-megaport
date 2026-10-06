@@ -103,6 +103,6 @@
     ]
   },
   "excluded": {
-    "TestAccMegaportMVE_to_MVE_VXC": "the provider moves a VXC between MVEs with an in-place PUT the API refuses"
+    "TestAccMegaportMVE_to_MVE_VXC": "NetAuto fails the VXC move between MVEs that the API accepts, and teardown then fails on the stranded products"
   }
 }
