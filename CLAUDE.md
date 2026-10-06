@@ -101,4 +101,4 @@ CI runs on PRs to `main` (`.github/workflows/test.yaml`):
 3. **Unit tests** — `go test` with 30min timeout
 4. **OpenTofu 1.6.0 compatibility** test
 
-Acceptance tests are currently disabled in CI.
+Acceptance tests run when a PR gets the `acceptance` label (`.github/workflows/acceptance-label.yaml`). The label dispatches the suite in `megaport/terraform-provider-acceptance-ci` against the PR head.
