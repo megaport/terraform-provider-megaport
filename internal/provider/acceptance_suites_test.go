@@ -13,8 +13,6 @@ import (
 	"testing"
 )
 
-// Puts each TestAcc function in one acceptance CI suite, or excludes it with
-// a reason.
 const acceptanceSuitesPath = "testdata/acceptance-suites.json"
 
 type acceptanceSuites struct {
@@ -38,9 +36,9 @@ func TestSuiteListCoversEveryAcceptanceTest(t *testing.T) {
 			listed[name] = append(listed[name], suite)
 		}
 	}
-	for name, reason := range list.Excluded {
+	for _, name := range slices.Sorted(maps.Keys(list.Excluded)) {
 		listed[name] = append(listed[name], "excluded")
-		if strings.TrimSpace(reason) == "" {
+		if strings.TrimSpace(list.Excluded[name]) == "" {
 			t.Errorf("%s: %s is excluded with no reason", acceptanceSuitesPath, name)
 		}
 	}
@@ -71,7 +69,7 @@ func TestSuiteListCoversEveryAcceptanceTest(t *testing.T) {
 
 	for _, name := range slices.Sorted(maps.Keys(accTests)) {
 		if len(listed[name]) == 0 {
-			t.Errorf("%s: %s is in no suite; add it to one, or to excluded with a reason", acceptanceSuitesPath, name)
+			t.Errorf("%s: %s is in no suite. Add it to one, or to excluded with a reason", acceptanceSuitesPath, name)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(listed)) {
