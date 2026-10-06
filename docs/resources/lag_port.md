@@ -41,7 +41,7 @@ resource "megaport_lag_port" "lag_port" {
 - `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. Specify a unique identifying number for the product to be used for billing purposes, such as a cost center number or a unique customer ID. The service level reference number appears for each service under the Product section of the invoice. You can also edit this field for an existing service.
 - `diversity_zone` (String) The diversity zone of the product. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
-- `resource_tags` (Map of String) The resource tags associated with the product.
+- `resource_tags` (Map of String) The resource tags associated with the product. Keys must be lowercase: 1 to 128 characters from a-z, 0-9, `_`, `:`, `.`, `/`, `\`, and `-`. Values can be 1 to 256 characters and also allow uppercase letters, spaces, `@`, and `+`. A product can have at most 50 tags.
 
 ### Read-Only
 

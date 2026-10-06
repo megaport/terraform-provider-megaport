@@ -1780,6 +1780,18 @@ func TestAccMegaportMCRVXC_BEndIpMtu(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.partner", "vrouter"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "b_end_partner_config.vrouter_config.interfaces.0.ip_mtu", "9000"),
+					// A-End MCR interface
+					resource.TestCheckTypeSetElemNestedAttrs("megaport_vxc.vxc", "csp_connections.*", map[string]string{
+						"connect_type":   "VROUTER",
+						"ip_addresses.#": "1",
+						"ip_addresses.0": "10.0.0.1/30",
+					}),
+					// B-End MCR interface
+					resource.TestCheckTypeSetElemNestedAttrs("megaport_vxc.vxc", "csp_connections.*", map[string]string{
+						"connect_type":   "VROUTER",
+						"ip_addresses.#": "1",
+						"ip_addresses.0": "10.0.0.2/30",
+					}),
 				),
 			},
 			// Step 2: Update ip_mtu to 1500 on both ends
@@ -2230,7 +2242,8 @@ func TestAccMegaportMVETransit_VXCAWS(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	// loc1 hosts the MVE (needs MVE capacity); loc2 needs both AWS and TRANSIT partner ports.
-	mveLocID, _ := findMVETestLocation(t, 0)
+	// MVE config below uses 3 vNICs — probe must match.
+	mveLocID, _ := findMVETestLocation(t, 3)
 	partnerLocs := findVXCPortTestLocationsWithPartners(t, 1, "AWS", "TRANSIT")
 	locs := []int{mveLocID, partnerLocs[0]}
 	portName := RandomTestName()
@@ -2599,7 +2612,7 @@ func TestAccMegaportMVETransit_VXCAWS(t *testing.T) {
 func TestAccMegaportMVEAWS_VXC(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	mveLocID, _ := findMVETestLocation(t, 0)
+	mveLocID, _ := findMVETestLocation(t, 2)
 	awsLocs := findVXCPortTestLocationsWithPartner(t, 1, "AWS")
 	portName := RandomTestName()
 	costCentreName := RandomTestName()
@@ -4863,7 +4876,8 @@ func TestAccMegaportVXC_ImportDrift_WithVnicIndex(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
 	locs := findVXCPortTestLocations(t, 1)
-	mveLocationID, _ := findMVETestLocation(t, 2)
+	// MVE config below uses 3 vNICs — probe must match.
+	mveLocationID, _ := findMVETestLocation(t, 3)
 	portName := RandomTestName()
 	mveName := RandomTestName()
 	vxcName := RandomTestName()
@@ -5040,6 +5054,83 @@ func TestAccMegaportVXC_AttachedProductReplace(t *testing.T) {
 			// the location may not support 10 G ports so we do not apply.
 			{
 				Config:             configWithSpeed(10000),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// A transit B-End refuses a VLAN change, so the plan fails on b_end.ordered_vlan.
+// An A-End VLAN change on the same VXC still applies, and a tainted VXC plans
+// the replace.
+func TestAccMegaportVXC_TransitBEndVLANChangeRejected(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+
+	mcrLocationID := findMCRWithPartnerTestLocation(t, 1000, "TRANSIT")
+	mcrName := RandomTestName()
+	vxcName := RandomTestName()
+
+	cfg := func(aEndVLAN, bEndVLAN int) string {
+		return providerConfig + fmt.Sprintf(`
+			data "megaport_location" "mcr_loc" {
+				id = %d
+			}
+
+			data "megaport_partner" "internet_port" {
+				connect_type = "TRANSIT"
+				location_id  = data.megaport_location.mcr_loc.id
+			}
+
+			resource "megaport_mcr" "mcr" {
+				product_name         = "%s"
+				location_id          = data.megaport_location.mcr_loc.id
+				contract_term_months = 1
+				port_speed           = 1000
+				asn                  = 64555
+			}
+
+			resource "megaport_vxc" "transit_vxc" {
+				product_name         = "%s"
+				rate_limit           = 100
+				contract_term_months = 1
+
+				a_end = {
+					requested_product_uid = megaport_mcr.mcr.product_uid
+					ordered_vlan          = %d
+				}
+
+				b_end = {
+					requested_product_uid = data.megaport_partner.internet_port.product_uid
+					ordered_vlan          = %d
+				}
+			}
+		`, mcrLocationID, mcrName, vxcName, aEndVLAN, bEndVLAN)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: cfg(0, 0),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "product_uid"),
+					resource.TestCheckResourceAttrSet("megaport_vxc.transit_vxc", "b_end.vlan"),
+				),
+			},
+			{
+				Config: cfg(2345, 0),
+				Check:  resource.TestCheckResourceAttr("megaport_vxc.transit_vxc", "a_end.ordered_vlan", "2345"),
+			},
+			{
+				Config:      cfg(2345, 3456),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)VLAN cannot be changed on this B-End.*connect\s+type\s+TRANSIT`),
+			},
+			{
+				Config:             cfg(2345, 3456),
+				Taint:              []string{"megaport_vxc.transit_vxc"},
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
 			},
@@ -6188,7 +6279,9 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 	mcrName := RandomTestName()
 	vxcName := RandomTestName()
 
-	config := providerConfig + fmt.Sprintf(`
+	// baseConfig is everything except the VXC, so the forget step below can
+	// drop the VXC from state while leaving the MCR and its IPsec add-on live.
+	baseConfig := providerConfig + fmt.Sprintf(`
 		data "megaport_location" "mcr_loc" {
 			id = %d
 		}
@@ -6210,7 +6303,9 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 			connect_type = "TRANSIT"
 			location_id  = data.megaport_location.mcr_loc.id
 		}
+	`, mcrLocID, mcrName)
 
+	config := baseConfig + fmt.Sprintf(`
 		resource "megaport_vxc" "ipsec_vxc" {
 			product_name         = "%s"
 			rate_limit           = 100
@@ -6227,13 +6322,16 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 						{
 							interface_type = "subInterface"
 							ip_addresses   = ["169.254.100.1/30"]
+							ip_mtu         = 1500
 						},
 						{
 							interface_type = "ipSecTunnel"
+							ip_mtu         = 1400
 							ip_sec_tunnel_options = {
 								source_ip_address      = "169.254.100.1"
 								destination_ip_address = "203.0.113.10"
 								pre_shared_key         = "tf-acc-test-psk"
+								passive                = true
 								phase1_lifetime        = 28800
 								phase2_lifetime        = 3600
 							}
@@ -6248,7 +6346,36 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 
 			depends_on = [megaport_mcr_ipsec_addon.addon]
 		}
-	`, mcrLocID, mcrName, vxcName)
+	`, vxcName)
+
+	// forgetConfig drops the VXC from state and leaves the live service alone,
+	// so the import step below has an unmanaged VXC to import, the case a
+	// customer actually hits and ImportStateVerify alone does not cover: it
+	// diffs against create-time state instead of persisting what a real
+	// import produces.
+	forgetConfig := baseConfig + `
+		removed {
+			from = megaport_vxc.ipsec_vxc
+			lifecycle {
+				destroy = false
+			}
+		}
+	`
+
+	// The forget step clears the VXC from state, so the UID has to be held
+	// here rather than read back out of state by the steps after it.
+	var vxcUID string
+	captureUID := func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources["megaport_vxc.ipsec_vxc"]
+		if !ok {
+			return fmt.Errorf("megaport_vxc.ipsec_vxc not found in state")
+		}
+		vxcUID = rs.Primary.Attributes["product_uid"]
+		if vxcUID == "" {
+			return fmt.Errorf("megaport_vxc.ipsec_vxc has no product_uid")
+		}
+		return nil
+	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -6267,7 +6394,79 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.phase2_lifetime", "3600"),
 					// pre_shared_key is write-only: it must never be persisted to state.
 					resource.TestCheckNoResourceAttr("megaport_vxc.ipsec_vxc", "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options.pre_shared_key"),
+					captureUID,
 				),
+			},
+			// The import reads the interfaces back, so a_end_partner_config has
+			// to match the applied configuration attribute for attribute.
+			{
+				ResourceName:                         "megaport_vxc.ipsec_vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.ipsec_vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "b_end_partner_config", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+			},
+			// Forget the VXC, then import it as a genuinely unmanaged resource:
+			// the case above does not reach, since ImportStateVerify diffs the
+			// import against create-time state rather than persisting it.
+			{
+				Config: forgetConfig,
+			},
+			{
+				Config:                               config,
+				ResourceName:                         "megaport_vxc.ipsec_vxc",
+				ImportState:                          true,
+				ImportStatePersist:                   true,
+				ImportStateVerify:                    false,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(_ *terraform.State) (string, error) {
+					if vxcUID == "" {
+						return "", fmt.Errorf("no VXC UID captured")
+					}
+					return vxcUID, nil
+				},
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					var attrs map[string]string
+					for _, st := range states {
+						if st.Attributes["product_uid"] == vxcUID {
+							attrs = st.Attributes
+							break
+						}
+					}
+					if attrs == nil {
+						return fmt.Errorf("imported VXC %s not among the %d states", vxcUID, len(states))
+					}
+					const ipsec = "a_end_partner_config.vrouter_config.interfaces.1.ip_sec_tunnel_options."
+					want := map[string]string{
+						"a_end_partner_config.vrouter_config.interfaces.0.interface_type": "subInterface",
+						"a_end_partner_config.vrouter_config.interfaces.1.interface_type": "ipSecTunnel",
+						ipsec + "source_ip_address":                                       "169.254.100.1",
+						ipsec + "destination_ip_address":                                  "203.0.113.10",
+						ipsec + "phase1_lifetime":                                         "28800",
+						ipsec + "phase2_lifetime":                                         "3600",
+					}
+					for k, v := range want {
+						if attrs[k] != v {
+							return fmt.Errorf("imported state %q = %q, want %q", k, attrs[k], v)
+						}
+					}
+					if psk := attrs[ipsec+"pre_shared_key"]; psk != "" {
+						return fmt.Errorf("imported state has %spre_shared_key = %q, want unset", ipsec, psk)
+					}
+					return nil
+				},
 			},
 		},
 	})

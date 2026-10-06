@@ -293,9 +293,9 @@ resource "megaport_mcr" "production" {
   contract_term_months = 12
   
   resource_tags = {
-    Environment = "production"
-    Owner       = "network-team"
-    Purpose     = "multi-cloud-connectivity"
+    environment = "production"
+    owner       = "network-team"
+    purpose     = "multi-cloud-connectivity"
   }
   
   lifecycle {
