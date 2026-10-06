@@ -1093,7 +1093,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"resource_tags": schema.MapAttribute{
-				Description: "The resource tags associated with the product.",
+				Description: resourceTagsDescription,
 				Optional:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
@@ -3155,6 +3155,14 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 			DeleteNow: true,
 		})
 	})
+	if errors.Is(err, megaport.ErrCancelPendingApproval) {
+		resp.Diagnostics.AddError(
+			"VXC cancellation pending approval",
+			"VXC "+state.UID.ValueString()+" is still live. Your partner must approve the cancellation request in the Megaport Portal. "+
+				"Run the same Terraform command again after approval.",
+		)
+		return
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting VXC",
