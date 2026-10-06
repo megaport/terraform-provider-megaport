@@ -33,8 +33,8 @@ func TestSuiteListCoversEveryAcceptanceTest(t *testing.T) {
 	}
 
 	listed := map[string][]string{}
-	for suite, names := range list.Suites {
-		for _, name := range names {
+	for _, suite := range slices.Sorted(maps.Keys(list.Suites)) {
+		for _, name := range list.Suites[suite] {
 			listed[name] = append(listed[name], suite)
 		}
 	}
