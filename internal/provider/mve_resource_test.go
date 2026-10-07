@@ -1326,3 +1326,134 @@ func TestAccMegaportMVEAruba_VnicsRemoval(t *testing.T) {
 		},
 	})
 }
+
+// mveMarketplaceVisibilityConfig renders an Aruba MVE. An empty visibility
+// leaves marketplace_visibility out of the configuration.
+func mveMarketplaceVisibilityConfig(locationID int, mveName, mveKey, visibility string) string {
+	attr := ""
+	if visibility != "" {
+		attr = "marketplace_visibility = " + visibility
+	}
+	return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "test_location" {
+			id = %d
+		}
+		data "megaport_mve_images" "aruba" {
+			vendor_filter = "Aruba"
+			id_filter = %d
+		}
+		resource "megaport_mve" "mve" {
+			product_name = "%s"
+			location_id = data.megaport_location.test_location.id
+			contract_term_months = 1
+			diversity_zone = "red"
+			%s
+			vendor_config = {
+				vendor = "aruba"
+				product_size = "SMALL"
+				mve_label = "MVE 2/8"
+				image_id = data.megaport_mve_images.aruba.mve_images.0.id
+				account_name = "%s"
+				account_key = "%s"
+				system_tag = "Preconfiguration-aruba-test-1"
+			}
+			vnics = [
+				{ description = "Data Plane" },
+				{ description = "Control Plane" }
+			]
+		}`, locationID, MVEArubaImageID, mveName, attr, mveName, mveKey)
+}
+
+// TestAccMegaportMVEAruba_MarketplaceVisibility covers a configured value on
+// create and an in-place update that does not replace the MVE.
+func TestAccMegaportMVEAruba_MarketplaceVisibility(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+
+	var originalUID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: mveMarketplaceVisibilityConfig(locationID, mveName, mveKey, "true"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "marketplace_visibility", "true"),
+					waitForProvisioningStatus("megaport_mve.mve"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
+						if !ok {
+							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						originalUID = rs.Primary.Attributes["product_uid"]
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after create.
+			{
+				Config:   mveMarketplaceVisibilityConfig(locationID, mveName, mveKey, "true"),
+				PlanOnly: true,
+			},
+			// Changing the value must update in place.
+			{
+				Config: mveMarketplaceVisibilityConfig(locationID, mveName, mveKey, "false"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_mve.mve", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "marketplace_visibility", "false"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
+						if !ok {
+							return fmt.Errorf("megaport_mve.mve not found in state")
+						}
+						if rs.Primary.Attributes["product_uid"] != originalUID {
+							return fmt.Errorf("MVE was replaced when only marketplace_visibility changed. before=%s after=%s", originalUID, rs.Primary.Attributes["product_uid"])
+						}
+						return nil
+					},
+				),
+			},
+			// Plan-only to confirm no drift after the in-place update.
+			{
+				Config:   mveMarketplaceVisibilityConfig(locationID, mveName, mveKey, "false"),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccMegaportMVEAruba_MarketplaceVisibilityUnset covers an MVE ordered
+// without the attribute. State records the API's value and the next plan is empty.
+func TestAccMegaportMVEAruba_MarketplaceVisibilityUnset(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locationID, _ := findMVETestLocation(t, 2)
+	mveName := RandomTestName()
+	mveKey := RandomTestName()
+
+	config := mveMarketplaceVisibilityConfig(locationID, mveName, mveKey, "")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("megaport_mve.mve", "marketplace_visibility", "false"),
+				),
+			},
+			// Plan-only to confirm no drift after create.
+			{
+				Config:   config,
+				PlanOnly: true,
+			},
+		},
+	})
+}
