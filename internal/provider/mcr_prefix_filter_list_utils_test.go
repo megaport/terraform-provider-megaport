@@ -629,31 +629,31 @@ func TestResolveGeLe(t *testing.T) {
 		},
 		{
 			name:   "le returned, ge absent",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Le: 24},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Le: megaport.PtrTo(24)},
 			wantGe: 8,
 			wantLe: 24,
 		},
 		{
 			name:   "ge returned above the prefix length, le absent",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/24", Ge: 26},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/24", Ge: megaport.PtrTo(26)},
 			wantGe: 26,
 			wantLe: 32,
 		},
 		{
 			name:   "IPv6 ge returned above the prefix length, le absent",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "2001:db8::/32", Ge: 48},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "2001:db8::/32", Ge: megaport.PtrTo(48)},
 			wantGe: 48,
 			wantLe: 128,
 		},
 		{
 			name:   "default route with an explicit le",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "0.0.0.0/0", Le: 32},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "0.0.0.0/0", Le: megaport.PtrTo(32)},
 			wantGe: 0,
 			wantLe: 32,
 		},
 		{
 			name:   "both returned are passed through",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Ge: 16, Le: 32},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Ge: megaport.PtrTo(16), Le: megaport.PtrTo(32)},
 			wantGe: 16,
 			wantLe: 32,
 		},
@@ -723,8 +723,8 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "10.0.0.0/8",
-				Ge:     16,
-				Le:     24,
+				Ge:     megaport.PtrTo(16),
+				Le:     megaport.PtrTo(24),
 			},
 			wantError: false,
 		},
@@ -739,8 +739,8 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "deny",
 				Prefix: "2001:db8::/32",
-				Ge:     48,
-				Le:     64,
+				Ge:     megaport.PtrTo(48),
+				Le:     megaport.PtrTo(64),
 			},
 			wantError: false,
 		},
@@ -755,8 +755,8 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "192.168.0.0/16",
-				Ge:     16, // Should default to prefix length
-				Le:     32, // Should default to max for IPv4
+				Ge:     megaport.PtrTo(16), // Should default to prefix length
+				Le:     megaport.PtrTo(32), // Should default to max for IPv4
 			},
 			wantError: false,
 		},
@@ -771,8 +771,8 @@ func TestConvertEntryToAPI(t *testing.T) {
 			wantEntry: &megaport.MCRPrefixListEntry{
 				Action: "permit",
 				Prefix: "162.43.146.92/31",
-				Ge:     31,
-				Le:     31,
+				Ge:     megaport.PtrTo(31),
+				Le:     megaport.PtrTo(31),
 			},
 			wantError: false,
 		},
@@ -809,11 +809,15 @@ func TestConvertEntryToAPI(t *testing.T) {
 				if apiEntry.Prefix != tt.wantEntry.Prefix {
 					t.Errorf("convertEntryToAPI() Prefix = %v, want %v", apiEntry.Prefix, tt.wantEntry.Prefix)
 				}
-				if apiEntry.Ge != tt.wantEntry.Ge {
-					t.Errorf("convertEntryToAPI() Ge = %v, want %v", apiEntry.Ge, tt.wantEntry.Ge)
+				if apiEntry.Ge == nil {
+					t.Errorf("convertEntryToAPI() Ge = nil, want %d", *tt.wantEntry.Ge)
+				} else if *apiEntry.Ge != *tt.wantEntry.Ge {
+					t.Errorf("convertEntryToAPI() Ge = %d, want %d", *apiEntry.Ge, *tt.wantEntry.Ge)
 				}
-				if apiEntry.Le != tt.wantEntry.Le {
-					t.Errorf("convertEntryToAPI() Le = %v, want %v", apiEntry.Le, tt.wantEntry.Le)
+				if apiEntry.Le == nil {
+					t.Errorf("convertEntryToAPI() Le = nil, want %d", *tt.wantEntry.Le)
+				} else if *apiEntry.Le != *tt.wantEntry.Le {
+					t.Errorf("convertEntryToAPI() Le = %d, want %d", *apiEntry.Le, *tt.wantEntry.Le)
 				}
 			}
 
@@ -850,14 +854,14 @@ func TestFromAPI(t *testing.T) {
 					{
 						Action: "permit",
 						Prefix: "10.0.0.0/8",
-						Ge:     16,
-						Le:     24,
+						Ge:     megaport.PtrTo(16),
+						Le:     megaport.PtrTo(24),
 					},
 					{
 						Action: "deny",
 						Prefix: "192.168.0.0/16",
-						Ge:     24,
-						Le:     32,
+						Ge:     megaport.PtrTo(24),
+						Le:     megaport.PtrTo(32),
 					},
 				},
 			},
@@ -873,8 +877,8 @@ func TestFromAPI(t *testing.T) {
 					{
 						Action: "permit",
 						Prefix: "10.0.0.0/8",
-						Ge:     0,
-						Le:     0,
+						Ge:     megaport.PtrTo(0),
+						Le:     megaport.PtrTo(0),
 					},
 				},
 			},
@@ -1021,7 +1025,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "10.0.0.0/24", Le: 30},
+					{Action: "permit", Prefix: "10.0.0.0/24", Le: megaport.PtrTo(30)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{{24, 30}},
@@ -1033,7 +1037,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 25, Le: 32},
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: megaport.PtrTo(25), Le: megaport.PtrTo(32)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{{25, 32}},
@@ -1045,7 +1049,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv6",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "2001:db8::/32", Ge: 48, Le: 128},
+					{Action: "permit", Prefix: "2001:db8::/32", Ge: megaport.PtrTo(48), Le: megaport.PtrTo(128)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{{48, 128}},
@@ -1057,7 +1061,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "0.0.0.0/0", Le: 32},
+					{Action: "permit", Prefix: "0.0.0.0/0", Le: megaport.PtrTo(32)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{{0, 32}},
@@ -1069,7 +1073,7 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				Description:   "Test",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
-					{Action: "permit", Prefix: "10.0.0.0/24", Ge: 26},
+					{Action: "permit", Prefix: "10.0.0.0/24", Ge: megaport.PtrTo(26)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{{26, 32}},
@@ -1082,9 +1086,9 @@ func TestFromAPIAbsentGeLeDecode(t *testing.T) {
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
 					{Action: "permit", Prefix: "10.0.0.0/24"},
-					{Action: "deny", Prefix: "192.168.0.0/16", Le: 24},
-					{Action: "permit", Prefix: "172.16.0.0/12", Ge: 16, Le: 32},
-					{Action: "permit", Prefix: "203.0.113.0/24", Ge: 28},
+					{Action: "deny", Prefix: "192.168.0.0/16", Le: megaport.PtrTo(24)},
+					{Action: "permit", Prefix: "172.16.0.0/12", Ge: megaport.PtrTo(16), Le: megaport.PtrTo(32)},
+					{Action: "permit", Prefix: "203.0.113.0/24", Ge: megaport.PtrTo(28)},
 				},
 			},
 			expectedGeLe: []struct{ ge, le int }{
@@ -1147,25 +1151,25 @@ func TestFromAPIMCRPrefixFilterListDecode(t *testing.T) {
 		},
 		{
 			name:   "ge above the prefix length, le absent",
-			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/24", Ge: 26},
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/24", Ge: megaport.PtrTo(26)},
 			wantGe: 26,
 			wantLe: 32,
 		},
 		{
 			name:   "ge absent, le present",
-			entry:  &megaport.MCRPrefixListEntry{Action: "deny", Prefix: "10.0.0.0/8", Le: 24},
+			entry:  &megaport.MCRPrefixListEntry{Action: "deny", Prefix: "10.0.0.0/8", Le: megaport.PtrTo(24)},
 			wantGe: 8,
 			wantLe: 24,
 		},
 		{
 			name:   "both bounds present",
-			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/8", Ge: 16, Le: 32},
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "10.0.0.0/8", Ge: megaport.PtrTo(16), Le: megaport.PtrTo(32)},
 			wantGe: 16,
 			wantLe: 32,
 		},
 		{
 			name:   "IPv6 ge above the prefix length, le absent",
-			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "2001:db8::/32", Ge: 48},
+			entry:  &megaport.MCRPrefixListEntry{Action: "permit", Prefix: "2001:db8::/32", Ge: megaport.PtrTo(48)},
 			wantGe: 48,
 			wantLe: 128,
 		},
