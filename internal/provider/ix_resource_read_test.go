@@ -234,7 +234,7 @@ func TestIXConversionErrorDoesNotSaveState(t *testing.T) {
 		stateAttrs["product_uid"] = tftypes.NewValue(tftypes.String, ixReadTestUID)
 		stateVal := tftypes.NewValue(schemaObjType, stateAttrs)
 
-		// The framework starts Update with a null response state.
+		// Seed a null state so any write by Update shows up.
 		resp := &fwresource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: tftypes.NewValue(schemaObjType, nil)}}
 		r.Update(ctx, fwresource.UpdateRequest{
 			Plan:  tfsdk.Plan{Schema: s, Raw: stateVal},
