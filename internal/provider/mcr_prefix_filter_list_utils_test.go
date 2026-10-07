@@ -653,9 +653,9 @@ func TestResolveGeLe(t *testing.T) {
 		},
 		{
 			name:   "both returned are passed through",
-			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Ge: megaport.PtrTo(16), Le: megaport.PtrTo(32)},
+			entry:  &megaport.MCRPrefixListEntry{Prefix: "10.0.0.0/8", Ge: megaport.PtrTo(16), Le: megaport.PtrTo(24)},
 			wantGe: 16,
-			wantLe: 32,
+			wantLe: 24,
 		},
 		{
 			name:          "invalid prefix format",
@@ -871,14 +871,12 @@ func TestFromAPI(t *testing.T) {
 			name: "API response with absent ge/le values",
 			apiList: &megaport.MCRPrefixFilterList{
 				ID:            456,
-				Description:   "Test prefix list with zero values",
+				Description:   "Test prefix list with absent values",
 				AddressFamily: "IPv4",
 				Entries: []*megaport.MCRPrefixListEntry{
 					{
 						Action: "permit",
 						Prefix: "10.0.0.0/8",
-						Ge:     megaport.PtrTo(0),
-						Le:     megaport.PtrTo(0),
 					},
 				},
 			},
@@ -1211,6 +1209,8 @@ func TestToAPIMCRPrefixFilterList_NullOrZeroBoundIsUnset(t *testing.T) {
 		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Null(), Le: types.Int64Null()},
 		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/8"), Ge: types.Int64Value(16), Le: types.Int64Value(24)},
 		{Action: types.StringValue("deny"), Prefix: types.StringValue("10.1.0.0/16"), Ge: types.Int64Value(0), Le: types.Int64Value(0)},
+		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.2.0.0/16"), Ge: types.Int64Null(), Le: types.Int64Value(24)},
+		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.3.0.0/16"), Ge: types.Int64Value(20), Le: types.Int64Null()},
 	})
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1225,8 +1225,8 @@ func TestToAPIMCRPrefixFilterList_NullOrZeroBoundIsUnset(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if len(out.Entries) != 3 {
-		t.Fatalf("got %d entries, want 3", len(out.Entries))
+	if len(out.Entries) != 5 {
+		t.Fatalf("got %d entries, want 5", len(out.Entries))
 	}
 	if out.Entries[0].Ge != nil || out.Entries[0].Le != nil {
 		t.Errorf("null bounds: got ge=%v le=%v, want both nil", out.Entries[0].Ge, out.Entries[0].Le)
@@ -1239,5 +1239,11 @@ func TestToAPIMCRPrefixFilterList_NullOrZeroBoundIsUnset(t *testing.T) {
 	}
 	if out.Entries[2].Ge != nil || out.Entries[2].Le != nil {
 		t.Errorf("zero bounds: got ge=%v le=%v, want both nil", out.Entries[2].Ge, out.Entries[2].Le)
+	}
+	if out.Entries[3].Ge != nil || out.Entries[3].Le == nil || *out.Entries[3].Le != 24 {
+		t.Errorf("le only: got ge=%v le=%v, want ge nil and le 24", out.Entries[3].Ge, out.Entries[3].Le)
+	}
+	if out.Entries[4].Ge == nil || *out.Entries[4].Ge != 20 || out.Entries[4].Le != nil {
+		t.Errorf("ge only: got ge=%v le=%v, want ge 20 and le nil", out.Entries[4].Ge, out.Entries[4].Le)
 	}
 }
