@@ -275,10 +275,11 @@ func (pfFilterListModel *mcrPrefixFilterListModel) toAPIMCRPrefixFilterList(ctx 
 				Action: entry.Action.ValueString(),
 				Prefix: entry.Prefix.ValueString(),
 			}
-			if !entry.Ge.IsNull() {
+			// Leave a 0 unset as the old SDK did. The API rejects it on every prefix except /0.
+			if !entry.Ge.IsNull() && entry.Ge.ValueInt64() != 0 {
 				apiEntry.Ge = megaport.PtrTo(int(entry.Ge.ValueInt64()))
 			}
-			if !entry.Le.IsNull() {
+			if !entry.Le.IsNull() && entry.Le.ValueInt64() != 0 {
 				apiEntry.Le = megaport.PtrTo(int(entry.Le.ValueInt64()))
 			}
 			megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, apiEntry)
