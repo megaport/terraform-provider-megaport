@@ -1202,3 +1202,38 @@ func TestFromAPIMCRPrefixFilterListDecode(t *testing.T) {
 		})
 	}
 }
+
+// The deprecated inline prefix_filter_lists block has optional ge/le with no
+// default. A null bound must stay off the wire rather than go out as 0.
+func TestToAPIMCRPrefixFilterList_NullBoundIsUnset(t *testing.T) {
+	ctx := context.Background()
+	entries, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes), []mcrPrefixListEntryModel{
+		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/24"), Ge: types.Int64Null(), Le: types.Int64Null()},
+		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/8"), Ge: types.Int64Value(16), Le: types.Int64Value(24)},
+	})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	m := &mcrPrefixFilterListModel{
+		Description:   types.StringValue("inline"),
+		AddressFamily: types.StringValue("IPv4"),
+		Entries:       entries,
+	}
+
+	out, diags := m.toAPIMCRPrefixFilterList(ctx)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(out.Entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(out.Entries))
+	}
+	if out.Entries[0].Ge != nil || out.Entries[0].Le != nil {
+		t.Errorf("null bounds: got ge=%v le=%v, want both nil", out.Entries[0].Ge, out.Entries[0].Le)
+	}
+	if out.Entries[1].Ge == nil || *out.Entries[1].Ge != 16 {
+		t.Errorf("ge: got %v, want 16", out.Entries[1].Ge)
+	}
+	if out.Entries[1].Le == nil || *out.Entries[1].Le != 24 {
+		t.Errorf("le: got %v, want 24", out.Entries[1].Le)
+	}
+}
