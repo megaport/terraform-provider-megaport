@@ -1220,7 +1220,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
-						Description: "The network interface index of the A-End configuration. Required for MVE connections.",
+						Description: "The network interface index of the A-End configuration. An MVE A-End ordered with no index uses the first vNIC (index 0).",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1304,7 +1304,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						},
 					},
 					"vnic_index": schema.Int64Attribute{
-						Description: "The network interface index of the B-End configuration. Required for MVE connections.",
+						Description: "The network interface index of the B-End configuration. An MVE B-End ordered with no index uses the first vNIC (index 0).",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1513,17 +1513,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		aEndConfig.VLAN = 0
 	}
 
-	// Check product type - if MVE, require VNIC Index
 	productType, _ := r.client.ProductService.GetProductType(ctx, a.RequestedProductUID.ValueString())
-	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if a.NetworkInterfaceIndex.IsNull() && a.NetworkInterfaceIndex.IsUnknown() {
-			resp.Diagnostics.AddError(
-				"Error creating VXC",
-				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-			)
-			return
-		}
-	}
 
 	resp.Diagnostics.Append(vlanAvailabilityPreflight(ctx, vlanPreflightInput{
 		svc:              r.client.PortService,
@@ -1538,6 +1528,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	// An omitted vnic_index plans as unknown, not null, and orders on vNIC 0.
 	if !a.InnerVLAN.IsNull() || !a.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
 		if !a.InnerVLAN.IsNull() {
@@ -1847,17 +1838,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		bEndConfig.VLAN = 0
 	}
 
-	// Check product type - if MVE, require VNIC Index
 	productType, _ = r.client.ProductService.GetProductType(ctx, b.RequestedProductUID.ValueString())
-	if strings.EqualFold(productType, megaport.PRODUCT_MVE) {
-		if b.NetworkInterfaceIndex.IsNull() && b.NetworkInterfaceIndex.IsUnknown() {
-			resp.Diagnostics.AddError(
-				"Error creating VXC",
-				"Could not create VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-			)
-			return
-		}
-	}
 
 	// Skip when a service key redirected the order to a different B-End, since
 	// the product type above was resolved for the port the user named, not the
@@ -1877,6 +1858,7 @@ func (r *vxcResource) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
+	// An omitted vnic_index plans as unknown, not null, and orders on vNIC 0.
 	if !b.InnerVLAN.IsNull() || !b.NetworkInterfaceIndex.IsNull() {
 		vxcOrderMVEConfig := &megaport.VXCOrderMVEConfig{}
 		if !b.InnerVLAN.IsNull() {
@@ -2737,13 +2719,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			!aEndState.VLAN.IsNull() && updateReq.AEndVLAN == nil {
 			updateReq.AEndVLAN = megaport.PtrTo(int(aEndState.VLAN.ValueInt64()))
 		}
-	} else if strings.EqualFold(aEndProductType, megaport.PRODUCT_MVE) && aEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
-		return
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		aEndState.NetworkInterfaceIndex = types.Int64Null()
@@ -2813,13 +2788,6 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 			!bEndState.VLAN.IsNull() && updateReq.BEndVLAN == nil {
 			updateReq.BEndVLAN = megaport.PtrTo(int(bEndState.VLAN.ValueInt64()))
 		}
-	} else if strings.EqualFold(bEndProductType, megaport.PRODUCT_MVE) && bEndPlan.NetworkInterfaceIndex.IsNull() {
-		// Error case for MVE with null VNIC index
-		resp.Diagnostics.AddError(
-			"Error updating VXC",
-			"Could not update VXC with name "+plan.Name.ValueString()+": Network Interface Index is required for MVE products",
-		)
-		return
 	} else {
 		// For non-MVE products, explicitly set to null in state
 		bEndState.NetworkInterfaceIndex = types.Int64Null()

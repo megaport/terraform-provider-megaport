@@ -208,6 +208,11 @@ func TestVXCUpdate_VLANSends(t *testing.T) {
 			want: map[string]float64{"bEndVlan": 300},
 		},
 		{
+			name:  "port ends send no vnic index",
+			planA: vxcEndSpec{vnicIndex: int64p(1)}, planB: vxcEndSpec{vnicIndex: int64p(1)},
+			wantAbsent: []string{"aVnicIndex", "bVnicIndex"},
+		},
+		{
 			name: "vnic change resends the live vlan on both ends", mve: true,
 			stateA: vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(100), vnicIndex: int64p(0)},
 			planA:  vxcEndSpec{orderedVLAN: int64p(0), vlan: int64p(100), vnicIndex: int64p(1)},
