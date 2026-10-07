@@ -1202,7 +1202,7 @@ func TestFromAPIMCRPrefixFilterListDecode(t *testing.T) {
 }
 
 // The deprecated inline prefix_filter_lists block has optional ge/le with no
-// default. A null bound or a 0 must stay off the wire, as the old SDK left it.
+// default. A null bound or a 0 must stay off the wire.
 func TestToAPIMCRPrefixFilterList_NullOrZeroBoundIsUnset(t *testing.T) {
 	ctx := context.Background()
 	entries, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(mcrPrefixListEntryAttributes), []mcrPrefixListEntryModel{
