@@ -3563,6 +3563,28 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		ibmObject, ibmObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
 		apiDiags = append(apiDiags, ibmObjectDiags...)
 		return ibmObject, apiDiags
+	case megaport.CSPConnectionOther:
+		connectType, _ := provider.CSPConnection["connectType"].(string)
+		resourceName, _ := provider.CSPConnection["resource_name"].(string)
+		resourceType, _ := provider.CSPConnection["resource_type"].(string)
+		otherModel := &cspConnectionModel{
+			ConnectType:  types.StringValue(connectType),
+			ResourceName: types.StringValue(resourceName),
+			ResourceType: types.StringValue(resourceType),
+		}
+		otherModel.Bandwidths = types.ListNull(types.Int64Type)
+		otherModel.IPAddresses = types.ListNull(types.StringType)
+		if connectType != "" {
+			apiDiags.AddWarning(
+				"Unsupported CSP connection type",
+				fmt.Sprintf("This VXC has a connection of type %q, which the Megaport Terraform provider does not support yet. "+
+					"Its csp_connections entry holds only the connection's type and name. "+
+					"To request support, open an issue at https://github.com/megaport/terraform-provider-megaport/issues.", connectType),
+			)
+		}
+		otherObject, otherObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, otherModel)
+		apiDiags = append(apiDiags, otherObjectDiags...)
+		return otherObject, apiDiags
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags

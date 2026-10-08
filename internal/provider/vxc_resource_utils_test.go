@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -546,6 +547,61 @@ func TestFromAPICSPConnection(t *testing.T) {
 			diags = model.IPAddresses.ElementsAs(ctx, &gotIPs, false)
 			require.False(t, diags.HasError(), "reading ip_addresses: %v", diags)
 			assert.Equal(t, tc.wantIPs, gotIPs)
+		})
+	}
+}
+
+func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name         string
+		body         string
+		wantType     string
+		wantName     string
+		wantResType  string
+		wantWarnings int
+	}{
+		{
+			name:         "alibaba",
+			body:         `[{"connectType":"ALIBABA","resource_name":"b_csp_connection","resource_type":"csp_connection","vlan":2001,"bandwidth":100}]`,
+			wantType:     "ALIBABA",
+			wantName:     "b_csp_connection",
+			wantResType:  "csp_connection",
+			wantWarnings: 1,
+		},
+		{
+			name:        "untyped",
+			body:        `[{"resource_name":"a_csp_connection","resource_type":"csp_connection"}]`,
+			wantName:    "a_csp_connection",
+			wantResType: "csp_connection",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var conns megaport.CSPConnection
+			require.NoError(t, json.Unmarshal([]byte(tc.body), &conns))
+			require.Len(t, conns.CSPConnection, 1)
+			require.IsType(t, megaport.CSPConnectionOther{}, conns.CSPConnection[0])
+
+			obj, diags := fromAPICSPConnection(ctx, conns.CSPConnection[0])
+			require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+			require.Equal(t, tc.wantWarnings, diags.WarningsCount(), "warnings: %v", diags)
+			for _, w := range diags.Warnings() {
+				assert.Contains(t, w.Detail(), `"`+tc.wantType+`"`)
+				assert.Contains(t, w.Detail(), "https://github.com/megaport/terraform-provider-megaport/issues")
+			}
+
+			var model cspConnectionModel
+			diags = obj.As(ctx, &model, basetypes.ObjectAsOptions{})
+			require.False(t, diags.HasError(), "decoding object: %v", diags)
+
+			assert.Equal(t, tc.wantType, model.ConnectType.ValueString())
+			assert.Equal(t, tc.wantName, model.ResourceName.ValueString())
+			assert.Equal(t, tc.wantResType, model.ResourceType.ValueString())
+			assert.True(t, model.Bandwidths.IsNull())
+			assert.True(t, model.IPAddresses.IsNull())
 		})
 	}
 }
