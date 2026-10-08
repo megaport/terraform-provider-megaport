@@ -560,10 +560,9 @@ type unhandledCSPConnection struct {
 	ResourceType string `json:"resource_type"`
 }
 
-func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
+func TestFromAPICSPConnection_UnsupportedType(t *testing.T) {
 	ctx := context.Background()
 
-	// The API sends a VXC's only CSP connection as an object, not an array.
 	cases := []struct {
 		name         string
 		body         string
@@ -586,7 +585,7 @@ func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 			wantName: "a_csp_connection",
 		},
 		{
-			name:         "modeled by the SDK only",
+			name:         "modeled by the SDK, no provider case",
 			conn:         unhandledCSPConnection{ConnectType: "NEWCLOUD", ResourceName: "b_csp_connection", ResourceType: "csp_connection"},
 			wantType:     "NEWCLOUD",
 			wantName:     "b_csp_connection",
@@ -598,6 +597,7 @@ func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			conn := tc.conn
 			if conn == nil {
+				// The API sends a VXC's only CSP connection as an object, not an array.
 				var conns megaport.CSPConnection
 				require.NoError(t, json.Unmarshal([]byte(tc.body), &conns))
 				require.Len(t, conns.CSPConnection, 1)

@@ -3565,8 +3565,8 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, ibmObjectDiags...)
 		return ibmObject, apiDiags
 	}
-	// CSPConnectionOther holds a type the SDK does not model. A type the SDK
-	// models that this switch does not handle yet has the same JSON keys.
+	// CSPConnectionOther keeps the API's keys in a map. The SDK interface has no
+	// accessor, so read a type with no case above from its JSON instead.
 	fields := map[string]any{}
 	if other, ok := c.(megaport.CSPConnectionOther); ok {
 		fields = other.CSPConnection
