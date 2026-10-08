@@ -554,27 +554,26 @@ func TestFromAPICSPConnection(t *testing.T) {
 func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 	ctx := context.Background()
 
+	// The API sends a VXC's only CSP connection as an object, not an array.
 	cases := []struct {
 		name         string
 		body         string
 		wantType     string
 		wantName     string
-		wantResType  string
 		wantWarnings int
 	}{
 		{
-			name:         "alibaba",
-			body:         `[{"connectType":"ALIBABA","resource_name":"b_csp_connection","resource_type":"csp_connection","vlan":2001,"bandwidth":100}]`,
+			name: "alibaba",
+			body: `{"connectType":"ALIBABA","resource_name":"b_csp_connection","resource_type":"csp_connection",` +
+				`"account_id":"1234567890","bandwidth":100,"bandwidths":[100],"csp_name":"Alibaba"}`,
 			wantType:     "ALIBABA",
 			wantName:     "b_csp_connection",
-			wantResType:  "csp_connection",
 			wantWarnings: 1,
 		},
 		{
-			name:        "untyped",
-			body:        `[{"resource_name":"a_csp_connection","resource_type":"csp_connection"}]`,
-			wantName:    "a_csp_connection",
-			wantResType: "csp_connection",
+			name:     "untyped",
+			body:     `{"resource_name":"a_csp_connection","resource_type":"csp_connection"}`,
+			wantName: "a_csp_connection",
 		},
 	}
 
@@ -597,11 +596,13 @@ func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 			diags = obj.As(ctx, &model, basetypes.ObjectAsOptions{})
 			require.False(t, diags.HasError(), "decoding object: %v", diags)
 
-			assert.Equal(t, tc.wantType, model.ConnectType.ValueString())
-			assert.Equal(t, tc.wantName, model.ResourceName.ValueString())
-			assert.Equal(t, tc.wantResType, model.ResourceType.ValueString())
-			assert.True(t, model.Bandwidths.IsNull())
-			assert.True(t, model.IPAddresses.IsNull())
+			assert.Equal(t, cspConnectionModel{
+				ConnectType:  types.StringValue(tc.wantType),
+				ResourceName: types.StringValue(tc.wantName),
+				ResourceType: types.StringValue("csp_connection"),
+				Bandwidths:   types.ListNull(types.Int64Type),
+				IPAddresses:  types.ListNull(types.StringType),
+			}, model)
 		})
 	}
 }

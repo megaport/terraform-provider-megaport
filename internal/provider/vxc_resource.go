@@ -3577,8 +3577,8 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		if connectType != "" {
 			apiDiags.AddWarning(
 				"Unsupported CSP connection type",
-				fmt.Sprintf("This VXC has a connection of type %q, which the Megaport Terraform provider does not support yet. "+
-					"Its csp_connections entry holds only the connection's type and name. "+
+				fmt.Sprintf("The provider does not support CSP connection type %q yet. "+
+					"The csp_connections entry for this connection records only connect_type, resource_name, and resource_type. "+
 					"To request support, open an issue at https://github.com/megaport/terraform-provider-megaport/issues.", connectType),
 			)
 		}
