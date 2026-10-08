@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -3564,8 +3565,35 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, ibmObjectDiags...)
 		return ibmObject, apiDiags
 	}
-	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+	// CSPConnectionOther keeps the API's keys in a map. The SDK interface has no
+	// accessor, so read a type with no case above from its JSON instead.
+	fields := map[string]any{}
+	if other, ok := c.(megaport.CSPConnectionOther); ok {
+		fields = other.CSPConnection
+	} else if b, err := json.Marshal(c); err == nil {
+		_ = json.Unmarshal(b, &fields)
+	}
+	connectType, _ := fields["connectType"].(string)
+	resourceName, _ := fields["resource_name"].(string)
+	resourceType, _ := fields["resource_type"].(string)
+	otherModel := &cspConnectionModel{
+		ConnectType:  types.StringValue(connectType),
+		ResourceName: types.StringValue(resourceName),
+		ResourceType: types.StringValue(resourceType),
+	}
+	otherModel.Bandwidths = types.ListNull(types.Int64Type)
+	otherModel.IPAddresses = types.ListNull(types.StringType)
+	if connectType != "" {
+		apiDiags.AddWarning(
+			"Unsupported CSP connection type",
+			fmt.Sprintf("The provider does not support CSP connection type %q yet. "+
+				"The csp_connections entry for this connection records only connect_type, resource_name, and resource_type. "+
+				"To request support, open an issue at https://github.com/megaport/terraform-provider-megaport/issues.", connectType),
+		)
+	}
+	otherObject, otherObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, otherModel)
+	apiDiags = append(apiDiags, otherObjectDiags...)
+	return otherObject, apiDiags
 }
 
 func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
