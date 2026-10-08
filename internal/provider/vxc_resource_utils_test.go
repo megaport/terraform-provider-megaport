@@ -551,6 +551,15 @@ func TestFromAPICSPConnection(t *testing.T) {
 	}
 }
 
+// unhandledCSPConnection stands in for a CSP type that a newer SDK models
+// before fromAPICSPConnection handles it.
+type unhandledCSPConnection struct {
+	megaport.CSPConnectionConfig
+	ConnectType  string `json:"connectType"`
+	ResourceName string `json:"resource_name"`
+	ResourceType string `json:"resource_type"`
+}
+
 func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 	ctx := context.Background()
 
@@ -558,6 +567,7 @@ func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 	cases := []struct {
 		name         string
 		body         string
+		conn         megaport.CSPConnectionConfig
 		wantType     string
 		wantName     string
 		wantWarnings int
@@ -575,16 +585,27 @@ func TestFromAPICSPConnection_UnmodeledType(t *testing.T) {
 			body:     `{"resource_name":"a_csp_connection","resource_type":"csp_connection"}`,
 			wantName: "a_csp_connection",
 		},
+		{
+			name:         "modeled by the SDK only",
+			conn:         unhandledCSPConnection{ConnectType: "NEWCLOUD", ResourceName: "b_csp_connection", ResourceType: "csp_connection"},
+			wantType:     "NEWCLOUD",
+			wantName:     "b_csp_connection",
+			wantWarnings: 1,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var conns megaport.CSPConnection
-			require.NoError(t, json.Unmarshal([]byte(tc.body), &conns))
-			require.Len(t, conns.CSPConnection, 1)
-			require.IsType(t, megaport.CSPConnectionOther{}, conns.CSPConnection[0])
+			conn := tc.conn
+			if conn == nil {
+				var conns megaport.CSPConnection
+				require.NoError(t, json.Unmarshal([]byte(tc.body), &conns))
+				require.Len(t, conns.CSPConnection, 1)
+				require.IsType(t, megaport.CSPConnectionOther{}, conns.CSPConnection[0])
+				conn = conns.CSPConnection[0]
+			}
 
-			obj, diags := fromAPICSPConnection(ctx, conns.CSPConnection[0])
+			obj, diags := fromAPICSPConnection(ctx, conn)
 			require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
 			require.Equal(t, tc.wantWarnings, diags.WarningsCount(), "warnings: %v", diags)
 			for _, w := range diags.Warnings() {
