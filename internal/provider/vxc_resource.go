@@ -164,6 +164,34 @@ var (
 		"ipv6_gateway_address": types.StringType,
 		"ip_addresses":         types.ListType{}.WithElementType(types.StringType),
 		"virtual_router_name":  types.StringType,
+		"interfaces":           types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs)),
+	}
+
+	cspConnectionInterfaceAttrs = map[string]attr.Type{
+		"ip_addresses":     types.ListType{}.WithElementType(types.StringType),
+		"ip_routes":        types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(ipRouteAttrs)),
+		"nat_ip_addresses": types.ListType{}.WithElementType(types.StringType),
+		"bgp_connections":  types.ListType{}.WithElementType(types.ObjectType{}.WithAttributeTypes(cspConnectionBGPConnectionAttrs)),
+	}
+
+	cspConnectionBGPConnectionAttrs = map[string]attr.Type{
+		"peer_type":             types.StringType,
+		"peer_asn":              types.Int64Type,
+		"local_asn":             types.Int64Type,
+		"local_ip_address":      types.StringType,
+		"peer_ip_address":       types.StringType,
+		"shutdown":              types.BoolType,
+		"description":           types.StringType,
+		"med_in":                types.Int64Type,
+		"med_out":               types.Int64Type,
+		"bfd_enabled":           types.BoolType,
+		"as_override":           types.BoolType,
+		"export_policy":         types.StringType,
+		"import_whitelist_id":   types.Int64Type,
+		"import_blacklist_id":   types.Int64Type,
+		"export_whitelist_id":   types.Int64Type,
+		"export_blacklist_id":   types.Int64Type,
+		"as_path_prepend_count": types.Int64Type,
 	}
 
 	vxcPartnerConfigAttrs = map[string]attr.Type{
@@ -420,6 +448,34 @@ type cspConnectionModel struct {
 	CustomerIP6Network types.String `tfsdk:"customer_ip6_network"`
 	IPv4GatewayAddress types.String `tfsdk:"ipv4_gateway_address"`
 	IPv6GatewayAddress types.String `tfsdk:"ipv6_gateway_address"`
+	Interfaces         types.List   `tfsdk:"interfaces"`
+}
+
+type cspConnectionInterfaceModel struct {
+	IPAddresses    types.List `tfsdk:"ip_addresses"`
+	IPRoutes       types.List `tfsdk:"ip_routes"`
+	NatIPAddresses types.List `tfsdk:"nat_ip_addresses"`
+	BGPConnections types.List `tfsdk:"bgp_connections"`
+}
+
+type cspConnectionBGPConnectionModel struct {
+	PeerType           types.String `tfsdk:"peer_type"`
+	PeerASN            types.Int64  `tfsdk:"peer_asn"`
+	LocalASN           types.Int64  `tfsdk:"local_asn"`
+	LocalIPAddress     types.String `tfsdk:"local_ip_address"`
+	PeerIPAddress      types.String `tfsdk:"peer_ip_address"`
+	Shutdown           types.Bool   `tfsdk:"shutdown"`
+	Description        types.String `tfsdk:"description"`
+	MedIn              types.Int64  `tfsdk:"med_in"`
+	MedOut             types.Int64  `tfsdk:"med_out"`
+	BFDEnabled         types.Bool   `tfsdk:"bfd_enabled"`
+	AsOverride         types.Bool   `tfsdk:"as_override"`
+	ExportPolicy       types.String `tfsdk:"export_policy"`
+	ImportWhitelistID  types.Int64  `tfsdk:"import_whitelist_id"`
+	ImportBlacklistID  types.Int64  `tfsdk:"import_blacklist_id"`
+	ExportWhitelistID  types.Int64  `tfsdk:"export_whitelist_id"`
+	ExportBlacklistID  types.Int64  `tfsdk:"export_blacklist_id"`
+	AsPathPrependCount types.Int64  `tfsdk:"as_path_prepend_count"`
 }
 
 // vxcEndConfigurationModel maps the end configuration schema data.
@@ -1089,6 +1145,120 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Computed:    true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"interfaces": schema.ListNestedAttribute{
+							Description: "The interfaces of the MCR or NAT Gateway end of the VXC.",
+							Computed:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"ip_addresses": schema.ListAttribute{
+										Description: "The IP addresses of the interface, in CIDR notation.",
+										Computed:    true,
+										ElementType: types.StringType,
+									},
+									"ip_routes": schema.ListNestedAttribute{
+										Description: "The static routes of the interface.",
+										Computed:    true,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"prefix": schema.StringAttribute{
+													Description: "The prefix of the route.",
+													Computed:    true,
+												},
+												"description": schema.StringAttribute{
+													Description: "The description of the route.",
+													Computed:    true,
+												},
+												"next_hop": schema.StringAttribute{
+													Description: "The next hop of the route.",
+													Computed:    true,
+												},
+											},
+										},
+									},
+									"nat_ip_addresses": schema.ListAttribute{
+										Description: "The NAT IP addresses of an MCR interface. The provider does not read NAT Gateway address pools.",
+										Computed:    true,
+										ElementType: types.StringType,
+									},
+									"bgp_connections": schema.ListNestedAttribute{
+										Description: "The BGP connections of the interface. The provider leaves out the BGP password.",
+										Computed:    true,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"peer_type": schema.StringAttribute{
+													Description: "The default BGP routing policy of the BGP connection: `NON_CLOUD`, `PRIV_CLOUD`, or `PUB_CLOUD`.",
+													Computed:    true,
+												},
+												"peer_asn": schema.Int64Attribute{
+													Description: "The ASN of the BGP peer.",
+													Computed:    true,
+												},
+												"local_asn": schema.Int64Attribute{
+													Description: "The local ASN of the BGP connection.",
+													Computed:    true,
+												},
+												"local_ip_address": schema.StringAttribute{
+													Description: "The local IP address of the BGP connection.",
+													Computed:    true,
+												},
+												"peer_ip_address": schema.StringAttribute{
+													Description: "The IP address of the BGP peer.",
+													Computed:    true,
+												},
+												"shutdown": schema.BoolAttribute{
+													Description: "Whether the BGP connection is shut down.",
+													Computed:    true,
+												},
+												"description": schema.StringAttribute{
+													Description: "The description of the BGP connection.",
+													Computed:    true,
+												},
+												"med_in": schema.Int64Attribute{
+													Description: "The MED applied to routes received from the peer.",
+													Computed:    true,
+												},
+												"med_out": schema.Int64Attribute{
+													Description: "The MED applied to routes advertised to the peer.",
+													Computed:    true,
+												},
+												"bfd_enabled": schema.BoolAttribute{
+													Description: "Whether BFD is enabled on the BGP connection.",
+													Computed:    true,
+												},
+												"as_override": schema.BoolAttribute{
+													Description: "Whether AS override is enabled on the BGP connection.",
+													Computed:    true,
+												},
+												"export_policy": schema.StringAttribute{
+													Description: "The export policy of the BGP connection.",
+													Computed:    true,
+												},
+												"import_whitelist_id": schema.Int64Attribute{
+													Description: "The ID of the prefix filter list that permits imported routes.",
+													Computed:    true,
+												},
+												"import_blacklist_id": schema.Int64Attribute{
+													Description: "The ID of the prefix filter list that denies imported routes.",
+													Computed:    true,
+												},
+												"export_whitelist_id": schema.Int64Attribute{
+													Description: "The ID of the prefix filter list that permits exported routes.",
+													Computed:    true,
+												},
+												"export_blacklist_id": schema.Int64Attribute{
+													Description: "The ID of the prefix filter list that denies exported routes.",
+													Computed:    true,
+												},
+												"as_path_prepend_count": schema.Int64Attribute{
+													Description: "The number of times the router prepends the local ASN to the routes it advertises on this BGP connection.",
+													Computed:    true,
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -3425,6 +3595,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		awsModel.Bandwidths = types.ListNull(types.Int64Type)
 		awsModel.IPAddresses = types.ListNull(types.StringType)
+		awsModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		awsObject, awsDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsModel)
 		apiDiags = append(apiDiags, awsDiags...)
 		return awsObject, apiDiags
@@ -3446,6 +3617,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, bandwidthDiags...)
 		awsHCModel.Bandwidths = bandwidthList
 		awsHCModel.IPAddresses = types.ListNull(types.StringType)
+		awsHCModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		awsHCObject, awsHCDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, awsHCModel)
 		apiDiags = append(apiDiags, awsHCDiags...)
 		return awsHCObject, apiDiags
@@ -3461,6 +3633,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		azureModel.Bandwidths = types.ListNull(types.Int64Type)
 		azureModel.IPAddresses = types.ListNull(types.StringType)
+		azureModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		azureObject, azureObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, azureModel)
 		apiDiags = append(apiDiags, azureObjDiags...)
 		return azureObject, apiDiags
@@ -3479,6 +3652,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 			bandwidths = append(bandwidths, int64(b))
 		}
 		googleModel.IPAddresses = types.ListNull(types.StringType)
+		googleModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		bandwidthList, bwListDiags := types.ListValueFrom(ctx, types.Int64Type, bandwidths)
 		apiDiags = append(apiDiags, bwListDiags...)
 		googleModel.Bandwidths = bandwidthList
@@ -3498,6 +3672,9 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		ipList, ipListDiags := types.ListValueFrom(ctx, types.StringType, ipAddresses)
 		apiDiags = append(apiDiags, ipListDiags...)
 		virtualRouterModel.IPAddresses = ipList
+		interfaceList, interfaceListDiags := fromAPICSPConnectionInterfaces(ctx, provider.Interfaces)
+		apiDiags = append(apiDiags, interfaceListDiags...)
+		virtualRouterModel.Interfaces = interfaceList
 		virtualRouterObject, vrObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, virtualRouterModel)
 		apiDiags = append(apiDiags, vrObjDiags...)
 		return virtualRouterObject, apiDiags
@@ -3513,6 +3690,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		}
 		transitModel.Bandwidths = types.ListNull(types.Int64Type)
 		transitModel.IPAddresses = types.ListNull(types.StringType)
+		transitModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		transitObject, transitObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, transitModel)
 		apiDiags = append(apiDiags, transitObjectDiags...)
 		return transitObject, apiDiags
@@ -3535,6 +3713,7 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		// Set null values for fields that don't apply to Oracle connections
 		oracleModel.Bandwidths = types.ListNull(types.Int64Type)
 		oracleModel.IPAddresses = types.ListNull(types.StringType)
+		oracleModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 
 		// Convert the model to a Terraform Object
 		oracleObj, oracleObjDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, oracleModel)
@@ -3560,12 +3739,90 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, bandwidthListDiags...)
 		ibmModel.Bandwidths = bandwidthList
 		ibmModel.IPAddresses = types.ListNull(types.StringType)
+		ibmModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
 		ibmObject, ibmObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, ibmModel)
 		apiDiags = append(apiDiags, ibmObjectDiags...)
 		return ibmObject, apiDiags
 	}
 	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
 	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+}
+
+// vrouterInterfacesUnknown marks interfaces and ip_addresses unknown on each VROUTER entry.
+// The other entries stay known: an unknown value there can force replacement of a resource that reads it.
+func vrouterInterfacesUnknown(ctx context.Context, conns types.List, diags *diag.Diagnostics) types.List {
+	if conns.IsUnknown() {
+		return conns
+	}
+	var models []cspConnectionModel
+	diags.Append(conns.ElementsAs(ctx, &models, false)...)
+	for i := range models {
+		if models[i].ConnectType.ValueString() == "VROUTER" {
+			models[i].Interfaces = types.ListUnknown(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
+			models[i].IPAddresses = types.ListUnknown(types.StringType)
+		}
+	}
+	list, listDiags := types.ListValueFrom(ctx, conns.ElementType(ctx), models)
+	diags.Append(listDiags...)
+	return list
+}
+
+// fromAPICSPConnectionInterfaces leaves out the BGP password, which the read call returns in plain text.
+func fromAPICSPConnectionInterfaces(ctx context.Context, interfaces []megaport.CSPConnectionVirtualRouterInterface) (types.List, diag.Diagnostics) {
+	apiDiags := diag.Diagnostics{}
+	interfaceModels := []cspConnectionInterfaceModel{}
+	for _, iface := range interfaces {
+		ipAddresses, ipDiags := types.ListValueFrom(ctx, types.StringType, append([]string{}, iface.IPAddresses...))
+		apiDiags = append(apiDiags, ipDiags...)
+		natIPAddresses, natDiags := types.ListValueFrom(ctx, types.StringType, append([]string{}, iface.NatIPAddresses...))
+		apiDiags = append(apiDiags, natDiags...)
+
+		routeModels := []ipRouteModel{}
+		for _, route := range iface.IPRoutes {
+			routeModels = append(routeModels, ipRouteModel{
+				Prefix:      types.StringValue(route.Prefix),
+				Description: stringOrNull(route.Description),
+				NextHop:     types.StringValue(route.NextHop),
+			})
+		}
+		ipRoutes, routeDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(ipRouteAttrs), routeModels)
+		apiDiags = append(apiDiags, routeDiags...)
+
+		bgpModels := []cspConnectionBGPConnectionModel{}
+		for _, bgp := range iface.BGPConnections {
+			bgpModels = append(bgpModels, cspConnectionBGPConnectionModel{
+				PeerType:           stringOrNull(bgp.PeerType),
+				PeerASN:            types.Int64Value(int64(bgp.PeerAsn)),
+				LocalASN:           int64PtrOrNull(bgp.LocalAsn),
+				LocalIPAddress:     types.StringValue(bgp.LocalIpAddress),
+				PeerIPAddress:      types.StringValue(bgp.PeerIpAddress),
+				Shutdown:           types.BoolValue(bgp.Shutdown),
+				Description:        stringOrNull(bgp.Description),
+				MedIn:              int64OrNull(bgp.MedIn),
+				MedOut:             int64OrNull(bgp.MedOut),
+				BFDEnabled:         types.BoolValue(bgp.BfdEnabled),
+				AsOverride:         types.BoolPointerValue(bgp.AsOverride),
+				ExportPolicy:       stringOrNull(bgp.ExportPolicy),
+				ImportWhitelistID:  int64OrNull(bgp.ImportWhitelist),
+				ImportBlacklistID:  int64OrNull(bgp.ImportBlacklist),
+				ExportWhitelistID:  int64OrNull(bgp.ExportWhitelist),
+				ExportBlacklistID:  int64OrNull(bgp.ExportBlacklist),
+				AsPathPrependCount: int64OrNull(bgp.AsPathPrependCount),
+			})
+		}
+		bgpConnections, bgpDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionBGPConnectionAttrs), bgpModels)
+		apiDiags = append(apiDiags, bgpDiags...)
+
+		interfaceModels = append(interfaceModels, cspConnectionInterfaceModel{
+			IPAddresses:    ipAddresses,
+			IPRoutes:       ipRoutes,
+			NatIPAddresses: natIPAddresses,
+			BGPConnections: bgpConnections,
+		})
+	}
+	interfaceList, listDiags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs), interfaceModels)
+	apiDiags = append(apiDiags, listDiags...)
+	return interfaceList, apiDiags
 }
 
 func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -3595,6 +3852,12 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 			bEndStateObj := state.BEndConfiguration
 			aEndPlanObj := plan.AEndConfiguration
 			bEndPlanObj := plan.BEndConfiguration
+
+			// A partner config change can change the interfaces the read call returns in csp_connections.
+			if !plan.AEndPartnerConfig.Equal(state.AEndPartnerConfig) || !plan.BEndPartnerConfig.Equal(state.BEndPartnerConfig) {
+				plan.CSPConnections = vrouterInterfacesUnknown(ctx, plan.CSPConnections, &resp.Diagnostics)
+				resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("csp_connections"), plan.CSPConnections)...)
+			}
 
 			// Skip the UID reconciliation below if any end-config object is wholly
 			// unknown or null. Unknown objects arise from conditional expressions

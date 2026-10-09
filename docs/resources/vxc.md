@@ -961,7 +961,51 @@ Optional:
 
 Read-Only:
 
+- `interfaces` (Attributes List) The interfaces of the MCR or NAT Gateway end of the VXC. (see [below for nested schema](#nestedatt--csp_connections--interfaces))
 - `vlan` (Number) The VLAN of the CSP connection.
+
+<a id="nestedatt--csp_connections--interfaces"></a>
+### Nested Schema for `csp_connections.interfaces`
+
+Read-Only:
+
+- `bgp_connections` (Attributes List) The BGP connections of the interface. The provider leaves out the BGP password. (see [below for nested schema](#nestedatt--csp_connections--interfaces--bgp_connections))
+- `ip_addresses` (List of String) The IP addresses of the interface, in CIDR notation.
+- `ip_routes` (Attributes List) The static routes of the interface. (see [below for nested schema](#nestedatt--csp_connections--interfaces--ip_routes))
+- `nat_ip_addresses` (List of String) The NAT IP addresses of an MCR interface. The provider does not read NAT Gateway address pools.
+
+<a id="nestedatt--csp_connections--interfaces--bgp_connections"></a>
+### Nested Schema for `csp_connections.interfaces.bgp_connections`
+
+Read-Only:
+
+- `as_override` (Boolean) Whether AS override is enabled on the BGP connection.
+- `as_path_prepend_count` (Number) The number of times the router prepends the local ASN to the routes it advertises on this BGP connection.
+- `bfd_enabled` (Boolean) Whether BFD is enabled on the BGP connection.
+- `description` (String) The description of the BGP connection.
+- `export_blacklist_id` (Number) The ID of the prefix filter list that denies exported routes.
+- `export_policy` (String) The export policy of the BGP connection.
+- `export_whitelist_id` (Number) The ID of the prefix filter list that permits exported routes.
+- `import_blacklist_id` (Number) The ID of the prefix filter list that denies imported routes.
+- `import_whitelist_id` (Number) The ID of the prefix filter list that permits imported routes.
+- `local_asn` (Number) The local ASN of the BGP connection.
+- `local_ip_address` (String) The local IP address of the BGP connection.
+- `med_in` (Number) The MED applied to routes received from the peer.
+- `med_out` (Number) The MED applied to routes advertised to the peer.
+- `peer_asn` (Number) The ASN of the BGP peer.
+- `peer_ip_address` (String) The IP address of the BGP peer.
+- `peer_type` (String) The default BGP routing policy of the BGP connection: `NON_CLOUD`, `PRIV_CLOUD`, or `PUB_CLOUD`.
+- `shutdown` (Boolean) Whether the BGP connection is shut down.
+
+
+<a id="nestedatt--csp_connections--interfaces--ip_routes"></a>
+### Nested Schema for `csp_connections.interfaces.ip_routes`
+
+Read-Only:
+
+- `description` (String) The description of the route.
+- `next_hop` (String) The next hop of the route.
+- `prefix` (String) The prefix of the route.
 
 ## Import
 
