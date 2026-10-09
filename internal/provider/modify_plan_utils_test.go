@@ -35,39 +35,50 @@ func TestRestoreComputedOnNoOpPlan_NestedObjects(t *testing.T) {
 
 	state := obj(str("vxc"), str("LIVE"), end(str("port-1"), str("CONFIGURED")))
 
-	// plan is a func so the expected value does not share a map with the input.
 	tests := []struct {
 		name      string
-		plan      func() tftypes.Value
+		prior     tftypes.Value
+		plan      tftypes.Value
 		config    tftypes.Value
 		converges bool
 	}{
 		{
 			name:      "nested unknowns converge",
-			plan:      func() tftypes.Value { return obj(str("vxc"), unknown, end(str("port-1"), unknown)) },
+			prior:     state,
+			plan:      obj(str("vxc"), unknown, end(str("port-1"), unknown)),
 			config:    obj(str("vxc"), null, end(str("port-1"), null)),
 			converges: true,
 		},
 		{
 			name:      "null config object counts as null for each child",
-			plan:      func() tftypes.Value { return obj(str("vxc"), unknown, end(str("port-1"), unknown)) },
+			prior:     state,
+			plan:      obj(str("vxc"), unknown, end(str("port-1"), unknown)),
 			config:    obj(str("vxc"), null, nullEnd),
 			converges: true,
 		},
 		{
 			name:   "nested real change",
-			plan:   func() tftypes.Value { return obj(str("vxc"), unknown, end(str("port-2"), unknown)) },
+			prior:  state,
+			plan:   obj(str("vxc"), unknown, end(str("port-2"), unknown)),
 			config: obj(str("vxc"), null, end(str("port-2"), null)),
 		},
 		{
 			name:   "nested unknown set in config",
-			plan:   func() tftypes.Value { return obj(str("vxc"), unknown, end(str("port-1"), unknown)) },
+			prior:  state,
+			plan:   obj(str("vxc"), unknown, end(str("port-1"), unknown)),
 			config: obj(str("vxc"), null, end(str("port-1"), unknown)),
 		},
 		{
 			name:   "nested object removed",
-			plan:   func() tftypes.Value { return obj(str("vxc"), unknown, nullEnd) },
+			prior:  state,
+			plan:   obj(str("vxc"), unknown, nullEnd),
 			config: obj(str("vxc"), null, nullEnd),
+		},
+		{
+			name:   "nested object added",
+			prior:  obj(str("vxc"), str("LIVE"), nullEnd),
+			plan:   obj(str("vxc"), unknown, end(unknown, unknown)),
+			config: obj(str("vxc"), null, end(null, null)),
 		},
 	}
 
@@ -75,12 +86,12 @@ func TestRestoreComputedOnNoOpPlan_NestedObjects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			want := tc.plan()
+			want := tc.plan
 			if tc.converges {
-				want = state
+				want = tc.prior
 			}
 
-			got, err := restoreComputedOnNoOpPlan(tc.plan(), state, tc.config)
+			got, err := restoreComputedOnNoOpPlan(tc.plan, tc.prior, tc.config)
 			if err != nil {
 				t.Fatalf("expected no error, got: %v", err)
 			}

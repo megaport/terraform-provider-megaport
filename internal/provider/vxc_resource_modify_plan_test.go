@@ -6,42 +6,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
-
-// vxcPlanFixture holds the megaport_vxc schema type and the nested types the
-// plan tests build values for.
-type vxcPlanFixture struct {
-	vxc, end, partner, aws tftypes.Object
-}
-
-func newVXCPlanFixture(t *testing.T) vxcPlanFixture {
-	t.Helper()
-	ctx := context.Background()
-
-	schemaResp := fwresource.SchemaResponse{}
-	(&vxcResource{}).Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
-
-	vxc, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
-	if !ok {
-		t.Fatal("schema type is not tftypes.Object")
-	}
-	end, ok := vxc.AttributeTypes["a_end"].(tftypes.Object)
-	if !ok {
-		t.Fatal("a_end type is not tftypes.Object")
-	}
-	partner, ok := vxc.AttributeTypes["b_end_partner_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("b_end_partner_config type is not tftypes.Object")
-	}
-	aws, ok := partner.AttributeTypes["aws_config"].(tftypes.Object)
-	if !ok {
-		t.Fatal("aws_config type is not tftypes.Object")
-	}
-	return vxcPlanFixture{vxc: vxc, end: end, partner: partner, aws: aws}
-}
 
 // objectWith builds an object of objType with the given attributes set and
 // every other attribute null.
@@ -54,20 +21,17 @@ func objectWith(objType tftypes.Object, set map[string]tftypes.Value) tftypes.Va
 }
 
 // awsHostedConnection returns an AWS Hosted Connection B-End partner config.
-func (fx vxcPlanFixture) awsHostedConnection() tftypes.Value {
-	return objectWith(fx.partner, map[string]tftypes.Value{
-		"partner": tftypes.NewValue(tftypes.String, "aws"),
-		"aws_config": objectWith(fx.aws, map[string]tftypes.Value{
-			"connect_type":  tftypes.NewValue(tftypes.String, "AWSHC"),
-			"type":          tftypes.NewValue(tftypes.String, "private"),
-			"owner_account": tftypes.NewValue(tftypes.String, "123456789012"),
-		}),
+func (ty vxcPartnerTestTypes) awsHostedConnection() tftypes.Value {
+	return ty.awsFieldsVal(map[string]tftypes.Value{
+		"connect_type":  tftypes.NewValue(tftypes.String, "AWSHC"),
+		"type":          tftypes.NewValue(tftypes.String, "private"),
+		"owner_account": tftypes.NewValue(tftypes.String, "123456789012"),
 	})
 }
 
 // priorEnd returns an end as state records it after a read.
-func (fx vxcPlanFixture) priorEnd(uid, name, location string, locationID int) tftypes.Value {
-	return objectWith(fx.end, map[string]tftypes.Value{
+func (ty vxcPartnerTestTypes) priorEnd(uid, name, location string, locationID int) tftypes.Value {
+	return objectWith(ty.end, map[string]tftypes.Value{
 		"owner_uid":             tftypes.NewValue(tftypes.String, "owner-uid-1"),
 		"requested_product_uid": tftypes.NewValue(tftypes.String, uid),
 		"current_product_uid":   tftypes.NewValue(tftypes.String, uid),
@@ -83,8 +47,8 @@ func (fx vxcPlanFixture) priorEnd(uid, name, location string, locationID int) tf
 }
 
 // configEnd returns an end as a configuration writes it.
-func (fx vxcPlanFixture) configEnd(uid string) tftypes.Value {
-	return objectWith(fx.end, map[string]tftypes.Value{
+func (ty vxcPartnerTestTypes) configEnd(uid string) tftypes.Value {
+	return objectWith(ty.end, map[string]tftypes.Value{
 		"requested_product_uid": tftypes.NewValue(tftypes.String, uid),
 		"ordered_vlan":          tftypes.NewValue(tftypes.Number, 200),
 	})
@@ -92,8 +56,8 @@ func (fx vxcPlanFixture) configEnd(uid string) tftypes.Value {
 
 // priorVXC returns a live VXC in state. bEndPartnerConfig is null for a
 // VXC between two ports.
-func (fx vxcPlanFixture) priorVXC(bEnd, bEndPartnerConfig tftypes.Value) tftypes.Value {
-	return objectWith(fx.vxc, map[string]tftypes.Value{
+func (ty vxcPartnerTestTypes) priorVXC(bEnd, bEndPartnerConfig tftypes.Value) tftypes.Value {
+	return objectWith(ty.obj, map[string]tftypes.Value{
 		"product_uid":          tftypes.NewValue(tftypes.String, "vxc-uid-1"),
 		"product_name":         tftypes.NewValue(tftypes.String, "vxc-one"),
 		"rate_limit":           tftypes.NewValue(tftypes.Number, 200),
@@ -104,15 +68,15 @@ func (fx vxcPlanFixture) priorVXC(bEnd, bEndPartnerConfig tftypes.Value) tftypes
 		"contract_start_date":  tftypes.NewValue(tftypes.String, "2026-05-24"),
 		"create_date":          tftypes.NewValue(tftypes.String, "2026-05-22"),
 		"live_date":            tftypes.NewValue(tftypes.String, "2026-05-24"),
-		"a_end":                fx.priorEnd("port-uid-1", "port-one", "Location One", 530),
+		"a_end":                ty.priorEnd("port-uid-1", "port-one", "Location One", 530),
 		"b_end":                bEnd,
 		"b_end_partner_config": bEndPartnerConfig,
 	})
 }
 
 // configVXC returns a configuration for the VXC that priorVXC records.
-func (fx vxcPlanFixture) configVXC(rateLimit int, aEnd, bEnd, bEndPartnerConfig tftypes.Value) tftypes.Value {
-	return objectWith(fx.vxc, map[string]tftypes.Value{
+func (ty vxcPartnerTestTypes) configVXC(rateLimit int, aEnd, bEnd, bEndPartnerConfig tftypes.Value) tftypes.Value {
+	return objectWith(ty.obj, map[string]tftypes.Value{
 		"product_name":         tftypes.NewValue(tftypes.String, "vxc-one"),
 		"rate_limit":           tftypes.NewValue(tftypes.Number, rateLimit),
 		"contract_term_months": tftypes.NewValue(tftypes.Number, 12),
@@ -145,7 +109,7 @@ func proposedNewState(prior, config tftypes.Value) tftypes.Value {
 
 // planVXC runs a megaport_vxc plan through the provider server, which marks
 // the Computed unknowns before ModifyPlan runs, the same as a terraform plan.
-func planVXC(t *testing.T, fx vxcPlanFixture, prior, proposed, config tftypes.Value) tftypes.Value {
+func planVXC(t *testing.T, ty vxcPartnerTestTypes, prior, proposed, config tftypes.Value) tftypes.Value {
 	t.Helper()
 
 	server, err := providerserver.NewProtocol6WithError(New("test")())()
@@ -153,7 +117,7 @@ func planVXC(t *testing.T, fx vxcPlanFixture, prior, proposed, config tftypes.Va
 		t.Fatal(err)
 	}
 	dynamic := func(value tftypes.Value) *tfprotov6.DynamicValue {
-		dv, err := tfprotov6.NewDynamicValue(fx.vxc, value)
+		dv, err := tfprotov6.NewDynamicValue(ty.obj, value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +138,7 @@ func planVXC(t *testing.T, fx vxcPlanFixture, prior, proposed, config tftypes.Va
 			t.Fatalf("expected no errors, got: %s: %s", d.Summary, d.Detail)
 		}
 	}
-	planned, err := resp.PlannedState.Unmarshal(fx.vxc)
+	planned, err := resp.PlannedState.Unmarshal(ty.obj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,15 +164,15 @@ func plannedAt(t *testing.T, planned tftypes.Value, names ...string) tftypes.Val
 	return value
 }
 
-// TestVXCModifyPlan_ConvergesCloudPortDrift covers the reported bug. A config
-// that names a different cloud partner port than state has to plan no changes.
-// The cloud-end pin hides the port, and every unknown the framework marked for
-// it has to go back to prior state.
+// TestVXCModifyPlan_ConvergesCloudPortDrift checks that a config naming a
+// different cloud partner port than state plans no changes. The cloud-end pin
+// hides the port. Every unknown the framework marked for it goes back to prior
+// state.
 func TestVXCModifyPlan_ConvergesCloudPortDrift(t *testing.T) {
 	t.Parallel()
-	fx := newVXCPlanFixture(t)
-	partnerConfig := fx.awsHostedConnection()
-	prior := fx.priorVXC(fx.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69), partnerConfig)
+	ty := newVXCPartnerTestTypes(context.Background(), t)
+	partnerConfig := ty.awsHostedConnection()
+	prior := ty.priorVXC(ty.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69), partnerConfig)
 
 	tests := []struct {
 		name    string
@@ -222,8 +186,8 @@ func TestVXCModifyPlan_ConvergesCloudPortDrift(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			config := fx.configVXC(200, fx.configEnd("port-uid-1"), fx.configEnd(tc.bEndUID), partnerConfig)
-			planned := planVXC(t, fx, prior, proposedNewState(prior, config), config)
+			config := ty.configVXC(200, ty.configEnd("port-uid-1"), ty.configEnd(tc.bEndUID), partnerConfig)
+			planned := planVXC(t, ty, prior, proposedNewState(prior, config), config)
 
 			if !planned.Equal(prior) {
 				diffs, _ := prior.Diff(planned)
@@ -233,16 +197,16 @@ func TestVXCModifyPlan_ConvergesCloudPortDrift(t *testing.T) {
 	}
 }
 
-// TestVXCModifyPlan_KeepsUnknownsOnRealChange guards the other half. Update
-// writes a fresh last_updated and reads the rest back from the API, so a plan
-// that carries a real change has to leave the unknowns alone.
+// TestVXCModifyPlan_KeepsUnknownsOnRealChange checks that a plan with a real
+// change keeps its unknowns. Update writes a fresh last_updated and reads the
+// rest back from the API.
 func TestVXCModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 	t.Parallel()
-	fx := newVXCPlanFixture(t)
-	partnerConfig := fx.awsHostedConnection()
-	portBEnd := fx.priorEnd("port-uid-2", "port-two", "Location Two", 69)
-	awsBEnd := fx.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69)
-	null := tftypes.NewValue(fx.partner, nil)
+	ty := newVXCPartnerTestTypes(context.Background(), t)
+	partnerConfig := ty.awsHostedConnection()
+	portBEnd := ty.priorEnd("port-uid-2", "port-two", "Location Two", 69)
+	awsBEnd := ty.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69)
+	null := tftypes.NewValue(ty.partner, nil)
 
 	tests := []struct {
 		name      string
@@ -252,16 +216,16 @@ func TestVXCModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 	}{
 		{
 			name:   "rate limit changed with a different AWS port",
-			prior:  fx.priorVXC(awsBEnd, partnerConfig),
-			config: fx.configVXC(500, fx.configEnd("port-uid-1"), fx.configEnd("aws-port-new"), partnerConfig),
+			prior:  ty.priorVXC(awsBEnd, partnerConfig),
+			config: ty.configVXC(500, ty.configEnd("port-uid-1"), ty.configEnd("aws-port-new"), partnerConfig),
 			wantKnown: map[string]tftypes.Value{
 				"rate_limit": tftypes.NewValue(tftypes.Number, 500),
 			},
 		},
 		{
 			name:   "A-End moved to another port",
-			prior:  fx.priorVXC(portBEnd, null),
-			config: fx.configVXC(200, fx.configEnd("port-uid-3"), fx.configEnd("port-uid-2"), null),
+			prior:  ty.priorVXC(portBEnd, null),
+			config: ty.configVXC(200, ty.configEnd("port-uid-3"), ty.configEnd("port-uid-2"), null),
 			wantKnown: map[string]tftypes.Value{
 				"a_end.requested_product_uid": tftypes.NewValue(tftypes.String, "port-uid-3"),
 			},
@@ -272,7 +236,7 @@ func TestVXCModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			planned := planVXC(t, fx, tc.prior, proposedNewState(tc.prior, tc.config), tc.config)
+			planned := planVXC(t, ty, tc.prior, proposedNewState(tc.prior, tc.config), tc.config)
 
 			for _, name := range []string{"last_updated", "provisioning_status"} {
 				if plannedAt(t, planned, name).IsKnown() {
@@ -289,20 +253,20 @@ func TestVXCModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 	}
 }
 
-// TestVXCModifyPlan_PlansCreateAndDestroy checks the two walks that have no
-// prior state to restore from.
+// TestVXCModifyPlan_PlansCreateAndDestroy checks create and destroy plans,
+// which skip the restore.
 func TestVXCModifyPlan_PlansCreateAndDestroy(t *testing.T) {
 	t.Parallel()
-	fx := newVXCPlanFixture(t)
-	partnerConfig := fx.awsHostedConnection()
-	config := fx.configVXC(200, fx.configEnd("port-uid-1"), fx.configEnd("aws-port-new"), partnerConfig)
-	prior := fx.priorVXC(fx.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69), partnerConfig)
-	nullVXC := tftypes.NewValue(fx.vxc, nil)
+	ty := newVXCPartnerTestTypes(context.Background(), t)
+	partnerConfig := ty.awsHostedConnection()
+	config := ty.configVXC(200, ty.configEnd("port-uid-1"), ty.configEnd("aws-port-new"), partnerConfig)
+	prior := ty.priorVXC(ty.priorEnd("aws-port-old", "US East (Ohio) (us-east-2)", "Location Two", 69), partnerConfig)
+	nullVXC := tftypes.NewValue(ty.obj, nil)
 
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()
 
-		planned := planVXC(t, fx, nullVXC, proposedNewState(nullVXC, config), config)
+		planned := planVXC(t, ty, nullVXC, proposedNewState(nullVXC, config), config)
 
 		for _, name := range []string{"product_uid", "last_updated", "provisioning_status"} {
 			if plannedAt(t, planned, name).IsKnown() {
@@ -314,7 +278,7 @@ func TestVXCModifyPlan_PlansCreateAndDestroy(t *testing.T) {
 	t.Run("destroy", func(t *testing.T) {
 		t.Parallel()
 
-		planned := planVXC(t, fx, prior, nullVXC, nullVXC)
+		planned := planVXC(t, ty, prior, nullVXC, nullVXC)
 
 		if !planned.IsNull() {
 			t.Errorf("expected a null plan on destroy, got: %v", planned)
