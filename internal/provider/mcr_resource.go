@@ -271,12 +271,18 @@ func (pfFilterListModel *mcrPrefixFilterListModel) toAPIMCRPrefixFilterList(ctx 
 		prefixListEntriesDiags := pfFilterListModel.Entries.ElementsAs(ctx, &listEntries, false)
 		diags = append(diags, prefixListEntriesDiags...)
 		for _, entry := range listEntries {
-			megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, &megaport.MCRPrefixListEntry{
+			apiEntry := &megaport.MCRPrefixListEntry{
 				Action: entry.Action.ValueString(),
 				Prefix: entry.Prefix.ValueString(),
-				Ge:     int(entry.Ge.ValueInt64()),
-				Le:     int(entry.Le.ValueInt64()),
-			})
+			}
+			// The API rejects a 0 on every prefix except /0.
+			if !entry.Ge.IsNull() && entry.Ge.ValueInt64() != 0 {
+				apiEntry.Ge = megaport.PtrTo(int(entry.Ge.ValueInt64()))
+			}
+			if !entry.Le.IsNull() && entry.Le.ValueInt64() != 0 {
+				apiEntry.Le = megaport.PtrTo(int(entry.Le.ValueInt64()))
+			}
+			megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, apiEntry)
 		}
 	}
 	return megaportPrefixFilterList, diags

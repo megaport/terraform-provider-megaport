@@ -31,7 +31,7 @@ func TestReadMCRPrefixFilterListDataSource_ResolvesAbsentBounds(t *testing.T) {
 					// Exact match: the API omits both bounds.
 					{Action: "permit", Prefix: "10.0.0.0/24"},
 					// ge above the prefix length: the API omits le only.
-					{Action: "deny", Prefix: "192.168.0.0/16", Ge: 24},
+					{Action: "deny", Prefix: "192.168.0.0/16", Ge: megaport.PtrTo(24)},
 				},
 			},
 		},
