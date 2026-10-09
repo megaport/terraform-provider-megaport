@@ -24,6 +24,7 @@ type MockIXService struct {
 	ListIXsErr    error
 	GetIXResult   *megaport.IX
 	GetIXErr      error
+	BuyIXResult   *megaport.BuyIXResponse
 
 	GotListIXsReq *megaport.ListIXsRequest
 	GotGetIXID    string
@@ -50,7 +51,7 @@ func (m *MockIXService) GetIX(ctx context.Context, id string) (*megaport.IX, err
 
 // Implement other required methods of the IXService interface with minimal stubs
 func (m *MockIXService) BuyIX(ctx context.Context, req *megaport.BuyIXRequest) (*megaport.BuyIXResponse, error) {
-	return nil, nil
+	return m.BuyIXResult, nil
 }
 
 func (m *MockIXService) ValidateIXOrder(ctx context.Context, req *megaport.BuyIXRequest) error {
