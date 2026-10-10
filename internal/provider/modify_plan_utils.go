@@ -6,14 +6,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// restoreComputedOnNoOpPlan converges a plan whose only content is unknowns.
-// Removing an Optional+Computed nested attribute from a configuration makes the
-// framework mark every Computed attribute with a null config value as unknown,
-// and it does that before any plan modifier runs. Restoring prior state here is
-// the only place left. A real change anywhere returns the plan untouched:
-// Update rewrites those attributes, so pinning them would fail the apply with
-// an inconsistent result. It walks nested objects too, since the framework
-// marks their Computed children the same way.
+// restoreComputedOnNoOpPlan returns prior state when plan differs from it only
+// in unknowns that the config leaves null, and returns plan otherwise. The
+// framework marks those unknowns before any plan modifier runs. On a real
+// change, Update rewrites them, and a pinned value would fail the apply.
 func restoreComputedOnNoOpPlan(plan, state, config tftypes.Value) (tftypes.Value, error) {
 	noOp, err := onlyRestorableUnknowns(plan, state, config)
 	if err != nil || !noOp {
@@ -28,13 +24,13 @@ func onlyRestorableUnknowns(plan, state, config tftypes.Value) (bool, error) {
 	if plan.Equal(state) {
 		return true, nil
 	}
-	// Same test the framework used to mark it: unknown in the plan, null in
-	// the config. An attribute wired to another resource's unknown output
-	// fails this and stays unknown.
+	// The framework marks an attribute unknown only when its config is null.
+	// An attribute wired to another resource's unknown output stays unknown.
 	if !plan.IsKnown() {
 		return config.IsNull(), nil
 	}
-	// Create, destroy, and an added or removed object are real changes.
+	// A changed value that isn't an object is a real change. An added or
+	// removed object is one too, and that covers create and destroy.
 	if _, isObject := plan.Type().(tftypes.Object); !isObject || plan.IsNull() || state.IsNull() {
 		return false, nil
 	}
