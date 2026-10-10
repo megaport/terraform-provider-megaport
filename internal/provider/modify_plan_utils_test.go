@@ -69,7 +69,7 @@ func TestRestoreComputedOnNoOpPlan_NestedObjects(t *testing.T) {
 			config: obj(str("vxc"), null, end(str("port-1"), unknown)),
 		},
 		{
-			name:   "nested unknown with a value in config",
+			name:   "nested unknown where the config has a known value",
 			prior:  state,
 			plan:   obj(str("vxc"), unknown, end(str("port-1"), unknown)),
 			config: obj(str("vxc"), null, end(str("port-1"), str("DOWN"))),

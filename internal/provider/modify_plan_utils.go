@@ -9,7 +9,7 @@ import (
 // restoreComputedOnNoOpPlan returns prior state when plan differs from it only
 // in unknowns that the config leaves null, and returns plan otherwise. The
 // framework marks those unknowns before any plan modifier runs. On a real
-// change, Update rewrites them, and a pinned value would fail the apply.
+// change, Update rewrites them, and a restored value would fail the apply.
 func restoreComputedOnNoOpPlan(plan, state, config tftypes.Value) (tftypes.Value, error) {
 	noOp, err := onlyRestorableUnknowns(plan, state, config)
 	if err != nil || !noOp {
