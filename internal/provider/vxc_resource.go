@@ -3629,9 +3629,22 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				diags:       &diags,
 			})
 			resp.Diagnostics.Append(diags...)
-			if !resp.Diagnostics.HasError() {
-				resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+			if resp.Diagnostics.HasError() {
+				return
 			}
+			resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			// The cloud-end pin above hides a port UID change, but the framework
+			// already marked the Computed attributes unknown for it.
+			restored, err := restoreComputedOnNoOpPlan(resp.Plan.Raw, req.State.Raw, req.Config.Raw)
+			if err != nil {
+				resp.Diagnostics.AddError("Error Modifying VXC Plan", err.Error())
+				return
+			}
+			resp.Plan.Raw = restored
 		}
 	}
 }

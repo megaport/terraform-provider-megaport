@@ -6,52 +6,52 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// restoreComputedOnNoOpPlan converges a plan whose only content is unknowns.
-// Removing an Optional+Computed nested attribute from a configuration makes the
-// framework mark every Computed attribute with a null config value as unknown,
-// and it does that before any plan modifier runs. Restoring prior state here is
-// the only place left. A real change anywhere returns the plan untouched:
-// Update rewrites those attributes, so pinning them would fail the apply with
-// an inconsistent result.
+// restoreComputedOnNoOpPlan returns prior state when plan differs from it only
+// in unknowns that the config leaves null, and returns plan otherwise. The
+// framework marks those unknowns before any plan modifier runs. On a real
+// change, Update rewrites them, and a restored value would fail the apply.
 func restoreComputedOnNoOpPlan(plan, state, config tftypes.Value) (tftypes.Value, error) {
-	// Nothing to restore when creating (no prior state) or destroying (no plan).
-	if state.IsNull() || plan.IsNull() {
-		return plan, nil
+	noOp, err := onlyRestorableUnknowns(plan, state, config)
+	if err != nil || !noOp {
+		return plan, err
+	}
+	return state, nil
+}
+
+// onlyRestorableUnknowns reports whether plan differs from state only in
+// unknowns that the config leaves null.
+func onlyRestorableUnknowns(plan, state, config tftypes.Value) (bool, error) {
+	if plan.Equal(state) {
+		return true, nil
+	}
+	// The framework marks an attribute unknown only when its config is null.
+	// An attribute wired to another resource's unknown output stays unknown.
+	if !plan.IsKnown() {
+		return config.IsNull(), nil
+	}
+	// A changed value that isn't an object is a real change. An added or
+	// removed object is one too, and that covers create and destroy.
+	if _, isObject := plan.Type().(tftypes.Object); !isObject || plan.IsNull() || state.IsNull() {
+		return false, nil
 	}
 
 	var planAttrs, stateAttrs, configAttrs map[string]tftypes.Value
 	if err := plan.As(&planAttrs); err != nil {
-		return plan, fmt.Errorf("could not read the planned values: %w", err)
+		return false, fmt.Errorf("could not read the planned values: %w", err)
 	}
 	if err := state.As(&stateAttrs); err != nil {
-		return plan, fmt.Errorf("could not read the prior state values: %w", err)
+		return false, fmt.Errorf("could not read the prior state values: %w", err)
 	}
 	if err := config.As(&configAttrs); err != nil {
-		return plan, fmt.Errorf("could not read the configured values: %w", err)
+		return false, fmt.Errorf("could not read the configured values: %w", err)
 	}
 
-	restorable := map[string]tftypes.Value{}
+	// A null config object reads as an empty map, and a missing child as null.
 	for name, planValue := range planAttrs {
-		if planValue.Equal(stateAttrs[name]) {
-			continue
+		noOp, err := onlyRestorableUnknowns(planValue, stateAttrs[name], configAttrs[name])
+		if err != nil || !noOp {
+			return false, err
 		}
-		// Same test the framework used to mark it: unknown in the plan, null
-		// in the config. An attribute wired to another resource's unknown
-		// output fails this and stays unknown.
-		if !planValue.IsKnown() && configAttrs[name].IsNull() {
-			restorable[name] = stateAttrs[name]
-			continue
-		}
-		// A real change. Leave the whole plan as it is.
-		return plan, nil
 	}
-
-	if len(restorable) == 0 {
-		return plan, nil
-	}
-
-	for name, stateValue := range restorable {
-		planAttrs[name] = stateValue
-	}
-	return tftypes.NewValue(plan.Type(), planAttrs), nil
+	return true, nil
 }
