@@ -40,7 +40,7 @@ output "ipsec_tunnel_destinations" {
 
 ### Read-Only
 
-- `max_tunnel_count_limit` (Number) The maximum number of IPsec tunnels allowed for the MCR. Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.
+- `max_tunnel_count_limit` (Number) The highest tunnel count Megaport accepts for the MCR's IPsec add-on. Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.
 - `total_tunnel_count` (Number) The number of IPsec tunnels configured on the MCR, across all its VXCs.
 - `vxcs` (Attributes List) The VXCs on the MCR that have at least one IPsec tunnel. (see [below for nested schema](#nestedatt--vxcs))
 
@@ -63,4 +63,4 @@ Read-Only:
 - `local_id` (String) IKE local identifier override.
 - `remote_id` (String) IKE remote identifier override.
 - `source_ip_address` (String) Local (Megaport-side) IP address used as the tunnel source.
-- `vlan` (Number) The VLAN of the interface that holds `source_ip_address`. Null when that interface is untagged.
+- `vlan` (Number) The VLAN of the interface that holds `source_ip_address`. Null when no interface with a VLAN holds that address.

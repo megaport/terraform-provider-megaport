@@ -89,7 +89,7 @@ func (d *mcrIPsecDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"max_tunnel_count_limit": schema.Int64Attribute{
-				Description: "The maximum number of IPsec tunnels allowed for the MCR. " +
+				Description: "The highest tunnel count Megaport accepts for the MCR's IPsec add-on. " +
 					"Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.",
 				Computed: true,
 			},
@@ -132,7 +132,7 @@ func (d *mcrIPsecDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 										Computed:    true,
 									},
 									"vlan": schema.Int64Attribute{
-										Description: "The VLAN of the interface that holds `source_ip_address`. Null when that interface is untagged.",
+										Description: "The VLAN of the interface that holds `source_ip_address`. Null when no interface with a VLAN holds that address.",
 										Computed:    true,
 									},
 								},
