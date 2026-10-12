@@ -86,6 +86,8 @@
       "TestAccMegaportMVEAruba_Basic",
       "TestAccMegaportMVEAruba_ContractTermUpdate",
       "TestAccMegaportMVEAruba_CostCentreRemoval",
+      "TestAccMegaportMVEAruba_MarketplaceVisibility",
+      "TestAccMegaportMVEAruba_MarketplaceVisibilityUnset",
       "TestAccMegaportMVEAruba_PromoCode",
       "TestAccMegaportMVEAruba_VnicDescriptionUpdate",
       "TestAccMegaportMVEAruba_VnicsRemoval",
