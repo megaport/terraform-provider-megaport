@@ -6769,6 +6769,9 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 	}
 	googleConn := megaport.CSPConnectionGoogle{ConnectType: "GOOGLE", ResourceName: "b_csp_connection", PairingKey: "pair-key"}
 	oracleConn := megaport.CSPConnectionOracle{ConnectType: "ORACLE", ResourceName: "b_csp_connection", VirtualCircuitId: "ocid1.vc"}
+	alibabaConn := megaport.CSPConnectionOther{CSPConnection: map[string]interface{}{
+		"connectType": "ALIBABA", "resource_name": "b_csp_connection", "resource_type": "csp_connection",
+	}}
 
 	decode := func(t *testing.T, obj types.Object, target any) {
 		t.Helper()
@@ -6900,6 +6903,12 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 			wantWarning: "cannot rebuild",
 		},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(awsConn)},
+		{name: "alibaba_b_end_warns", vxc: readVXC(alibabaConn), wantWarning: `type "ALIBABA"`},
+		{name: "managed_refresh_alibaba_warns", stateName: "test-vxc", vxc: readVXC(alibabaConn), wantWarning: `type "ALIBABA"`},
+		{
+			name: "managed_refresh_untyped", stateName: "test-vxc",
+			vxc: readVXC(megaport.CSPConnectionOther{CSPConnection: map[string]interface{}{"resource_name": "a_csp_connection", "resource_type": "csp_connection"}}),
+		},
 	}
 
 	for _, tc := range tests {
