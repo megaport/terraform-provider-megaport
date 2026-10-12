@@ -4531,7 +4531,7 @@ func TestAccMegaportVXC_ImportDrift_WithInnerVLAN(t *testing.T) {
 func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWSHC")
+	locs := findVXCPortTestLocationsWithPartner(t, 1, "AWSHC", "blue", "red")
 	portName := RandomTestName()
 	vxcName := RandomTestName()
 
@@ -4543,8 +4543,15 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 			}
 
 			data "megaport_partner" "aws_port" {
-				connect_type = "AWSHC"
-				location_id  = data.megaport_location.loc.id
+				connect_type   = "AWSHC"
+				location_id    = data.megaport_location.loc.id
+				diversity_zone = "blue"
+			}
+
+			data "megaport_partner" "aws_port_red" {
+				connect_type   = "AWSHC"
+				location_id    = data.megaport_location.loc.id
+				diversity_zone = "red"
 			}
 
 			resource "megaport_port" "port" {
@@ -4556,7 +4563,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 			}
 		`, locs[0], portName)
 
-	vxcConfig := func() string {
+	vxcConfig := func(awsPort string) string {
 		return baseConfig + fmt.Sprintf(`
 			resource "megaport_vxc" "vxc" {
 				product_name         = "%s"
@@ -4569,7 +4576,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 				}
 
 				b_end = {
-					requested_product_uid = data.megaport_partner.aws_port.product_uid
+					requested_product_uid = data.megaport_partner.%s.product_uid
 				}
 
 				b_end_partner_config = {
@@ -4582,7 +4589,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 					}
 				}
 			}
-		`, vxcName, vxcName)
+		`, vxcName, awsPort, vxcName)
 	}
 
 	// forgetConfig drops the VXC from state and leaves the live service alone,
@@ -4619,7 +4626,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Step 1: Create AWS Hosted Connection VXC
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig("aws_port"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
@@ -4639,7 +4646,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 			// from the hosted connection, which carries no type.
 			// ImportStatePersist keeps that state for the steps below.
 			{
-				Config:                               vxcConfig(),
+				Config:                               vxcConfig("aws_port"),
 				ResourceName:                         "megaport_vxc.vxc",
 				ImportState:                          true,
 				ImportStatePersist:                   true,
@@ -4688,7 +4695,7 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 			// type, which the import left null, so the apply records it and
 			// warns instead of failing.
 			{
-				Config: vxcConfig(),
+				Config: vxcConfig("aws_port"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "product_name", vxcName),
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "a_end.ordered_vlan", "200"),
@@ -4701,7 +4708,13 @@ func TestAccMegaportVXC_ImportDrift_AWSHostedConnection(t *testing.T) {
 			// Before the fix, this would fail because the plan would show changes
 			// for b_end_partner_config even though nothing changed.
 			{
-				Config:   vxcConfig(),
+				Config:   vxcConfig("aws_port"),
+				PlanOnly: true,
+			},
+			// Step 6: Name the red AWS port in b_end. A cloud end stays on the
+			// port it ordered, so the plan is empty.
+			{
+				Config:   vxcConfig("aws_port_red"),
 				PlanOnly: true,
 			},
 		},
@@ -6769,6 +6782,9 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 	}
 	googleConn := megaport.CSPConnectionGoogle{ConnectType: "GOOGLE", ResourceName: "b_csp_connection", PairingKey: "pair-key"}
 	oracleConn := megaport.CSPConnectionOracle{ConnectType: "ORACLE", ResourceName: "b_csp_connection", VirtualCircuitId: "ocid1.vc"}
+	alibabaConn := megaport.CSPConnectionOther{CSPConnection: map[string]interface{}{
+		"connectType": "ALIBABA", "resource_name": "b_csp_connection", "resource_type": "csp_connection",
+	}}
 
 	decode := func(t *testing.T, obj types.Object, target any) {
 		t.Helper()
@@ -6900,6 +6916,12 @@ func TestVXCRead_RecordsCloudPartnerConfigOnImport(t *testing.T) {
 			wantWarning: "cannot rebuild",
 		},
 		{name: "managed_refresh_leaves_null", stateName: "test-vxc", vxc: readVXC(awsConn)},
+		{name: "alibaba_b_end_warns", vxc: readVXC(alibabaConn), wantWarning: `type "ALIBABA"`},
+		{name: "managed_refresh_alibaba_warns", stateName: "test-vxc", vxc: readVXC(alibabaConn), wantWarning: `type "ALIBABA"`},
+		{
+			name: "managed_refresh_untyped", stateName: "test-vxc",
+			vxc: readVXC(megaport.CSPConnectionOther{CSPConnection: map[string]interface{}{"resource_name": "a_csp_connection", "resource_type": "csp_connection"}}),
+		},
 	}
 
 	for _, tc := range tests {

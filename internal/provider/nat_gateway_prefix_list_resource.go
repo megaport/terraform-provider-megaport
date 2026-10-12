@@ -336,11 +336,28 @@ func (m *natGatewayPrefixListResourceModel) toAPIRequest(ctx context.Context) (*
 		out.Entries = append(out.Entries, megaport.NATGatewayPrefixListEntry{
 			Action: e.Action.ValueString(),
 			Prefix: e.Prefix.ValueString(),
-			Ge:     int(e.Ge.ValueInt64()),
-			Le:     int(e.Le.ValueInt64()),
+			Ge:     natPrefixLenToAPI(e.Ge),
+			Le:     natPrefixLenToAPI(e.Le),
 		})
 	}
 	return out, diags
+}
+
+// natPrefixLenToAPI maps the schema default of 0 to an unset bound. The API
+// rejects a 0 on every prefix except /0.
+func natPrefixLenToAPI(v types.Int64) *int {
+	if v.ValueInt64() == 0 {
+		return nil
+	}
+	return megaport.PtrTo(int(v.ValueInt64()))
+}
+
+// natPrefixLenFromAPI maps an absent bound back to the schema default of 0.
+func natPrefixLenFromAPI(v *int) types.Int64 {
+	if v == nil {
+		return types.Int64Value(0)
+	}
+	return types.Int64Value(int64(*v))
 }
 
 func (m *natGatewayPrefixListResourceModel) fromAPI(ctx context.Context, pl *megaport.NATGatewayPrefixList) diag.Diagnostics {
@@ -354,8 +371,8 @@ func (m *natGatewayPrefixListResourceModel) fromAPI(ctx context.Context, pl *meg
 		em := &natGatewayPrefixListEntryModel{
 			Action: types.StringValue(e.Action),
 			Prefix: types.StringValue(e.Prefix),
-			Ge:     types.Int64Value(int64(e.Ge)),
-			Le:     types.Int64Value(int64(e.Le)),
+			Ge:     natPrefixLenFromAPI(e.Ge),
+			Le:     natPrefixLenFromAPI(e.Le),
 		}
 		obj, d := types.ObjectValueFrom(ctx, natGatewayPrefixListEntryAttrs, em)
 		diags.Append(d...)

@@ -26,6 +26,8 @@ type MockMVEService struct {
 	ListMVEResourceTagsErr    error
 	ListMVEResourceTagsResult map[string]string
 	CapturedResourceTagMVEUID string
+	BuyMVEFunc                func(ctx context.Context, req *megaport.BuyMVERequest) (*megaport.BuyMVEResponse, error)
+	ModifyMVEFunc             func(ctx context.Context, req *megaport.ModifyMVERequest) (*megaport.ModifyMVEResponse, error)
 }
 
 func (m *MockMVEService) ListMVEs(ctx context.Context, req *megaport.ListMVEsRequest) ([]*megaport.MVE, error) {
@@ -67,6 +69,9 @@ func (m *MockMVEService) ListMVEResourceTags(ctx context.Context, mveID string) 
 
 // Implement other required methods of the MVEService interface with minimal stubs
 func (m *MockMVEService) BuyMVE(ctx context.Context, req *megaport.BuyMVERequest) (*megaport.BuyMVEResponse, error) {
+	if m.BuyMVEFunc != nil {
+		return m.BuyMVEFunc(ctx, req)
+	}
 	return nil, nil
 }
 
@@ -75,6 +80,9 @@ func (m *MockMVEService) ValidateMVEOrder(ctx context.Context, req *megaport.Buy
 }
 
 func (m *MockMVEService) ModifyMVE(ctx context.Context, req *megaport.ModifyMVERequest) (*megaport.ModifyMVEResponse, error) {
+	if m.ModifyMVEFunc != nil {
+		return m.ModifyMVEFunc(ctx, req)
+	}
 	return nil, nil
 }
 
