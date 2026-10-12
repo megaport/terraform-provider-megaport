@@ -185,17 +185,13 @@ func (d *mcrIPsecDataSource) Read(ctx context.Context, req datasource.ReadReques
 	for _, vxc := range ipsec.IPsecConfiguredVXCs {
 		tunnelObjects := []types.Object{}
 		for _, tunnel := range vxc.Tunnels {
-			vlan := types.Int64Null()
-			if tunnel.VLAN != nil {
-				vlan = types.Int64Value(int64(*tunnel.VLAN))
-			}
 			tunnelObj, diags := types.ObjectValueFrom(ctx, mcrIPsecTunnelAttributes, &mcrIPsecTunnelModel{
 				Description:          stringOrNull(tunnel.Description),
 				SourceIPAddress:      types.StringValue(tunnel.SourceIpAddress),
 				DestinationIPAddress: types.StringValue(tunnel.DestinationIpAddress),
 				LocalID:              stringOrNull(tunnel.LocalId),
 				RemoteID:             stringOrNull(tunnel.RemoteId),
-				VLAN:                 vlan,
+				VLAN:                 int64PtrOrNull(tunnel.VLAN),
 			})
 			resp.Diagnostics.Append(diags...)
 			if resp.Diagnostics.HasError() {
