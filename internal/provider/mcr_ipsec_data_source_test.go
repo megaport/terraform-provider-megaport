@@ -114,6 +114,9 @@ func TestReadMCRIPsec_WithTunnels(t *testing.T) {
 	assert.Equal(t, "remote.example", tunnels[0].RemoteID.ValueString())
 	assert.Equal(t, int64(100), tunnels[0].VLAN.ValueInt64())
 	assert.Equal(t, "169.254.100.5", tunnels[1].SourceIPAddress.ValueString())
+	assert.True(t, tunnels[1].Description.IsNull())
+	assert.True(t, tunnels[1].LocalID.IsNull())
+	assert.True(t, tunnels[1].RemoteID.IsNull())
 	assert.True(t, tunnels[1].VLAN.IsNull(), "an untagged source interface should leave vlan null")
 
 	require.False(t, vxcs[1].Tunnels.ElementsAs(ctx, &tunnels, false).HasError())

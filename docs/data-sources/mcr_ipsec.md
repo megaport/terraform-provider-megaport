@@ -3,12 +3,12 @@
 page_title: "megaport_mcr_ipsec Data Source - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels in use. The API does not return pre-shared keys or phase lifetimes.
+  Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels configured. The API does not return pre-shared keys or phase lifetimes.
 ---
 
 # megaport_mcr_ipsec (Data Source)
 
-Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels in use. The API does not return pre-shared keys or phase lifetimes.
+Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels configured. The API does not return pre-shared keys or phase lifetimes.
 
 ## Example Usage
 
@@ -40,7 +40,7 @@ output "ipsec_tunnel_destinations" {
 
 ### Read-Only
 
-- `max_tunnel_count_limit` (Number) The highest `tunnel_count` the MCR's IPsec add-on accepts. Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.
+- `max_tunnel_count_limit` (Number) The maximum number of IPsec tunnels allowed for the MCR. Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.
 - `total_tunnel_count` (Number) The number of IPsec tunnels configured on the MCR, across all its VXCs.
 - `vxcs` (Attributes List) The VXCs on the MCR that have at least one IPsec tunnel. (see [below for nested schema](#nestedatt--vxcs))
 
@@ -59,8 +59,8 @@ Read-Only:
 Read-Only:
 
 - `description` (String) The description of the tunnel interface.
-- `destination_ip_address` (String) Remote peer IPv4 address the tunnel connects to.
+- `destination_ip_address` (String) Remote peer IP address the tunnel connects to.
 - `local_id` (String) IKE local identifier override.
 - `remote_id` (String) IKE remote identifier override.
-- `source_ip_address` (String) Local (Megaport-side) IPv4 address used as the tunnel source.
+- `source_ip_address` (String) Local (Megaport-side) IP address used as the tunnel source.
 - `vlan` (Number) The VLAN of the interface that holds `source_ip_address`. Null when that interface is untagged.

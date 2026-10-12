@@ -77,7 +77,7 @@ func (d *mcrIPsecDataSource) Metadata(_ context.Context, req datasource.Metadata
 // Schema defines the schema for the data source.
 func (d *mcrIPsecDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels in use. " +
+		Description: "Data source for reading the IPsec tunnels on an MCR, grouped by VXC, and the number of tunnels configured. " +
 			"The API does not return pre-shared keys or phase lifetimes.",
 		Attributes: map[string]schema.Attribute{
 			"mcr_id": schema.StringAttribute{
@@ -89,7 +89,7 @@ func (d *mcrIPsecDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"max_tunnel_count_limit": schema.Int64Attribute{
-				Description: "The highest `tunnel_count` the MCR's IPsec add-on accepts. " +
+				Description: "The maximum number of IPsec tunnels allowed for the MCR. " +
 					"Megaport sets this limit for each MCR, and it is 30 unless Megaport raises it.",
 				Computed: true,
 			},
@@ -116,11 +116,11 @@ func (d *mcrIPsecDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 										Computed:    true,
 									},
 									"source_ip_address": schema.StringAttribute{
-										Description: "Local (Megaport-side) IPv4 address used as the tunnel source.",
+										Description: "Local (Megaport-side) IP address used as the tunnel source.",
 										Computed:    true,
 									},
 									"destination_ip_address": schema.StringAttribute{
-										Description: "Remote peer IPv4 address the tunnel connects to.",
+										Description: "Remote peer IP address the tunnel connects to.",
 										Computed:    true,
 									},
 									"local_id": schema.StringAttribute{
@@ -190,11 +190,11 @@ func (d *mcrIPsecDataSource) Read(ctx context.Context, req datasource.ReadReques
 				vlan = types.Int64Value(int64(*tunnel.VLAN))
 			}
 			tunnelObj, diags := types.ObjectValueFrom(ctx, mcrIPsecTunnelAttributes, &mcrIPsecTunnelModel{
-				Description:          types.StringValue(tunnel.Description),
+				Description:          stringOrNull(tunnel.Description),
 				SourceIPAddress:      types.StringValue(tunnel.SourceIpAddress),
 				DestinationIPAddress: types.StringValue(tunnel.DestinationIpAddress),
-				LocalID:              types.StringValue(tunnel.LocalId),
-				RemoteID:             types.StringValue(tunnel.RemoteId),
+				LocalID:              stringOrNull(tunnel.LocalId),
+				RemoteID:             stringOrNull(tunnel.RemoteId),
 				VLAN:                 vlan,
 			})
 			resp.Diagnostics.Append(diags...)
