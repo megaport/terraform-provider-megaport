@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -567,7 +568,7 @@ type vxcPartnerConfigAEndModel struct {
 
 type vxcPartnerConfigIbmModel struct {
 	vxcPartnerConfig  `tfsdk:"-"`
-	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Acount ID.  32 Hexadecimal Characters. REQUIRED
+	AccountID         types.String `tfsdk:"account_id"`          // Customer's IBM Account ID.  32 Hexadecimal Characters. REQUIRED
 	CustomerASN       types.Int64  `tfsdk:"customer_asn"`        // Customer's ASN. Valid ranges: 1-64495, 64999, 131072-4199999999, 4201000000-4201064511. Required unless the connection at the other end of the VXC is an MCR.
 	Name              types.String `tfsdk:"name"`                // Description of this connection for identification purposes. Max 100 characters from 0-9 a-z A-Z / - _ , Defaults to "MEGAPORT".
 	CustomerIPAddress types.String `tfsdk:"customer_ip_address"` // IPv4 network address including subnet mask. Default is /30 assigned from 169.254.0.0/16.
@@ -1019,6 +1020,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The authentication key of the CSP connection.",
 							Optional:    true,
 							Computed:    true,
+							Sensitive:   true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 							},
@@ -1100,6 +1102,7 @@ func (r *vxcResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 							Description: "The pairing key of the Google Cloud connection.",
 							Optional:    true,
 							Computed:    true,
+							Sensitive:   true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 							},
@@ -3325,6 +3328,14 @@ func (r *vxcResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 			DeleteNow: true,
 		})
 	})
+	if errors.Is(err, megaport.ErrCancelPendingApproval) {
+		resp.Diagnostics.AddError(
+			"VXC cancellation pending approval",
+			"VXC "+state.UID.ValueString()+" is still live. Your partner must approve the cancellation request in the Megaport Portal. "+
+				"Run the same Terraform command again after approval.",
+		)
+		return
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting VXC",
@@ -3734,8 +3745,36 @@ func fromAPICSPConnection(ctx context.Context, c megaport.CSPConnectionConfig) (
 		apiDiags = append(apiDiags, ibmObjectDiags...)
 		return ibmObject, apiDiags
 	}
-	apiDiags.AddError("Error creating CSP Connection", "Could not create CSP Connection, unknown type")
-	return types.ObjectNull(cspConnectionFullAttrs), apiDiags
+	// CSPConnectionOther keeps the API's keys in a map. The SDK interface has no
+	// accessor, so read a type with no case above from its JSON instead.
+	fields := map[string]any{}
+	if other, ok := c.(megaport.CSPConnectionOther); ok {
+		fields = other.CSPConnection
+	} else if b, err := json.Marshal(c); err == nil {
+		_ = json.Unmarshal(b, &fields)
+	}
+	connectType, _ := fields["connectType"].(string)
+	resourceName, _ := fields["resource_name"].(string)
+	resourceType, _ := fields["resource_type"].(string)
+	otherModel := &cspConnectionModel{
+		ConnectType:  types.StringValue(connectType),
+		ResourceName: types.StringValue(resourceName),
+		ResourceType: types.StringValue(resourceType),
+	}
+	otherModel.Bandwidths = types.ListNull(types.Int64Type)
+	otherModel.IPAddresses = types.ListNull(types.StringType)
+	otherModel.Interfaces = types.ListNull(types.ObjectType{}.WithAttributeTypes(cspConnectionInterfaceAttrs))
+	if connectType != "" {
+		apiDiags.AddWarning(
+			"Unsupported CSP connection type",
+			fmt.Sprintf("The provider does not support CSP connection type %q yet. "+
+				"The csp_connections entry for this connection records only connect_type, resource_name, and resource_type. "+
+				"To request support, open an issue at https://github.com/megaport/terraform-provider-megaport/issues.", connectType),
+		)
+	}
+	otherObject, otherObjectDiags := types.ObjectValueFrom(ctx, cspConnectionFullAttrs, otherModel)
+	apiDiags = append(apiDiags, otherObjectDiags...)
+	return otherObject, apiDiags
 }
 
 // vrouterInterfacesUnknown marks interfaces and ip_addresses unknown on each VROUTER entry.
