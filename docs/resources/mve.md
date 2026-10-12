@@ -207,6 +207,7 @@ resource "megaport_mve" "mve_c8000v_autonomous" {
 
 - `cost_centre` (String) The cost centre of the MVE.
 - `diversity_zone` (String) The diversity zone of the MVE. Once known, this value is preserved if a later read reports it empty, since that's typically a transient backend gap rather than a real change. If the empty value is a genuine correction rather than a gap, remove or update `diversity_zone` in your configuration first; optionally run `terraform state rm` followed by `terraform import` to reset the stored value.
+- `marketplace_visibility` (Boolean) Whether the MVE is visible in the Marketplace. Defaults to the API's own default when not set.
 - `promo_code` (String) Promo code is an optional string that can be used to enter a promotional code for the service order. The code is not validated, so if the code doesn't exist or doesn't work for the service, the request will still be successful.
 - `resource_tags` (Map of String) The resource tags associated with the product. Keys must be lowercase: 1 to 128 characters from a-z, 0-9, `_`, `:`, `.`, `/`, `\`, and `-`. Values can be 1 to 256 characters and also allow uppercase letters, spaces, `@`, and `+`. A product can have at most 50 tags.
 - `vnics` (Attributes List) The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each supplied vNIC must include a description. The maximum number of vNICs allowed is 5. If the list is omitted or set to null, it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. vNIC descriptions can be updated in place; adding or removing vNICs forces the MVE to be replaced because the API does not allow changing the vNIC count after provisioning. (see [below for nested schema](#nestedatt--vnics))
@@ -227,7 +228,6 @@ resource "megaport_mve" "mve_c8000v_autonomous" {
 - `live_date` (String) The date the MVE went live. This value is set by the Megaport API when the MVE becomes active. During import, this field may show as changing from unknown to its actual value - this is expected behavior.
 - `locked` (Boolean) Whether the MVE is locked.
 - `market` (String) The market the MVE is in.
-- `marketplace_visibility` (Boolean) Whether the MVE is visible in the marketplace.
 - `mve_size` (String) The size of the MVE.
 - `product_id` (Number) The Numeric ID of the MVE.
 - `product_type` (String) The type of product (MVE).
