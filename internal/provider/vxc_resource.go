@@ -3925,9 +3925,9 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	}
 
 	const summary = "VLAN cannot be changed on this B-End"
-	// A taint orders the VXC again from config, which needs the B-End partner config.
+	// A taint orders the VXC again from config. A cloud B-End needs its partner config for that order.
 	taint := func(value string) string {
-		if plan.BEndPartnerConfig.IsNull() {
+		if plan.BEndPartnerConfig.IsNull() && connectType != "TRANSIT" {
 			return ""
 		}
 		return fmt.Sprintf(", or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the %s", value)

@@ -179,7 +179,7 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 }
 
 // A taint orders the VXC again from the planned config, which cannot rebuild a
-// cloud B-End that has no partner config.
+// cloud B-End that has no partner config. A transit B-End orders without one.
 func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -197,8 +197,13 @@ func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
 	}{
 		{name: "error without partner config", conns: bCSP("ALIBABA"),
 			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
+		{name: "transit error without partner config", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
 		{name: "error with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
 			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "inner_vlan error with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantTaint: true,
+			wantEnd: "orders a new one with the planned inner_vlan."},
 		{name: "error with partner config only in plan", conns: bCSP("AWS"), planPartner: "aws",
 			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
 		{name: "error with partner config only in state", conns: bCSP("AWS"), statePartner: "aws",
