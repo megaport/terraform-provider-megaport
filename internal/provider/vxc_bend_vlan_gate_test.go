@@ -210,6 +210,8 @@ func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
 			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
 		{name: "warning without partner config", conns: bCSP("AWS"),
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantEnd: "Set ordered_vlan to 200."},
+		{name: "transit warning without partner config", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
 		{name: "warning with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
 	}
