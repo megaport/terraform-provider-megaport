@@ -6348,6 +6348,13 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 		}
 	`, vxcName)
 
+	// ipsecDataConfig reads the MCR's tunnels back once the VXC exists.
+	ipsecDataConfig := config + `
+		data "megaport_mcr_ipsec" "ipsec" {
+			mcr_id = megaport_mcr.mcr.product_uid
+		}
+	`
+
 	// forgetConfig drops the VXC from state and leaves the live service alone,
 	// so the import step below has an unmanaged VXC to import, the case a
 	// customer actually hits and ImportStateVerify alone does not cover: it
@@ -6417,6 +6424,18 @@ func TestAccMegaportVXC_IPsecTunnel(t *testing.T) {
 					return rawState["product_uid"], nil
 				},
 				ImportStateVerifyIgnore: []string{"last_updated", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "b_end_partner_config", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
+			},
+			{
+				Config: ipsecDataConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "total_tunnel_count", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "max_tunnel_count_limit", "30"),
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "vxcs.#", "1"),
+					resource.TestCheckResourceAttrPair("data.megaport_mcr_ipsec.ipsec", "vxcs.0.product_uid", "megaport_vxc.ipsec_vxc", "product_uid"),
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "vxcs.0.tunnels.#", "1"),
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "vxcs.0.tunnels.0.source_ip_address", "169.254.100.1"),
+					resource.TestCheckResourceAttr("data.megaport_mcr_ipsec.ipsec", "vxcs.0.tunnels.0.destination_ip_address", "203.0.113.10"),
+				),
 			},
 			// Forget the VXC, then import it as a genuinely unmanaged resource:
 			// the case above does not reach, since ImportStateVerify diffs the

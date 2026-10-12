@@ -370,6 +370,7 @@ func (p *megaportProvider) DataSources(_ context.Context) []func() datasource.Da
 		NewMVEImageDataSource,
 		NewMVESizeDataSource,
 		NewMCRPrefixFilterListDataSource,
+		NewMCRIPsecDataSource,
 		NewMCRsDataSource,
 		NewMVEsDataSource,
 		NewPortsDataSource,
