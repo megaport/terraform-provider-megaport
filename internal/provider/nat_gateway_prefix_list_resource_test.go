@@ -1,12 +1,65 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/require"
+
+	megaport "github.com/megaport/megaportgo"
 )
+
+// The schema defaults ge and le to 0. A 0 must not reach the API, which
+// rejects it on every prefix except /0.
+func TestNATGatewayPrefixListToAPIRequest_ZeroBoundIsUnset(t *testing.T) {
+	ctx := context.Background()
+	entries, diags := types.ListValueFrom(ctx, types.ObjectType{}.WithAttributeTypes(natGatewayPrefixListEntryAttrs), []natGatewayPrefixListEntryModel{
+		{Action: types.StringValue("deny"), Prefix: types.StringValue("192.168.0.0/16"), Ge: types.Int64Value(0), Le: types.Int64Value(0)},
+		{Action: types.StringValue("permit"), Prefix: types.StringValue("10.0.0.0/8"), Ge: types.Int64Value(24), Le: types.Int64Value(32)},
+	})
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	m := &natGatewayPrefixListResourceModel{
+		Description:   types.StringValue("test"),
+		AddressFamily: types.StringValue("IPv4"),
+		Entries:       entries,
+	}
+
+	out, diags := m.toAPIRequest(ctx)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	require.Len(t, out.Entries, 2)
+	require.Nil(t, out.Entries[0].Ge)
+	require.Nil(t, out.Entries[0].Le)
+	require.Equal(t, megaport.PtrTo(24), out.Entries[1].Ge)
+	require.Equal(t, megaport.PtrTo(32), out.Entries[1].Le)
+}
+
+// The API omits a bound that nothing set, which state holds as the schema default of 0.
+func TestNATGatewayPrefixListFromAPI_AbsentBoundIsZero(t *testing.T) {
+	ctx := context.Background()
+	m := &natGatewayPrefixListResourceModel{}
+	diags := m.fromAPI(ctx, &megaport.NATGatewayPrefixList{
+		ID:            1,
+		Description:   "test",
+		AddressFamily: "IPv4",
+		Entries: []megaport.NATGatewayPrefixListEntry{
+			{Action: "deny", Prefix: "192.168.0.0/16"},
+			{Action: "permit", Prefix: "10.0.0.0/8", Ge: megaport.PtrTo(24), Le: megaport.PtrTo(32)},
+		},
+	})
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+
+	var entries []natGatewayPrefixListEntryModel
+	require.False(t, m.Entries.ElementsAs(ctx, &entries, false).HasError())
+	require.Len(t, entries, 2)
+	require.Equal(t, types.Int64Value(0), entries[0].Ge)
+	require.Equal(t, types.Int64Value(0), entries[0].Le)
+	require.Equal(t, types.Int64Value(24), entries[1].Ge)
+	require.Equal(t, types.Int64Value(32), entries[1].Le)
+}
 
 // TestAccMegaportNATGatewayPrefixList_Basic exercises the create → read →
 // import → update lifecycle of megaport_nat_gateway_prefix_list against a
