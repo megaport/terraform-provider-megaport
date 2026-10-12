@@ -3925,7 +3925,8 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	}
 
 	const summary = "VLAN cannot be changed on this B-End"
-	// A taint orders the VXC again from config. A cloud B-End needs its partner config for that order.
+	// A taint orders the VXC again from config. A cloud B-End needs its partner config for that order,
+	// and a transit order refuses an inner VLAN.
 	taint := func(value string) string {
 		if plan.BEndPartnerConfig.IsNull() && connectType != "TRANSIT" {
 			return ""
@@ -3933,7 +3934,11 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 		return fmt.Sprintf(", or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the %s", value)
 	}
 	detail := func(attr string) string {
-		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change%s.", connectType, attr, taint("planned "+attr))
+		advice := taint("planned " + attr)
+		if connectType == "TRANSIT" && attr == "inner_vlan" {
+			advice = ""
+		}
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change%s.", connectType, attr, advice)
 	}
 	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
 		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
