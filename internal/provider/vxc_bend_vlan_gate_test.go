@@ -209,7 +209,7 @@ func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
 			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantEnd: "Revert the change."},
 		{name: "transit inner_vlan error without partner config", conns: bCSP("TRANSIT"),
 			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantEnd: "Revert the change."},
-		{name: "transit error with inner_vlan", conns: bCSP("TRANSIT"),
+		{name: "transit error with tagged inner_vlan", conns: bCSP("TRANSIT"),
 			stateB: bEndAt(200, int64p(10)), planB: bEndAt(300, int64p(10)), wantEnd: "Revert the change."},
 		{name: "transit error with untagged inner_vlan", conns: bCSP("TRANSIT"),
 			stateB: bEndAt(200, int64p(-1)), planB: bEndAt(300, int64p(-1)), wantTaint: true, wantEnd: errorTaint},
@@ -221,6 +221,8 @@ func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantEnd: "Set ordered_vlan to 200."},
 		{name: "transit warning without partner config", conns: bCSP("TRANSIT"),
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
+		{name: "transit warning with tagged inner_vlan", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(300, int64p(10)), planB: bEndAt(300, int64p(10)), wantEnd: "Set ordered_vlan to 200."},
 		{name: "warning with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
 			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
 	}
