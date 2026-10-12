@@ -32,6 +32,7 @@ type MockMCRService struct {
 	GetMCRPrefixFilterListResult   map[int]*megaport.MCRPrefixFilterList
 
 	UpdateMCRIPsecAddOnFunc func(ctx context.Context, mcrID, addOnUID string, tunnelCount int) error
+	GetMCRIPsecFunc         func(ctx context.Context, mcrID string) (*megaport.MCRIPsecConfiguration, error)
 }
 
 func (m *MockMCRService) ListMCRs(ctx context.Context, req *megaport.ListMCRsRequest) ([]*megaport.MCR, error) {
@@ -123,6 +124,13 @@ func (m *MockMCRService) UpdateMCRIPsecAddOn(ctx context.Context, mcrID string, 
 		return m.UpdateMCRIPsecAddOnFunc(ctx, mcrID, addOnUID, tunnelCount)
 	}
 	return nil
+}
+
+func (m *MockMCRService) GetMCRIPsec(ctx context.Context, mcrID string) (*megaport.MCRIPsecConfiguration, error) {
+	if m.GetMCRIPsecFunc != nil {
+		return m.GetMCRIPsecFunc(ctx, mcrID)
+	}
+	return nil, nil
 }
 
 func (m *MockMCRService) GetMCRPrefixFilterLists(ctx context.Context, mcrId string) ([]*megaport.PrefixFilterList, error) {
