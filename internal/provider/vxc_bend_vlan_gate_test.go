@@ -47,10 +47,16 @@ func (b *vxcValueBuilder) cspConnections(t *testing.T, conns ...[2]string) tftyp
 }
 
 // liveVXC builds a created VXC with the given csp_connections and B-End
-// partner, either of which may be empty.
+// partner, either of which may be empty. The ends default to port-a and
+// port-b.
 func (b *vxcValueBuilder) liveVXC(t *testing.T, aEnd, bEnd vxcEndSpec, conns [][2]string, partner string) tftypes.Value {
 	t.Helper()
-	aEnd.productUID, bEnd.productUID = "port-a", "port-b"
+	if aEnd.productUID == "" {
+		aEnd.productUID = "port-a"
+	}
+	if bEnd.productUID == "" {
+		bEnd.productUID = "port-b"
+	}
 	var bEndPartner *tftypes.Value
 	if partner != "" {
 		p := b.partner(partner)

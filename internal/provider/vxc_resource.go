@@ -2841,7 +2841,7 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	aEndMovesPort := movesPort(aEndPlan, aEndState, aEndCSP)
-	bEndMovesPort := movesPort(bEndPlan, bEndState, bEndCSP)
+	bEndMovesPort := movesPort(bEndPlan, bEndState, cloudBEnd(bEndCSP, bEndConnectType))
 
 	// Only send a VLAN update when the user has actually changed ordered_vlan.
 	// Comparing plan.OrderedVLAN (user intent) to state.VLAN (API-allocated value)
@@ -3873,6 +3873,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 
 			_, aEndPlanCSP := classifyPartner(ctx, plan.AEndPartnerConfig, &resp.Diagnostics)
 			_, bEndPlanCSP := classifyPartner(ctx, plan.BEndPartnerConfig, &resp.Diagnostics)
+			bEndConnectType := bEndCSPConnectType(ctx, state.CSPConnections, plan.BEndPartnerConfig, &resp.Diagnostics)
 
 			plan.AEndConfiguration = reconcileVXCEnd(ctx, vxcEndReconcileInput{
 				endLabel:    "A-End",
@@ -3885,7 +3886,7 @@ func (r *vxcResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 				endLabel:    "B-End",
 				planEndObj:  bEndPlanObj,
 				stateEndObj: bEndStateObj,
-				planCSP:     bEndPlanCSP,
+				planCSP:     cloudBEnd(bEndPlanCSP, bEndConnectType),
 				diags:       &diags,
 			})
 			resp.Diagnostics.Append(diags...)
@@ -3924,8 +3925,15 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	}
 
 	const summary = "VLAN cannot be changed on this B-End"
+	// A taint orders the VXC again from config, which needs the B-End partner config.
+	taint := func(value string) string {
+		if plan.BEndPartnerConfig.IsNull() {
+			return "."
+		}
+		return fmt.Sprintf(", or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the %s.", value)
+	}
 	detail := func(attr string) string {
-		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change, or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the planned %s.", connectType, attr, attr)
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change%s", connectType, attr, taint("planned "+attr))
 	}
 	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
 		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
@@ -3942,8 +3950,8 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	if v, live := stateEnd.OrderedVLAN, stateEnd.VLAN; v.Equal(planEnd.OrderedVLAN) && !live.IsUnknown() && !live.IsNull() &&
 		((v.ValueInt64() > 0 && !v.Equal(live)) || (v.ValueInt64() == -1 && live.ValueInt64() > 0)) {
 		diags.AddAttributeWarning(path.Root("b_end").AtName("ordered_vlan"), "B-End VLAN was never applied",
-			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d, or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the configured ordered_vlan.",
-				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64()))
+			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d%s",
+				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64(), taint("configured ordered_vlan")))
 	}
 }
 
