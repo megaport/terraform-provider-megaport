@@ -178,6 +178,63 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 	}
 }
 
+// A taint orders the VXC again from the planned config, which cannot rebuild a
+// cloud B-End that has no partner config.
+func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+	const errorTaint = "orders a new one with the planned ordered_vlan."
+	const warningTaint = "orders a new one with the configured ordered_vlan."
+
+	tests := []struct {
+		name                      string
+		conns                     [][2]string
+		statePartner, planPartner string
+		stateB, planB             vxcEndSpec
+		wantTaint                 bool
+		wantEnd                   string
+	}{
+		{name: "error without partner config", conns: bCSP("ALIBABA"),
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
+		{name: "error with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "error with partner config only in plan", conns: bCSP("AWS"), planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "error with partner config only in state", conns: bCSP("AWS"), statePartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
+		{name: "warning without partner config", conns: bCSP("AWS"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantEnd: "Set ordered_vlan to 200."},
+		{name: "warning with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			state := b.liveVXC(t, vxcEndSpec{}, tc.stateB, tc.conns, tc.statePartner)
+			plan := b.liveVXC(t, vxcEndSpec{}, tc.planB, tc.conns, tc.planPartner)
+
+			resp := fwresource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}
+			(&vxcResource{}).ModifyPlan(ctx, fwresource.ModifyPlanRequest{
+				State: tfsdk.State{Schema: b.schema, Raw: state},
+				Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+			}, &resp)
+
+			if len(resp.Diagnostics) != 1 {
+				t.Fatalf("expected one diagnostic, got %v", resp.Diagnostics)
+			}
+			detail := resp.Diagnostics[0].Detail()
+			if got := strings.Contains(detail, "terraform taint"); got != tc.wantTaint {
+				t.Errorf("taint advice = %v, want %v: %q", got, tc.wantTaint, detail)
+			}
+			if !strings.HasSuffix(detail, tc.wantEnd) {
+				t.Errorf("expected detail to end %q, got %q", tc.wantEnd, detail)
+			}
+		})
+	}
+}
+
 // Each case checks which VLAN fields reach the update request. The fake
 // update returns 500, so only the request body matters.
 func TestVXCUpdate_VLANSends(t *testing.T) {

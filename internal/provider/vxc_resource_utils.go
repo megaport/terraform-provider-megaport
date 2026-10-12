@@ -1143,9 +1143,9 @@ func bEndCSPConnectType(ctx context.Context, stateCSPConnections types.List, pla
 	return strings.ToUpper(partner.ValueString())
 }
 
-// cloudBEnd reports whether the B-End is a cloud service, which the API never
-// moves. State's connect type covers a cloud with no partner config, such as
-// Alibaba or an import.
+// cloudBEnd reports whether the B-End is a cloud service, which Update never
+// moves. State's connect type finds a cloud B-End that has no partner config,
+// such as Alibaba.
 func cloudBEnd(planCSP bool, connectType string) bool {
 	return planCSP || connectType != "" && connectType != "TRANSIT"
 }

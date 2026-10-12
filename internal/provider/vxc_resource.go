@@ -3928,12 +3928,12 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	// A taint orders the VXC again from config, which needs the B-End partner config.
 	taint := func(value string) string {
 		if plan.BEndPartnerConfig.IsNull() {
-			return "."
+			return ""
 		}
-		return fmt.Sprintf(", or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the %s.", value)
+		return fmt.Sprintf(", or run \"terraform taint <resource address>\" and apply. Terraform then deletes this VXC and orders a new one with the %s", value)
 	}
 	detail := func(attr string) string {
-		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change%s", connectType, attr, taint("planned "+attr))
+		return fmt.Sprintf("The B-End of this VXC has connect type %s, and Megaport does not change its %s on a live VXC. Revert the change%s.", connectType, attr, taint("planned "+attr))
 	}
 	if v := planEnd.OrderedVLAN; !v.IsUnknown() && !v.IsNull() && v.ValueInt64() != 0 &&
 		!v.Equal(stateEnd.OrderedVLAN) && !v.Equal(stateEnd.VLAN) {
@@ -3950,7 +3950,7 @@ func checkBEndVLANUpdatable(ctx context.Context, plan, state vxcResourceModel, d
 	if v, live := stateEnd.OrderedVLAN, stateEnd.VLAN; v.Equal(planEnd.OrderedVLAN) && !live.IsUnknown() && !live.IsNull() &&
 		((v.ValueInt64() > 0 && !v.Equal(live)) || (v.ValueInt64() == -1 && live.ValueInt64() > 0)) {
 		diags.AddAttributeWarning(path.Root("b_end").AtName("ordered_vlan"), "B-End VLAN was never applied",
-			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d%s",
+			fmt.Sprintf("b_end.ordered_vlan is %d, but the live VLAN of this VXC is %d. An earlier provider version saved the change without sending it, and Megaport does not change the VLAN of a %s B-End on a live VXC. Set ordered_vlan to %d%s.",
 				v.ValueInt64(), live.ValueInt64(), connectType, live.ValueInt64(), taint("configured ordered_vlan")))
 	}
 }
