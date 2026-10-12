@@ -271,12 +271,18 @@ func (pfFilterListModel *mcrPrefixFilterListModel) toAPIMCRPrefixFilterList(ctx 
 		prefixListEntriesDiags := pfFilterListModel.Entries.ElementsAs(ctx, &listEntries, false)
 		diags = append(diags, prefixListEntriesDiags...)
 		for _, entry := range listEntries {
-			megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, &megaport.MCRPrefixListEntry{
+			apiEntry := &megaport.MCRPrefixListEntry{
 				Action: entry.Action.ValueString(),
 				Prefix: entry.Prefix.ValueString(),
-				Ge:     int(entry.Ge.ValueInt64()),
-				Le:     int(entry.Le.ValueInt64()),
-			})
+			}
+			// The API rejects a 0 on every prefix except /0.
+			if !entry.Ge.IsNull() && entry.Ge.ValueInt64() != 0 {
+				apiEntry.Ge = megaport.PtrTo(int(entry.Ge.ValueInt64()))
+			}
+			if !entry.Le.IsNull() && entry.Le.ValueInt64() != 0 {
+				apiEntry.Le = megaport.PtrTo(int(entry.Le.ValueInt64()))
+			}
+			megaportPrefixFilterList.Entries = append(megaportPrefixFilterList.Entries, apiEntry)
 		}
 	}
 	return megaportPrefixFilterList, diags
@@ -504,7 +510,8 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the product is visible in the Marketplace.",
+				Description: "Whether the product is visible in the Marketplace. Defaults to the API's own default when not set.",
+				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -570,7 +577,7 @@ func (r *mcrResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"resource_tags": schema.MapAttribute{
-				Description: "The resource tags associated with the product.",
+				Description: resourceTagsDescription,
 				Optional:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
@@ -672,6 +679,13 @@ func (r *mcrResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if !plan.DiversityZone.IsNull() {
 		buyReq.DiversityZone = plan.DiversityZone.ValueString()
+	}
+
+	// An unset value arrives as Unknown (no config, no prior state); only
+	// send it when the practitioner actually configured a value.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		buyReq.MarketplaceVisibility = &marketplaceVisibility
 	}
 
 	if !plan.ResourceTags.IsNull() {

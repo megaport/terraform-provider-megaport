@@ -1118,12 +1118,29 @@ func movesPort(plan, state *vxcEndConfigurationModel, isCSP bool) bool {
 		!plan.RequestedProductUID.Equal(state.CurrentProductUID)
 }
 
-func supportVLANUpdates(partnerType string) bool {
-	// AWS and Transit connections do not support VLAN updates
-	if partnerType == "aws" || partnerType == "transit" {
-		return false
+// bEndCSPConnectType returns the connect type of the cloud or transit service
+// on the B-End, or "" when the B-End is a Megaport product. State's
+// b_csp_connection decides, and the planned partner config stands in when
+// state has none.
+func bEndCSPConnectType(ctx context.Context, stateCSPConnections types.List, planPartnerConfig types.Object, diags *diag.Diagnostics) string {
+	var conns []cspConnectionModel
+	if !stateCSPConnections.IsNull() && !stateCSPConnections.IsUnknown() {
+		*diags = append(*diags, stateCSPConnections.ElementsAs(ctx, &conns, false)...)
 	}
-	return true
+	for _, c := range conns {
+		if c.ResourceName.ValueString() != "b_csp_connection" {
+			continue
+		}
+		if c.ConnectType.ValueString() == "VROUTER" {
+			return ""
+		}
+		return c.ConnectType.ValueString()
+	}
+	partner, csp := classifyPartner(ctx, planPartnerConfig, diags)
+	if partner.IsUnknown() || !csp && partner.ValueString() != "transit" {
+		return ""
+	}
+	return strings.ToUpper(partner.ValueString())
 }
 
 // waitForVXCUpdate polls the VXC API to verify that an update has propagated successfully.
@@ -1369,10 +1386,22 @@ func vlanAvailabilityPreflight(ctx context.Context, in vlanPreflightInput) diag.
 	if !available {
 		diags.AddError(
 			fmt.Sprintf("VLAN %d is not available on the %s port", vlan, in.end),
-			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one.", vlan, in.end, in.productUID, in.end),
+			fmt.Sprintf("VLAN %d is already in use on %s port %s. Pick a different %s ordered_vlan, or set it to 0 to let Megaport allocate one. %s", vlan, in.end, in.productUID, in.end, vlanFreeHint),
 		)
 	}
 	return diags
+}
+
+// vlanFreeHint covers the one taken-VLAN case a re-run fixes. Megaport frees a
+// destroyed VXC's VLAN a few minutes after the destroy returns.
+const vlanFreeHint = "If a VXC using this VLAN was just destroyed, Megaport can take a few minutes to free the VLAN. Run the apply again after that."
+
+// withVLANFreeHint appends vlanFreeHint when err is the backend's taken-VLAN error.
+func withVLANFreeHint(detail string, err error) string {
+	if strings.Contains(err.Error(), "not available on service") {
+		return detail + " " + vlanFreeHint
+	}
+	return detail
 }
 
 // prefixFilterIDToName resolves a prefix filter list ID to its description.

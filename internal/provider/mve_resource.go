@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -95,6 +96,21 @@ type mveNetworkInterfaceModel struct {
 func toAPINetworkInterface(orm *mveNetworkInterfaceModel) *megaport.MVENetworkInterface {
 	return &megaport.MVENetworkInterface{
 		Description: orm.Description.ValueString(),
+	}
+}
+
+// vnicCountChanged forces replacement when the number of vNICs changes between
+// state and plan. Description-only edits are sent through Update; the API does
+// not support changing the vNIC count after provisioning.
+func vnicCountChanged(_ context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if len(req.StateValue.Elements()) != len(req.PlanValue.Elements()) {
+		resp.RequiresReplace = true
 	}
 }
 
@@ -504,7 +520,8 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:    true,
 			},
 			"marketplace_visibility": schema.BoolAttribute{
-				Description: "Whether the MVE is visible in the marketplace.",
+				Description: "Whether the MVE is visible in the Marketplace. Defaults to the API's own default when not set.",
+				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
@@ -600,7 +617,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vnics": schema.ListNestedAttribute{
-				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Description can be null. The maximum number of vNICs allowed is 5. If the array is not supplied (i.e. null), it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others.",
+				Description: "The network interfaces of the MVE. The number of elements in the array is the number of vNICs the user wants to provision. Each supplied vNIC must include a description. The maximum number of vNICs allowed is 5. If the list is omitted or set to null, it will default to the minimum number of vNICs for the supplier - 2 for Palo Alto and 1 for the others. vNIC descriptions can be updated in place; adding or removing vNICs forces the MVE to be replaced because the API does not allow changing the vNIC count after provisioning.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
@@ -608,6 +625,11 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						"description": schema.StringAttribute{
 							Description: "The description of the network interface.",
 							Required:    true,
+							Validators: []validator.String{
+								// The API rejects empty descriptions; fail at plan time
+								// instead of mid-apply.
+								stringvalidator.LengthAtLeast(1),
+							},
 						},
 						"vlan": schema.Int64Attribute{
 							Description: "The VLAN of the network interface.",
@@ -620,11 +642,15 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
-					listplanmodifier.RequiresReplace(),
+					listplanmodifier.RequiresReplaceIf(
+						vnicCountChanged,
+						"Adding or removing vNICs requires replacing the MVE.",
+						"Adding or removing vNICs requires replacing the MVE.",
+					),
 				},
 			},
 			"resource_tags": schema.MapAttribute{
-				Description: "The resource tags associated with the product.",
+				Description: resourceTagsDescription,
 				Optional:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
@@ -784,6 +810,13 @@ func (r *mveResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 		WaitForProvision: true,
 		WaitForTime:      waitForTime,
+	}
+
+	// An unset value arrives as Unknown (no config, no prior state). Send it
+	// only when the practitioner configured a value.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		mveReq.MarketplaceVisibility = &marketplaceVisibility
 	}
 
 	if !plan.ResourceTags.IsNull() {
@@ -974,14 +1007,45 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		contractTermMonths = &months
 	}
 
-	_, err := r.client.MVEService.ModifyMVE(ctx, &megaport.ModifyMVERequest{
+	modifyReq := &megaport.ModifyMVERequest{
 		MVEID:              state.UID.ValueString(),
 		Name:               name,
 		CostCentre:         costCentre,
 		ContractTermMonths: contractTermMonths,
 		WaitForUpdate:      true,
 		WaitForTime:        waitForTime,
-	})
+	}
+
+	// UseStateForUnknown keeps the planned value equal to state unless the
+	// practitioner changed it, so a difference means a configured change.
+	if !plan.MarketplaceVisibility.IsUnknown() && !plan.MarketplaceVisibility.IsNull() &&
+		!plan.MarketplaceVisibility.Equal(state.MarketplaceVisibility) {
+		marketplaceVisibility := plan.MarketplaceVisibility.ValueBool()
+		modifyReq.MarketplaceVisibility = &marketplaceVisibility
+	}
+
+	// Forward vNIC description changes. vnics is Optional+Computed, so the
+	// planned value can be null or unknown — treat those as "no vNIC update".
+	// Element-count changes are handled by the schema's RequiresReplaceIf, so
+	// a mismatch here would mean Update was reached in an unexpected state;
+	// skip rather than push a count-changing payload to the API.
+	if !plan.NetworkInterfaces.IsNull() && !plan.NetworkInterfaces.IsUnknown() &&
+		!plan.NetworkInterfaces.Equal(state.NetworkInterfaces) &&
+		len(plan.NetworkInterfaces.Elements()) == len(state.NetworkInterfaces.Elements()) {
+		planVnics := []*mveNetworkInterfaceModel{}
+		vnicDiags := plan.NetworkInterfaces.ElementsAs(ctx, &planVnics, false)
+		resp.Diagnostics.Append(vnicDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		vnicUpdates := make([]megaport.MVEVnicUpdate, len(planVnics))
+		for i, v := range planVnics {
+			vnicUpdates[i] = megaport.MVEVnicUpdate{Description: v.Description.ValueString()}
+		}
+		modifyReq.Vnics = vnicUpdates
+	}
+
+	_, err := r.client.MVEService.ModifyMVE(ctx, modifyReq)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1027,6 +1091,14 @@ func (r *mveResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	apiDiags := state.fromAPIMVE(ctx, updatedMVE, tags)
 	resp.Diagnostics = append(resp.Diagnostics, apiDiags...)
+
+	// Adopt the planned vnics rather than the immediate post-modify read: the
+	// read model can briefly lag a description PUT, which would otherwise
+	// surface as "inconsistent result after apply". Descriptions are
+	// user-authoritative and VLANs are immutable and index-stable.
+	if !plan.NetworkInterfaces.IsNull() && !plan.NetworkInterfaces.IsUnknown() {
+		state.NetworkInterfaces = plan.NetworkInterfaces
+	}
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	state.PromoCode = plan.PromoCode

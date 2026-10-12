@@ -58,7 +58,7 @@ This is a **Terraform Plugin Framework** provider (not the older SDK/v2). All pr
 - `tflog_slog_handler.go` — bridges megaportgo slog logging to Terraform's tflog
 
 ### External API Client
-The provider uses `github.com/megaport/megaportgo` (v1.4.9) as its API client library. The `megaportProviderData` struct (in `provider.go`) holds the configured `*megaport.Client` and is passed to all resources/data sources via `Configure()`.
+The provider uses `github.com/megaport/megaportgo` as its API client library. The pinned version is in `go.mod`. The `megaportProviderData` struct (in `provider.go`) holds the configured `*megaport.Client` and is passed to all resources/data sources via `Configure()`.
 
 ## Key Patterns
 
@@ -77,7 +77,7 @@ Uses `diag.Diagnostics` for error reporting. HTTP 404 responses in `Read` should
 All resources support a `resource_tags` map attribute. Use `toResourceTagMap()` helper for conversion.
 
 ### Testing
-Tests use `testify/suite` with `ProviderTestSuite`. Acceptance tests use `testAccProtoV6ProviderFactories` and the `providerConfig` template from `provider_test.go`. Test names follow `TestAccMegaport{Resource}_Basic`. The `RandomTestName()` helper generates prefixed test names (`tf-acc-test-`).
+Tests use `testify/suite` with `ProviderTestSuite`. Acceptance tests use `testAccProtoV6ProviderFactories` and the `providerConfig` template from `provider_test.go`. Test names follow `TestAccMegaport{Resource}_Basic`. The `RandomTestName()` helper generates prefixed test names (`tf-acc-test-`). Each `TestAcc` function needs a CI suite in `internal/provider/testdata/acceptance-suites.json`, or an `excluded` entry with a reason. A unit test enforces this.
 
 ### VXC Partner Configurations
 VXC resources support multiple cloud partner types (AWS, Azure, Google, Oracle, Aruba, Fortinet, Versa, etc.), each with unique nested config schemas defined in `vxc_schemas.go`. Partner port UIDs can change via rotation — handle via `requested_product_uid` vs `current_product_uid`.
@@ -101,4 +101,4 @@ CI runs on PRs to `main` (`.github/workflows/test.yaml`):
 3. **Unit tests** — `go test` with 30min timeout
 4. **OpenTofu 1.6.0 compatibility** test
 
-Acceptance tests are currently disabled in CI.
+Acceptance tests run when a PR gets the `acceptance` label (`.github/workflows/acceptance-label.yaml`). The label dispatches the acceptance workflow in `megaport/terraform-provider-acceptance-ci` against the PR head.

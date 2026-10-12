@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -226,7 +225,7 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"resource_tags": schema.MapAttribute{
-				Description: "Resource tags for the NAT Gateway.",
+				Description: resourceTagsDescription,
 				Optional:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
@@ -662,23 +661,16 @@ func (r *natGatewayResource) ModifyPlan(ctx context.Context, req resource.Modify
 // appears in the live availability matrix. When unsupported it returns the
 // offending attribute path and a human-readable message for the diagnostic.
 func natGatewaySpeedSessionSupported(matrix []*megaport.NATGatewaySession, speed, sessionCount int) (path.Path, string, bool) {
-	supportedSpeeds := make([]int, 0, len(matrix))
-	for _, entry := range matrix {
-		if entry == nil {
-			continue
-		}
-		supportedSpeeds = append(supportedSpeeds, entry.SpeedMbps)
-		if entry.SpeedMbps != speed {
-			continue
-		}
-		if slices.Contains(entry.SessionCount, sessionCount) {
-			return path.Empty(), "", true
-		}
-		return path.Root("session_count"),
-			fmt.Sprintf("Session count %d is not supported for %d Mbps. Supported session counts: %v.", sessionCount, speed, entry.SessionCount),
+	result := megaport.NATGatewaySpeedSessionSupported(matrix, speed, sessionCount)
+	if result.Supported {
+		return path.Empty(), "", true
+	}
+	if !result.SpeedSupported {
+		return path.Root("speed"),
+			fmt.Sprintf("Speed %d Mbps is not supported. Supported speeds: %v.", speed, result.SupportedSpeeds),
 			false
 	}
-	return path.Root("speed"),
-		fmt.Sprintf("Speed %d Mbps is not supported. Supported speeds: %v.", speed, supportedSpeeds),
+	return path.Root("session_count"),
+		fmt.Sprintf("Session count %d is not supported for %d Mbps. Supported session counts: %v.", sessionCount, speed, result.SessionsAtSpeed),
 		false
 }

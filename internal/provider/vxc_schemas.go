@@ -134,6 +134,7 @@ var (
 			"pairing_key": schema.StringAttribute{
 				Description: "The pairing key of the partner configuration. Required for Google partner configurations.",
 				Required:    true,
+				Sensitive:   true,
 			},
 		},
 	}
@@ -142,7 +143,7 @@ var (
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"account_id": schema.StringAttribute{
-				Description: "Customer's IBM Acount ID. Required for all IBM partner configurations.",
+				Description: "Customer's IBM Account ID. Required for all IBM partner configurations.",
 				Required:    true,
 			},
 			"customer_asn": schema.Int64Attribute{
@@ -357,7 +358,7 @@ var (
 										Optional:    true,
 									},
 									"local_asn": schema.Int64Attribute{
-										Description: "The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.",
+										Description: "The local ASN of the BGP connection. When this end is an MCR or NAT Gateway, the API applies this rule on create and update. When peer_asn equals the ASN of that end, leave local_asn unset or set it to that ASN. Otherwise, local_asn must differ from peer_asn.",
 										Optional:    true,
 									},
 									"peer_type": schema.StringAttribute{
@@ -519,7 +520,7 @@ var (
 										Optional:    true,
 									},
 									"local_asn": schema.Int64Attribute{
-										Description: "The local ASN of the BGP connection. An in-place change cannot turn an iBGP session into eBGP. Delete and recreate the VXC to make that change.",
+										Description: "The local ASN of the BGP connection. When this end is an MCR or NAT Gateway, the API applies this rule on create and update. When peer_asn equals the ASN of that end, leave local_asn unset or set it to that ASN. Otherwise, local_asn must differ from peer_asn.",
 										Optional:    true,
 									},
 									"local_ip_address": schema.StringAttribute{

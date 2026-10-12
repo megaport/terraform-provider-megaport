@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -490,6 +491,139 @@ func TestVerifyUpdateApplied(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, r.verifyUpdateApplied(tc.vxc, tc.updateReq))
+		})
+	}
+}
+
+func TestFromAPICSPConnection(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name    string
+		conn    megaport.CSPConnectionVirtualRouter
+		wantIPs []string
+	}{
+		{
+			name: "populated ip_addresses",
+			conn: megaport.CSPConnectionVirtualRouter{
+				ConnectType:       "VROUTER",
+				ResourceName:      "vrouter-a",
+				ResourceType:      "vrouter",
+				VLAN:              200,
+				VirtualRouterName: "mcr-vrouter",
+				IPAddresses:       []string{"10.0.0.1/30", "10.0.0.2/30"},
+			},
+			wantIPs: []string{"10.0.0.1/30", "10.0.0.2/30"},
+		},
+		{
+			name: "empty ip_addresses",
+			conn: megaport.CSPConnectionVirtualRouter{
+				ConnectType:       "VROUTER",
+				ResourceName:      "vrouter-b",
+				ResourceType:      "vrouter",
+				VLAN:              201,
+				VirtualRouterName: "mcr-vrouter-2",
+				IPAddresses:       nil,
+			},
+			wantIPs: []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj, diags := fromAPICSPConnection(ctx, tc.conn)
+			require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+
+			var model cspConnectionModel
+			diags = obj.As(ctx, &model, basetypes.ObjectAsOptions{})
+			require.False(t, diags.HasError(), "decoding object: %v", diags)
+
+			assert.Equal(t, tc.conn.ConnectType, model.ConnectType.ValueString())
+			assert.Equal(t, int64(tc.conn.VLAN), model.VLAN.ValueInt64())
+			assert.Equal(t, tc.conn.VirtualRouterName, model.VirtualRouterName.ValueString())
+
+			assert.False(t, model.IPAddresses.IsNull(), "ip_addresses should be an empty list, not null")
+			var gotIPs []string
+			diags = model.IPAddresses.ElementsAs(ctx, &gotIPs, false)
+			require.False(t, diags.HasError(), "reading ip_addresses: %v", diags)
+			assert.Equal(t, tc.wantIPs, gotIPs)
+		})
+	}
+}
+
+// unhandledCSPConnection stands in for a CSP type that a newer SDK models
+// before fromAPICSPConnection handles it.
+type unhandledCSPConnection struct {
+	megaport.CSPConnectionConfig
+	ConnectType  string `json:"connectType"`
+	ResourceName string `json:"resource_name"`
+	ResourceType string `json:"resource_type"`
+}
+
+func TestFromAPICSPConnection_UnsupportedType(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name         string
+		body         string
+		conn         megaport.CSPConnectionConfig
+		wantType     string
+		wantName     string
+		wantWarnings int
+	}{
+		{
+			name: "alibaba",
+			body: `{"connectType":"ALIBABA","resource_name":"b_csp_connection","resource_type":"csp_connection",` +
+				`"account_id":"1234567890","bandwidth":100,"bandwidths":[100],"csp_name":"Alibaba"}`,
+			wantType:     "ALIBABA",
+			wantName:     "b_csp_connection",
+			wantWarnings: 1,
+		},
+		{
+			name:     "untyped",
+			body:     `{"resource_name":"a_csp_connection","resource_type":"csp_connection"}`,
+			wantName: "a_csp_connection",
+		},
+		{
+			name:         "modeled by the SDK, no provider case",
+			conn:         unhandledCSPConnection{ConnectType: "NEWCLOUD", ResourceName: "b_csp_connection", ResourceType: "csp_connection"},
+			wantType:     "NEWCLOUD",
+			wantName:     "b_csp_connection",
+			wantWarnings: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := tc.conn
+			if conn == nil {
+				// The API sends a VXC's only CSP connection as an object, not an array.
+				var conns megaport.CSPConnection
+				require.NoError(t, json.Unmarshal([]byte(tc.body), &conns))
+				require.Len(t, conns.CSPConnection, 1)
+				require.IsType(t, megaport.CSPConnectionOther{}, conns.CSPConnection[0])
+				conn = conns.CSPConnection[0]
+			}
+
+			obj, diags := fromAPICSPConnection(ctx, conn)
+			require.False(t, diags.HasError(), "fromAPICSPConnection: %v", diags)
+			require.Equal(t, tc.wantWarnings, diags.WarningsCount(), "warnings: %v", diags)
+			for _, w := range diags.Warnings() {
+				assert.Contains(t, w.Detail(), `"`+tc.wantType+`"`)
+				assert.Contains(t, w.Detail(), "https://github.com/megaport/terraform-provider-megaport/issues")
+			}
+
+			var model cspConnectionModel
+			diags = obj.As(ctx, &model, basetypes.ObjectAsOptions{})
+			require.False(t, diags.HasError(), "decoding object: %v", diags)
+
+			assert.Equal(t, cspConnectionModel{
+				ConnectType:  types.StringValue(tc.wantType),
+				ResourceName: types.StringValue(tc.wantName),
+				ResourceType: types.StringValue("csp_connection"),
+				Bandwidths:   types.ListNull(types.Int64Type),
+				IPAddresses:  types.ListNull(types.StringType),
+			}, model)
 		})
 	}
 }
