@@ -348,7 +348,7 @@ resource "megaport_mcr_prefix_filter_list" "ipv6_networks" {
 You don't need to do this if you're not modifying `megaportgo`, but if you need to modify it you can use a Go workspace to make this process easier. Take a look at [this tutorial](https://go.dev/doc/tutorial/workspaces) first to get familiar with how Go workspaces work, then create a workspace for local development. This will let you edit the megaportgo library while working on the Terraform Provider without needing to publish changes to Git or modify your go.mod file in the Terraform Provider with a replace statement.
 
 ```go.work
-go 1.22.0
+go 1.26.0
 use (
 	./megaportgo
 	./terraform-provider-megaport

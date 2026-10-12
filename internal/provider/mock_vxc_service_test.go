@@ -21,6 +21,7 @@ type MockVXCService struct {
 	BuyVXCErr                 error
 	UpdateVXCResult           *megaport.VXC
 	UpdateVXCErr              error
+	DeleteVXCErr              error
 }
 
 func (m *MockVXCService) GetVXC(ctx context.Context, id string) (*megaport.VXC, error) {
@@ -69,7 +70,7 @@ func (m *MockVXCService) ValidateVXCOrder(_ context.Context, _ *megaport.BuyVXCR
 }
 
 func (m *MockVXCService) DeleteVXC(_ context.Context, _ string, _ *megaport.DeleteVXCRequest) error {
-	return nil
+	return m.DeleteVXCErr
 }
 
 func (m *MockVXCService) UpdateVXC(_ context.Context, _ string, _ *megaport.UpdateVXCRequest) (*megaport.VXC, error) {

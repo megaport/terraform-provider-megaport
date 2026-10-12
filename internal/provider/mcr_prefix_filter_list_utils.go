@@ -115,8 +115,8 @@ func convertEntryToAPI(entry *mcrPrefixFilterListEntryResourceModel) (*megaport.
 		return nil, diags
 	}
 
-	apiEntry.Ge = ge
-	apiEntry.Le = le
+	apiEntry.Ge = megaport.PtrTo(ge)
+	apiEntry.Le = megaport.PtrTo(le)
 
 	return apiEntry, diags
 }
@@ -191,8 +191,8 @@ func generateImportID(mcrUID string, prefixListID int64) string {
 func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics) {
 	diags := diag.Diagnostics{}
 
-	if entry.Ge != 0 && entry.Le != 0 {
-		return entry.Ge, entry.Le, diags
+	if entry.Ge != nil && entry.Le != nil {
+		return *entry.Ge, *entry.Le, diags
 	}
 
 	_, network, err := net.ParseCIDR(entry.Prefix)
@@ -205,16 +205,14 @@ func resolveGeLe(entry *megaport.MCRPrefixListEntry) (int, int, diag.Diagnostics
 	}
 	prefixLength, maxLength := network.Mask.Size()
 
-	ge, le := entry.Ge, entry.Le
 	switch {
-	case ge == 0 && le == 0:
-		ge, le = prefixLength, prefixLength
-	case ge == 0:
-		ge = prefixLength
-	case le == 0:
-		le = maxLength
+	case entry.Ge == nil && entry.Le == nil:
+		return prefixLength, prefixLength, diags
+	case entry.Ge == nil:
+		return prefixLength, *entry.Le, diags
+	default:
+		return *entry.Ge, maxLength, diags
 	}
-	return ge, le, diags
 }
 
 // normalizeCIDR returns the canonical network address for a CIDR prefix.
