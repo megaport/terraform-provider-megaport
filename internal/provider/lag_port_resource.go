@@ -645,11 +645,14 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 			// Each port gets its own approval request, so the loop still modifies the rest.
 			if errors.Is(err, megaport.ErrModifyPendingApproval) {
 				pendingUIDs = append(pendingUIDs, member.UID)
-				// Save the held values now: an error below returns before the final state write.
-				resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_name"), plan.Name)...)
-				resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("cost_centre"), plan.CostCentre)...)
-				resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marketplace_visibility"), plan.MarketplaceVisibility)...)
-				resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("contract_term_months"), plan.ContractTermMonths)...)
+				// Read keeps the requested values only while the primary has a pending approval.
+				// Save them now: an error below returns before the final state write.
+				if member.UID == plan.UID.ValueString() {
+					resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_name"), plan.Name)...)
+					resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("cost_centre"), plan.CostCentre)...)
+					resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marketplace_visibility"), plan.MarketplaceVisibility)...)
+					resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("contract_term_months"), plan.ContractTermMonths)...)
+				}
 				continue
 			}
 			if err != nil {

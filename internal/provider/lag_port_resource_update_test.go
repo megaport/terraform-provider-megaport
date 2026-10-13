@@ -251,17 +251,19 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantWarning:    "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
 		},
 		{
-			name:         "a failed read after a pending modify still warns",
-			planName:     "lag-new",
-			planTerm:     24,
-			planLagCount: 2,
-			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
-			pending:      map[string]bool{"lag-1": true, "lag-2": true},
-			getErr:       errors.New("the stub rejects the read"),
-			wantModified: []string{"lag-2", "lag-1"},
-			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
-			wantError:    "the stub rejects the read",
-			wantWarning:  "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
+			name:           "a failed read after a pending modify still warns",
+			planName:       "lag-new",
+			planTerm:       24,
+			planCostCentre: "cc-2",
+			planVisibility: true,
+			planLagCount:   2,
+			listed:         []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:        map[string]bool{"lag-1": true, "lag-2": true},
+			getErr:         errors.New("the stub rejects the read"),
+			wantModified:   []string{"lag-2", "lag-1"},
+			wantTerm:       map[string]int{"lag-1": 24, "lag-2": 24},
+			wantError:      "the stub rejects the read",
+			wantWarning:    "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
 		},
 		{
 			name:         "a failed modify after a pending member still warns about the pending one",
@@ -342,15 +344,21 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				t.Errorf("warning %q does not contain %q", warnings[0].Detail(), tc.wantWarning)
 			}
 			// The API reads back the old values while the approval is pending, so state must keep the plan.
+			// A failed primary modify keeps the prior values, which Read compares with the primary.
 			if tc.wantWarning != "" {
+				want := planModel
+				if tc.failUID != "" {
+					want = stateModel
+				}
 				var got lagPortResourceModel
 				if diags := resp.State.Get(ctx, &got); diags.HasError() {
 					t.Fatalf("reading state: %v", diags.Errors())
 				}
-				if !got.Name.Equal(planModel.Name) || !got.ContractTermMonths.Equal(planModel.ContractTermMonths) ||
-					!got.CostCentre.Equal(planModel.CostCentre) || !got.MarketplaceVisibility.Equal(planModel.MarketplaceVisibility) {
-					t.Errorf("state holds name %s, term %s, cost centre %s, visibility %s; want the planned values",
-						got.Name, got.ContractTermMonths, got.CostCentre, got.MarketplaceVisibility)
+				if !got.Name.Equal(want.Name) || !got.ContractTermMonths.Equal(want.ContractTermMonths) ||
+					!got.CostCentre.Equal(want.CostCentre) || !got.MarketplaceVisibility.Equal(want.MarketplaceVisibility) {
+					t.Errorf("state holds name %s, term %s, cost centre %s, visibility %s; want %s, %s, %s, %s",
+						got.Name, got.ContractTermMonths, got.CostCentre, got.MarketplaceVisibility,
+						want.Name, want.ContractTermMonths, want.CostCentre, want.MarketplaceVisibility)
 				}
 			}
 

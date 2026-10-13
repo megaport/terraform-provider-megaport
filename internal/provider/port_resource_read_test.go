@@ -35,8 +35,8 @@ func (s *readApprovalService) ListOrderApprovals(_ context.Context, req *megapor
 	return &megaport.ListOrderApprovalsResponse{OrderApprovals: s.approvals}, nil
 }
 
-func pendingApproval(serviceID int, approvalType megaport.OrderApprovalType) []*megaport.OrderApproval {
-	return []*megaport.OrderApproval{{ServiceID: serviceID, Type: approvalType, Status: megaport.OrderApprovalStatusPending}}
+func pendingApproval(approvalType megaport.OrderApprovalType) []*megaport.OrderApproval {
+	return []*megaport.OrderApproval{{ServiceID: 101, Type: approvalType, Status: megaport.OrderApprovalStatusPending}}
 }
 
 // portReadCases refresh a port whose state holds a term the API has not applied yet.
@@ -51,7 +51,7 @@ var portReadCases = []struct {
 }{
 	{
 		name:      "a pending term change keeps the requested values and warns",
-		approvals: pendingApproval(101, megaport.OrderApprovalTypeTermChange),
+		approvals: pendingApproval(megaport.OrderApprovalTypeTermChange),
 		wantList:  true,
 		wantKept:  true,
 	},
@@ -70,13 +70,13 @@ var portReadCases = []struct {
 	},
 	{
 		name:      "a pending approval of another type brings the old values back",
-		approvals: pendingApproval(101, megaport.OrderApprovalTypeSpeedChange),
+		approvals: pendingApproval(megaport.OrderApprovalTypeSpeedChange),
 		wantList:  true,
 	},
 	{
 		name:      "an import takes the API values",
 		imported:  true,
-		approvals: pendingApproval(101, megaport.OrderApprovalTypeTermChange),
+		approvals: pendingApproval(megaport.OrderApprovalTypeTermChange),
 	},
 }
 

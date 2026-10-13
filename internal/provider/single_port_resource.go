@@ -578,7 +578,7 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	if pendingApproval {
 		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString()))
-		// Save the held values now: an error below returns before the final state write.
+		// Save the requested values now: an error below returns before the final state write.
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_name"), plan.Name)...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("cost_centre"), plan.CostCentre)...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marketplace_visibility"), plan.MarketplaceVisibility)...)
