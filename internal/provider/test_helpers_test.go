@@ -615,7 +615,10 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 		}
 	}
 
-	t.Skipf("skipping: no location with available MVE capacity found in staging, last validate error: %v", lastErr)
+	if lastErr != nil {
+		t.Skipf("skipping: no location with available MVE capacity found in staging, last validate error: %v", lastErr)
+	}
+	t.Skip("skipping: no location with available MVE capacity found in staging")
 	return 0, ""
 }
 
