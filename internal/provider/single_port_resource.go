@@ -510,7 +510,7 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	apiDiags := state.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
 
-	// The API reads back the old values until the approval. An import has no requested values to keep.
+	// The API reads back the old values until the approval. State from an import or a failed create has no requested values to keep.
 	if !prior.ContractTermMonths.IsNull() && !prior.ContractTermMonths.Equal(state.ContractTermMonths) &&
 		termChangePending(ctx, r.client.OrderApprovalService, port.ID) {
 		state.Name = prior.Name
@@ -661,7 +661,7 @@ func termChangePending(ctx context.Context, approvals megaport.OrderApprovalServ
 		return false
 	}
 	return slices.ContainsFunc(resp.OrderApprovals, func(a *megaport.OrderApproval) bool {
-		return a != nil && a.Type == megaport.OrderApprovalTypeTermChange
+		return a.Type == megaport.OrderApprovalTypeTermChange
 	})
 }
 
