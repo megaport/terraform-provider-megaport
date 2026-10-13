@@ -342,7 +342,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				t.Errorf("warning %q does not contain %q", warnings[0].Detail(), tc.wantWarning)
 			}
 			// The API reads back the old values while the approval is pending, so state must keep the plan.
-			if tc.wantWarning != "" && tc.wantError == "" {
+			if tc.wantWarning != "" {
 				var got lagPortResourceModel
 				if diags := resp.State.Get(ctx, &got); diags.HasError() {
 					t.Fatalf("reading state: %v", diags.Errors())

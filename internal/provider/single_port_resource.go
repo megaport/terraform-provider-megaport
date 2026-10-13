@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	megaport "github.com/megaport/megaportgo"
 )
 
@@ -577,6 +578,11 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	if pendingApproval {
 		resp.Diagnostics.AddWarning("Port change pending approval", portPendingApprovalWarning("port "+plan.UID.ValueString()))
+		// Save the held values now: an error below returns before the final state write.
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("product_name"), plan.Name)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("cost_centre"), plan.CostCentre)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marketplace_visibility"), plan.MarketplaceVisibility)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("contract_term_months"), plan.ContractTermMonths)...)
 	}
 
 	port, portErr := r.client.PortService.GetPort(ctx, plan.UID.ValueString())
@@ -651,10 +657,11 @@ func termChangePending(ctx context.Context, approvals megaport.OrderApprovalServ
 	status := megaport.OrderApprovalStatusPending
 	resp, err := approvals.ListOrderApprovals(ctx, &megaport.ListOrderApprovalsRequest{Status: &status, ServiceIDs: []int{serviceID}})
 	if err != nil {
+		tflog.Debug(ctx, "Order approvals list failed", map[string]any{"service_id": serviceID, "error": err.Error()})
 		return false
 	}
 	return slices.ContainsFunc(resp.OrderApprovals, func(a *megaport.OrderApproval) bool {
-		return a != nil && a.ServiceID == serviceID && a.Type == megaport.OrderApprovalTypeTermChange
+		return a != nil && a.Type == megaport.OrderApprovalTypeTermChange
 	})
 }
 

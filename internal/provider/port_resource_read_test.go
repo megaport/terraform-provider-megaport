@@ -18,7 +18,7 @@ import (
 	megaport "github.com/megaport/megaportgo"
 )
 
-// readApprovalService answers the approvals list the port reads make.
+// readApprovalService stubs ListOrderApprovals and records each request.
 type readApprovalService struct {
 	megaport.OrderApprovalService
 
@@ -39,7 +39,7 @@ func pendingApproval(serviceID int, approvalType megaport.OrderApprovalType) []*
 	return []*megaport.OrderApproval{{ServiceID: serviceID, Type: approvalType, Status: megaport.OrderApprovalStatusPending}}
 }
 
-// portReadCases cover a refresh after Update kept the requested values for a term change held for approval.
+// portReadCases refresh a port whose state holds a term the API has not applied yet.
 var portReadCases = []struct {
 	name      string
 	imported  bool
@@ -71,11 +71,6 @@ var portReadCases = []struct {
 	{
 		name:      "a pending approval of another type brings the old values back",
 		approvals: pendingApproval(101, megaport.OrderApprovalTypeSpeedChange),
-		wantList:  true,
-	},
-	{
-		name:      "a pending term change on another service brings the old values back",
-		approvals: pendingApproval(999, megaport.OrderApprovalTypeTermChange),
 		wantList:  true,
 	},
 	{

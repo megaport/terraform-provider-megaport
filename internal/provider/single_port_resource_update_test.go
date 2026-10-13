@@ -132,8 +132,8 @@ func TestSinglePortUpdate_PendingApproval(t *testing.T) {
 				t.Errorf("warning %q does not name the port", warnings[0].Detail())
 			}
 
-			// A failed read keeps the prior state, which the framework already holds.
-			if tc.wantError != "" {
+			// A failed modify keeps the prior state, which the framework already holds.
+			if tc.wantError != "" && !tc.wantWarning {
 				return
 			}
 
