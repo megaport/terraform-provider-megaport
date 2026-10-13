@@ -317,11 +317,38 @@ func findMVETestLocationBlueZone(t *testing.T) (id int, name string) {
 }
 
 // findMVEVersaTestLocation returns a staging location with Versa MVE capacity.
-func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
-	return findMVETestLocationWithOpts(t, mveProbeOpts{
+// It resolves the Versa image ID at run time because staging Versa images change.
+func findMVEVersaTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var versaImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Versa") {
+			versaImageID = img.ID
+			break
+		}
+	}
+	if versaImageID == 0 {
+		t.Skip("skipping: no Versa MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
 		vendorConfig: &megaport.VersaConfig{
 			Vendor:            "versa",
-			ImageID:           20,
+			ImageID:           versaImageID,
 			ProductSize:       "SMALL",
 			MVELabel:          "MVE 2/8",
 			DirectorAddress:   "director1.versa.com",
@@ -333,6 +360,7 @@ func findMVEVersaTestLocation(t *testing.T) (id int, name string) {
 		diversityZone: "red",
 		vnicCount:     2,
 	})
+	return locID, versaImageID, locName
 }
 
 // mveAdminPasswordSafeAlphabet is the character set used to build random admin
@@ -525,6 +553,9 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 		byID[loc.ID] = loc
 	}
 
+	// Validate reports a missing image as no capacity, so keep the last
+	// error for the skip message.
+	var lastErr error
 	probe := func(loc *megaport.LocationV3) bool {
 		if !strings.EqualFold(loc.Status, "active") || !loc.HasMVESupport() {
 			return false
@@ -544,6 +575,9 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 			VendorConfig:  opts.vendorConfig,
 			Vnics:         vnics,
 		})
+		if err != nil {
+			lastErr = err
+		}
 		return err == nil
 	}
 
@@ -581,7 +615,7 @@ func findMVETestLocationWithOpts(t *testing.T, opts mveProbeOpts) (id int, name 
 		}
 	}
 
-	t.Skip("skipping: no location with available MVE capacity found in staging")
+	t.Skipf("skipping: no location with available MVE capacity found in staging, last validate error: %v", lastErr)
 	return 0, ""
 }
 

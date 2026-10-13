@@ -158,6 +158,11 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					}
 					]
                   }`, locationID, MVEArubaImageID, mveNameNew, costCentreNew, mveName, mveKey),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_mve.mve", plancheck.ResourceActionUpdate),
+					},
+				},
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
@@ -477,14 +482,12 @@ func TestAccMegaportMVEAruba_ContractTermUpdate(t *testing.T) {
 
 // TestAccMegaportMVEAruba_VnicDescriptionUpdate exercises ESD-1201:
 // editing only vnics[*].description must update the MVE in place
-// (product_uid preserved), while changing the vNIC count still forces
-// replacement (product_uid changes).
+// (product_uid preserved), while changing the vNIC count still plans a
+// replacement.
 func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	// Probe with 3 vNICs — the final step replaces the MVE with three vNICs,
-	// so the location must validate for the maximum count the test exercises.
-	locationID, _ := findMVETestLocation(t, 3)
+	locationID, _ := findMVETestLocation(t, 2)
 	mveName := RandomTestName()
 	mveKey := RandomTestName()
 
@@ -529,7 +532,7 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 		{ description = "Management Plane" }
 	]`
 
-	var originalUID, postRenameUID string
+	var originalUID string
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -565,7 +568,7 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 						if originalUID == "" {
 							return fmt.Errorf("originalUID was not captured in step 1")
 						}
-						postRenameUID = rs.Primary.Attributes["product_uid"]
+						postRenameUID := rs.Primary.Attributes["product_uid"]
 						if postRenameUID != originalUID {
 							return fmt.Errorf("MVE was replaced (product_uid changed) when only vNIC descriptions changed; want in-place update. before=%s after=%s", originalUID, postRenameUID)
 						}
@@ -578,25 +581,17 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 				Config:   configWithVnics(twoVnicsRenamed),
 				PlanOnly: true,
 			},
-			// Add a vNIC — must force replacement (product_uid changes).
+			// Add a vNIC: the plan must replace the MVE. Plan-only, so the test
+			// never needs room for a second MVE at the location.
 			{
-				Config: configWithVnics(threeVnics),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vnics.#", "3"),
-					func(s *terraform.State) error {
-						rs, ok := s.RootModule().Resources["megaport_mve.mve"]
-						if !ok {
-							return fmt.Errorf("megaport_mve.mve not found in state")
-						}
-						if postRenameUID == "" {
-							return fmt.Errorf("postRenameUID was not captured in step 2")
-						}
-						if rs.Primary.Attributes["product_uid"] == postRenameUID {
-							return fmt.Errorf("MVE was updated in place when vNIC count changed; want replacement. product_uid unchanged=%s", postRenameUID)
-						}
-						return nil
+				Config:             configWithVnics(threeVnics),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("megaport_mve.mve", plancheck.ResourceActionReplace),
 					},
-				),
+				},
 			},
 		},
 	})
@@ -605,7 +600,7 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, _ := findMVEVersaTestLocation(t)
+	locationID, versaImageID, _ := findMVEVersaTestLocation(t)
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
@@ -621,7 +616,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 
 				data "megaport_mve_images" "versa" {
   					vendor_filter = "Versa"
-  					id_filter = 20
+  					id_filter = %d
 				}
 
 				resource "megaport_mve" "mve" {
@@ -661,7 +656,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 						description = "Extra Plane"
 					}
 					]
-                  }`, locationID, mveName, costCentre),
+                  }`, locationID, versaImageID, mveName, costCentre),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
@@ -712,7 +707,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 
 				data "megaport_mve_images" "versa" {
   					vendor_filter = "Versa"
-  					id_filter = 20
+  					id_filter = %d
 				}
 
 				resource "megaport_mve" "mve" {
@@ -752,7 +747,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 						description = "Extra Plane"
 					}
 					]
-                  }`, locationID, mveNameNew, costCentreNew),
+                  }`, locationID, versaImageID, mveNameNew, costCentreNew),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),

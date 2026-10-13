@@ -1234,10 +1234,16 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					// Vendor or size changed (case-insensitive) — must replace.
 					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
 				} else {
-					// Vendor/size match case-insensitively. Normalize them in the
-					// plan to match state casing, then check remaining fields.
-					planVC.Vendor = types.StringValue(state.Vendor.ValueString())
-					planVC.ProductSize = types.StringValue(state.Size.ValueString())
+					// Vendor/size match case-insensitively. Copy the stored
+					// vendor_config casing into the plan, then check remaining fields.
+					var stateVC vendorConfigModel
+					stateVCDiags := state.VendorConfig.As(ctx, &stateVC, basetypes.ObjectAsOptions{})
+					resp.Diagnostics.Append(stateVCDiags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					planVC.Vendor = stateVC.Vendor
+					planVC.ProductSize = stateVC.ProductSize
 					normalized, normDiags := types.ObjectValueFrom(ctx, plan.VendorConfig.AttributeTypes(ctx), &planVC)
 					resp.Diagnostics.Append(normDiags...)
 					if resp.Diagnostics.HasError() {

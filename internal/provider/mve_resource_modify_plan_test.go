@@ -40,7 +40,7 @@ func mveSchemaObjectType(t *testing.T, ctx context.Context, r *mveResource) (tfs
 
 // mveVendorConfig builds the Required vendor_config object. Every plan, state
 // and configuration in these tests carries one.
-func mveVendorConfig(t *testing.T, objType tftypes.Object, productSize string) tftypes.Value {
+func mveVendorConfig(t *testing.T, objType tftypes.Object, vendor, productSize string) tftypes.Value {
 	t.Helper()
 
 	vcType, ok := objType.AttributeTypes["vendor_config"].(tftypes.Object)
@@ -48,7 +48,7 @@ func mveVendorConfig(t *testing.T, objType tftypes.Object, productSize string) t
 		t.Fatal("vendor_config is not tftypes.Object")
 	}
 	attrs := nullValueMap(vcType)
-	attrs["vendor"] = tftypes.NewValue(tftypes.String, "cisco")
+	attrs["vendor"] = tftypes.NewValue(tftypes.String, vendor)
 	attrs["image_id"] = tftypes.NewValue(tftypes.Number, 42)
 	attrs["product_size"] = tftypes.NewValue(tftypes.String, productSize)
 	return tftypes.NewValue(vcType, attrs)
@@ -88,7 +88,7 @@ func mvePriorStateAttrs(t *testing.T, objType tftypes.Object) map[string]tftypes
 	// The API uppercases both, the configuration below sends them lowercase.
 	attrs["vendor"] = tftypes.NewValue(tftypes.String, "CISCO")
 	attrs["mve_size"] = tftypes.NewValue(tftypes.String, "SMALL")
-	attrs["vendor_config"] = mveVendorConfig(t, objType, "SMALL")
+	attrs["vendor_config"] = mveVendorConfig(t, objType, "cisco", "SMALL")
 	attrs["vnics"] = mveVnics(t, objType)
 	attrs["contract_end_date"] = tftypes.NewValue(tftypes.String, "2027-09-01")
 	attrs["contract_start_date"] = tftypes.NewValue(tftypes.String, "2026-09-01")
@@ -110,7 +110,7 @@ func mveConfigAttrs(t *testing.T, objType tftypes.Object) map[string]tftypes.Val
 	attrs["product_name"] = tftypes.NewValue(tftypes.String, "mve-one")
 	attrs["location_id"] = tftypes.NewValue(tftypes.Number, 5)
 	attrs["contract_term_months"] = tftypes.NewValue(tftypes.Number, 12)
-	attrs["vendor_config"] = mveVendorConfig(t, objType, "SMALL")
+	attrs["vendor_config"] = mveVendorConfig(t, objType, "cisco", "SMALL")
 	return attrs
 }
 
@@ -165,7 +165,8 @@ func TestMVEResourceModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 	base, objType := mveSchemaObjectType(t, ctx, r)
 
 	stateVal := tftypes.NewValue(objType, mvePriorStateAttrs(t, objType))
-	resizedVendorConfig := mveVendorConfig(t, objType, "MEDIUM")
+	resizedVendorConfig := mveVendorConfig(t, objType, "cisco", "MEDIUM")
+	recasedVendorConfig := mveVendorConfig(t, objType, "CiScO", "SmAlL")
 
 	tests := []struct {
 		name            string
@@ -201,6 +202,15 @@ func TestMVEResourceModifyPlan_KeepsUnknownsOnRealChange(t *testing.T) {
 				configAttrs["vendor_config"] = resizedVendorConfig
 			},
 			requiresReplace: true,
+		},
+		{
+			// A casing-only change updates in place. Stored vendor_config keeps
+			// the configured casing, while vendor and mve_size hold the API's.
+			name: "vendor_config casing changed",
+			mutate: func(planAttrs, configAttrs map[string]tftypes.Value) {
+				planAttrs["vendor_config"] = recasedVendorConfig
+				configAttrs["vendor_config"] = recasedVendorConfig
+			},
 		},
 	}
 
