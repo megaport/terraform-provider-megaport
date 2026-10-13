@@ -266,17 +266,19 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 			wantWarning:    "term increase on ports lag-2, lag-1 in LAG lag-1 needs order approval",
 		},
 		{
-			name:         "a failed modify after a pending member still warns about the pending one",
-			planName:     "lag-old",
-			planTerm:     24,
-			planLagCount: 2,
-			listed:       []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
-			pending:      map[string]bool{"lag-2": true},
-			failUID:      "lag-1",
-			wantModified: []string{"lag-2", "lag-1"},
-			wantTerm:     map[string]int{"lag-1": 24, "lag-2": 24},
-			wantError:    "port lag-1 in LAG lag-1 failed: the stub rejects the modify. Run the apply again to modify the remaining ports once no port in the LAG has a pending approval.",
-			wantWarning:  "term increase on port lag-2 in LAG lag-1 needs order approval",
+			name:           "a failed modify after a pending member still warns about the pending one",
+			planName:       "lag-new",
+			planTerm:       24,
+			planCostCentre: "cc-2",
+			planVisibility: true,
+			planLagCount:   2,
+			listed:         []*megaport.Port{lagMember("lag-1", "lag-old", 12), lagMember("lag-2", "lag-old", 12)},
+			pending:        map[string]bool{"lag-2": true},
+			failUID:        "lag-1",
+			wantModified:   []string{"lag-2", "lag-1"},
+			wantTerm:       map[string]int{"lag-1": 24, "lag-2": 24},
+			wantError:      "port lag-1 in LAG lag-1 failed: the stub rejects the modify. Run the apply again to modify the remaining ports once no port in the LAG has a pending approval.",
+			wantWarning:    "term increase on port lag-2 in LAG lag-1 needs order approval",
 		},
 		{
 			name:         "a failed list read modifies no port",
@@ -344,7 +346,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				t.Errorf("warning %q does not contain %q", warnings[0].Detail(), tc.wantWarning)
 			}
 			// The API reads back the old values while the approval is pending, so state must keep the plan.
-			// A failed primary modify keeps the prior values, which Read compares with the primary.
+			// A failed primary modify files no approval, so state keeps the prior values.
 			if tc.wantWarning != "" {
 				want := planModel
 				if tc.failUID != "" {
