@@ -405,16 +405,26 @@ func TestLagPortUpdate_PendingTermChangeWithoutModify(t *testing.T) {
 
 	tests := []struct {
 		name      string
+		apiTerm   int
 		approvals []*megaport.OrderApproval
+		wantList  bool
 		wantKept  bool
 	}{
 		{
 			name:      "a pending term change keeps the requested values",
+			apiTerm:   12,
 			approvals: pendingApproval(megaport.OrderApprovalTypeTermChange),
+			wantList:  true,
 			wantKept:  true,
 		},
 		{
-			name: "no pending approval takes the API values",
+			name:     "no pending approval takes the API values",
+			apiTerm:  12,
+			wantList: true,
+		},
+		{
+			name:    "a term that matches the API lists no approvals",
+			apiTerm: 24,
 		},
 	}
 
@@ -423,7 +433,7 @@ func TestLagPortUpdate_PendingTermChangeWithoutModify(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 
-			primary := *lagMember("lag-1", "lag-old", 12)
+			primary := *lagMember("lag-1", "lag-old", tc.apiTerm)
 			primary.ID = 101
 			svc := &lagUpdatePortService{primary: primary}
 			approvals := &readApprovalService{approvals: tc.approvals}
@@ -457,12 +467,16 @@ func TestLagPortUpdate_PendingTermChangeWithoutModify(t *testing.T) {
 			if len(svc.modified) != 0 {
 				t.Errorf("modified %d ports (%v), want none", len(svc.modified), svc.modified)
 			}
-			assertApprovalList(t, approvals.requests, true)
+			assertApprovalList(t, approvals.requests, tc.wantList)
 			assertPendingWarning(t, resp.Diagnostics.Warnings(), false, "")
 
 			var got lagPortResourceModel
 			if diags := resp.State.Get(ctx, &got); diags.HasError() {
 				t.Fatalf("reading state: %v", diags.Errors())
+			}
+			// The response starts as the prior state, which holds the kept values.
+			if got.LastUpdated.IsNull() {
+				t.Fatal("Update wrote no state")
 			}
 			want := lagUpdateTestModel(t, primary.Name, int64(primary.ContractTermMonths), 2)
 			if tc.wantKept {
