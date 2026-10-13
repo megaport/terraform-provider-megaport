@@ -71,6 +71,10 @@ func (s *lagUpdatePortService) ListPortResourceTags(_ context.Context, _ string)
 	return nil, nil
 }
 
+func (s *lagUpdatePortService) UpdatePortResourceTags(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
 func lagMember(uid, name string, term int) *megaport.Port {
 	return &megaport.Port{UID: uid, Name: name, ContractTermMonths: term, CostCentre: "cc-1", AggregationID: 7}
 }
@@ -297,7 +301,7 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 
 			primary := megaport.Port{UID: "lag-1", Name: "lag-old", ContractTermMonths: 12, CostCentre: "cc-1", AggregationID: 7, LagCount: 2}
 			svc := &lagUpdatePortService{primary: primary, listed: tc.listed, listErr: tc.listErr, boughtUID: "lag-3", failUID: tc.failUID, pending: tc.pending, getErr: tc.getErr}
-			r := &lagPortResource{client: &megaport.Client{PortService: svc}}
+			r := &lagPortResource{client: &megaport.Client{PortService: svc, OrderApprovalService: &readApprovalService{}}}
 
 			schemaResp := fwresource.SchemaResponse{}
 			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
@@ -390,6 +394,85 @@ func TestLagPortUpdate_ModifiesEveryMember(t *testing.T) {
 				case sendsTerm && (req.ContractTermMonths == nil || *req.ContractTermMonths != wantTerm):
 					t.Errorf("modify %s sent term %v, want %d", req.PortID, req.ContractTermMonths, wantTerm)
 				}
+			}
+		})
+	}
+}
+
+// TestLagPortUpdate_PendingTermChangeWithoutModify covers a tag change on a LAG whose state holds the values Read kept.
+func TestLagPortUpdate_PendingTermChangeWithoutModify(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		approvals []*megaport.OrderApproval
+		wantKept  bool
+	}{
+		{
+			name:      "a pending term change keeps the requested values",
+			approvals: pendingApproval(megaport.OrderApprovalTypeTermChange),
+			wantKept:  true,
+		},
+		{
+			name: "no pending approval takes the API values",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			primary := *lagMember("lag-1", "lag-old", 12)
+			primary.ID = 101
+			svc := &lagUpdatePortService{primary: primary}
+			approvals := &readApprovalService{approvals: tc.approvals}
+			r := &lagPortResource{client: &megaport.Client{PortService: svc, OrderApprovalService: approvals}}
+
+			schemaResp := fwresource.SchemaResponse{}
+			r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+
+			stateModel := lagUpdateTestModel(t, "lag-new", 24, 2)
+			stateModel.CostCentre, stateModel.MarketplaceVisibility = types.StringValue("cc-2"), types.BoolValue(true)
+			planModel := stateModel
+			tags, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"team": "net"})
+			if diags.HasError() {
+				t.Fatalf("building resource_tags: %v", diags.Errors())
+			}
+			planModel.ResourceTags = tags
+			state := tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil)}
+			plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil)}
+			if diags := state.Set(ctx, &stateModel); diags.HasError() {
+				t.Fatalf("building state: %v", diags.Errors())
+			}
+			if diags := plan.Set(ctx, &planModel); diags.HasError() {
+				t.Fatalf("building plan: %v", diags.Errors())
+			}
+
+			resp := fwresource.UpdateResponse{State: state}
+			r.Update(ctx, fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected errors: %v", resp.Diagnostics.Errors())
+			}
+			if len(svc.modified) != 0 {
+				t.Errorf("modified %d ports (%v), want none", len(svc.modified), svc.modified)
+			}
+			assertApprovalList(t, approvals.requests, true)
+			assertPendingWarning(t, resp.Diagnostics.Warnings(), false, "")
+
+			var got lagPortResourceModel
+			if diags := resp.State.Get(ctx, &got); diags.HasError() {
+				t.Fatalf("reading state: %v", diags.Errors())
+			}
+			want := lagUpdateTestModel(t, primary.Name, int64(primary.ContractTermMonths), 2)
+			if tc.wantKept {
+				want = planModel
+			}
+			if !got.Name.Equal(want.Name) || !got.ContractTermMonths.Equal(want.ContractTermMonths) ||
+				!got.CostCentre.Equal(want.CostCentre) || !got.MarketplaceVisibility.Equal(want.MarketplaceVisibility) {
+				t.Errorf("state holds name %s, term %s, cost centre %s, visibility %s; want %s, %s, %s, %s",
+					got.Name, got.ContractTermMonths, got.CostCentre, got.MarketplaceVisibility,
+					want.Name, want.ContractTermMonths, want.CostCentre, want.MarketplaceVisibility)
 			}
 		})
 	}

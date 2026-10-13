@@ -713,7 +713,9 @@ func (r *lagPortResource) Update(ctx context.Context, req resource.UpdateRequest
 	state.PromoCode = plan.PromoCode
 
 	// The read returns the old values until the approval, and Terraform rejects them as an inconsistent result.
-	if len(pendingUIDs) > 0 {
+	// A plan that sends no modify, such as a tag change, can still hold values that wait on approval.
+	if len(pendingUIDs) > 0 || (!plan.ContractTermMonths.Equal(state.ContractTermMonths) &&
+		termChangePending(ctx, r.client.OrderApprovalService, port.ID)) {
 		state.Name = plan.Name
 		state.CostCentre = plan.CostCentre
 		state.MarketplaceVisibility = plan.MarketplaceVisibility
