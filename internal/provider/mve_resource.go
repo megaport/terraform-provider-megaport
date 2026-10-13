@@ -1234,8 +1234,8 @@ func (r *mveResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 					// Vendor or size changed (case-insensitive) — must replace.
 					resp.RequiresReplace = append(resp.RequiresReplace, path.Root("vendor_config"))
 				} else {
-					// Vendor/size match case-insensitively. Give planVC their stored
-					// casing, then compare the remaining fields.
+					// Vendor and size match ignoring case. Copy both from the state's
+					// vendor_config into planVC, then compare the other fields.
 					var stateVC vendorConfigModel
 					stateVCDiags := state.VendorConfig.As(ctx, &stateVC, basetypes.ObjectAsOptions{})
 					resp.Diagnostics.Append(stateVCDiags...)
