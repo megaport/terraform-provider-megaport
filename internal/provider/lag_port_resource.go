@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -230,7 +229,7 @@ func (r *lagPortResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`. The apply completes with a warning.",
+				Description: "The term of the contract in months: valid values are 1, 12, 24, 36, 48, and 60. To set the product to a month-to-month contract with no minimum term, set the value to 1. For a managed account whose partner requires order approval, a term increase on a live LAG creates an approval request for each port. Until approval, each port also keeps its old `name`, `cost_centre`, and `marketplace_visibility`. The apply completes with a warning, and state keeps the requested values until the approval resolves.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(1, 12, 24, 36, 48, 60),
@@ -515,8 +514,19 @@ func (r *lagPortResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Populate the state with the port details
+	prior := state
 	apiDiags := state.fromAPIPort(ctx, port, tags)
 	resp.Diagnostics.Append(apiDiags...)
+
+	// The API reads back the old values until the approval. An import has no requested values to keep.
+	if !prior.ContractTermMonths.IsNull() && !prior.ContractTermMonths.Equal(state.ContractTermMonths) &&
+		termChangePending(ctx, r.client.OrderApprovalService, port.ID) {
+		state.Name = prior.Name
+		state.CostCentre = prior.CostCentre
+		state.MarketplaceVisibility = prior.MarketplaceVisibility
+		state.ContractTermMonths = prior.ContractTermMonths
+		warnLagPendingApproval(&resp.Diagnostics, state.UID.ValueString(), []string{port.UID})
+	}
 
 	// Populate the LAG port UIDs
 	if len(port.LagPortUIDs) > 0 {
@@ -728,12 +738,8 @@ func warnLagPendingApproval(diags *diag.Diagnostics, lagUID string, pendingUIDs 
 	if len(pendingUIDs) > 1 {
 		ports = "ports "
 	}
-	msg := portPendingApprovalWarning(ports + strings.Join(pendingUIDs, ", ") + " in LAG " + lagUID)
-	// Read returns the primary port only, so the old values come back only when the primary is pending.
-	if slices.Contains(pendingUIDs, lagUID) {
-		msg += pendingApprovalRefreshNote
-	}
-	diags.AddWarning("LAG port change pending approval", msg)
+	diags.AddWarning("LAG port change pending approval",
+		portPendingApprovalWarning(ports+strings.Join(pendingUIDs, ", ")+" in LAG "+lagUID))
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
