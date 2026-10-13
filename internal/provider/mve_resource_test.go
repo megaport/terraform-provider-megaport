@@ -184,7 +184,7 @@ func TestAccMegaportMVEAruba_Basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "company_name"),
 				),
 			},
-			// Make sure resource has not been destroyed by change of casing in Vendor Config
+			// ImportState testing after the casing-only update
 			{
 				ResourceName:                         "megaport_mve.mve",
 				ImportState:                          true,
@@ -769,7 +769,7 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("megaport_mve.mve", "diversity_zone", "red"),
 				),
 			},
-			// Make sure resource has not been destroyed by change of casing in Vendor Config
+			// ImportState testing after the update
 			{
 				ResourceName:                         "megaport_mve.mve",
 				ImportState:                          true,
