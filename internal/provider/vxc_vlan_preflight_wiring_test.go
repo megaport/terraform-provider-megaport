@@ -76,6 +76,10 @@ func newPreflightServer(t *testing.T, taken map[string]int) *preflightServer {
 			if pt, ok := ps.productTypeOf[parts[2]]; ok {
 				productType = pt
 			}
+			// The API can answer an AWS Interconnect read with partial content.
+			if productType == awsInterconnectProductType {
+				w.WriteHeader(http.StatusPartialContent)
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"productType": productType}})
 		case r.Method == http.MethodPut && len(parts) == 4 && parts[1] == "product" && parts[2] == "vxc":
 			body := map[string]any{}
