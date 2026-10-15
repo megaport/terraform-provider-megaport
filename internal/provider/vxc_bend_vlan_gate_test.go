@@ -14,7 +14,8 @@ import (
 )
 
 // cspConnections builds csp_connections with one entry per resource_name to
-// connect_type pair.
+// connect_type pair. Each string, number, and bool attribute carries a known
+// placeholder, so a test can tell a kept value from a null one.
 func (b *vxcValueBuilder) cspConnections(t *testing.T, conns ...[2]string) tftypes.Value {
 	t.Helper()
 	listType, ok := b.objType.AttributeTypes["csp_connections"].(tftypes.List)
@@ -28,6 +29,16 @@ func (b *vxcValueBuilder) cspConnections(t *testing.T, conns ...[2]string) tftyp
 	elems := []tftypes.Value{}
 	for _, c := range conns {
 		attrs := nullValueMap(elemType)
+		for name, ty := range elemType.AttributeTypes {
+			switch {
+			case ty.Is(tftypes.String):
+				attrs[name] = tftypes.NewValue(tftypes.String, name)
+			case ty.Is(tftypes.Number):
+				attrs[name] = tftypes.NewValue(tftypes.Number, 200)
+			case ty.Is(tftypes.Bool):
+				attrs[name] = tftypes.NewValue(tftypes.Bool, true)
+			}
+		}
 		attrs["resource_name"] = tftypes.NewValue(tftypes.String, c[0])
 		attrs["connect_type"] = tftypes.NewValue(tftypes.String, c[1])
 		elems = append(elems, tftypes.NewValue(elemType, attrs))
