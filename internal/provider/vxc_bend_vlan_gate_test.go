@@ -47,10 +47,16 @@ func (b *vxcValueBuilder) cspConnections(t *testing.T, conns ...[2]string) tftyp
 }
 
 // liveVXC builds a created VXC with the given csp_connections and B-End
-// partner, either of which may be empty.
+// partner, either of which may be empty. The ends default to port-a and
+// port-b.
 func (b *vxcValueBuilder) liveVXC(t *testing.T, aEnd, bEnd vxcEndSpec, conns [][2]string, partner string) tftypes.Value {
 	t.Helper()
-	aEnd.productUID, bEnd.productUID = "port-a", "port-b"
+	if aEnd.productUID == "" {
+		aEnd.productUID = "port-a"
+	}
+	if bEnd.productUID == "" {
+		bEnd.productUID = "port-b"
+	}
 	var bEndPartner *tftypes.Value
 	if partner != "" {
 		p := b.partner(partner)
@@ -167,6 +173,81 @@ func TestVXCModifyPlan_BEndVLANGate(t *testing.T) {
 				if !strings.Contains(errs[i].Detail(), "has connect type "+tc.wantType+",") {
 					t.Errorf("error %d detail does not name %s: %q", i, tc.wantType, errs[i].Detail())
 				}
+			}
+		})
+	}
+}
+
+// A taint orders the VXC again from the planned config, which cannot rebuild a
+// cloud B-End that has no partner config. A transit B-End orders without one,
+// but not with a tagged inner VLAN.
+func TestVXCModifyPlan_BEndVLANGateTaintAdvice(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b := newVXCValueBuilder(t)
+	const errorTaint = "orders a new one with the planned ordered_vlan."
+	const warningTaint = "orders a new one with the configured ordered_vlan."
+
+	tests := []struct {
+		name                      string
+		conns                     [][2]string
+		statePartner, planPartner string
+		stateB, planB             vxcEndSpec
+		wantTaint                 bool
+		wantEnd                   string
+	}{
+		{name: "error without partner config", conns: bCSP("ALIBABA"),
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
+		{name: "transit error without partner config", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "error with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "inner_vlan error with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantTaint: true,
+			wantEnd: "orders a new one with the planned inner_vlan."},
+		{name: "transit inner_vlan error", conns: bCSP("TRANSIT"), statePartner: "transit", planPartner: "transit",
+			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantEnd: "Revert the change."},
+		{name: "transit inner_vlan error without partner config", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(200, nil), planB: bEndAt(200, int64p(10)), wantEnd: "Revert the change."},
+		{name: "transit error with tagged inner_vlan", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(200, int64p(10)), planB: bEndAt(300, int64p(10)), wantEnd: "Revert the change."},
+		{name: "transit error with untagged inner_vlan", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(200, int64p(-1)), planB: bEndAt(300, int64p(-1)), wantTaint: true, wantEnd: errorTaint},
+		{name: "error with partner config only in plan", conns: bCSP("AWS"), planPartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: errorTaint},
+		{name: "error with partner config only in state", conns: bCSP("AWS"), statePartner: "aws",
+			stateB: bEndAt(200, nil), planB: bEndAt(300, nil), wantEnd: "Revert the change."},
+		{name: "warning without partner config", conns: bCSP("AWS"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantEnd: "Set ordered_vlan to 200."},
+		{name: "transit warning without partner config", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
+		{name: "transit warning with tagged inner_vlan", conns: bCSP("TRANSIT"),
+			stateB: bEndAt(300, int64p(10)), planB: bEndAt(300, int64p(10)), wantEnd: "Set ordered_vlan to 200."},
+		{name: "warning with partner config", conns: bCSP("AWS"), statePartner: "aws", planPartner: "aws",
+			stateB: bEndAt(300, nil), planB: bEndAt(300, nil), wantTaint: true, wantEnd: warningTaint},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			state := b.liveVXC(t, vxcEndSpec{}, tc.stateB, tc.conns, tc.statePartner)
+			plan := b.liveVXC(t, vxcEndSpec{}, tc.planB, tc.conns, tc.planPartner)
+
+			resp := fwresource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: b.schema, Raw: plan}}
+			(&vxcResource{}).ModifyPlan(ctx, fwresource.ModifyPlanRequest{
+				State: tfsdk.State{Schema: b.schema, Raw: state},
+				Plan:  tfsdk.Plan{Schema: b.schema, Raw: plan},
+			}, &resp)
+
+			if len(resp.Diagnostics) != 1 {
+				t.Fatalf("expected one diagnostic, got %v", resp.Diagnostics)
+			}
+			detail := resp.Diagnostics[0].Detail()
+			if got := strings.Contains(detail, "terraform taint"); got != tc.wantTaint {
+				t.Errorf("taint advice = %v, want %v: %q", got, tc.wantTaint, detail)
+			}
+			if !strings.HasSuffix(detail, tc.wantEnd) {
+				t.Errorf("expected detail to end %q, got %q", tc.wantEnd, detail)
 			}
 		})
 	}

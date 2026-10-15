@@ -1143,6 +1143,13 @@ func bEndCSPConnectType(ctx context.Context, stateCSPConnections types.List, pla
 	return strings.ToUpper(partner.ValueString())
 }
 
+// cloudBEnd reports whether the B-End is a cloud service, which Update never
+// moves. State's connect type marks a cloud B-End that has no partner config,
+// such as Alibaba.
+func cloudBEnd(planCSP bool, connectType string) bool {
+	return planCSP || connectType != "" && connectType != "TRANSIT"
+}
+
 // waitForVXCUpdate polls the VXC API to verify that an update has propagated successfully.
 // It uses exponential backoff with a maximum backoff time to efficiently wait for API propagation.
 //
