@@ -101,6 +101,7 @@ func (d *productAvailabilityDataSource) Schema(_ context.Context, _ datasource.S
 										Description: "The short code of the market's country.",
 										Computed:    true,
 									},
+									// The API lists only available markets, so source is never UNCONFIGURED_MARKET.
 									"source": schema.StringAttribute{
 										Description: "Where the availability comes from: `MARKET` (the market default) or `OVERRIDE` (a rule for your company).",
 										Computed:    true,
