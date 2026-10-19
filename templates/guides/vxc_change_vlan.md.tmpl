@@ -10,7 +10,7 @@ This guide provides an example configuration for changing the VLAN for a Virtual
 
 A B-End on a cloud or transit service, such as AWS, Azure, Google Cloud, Oracle, or Megaport Internet, cannot change its VLAN after the order. A plan that sets `b_end.ordered_vlan` to a new VLAN on one of these fails. A value of `0` passes but leaves the live VLAN as it is. Only Azure accepts a `b_end.inner_vlan` change.
 
-To move one of these VXCs to a new VLAN, run `terraform taint` on the VXC and apply. Terraform then deletes the VXC and orders a new one with the new VLAN. `terraform apply -replace` does not work here, because Terraform runs the plan check against the current VXC first.
+To move one of these VXCs to a new VLAN, run `terraform taint` on the VXC and apply. Terraform then deletes the VXC and orders a new one with the new VLAN. A new order for a cloud B-End needs `b_end_partner_config`. Do not taint a VXC that has a cloud B-End and no `b_end_partner_config` in its configuration. Do not taint a VXC that has a transit B-End and a `b_end.inner_vlan` above 0 in its configuration. A new transit order refuses that inner VLAN. `terraform apply -replace` does not work here, because Terraform runs the plan check against the current VXC first.
 
 Earlier provider versions saved an AWS or transit B-End VLAN change without sending it. On those VXCs, the plan warns until `b_end.ordered_vlan` matches the live `b_end.vlan`.
 
