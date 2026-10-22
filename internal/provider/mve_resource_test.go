@@ -916,7 +916,7 @@ func TestAccMegaportMVEImport_WithLifecycleIgnoreChanges(t *testing.T) {
 
 // TestAccMegaportMVECisco_Basic exercises Cisco FTDv MVE provisioning end-to-end.
 // The test uses manage_locally=true so no FMC details are required.
-// Required fields per the Megaport API: adminPassword (≥9 chars) and manageLocally.
+// Required fields per the Megaport API: adminPassword (see mveTestCiscoAdminPassword) and manageLocally.
 // Cisco Firewall does not support the "MVE 2/8" size; "MVE 4/16" (MEDIUM) is used.
 // The Cisco Firewall requires at least 4 vNICs.
 func TestAccMegaportMVECisco_Basic(t *testing.T) {
