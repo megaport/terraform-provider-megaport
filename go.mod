@@ -2,7 +2,7 @@ module github.com/megaport/terraform-provider-megaport
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/hashicorp/terraform-plugin-log v0.11.0
-	github.com/megaport/megaportgo v1.30.0
+	github.com/megaport/megaportgo v1.30.3
 )
 
 require (
