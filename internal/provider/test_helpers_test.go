@@ -364,10 +364,10 @@ func findMVEVersaTestLocation(t *testing.T) (locationID int, imageID int, locati
 }
 
 // mveAdminPasswordSafeAlphabet is the character set used to build random admin
-// passwords and password hashes for acceptance tests. It is the intersection of
-// what the Megaport API accepts for the Cisco FTDv `adminPassword` field
-// (anything except `"`, CR, LF) and the sha256crypt salt/encrypted alphabet
-// `[a-zA-Z0-9./]` enforced by megalith's HashAdminPasswordValidator.
+// passwords and password hashes for acceptance tests. It is the sha256crypt
+// salt/encrypted alphabet `[a-zA-Z0-9./]` enforced by megalith's
+// HashAdminPasswordValidator, and every character in it is valid in a Cisco FTDv
+// `adminPassword`.
 const mveAdminPasswordSafeAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./"
 
 // randomFromAlphabet returns a string of length n drawn uniformly from alphabet
@@ -386,12 +386,13 @@ func randomFromAlphabet(t *testing.T, n int, alphabet string) string {
 }
 
 // mveTestCiscoAdminPassword returns a freshly-generated plaintext admin password
-// suitable for Cisco FTDv acceptance tests. The API requires 9–100 characters
-// and disallows `"`, CR, LF. We generate 24 characters from a safe alphabet so
-// every test run uses unique credentials on the (temporary) provisioned MVE.
+// suitable for Cisco FTDv acceptance tests. The API requires 9 to 99 printable
+// ASCII characters with no spaces, including a lowercase letter, an uppercase
+// letter, a digit, and a symbol. The random part makes each run's credentials
+// unique, and the fixed tail supplies all four character classes.
 func mveTestCiscoAdminPassword(t *testing.T) string {
 	t.Helper()
-	return randomFromAlphabet(t, 24, mveAdminPasswordSafeAlphabet)
+	return randomFromAlphabet(t, 20, mveAdminPasswordSafeAlphabet) + "aA1."
 }
 
 // mveTestPaloAltoAdminPasswordHash returns a freshly-generated sha256crypt-format

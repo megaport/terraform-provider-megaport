@@ -712,7 +712,7 @@ func (r *mveResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 						Optional:    true,
 					},
 					"admin_password": schema.StringAttribute{
-						Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9–100 characters and may not contain `\"`, carriage return, or line feed. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.",
+						Description: "Plain-text admin password for the vendor config. Required for Cisco FTDv (Firewall) MVE only; Palo Alto MVE uses `admin_password_hash` instead. Must be 9 to 99 printable ASCII characters with no spaces, and must contain a lowercase letter, an uppercase letter, a digit, and a symbol. This value is only consumed when the MVE is provisioned to seed the initial admin account; after deployment, manage the password via the vendor's management interface. Declared as a [write-only argument](https://developer.hashicorp.com/terraform/language/v1.11.x/resources/ephemeral/write-only) (Terraform 1.11+) so the password is not persisted in the Terraform plan or state.",
 						Optional:    true,
 						Sensitive:   true,
 						WriteOnly:   true,
