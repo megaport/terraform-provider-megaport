@@ -597,10 +597,11 @@ func TestAccMegaportMVEAruba_VnicDescriptionUpdate(t *testing.T) {
 	})
 }
 
-func TestAccMegaportMVEVersa_Basic(t *testing.T) {
+func TestAccMegaportMVEFortinet_Basic(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()
-	locationID, versaImageID, _ := findMVEVersaTestLocation(t)
+	sshPublicKey := mveTestSSHPublicKey(t)
+	locationID, imageID, _ := findMVEFortinetTestLocation(t)
 	mveName := RandomTestName()
 	mveNameNew := RandomTestName()
 	costCentre := RandomTestName()
@@ -614,56 +615,45 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					id = %d
 				}
 
-				data "megaport_mve_images" "versa" {
-  					vendor_filter = "Versa"
-  					id_filter = %d
+				data "megaport_mve_images" "fortinet" {
+					vendor_filter = "Fortinet"
+					id_filter     = %d
 				}
 
 				resource "megaport_mve" "mve" {
-                    product_name  = "%s"
-                    location_id = data.megaport_location.test_location.id
-                    contract_term_months        = 1
-					cost_centre = "%s"
-					diversity_zone = "red"
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
 
 					resource_tags = {
 						"key1" = "value1"
 						"key2" = "value2"
 					}
 
-                    vendor_config = {
-                        vendor = "versa"
-                        product_size = "SMALL"
-						mve_label = "MVE 2/8"
-                        image_id = data.megaport_mve_images.versa.mve_images.0.id
-						director_address = "director1.versa.com"
-						controller_address = "controller1.versa.com"
-						local_auth = "SDWAN-Branch@Versa.com"
-						remote_auth = "Controller-1-staging@Versa.com"
-						serial_number = "Megaport-Hub1"
-                    }
-
-					vnics = [{
-						description = "Data Plane"
-					},
-					{
-						description = "Control Plane"
-					},
-					{
-						description = "Management Plane"
-					},
-					{
-						description = "Extra Plane"
+					vendor_config = {
+						vendor         = "fortinet"
+						product_size   = "MEDIUM"
+						mve_label      = "MVE 4/16"
+						image_id       = data.megaport_mve_images.fortinet.mve_images.0.id
+						ssh_public_key = "%s"
 					}
+
+					vnics = [
+						{ description = "Data Plane" },
+						{ description = "Control Plane" },
+						{ description = "Management Plane" },
+						{ description = "Extra Plane" },
 					]
-                  }`, locationID, versaImageID, mveName, costCentre),
+				}`, locationID, imageID, mveName, costCentre, sshPublicKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveName),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentre),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "FORTINET"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1", "value1"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2", "value2"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
@@ -705,56 +695,45 @@ func TestAccMegaportMVEVersa_Basic(t *testing.T) {
 					id = %d
 				}
 
-				data "megaport_mve_images" "versa" {
-  					vendor_filter = "Versa"
-  					id_filter = %d
+				data "megaport_mve_images" "fortinet" {
+					vendor_filter = "Fortinet"
+					id_filter     = %d
 				}
 
 				resource "megaport_mve" "mve" {
-                    product_name  = "%s"
-                    location_id = data.megaport_location.test_location.id
-                    contract_term_months        = 1
-					cost_centre = "%s"
-					diversity_zone = "red"
+					product_name         = "%s"
+					location_id          = data.megaport_location.test_location.id
+					contract_term_months = 1
+					cost_centre          = "%s"
+					diversity_zone       = "red"
 
 					resource_tags = {
 						"key1updated" = "value1updated"
 						"key2updated" = "value2updated"
 					}
 
-                    vendor_config = {
-                        vendor = "versa"
-                        product_size = "SMALL"
-						mve_label = "MVE 2/8"
-                        image_id = data.megaport_mve_images.versa.mve_images.0.id
-						director_address = "director1.versa.com"
-						controller_address = "controller1.versa.com"
-						local_auth = "SDWAN-Branch@Versa.com"
-						remote_auth = "Controller-1-staging@Versa.com"
-						serial_number = "Megaport-Hub1"
-                    }
-
-					vnics = [{
-						description = "Data Plane"
-					},
-					{
-						description = "Control Plane"
-					},
-					{
-						description = "Management Plane"
-					},
-					{
-						description = "Extra Plane"
+					vendor_config = {
+						vendor         = "fortinet"
+						product_size   = "MEDIUM"
+						mve_label      = "MVE 4/16"
+						image_id       = data.megaport_mve_images.fortinet.mve_images.0.id
+						ssh_public_key = "%s"
 					}
+
+					vnics = [
+						{ description = "Data Plane" },
+						{ description = "Control Plane" },
+						{ description = "Management Plane" },
+						{ description = "Extra Plane" },
 					]
-                  }`, locationID, versaImageID, mveNameNew, costCentreNew),
+				}`, locationID, imageID, mveNameNew, costCentreNew, sshPublicKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_name", mveNameNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "cost_centre", costCentreNew),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "product_type", "MVE"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "contract_term_months", "1"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "VERSA"),
-					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "SMALL"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "vendor", "FORTINET"),
+					resource.TestCheckResourceAttr("megaport_mve.mve", "mve_size", "MEDIUM"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key1updated", "value1updated"),
 					resource.TestCheckResourceAttr("megaport_mve.mve", "resource_tags.key2updated", "value2updated"),
 					resource.TestCheckResourceAttrSet("megaport_mve.mve", "product_uid"),
