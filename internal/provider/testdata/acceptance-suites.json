@@ -93,12 +93,12 @@
       "TestAccMegaportMVEAruba_VnicDescriptionUpdate",
       "TestAccMegaportMVEAruba_VnicsRemoval",
       "TestAccMegaportMVECisco_Basic",
+      "TestAccMegaportMVEFortinet_Basic",
       "TestAccMegaportMVEImagesDataSource_AvailableSizes",
       "TestAccMegaportMVEImport_WithLifecycleIgnoreChanges",
       "TestAccMegaportMVEPaloAlto_Basic",
       "TestAccMegaportMVETransit_VXC",
-      "TestAccMegaportMVETransit_VXCAWS",
-      "TestAccMegaportMVEVersa_Basic"
+      "TestAccMegaportMVETransit_VXCAWS"
     ],
     "ix": [
       "TestAccMegaportIX_Basic",

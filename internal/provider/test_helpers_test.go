@@ -316,53 +316,6 @@ func findMVETestLocationBlueZone(t *testing.T) (id int, name string) {
 	})
 }
 
-// findMVEVersaTestLocation returns a staging location with Versa MVE capacity.
-// It resolves the Versa image ID at run time because staging Versa images change.
-func findMVEVersaTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
-	t.Helper()
-	ctx := context.Background()
-	client, err := getTestClient()
-	if err != nil {
-		t.Skipf("skipping: could not get test client: %v", err)
-		return 0, 0, ""
-	}
-
-	images, err := client.MVEService.ListMVEImages(ctx)
-	if err != nil {
-		t.Skipf("skipping: could not list MVE images: %v", err)
-		return 0, 0, ""
-	}
-
-	var versaImageID int
-	for _, img := range images {
-		if strings.EqualFold(img.Vendor, "Versa") {
-			versaImageID = img.ID
-			break
-		}
-	}
-	if versaImageID == 0 {
-		t.Skip("skipping: no Versa MVE image found in staging")
-		return 0, 0, ""
-	}
-
-	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
-		vendorConfig: &megaport.VersaConfig{
-			Vendor:            "versa",
-			ImageID:           versaImageID,
-			ProductSize:       "SMALL",
-			MVELabel:          "MVE 2/8",
-			DirectorAddress:   "director1.versa.com",
-			ControllerAddress: "controller1.versa.com",
-			LocalAuth:         "SDWAN-Branch@Versa.com",
-			RemoteAuth:        "Controller-1-staging@Versa.com",
-			SerialNumber:      "Megaport-Hub1",
-		},
-		diversityZone: "red",
-		vnicCount:     2,
-	})
-	return locID, versaImageID, locName
-}
-
 // mveAdminPasswordSafeAlphabet is the character set used to build random admin
 // passwords and password hashes for acceptance tests. It is the sha256crypt
 // salt/encrypted alphabet `[a-zA-Z0-9./]` enforced by megalith's
@@ -531,6 +484,52 @@ func findMVEPaloAltoTestLocation(t *testing.T) (locationID int, imageID int, loc
 		vnicCount:     2,
 	})
 	return locID, paloAltoImageID, locName
+}
+
+// findMVEFortinetTestLocation returns a staging location with confirmed capacity
+// for a Fortinet FortiGate MVE. It takes the first released FortiGate image, the
+// same one the acceptance CI preflight checks.
+func findMVEFortinetTestLocation(t *testing.T) (locationID int, imageID int, locationName string) {
+	t.Helper()
+	sshPublicKey := mveTestSSHPublicKey(t)
+
+	ctx := context.Background()
+	client, err := getTestClient()
+	if err != nil {
+		t.Skipf("skipping: could not get test client: %v", err)
+		return 0, 0, ""
+	}
+
+	images, err := client.MVEService.ListMVEImages(ctx)
+	if err != nil {
+		t.Skipf("skipping: could not list MVE images: %v", err)
+		return 0, 0, ""
+	}
+
+	var fortinetImageID int
+	for _, img := range images {
+		if strings.EqualFold(img.Vendor, "Fortinet") && strings.Contains(strings.ToLower(img.Product), "fortigate") && img.ReleaseImage {
+			fortinetImageID = img.ID
+			break
+		}
+	}
+	if fortinetImageID == 0 {
+		t.Skip("skipping: no released Fortinet FortiGate MVE image found in staging")
+		return 0, 0, ""
+	}
+
+	locID, locName := findMVETestLocationWithOpts(t, mveProbeOpts{
+		vendorConfig: &megaport.FortinetConfig{
+			Vendor:       "fortinet",
+			ImageID:      fortinetImageID,
+			ProductSize:  "MEDIUM",
+			MVELabel:     "MVE 4/16",
+			SSHPublicKey: sshPublicKey,
+		},
+		diversityZone: "red",
+		vnicCount:     4,
+	})
+	return locID, fortinetImageID, locName
 }
 
 // findMVETestLocationWithOpts returns a staging location ID with confirmed MVE
