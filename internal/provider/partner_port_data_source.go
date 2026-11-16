@@ -236,7 +236,7 @@ func runFiltersAndSort(ports []*megaport.PartnerMegaport, filters [](func(*megap
 	}
 
 	// sort remaining ports by rank
-	slices.SortFunc(ports, func(a *megaport.PartnerMegaport, b *megaport.PartnerMegaport) int {
+	slices.SortFunc(toReturn, func(a *megaport.PartnerMegaport, b *megaport.PartnerMegaport) int {
 		if n := cmp.Compare(a.Rank, b.Rank); n != 0 {
 			return n
 		}

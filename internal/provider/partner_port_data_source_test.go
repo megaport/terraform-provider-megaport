@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"slices"
 	"testing"
 
 	megaport "github.com/megaport/megaportgo"
@@ -136,23 +137,22 @@ func TestFilters(t *testing.T) {
 
 func TestRank(t *testing.T) {
 	ports := []*megaport.PartnerMegaport{
-		{ProductName: "p1", Rank: 0},
+		{ProductName: "p7", Rank: 0},
 		{ProductName: "p6", Rank: 4},
 		{ProductName: "p3", Rank: 2},
 		{ProductName: "p2", Rank: 1},
-		{ProductName: "p4", Rank: 3},
 		{ProductName: "p5", Rank: 3},
+		{ProductName: "p4", Rank: 3},
 	}
+	input := slices.Clone(ports)
 
 	// should sort by rank then by product name
 	sorted := runFiltersAndSort(ports, nil)
 
-	assert.ElementsMatch(t, sorted, []*megaport.PartnerMegaport{
-		ports[0],
-		ports[3],
-		ports[2],
-		ports[4],
-		ports[5],
-		ports[1],
-	})
+	names := make([]string, 0, len(sorted))
+	for _, port := range sorted {
+		names = append(names, port.ProductName)
+	}
+	assert.Equal(t, []string{"p7", "p2", "p3", "p4", "p5", "p6"}, names)
+	assert.Equal(t, input, ports)
 }
