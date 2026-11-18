@@ -41,6 +41,7 @@ This is a **Terraform Plugin Framework** provider (not the older SDK/v2). All pr
 | `megaport_mve` | `mve_resource.go` | Megaport Virtual Edge |
 | `megaport_vxc` | `vxc_resource.go` | Virtual Cross Connect |
 | `megaport_ix` | `ix_resource.go` | Internet Exchange |
+| `megaport_dci` | `dci_resource.go` | Data Centre Interconnect |
 
 ### Data Sources
 | Data Source | File |
