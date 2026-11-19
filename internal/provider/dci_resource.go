@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -41,29 +40,32 @@ type dciResourceModel struct {
 }
 
 // fromAPI fills the model from a DCI and its billing.
-func (orm *dciResourceModel) fromAPI(s *megaport.Solution, b *megaport.SolutionBillable) {
-	orm.UID = types.StringValue(s.UID)
-	orm.Name = types.StringValue(s.Name)
-	orm.CostCentre = types.StringValue(s.ServiceLevelReference)
-	orm.ProvisioningStatus = types.StringValue(s.ProvisioningStatus)
-	orm.AEndPortUID = types.StringValue(s.MemberUID(megaport.SolutionMemberRoleAEndPort))
-	orm.BEndPortUID = types.StringValue(s.MemberUID(megaport.SolutionMemberRoleBEndPort))
-	orm.VXCUID = types.StringValue(s.MemberUID(megaport.SolutionMemberRoleVXC))
+func (orm *dciResourceModel) fromAPI(solution *megaport.Solution, billable *megaport.SolutionBillable) {
+	orm.UID = types.StringValue(solution.UID)
+	orm.Name = types.StringValue(solution.Name)
+	orm.CostCentre = types.StringValue(solution.ServiceLevelReference)
+	orm.ProvisioningStatus = types.StringValue(solution.ProvisioningStatus)
+	orm.AEndPortUID = types.StringValue(solution.MemberUID(megaport.SolutionMemberRoleAEndPort))
+	orm.BEndPortUID = types.StringValue(solution.MemberUID(megaport.SolutionMemberRoleBEndPort))
+	orm.VXCUID = types.StringValue(solution.MemberUID(megaport.SolutionMemberRoleVXC))
 
 	// The API reports the DCI's locations and speed from its VXC, so they are empty until the VXC is created.
 	// Keep the ordered values until then.
-	if id := dciLocationID(s, s.ALocationID, megaport.SolutionMemberRoleAEndPort); id != 0 {
+	if id := dciLocationID(solution, solution.ALocationID, megaport.SolutionMemberRoleAEndPort); id != 0 {
 		orm.AEndLocationID = types.Int64Value(int64(id))
 	}
-	if id := dciLocationID(s, s.BLocationID, megaport.SolutionMemberRoleBEndPort); id != 0 {
+	if id := dciLocationID(solution, solution.BLocationID, megaport.SolutionMemberRoleBEndPort); id != 0 {
 		orm.BEndLocationID = types.Int64Value(int64(id))
 	}
-	if s.SpeedMbps != 0 {
-		orm.Speed = types.Int64Value(int64(s.SpeedMbps))
+	if solution.SpeedMbps != 0 {
+		orm.Speed = types.Int64Value(int64(solution.SpeedMbps))
 	}
-
-	orm.ContractTermMonths = types.Int64Value(int64(b.ContractTermMonths))
-	orm.AutoRenew = types.BoolValue(b.AutoRenewTerm)
+	// A DCI rolls to month-to-month (1) when its term ends without auto-renew.
+	// Keep the ordered term then, so the config does not drift from state.
+	if billable.ContractTermMonths != 1 || orm.ContractTermMonths.IsNull() || orm.ContractTermMonths.IsUnknown() {
+		orm.ContractTermMonths = types.Int64Value(int64(billable.ContractTermMonths))
+	}
+	orm.AutoRenew = types.BoolValue(billable.AutoRenewTerm)
 }
 
 // dciLocationID returns the location of one end of a DCI: the DCI's own, or else that of the Port at that end.
@@ -123,7 +125,7 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months. A DCI is available on a term of 12, 24 or 36 months.",
+				Description: "The term of the contract in months. When the term ends without auto-renew, the DCI moves to a month-to-month term, and this attribute keeps the term that was ordered.",
 				Required:    true,
 			},
 			"auto_renew": schema.BoolAttribute{
@@ -133,7 +135,7 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Default:     booldefault.StaticBool(false),
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. It appears on the DCI's invoice lines.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -208,7 +210,7 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"DCI ordered but not ready",
-			fmt.Sprintf("DCI %s (%s) was ordered successfully but did not reach a ready state: %s. Its UID has been saved to state and the resource is marked as tainted. Do not apply again as is: Terraform would try to replace the DCI, and this version of the provider cannot cancel one. Once the DCI is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
+			fmt.Sprintf("DCI %s (%s) was ordered but is not ready yet: %s. Do not apply again: Terraform would try to replace the DCI. Once it is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
@@ -247,30 +249,22 @@ func (r *dciResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	// Get refreshed DCI value from API
 	solution, billable, err := r.readDCI(ctx, state.UID.ValueString())
 	if err != nil {
+		detail := err.Error()
+		// The API never deletes a DCI: a canceled one still reads back, with active set to false.
+		// It answers 404 when DCI ordering is off for the account or the account does not own the DCI,
+		// so a 404 keeps the DCI in state. Dropping it would leave a billed DCI that Terraform no longer tracks.
 		var mpErr *megaport.ErrorResponse
 		if errors.As(err, &mpErr) && mpErr.Response != nil && mpErr.Response.StatusCode == http.StatusNotFound {
-			// The API also answers 404 on every DCI endpoint while DCI ordering is off for the account.
-			// Dropping the DCI from state then would leave a billed DCI that Terraform no longer tracks.
-			if strings.Contains(mpErr.Message, "endpoint is not found") {
-				resp.Diagnostics.AddError(
-					"Error Reading DCI",
-					"Could not read DCI with ID "+state.UID.ValueString()+": DCI is not available for this account: "+err.Error(),
-				)
-				return
-			}
-			// DCI has been deleted or is not found
-			resp.State.RemoveResource(ctx)
-			return
+			detail = "DCI is not available for this account, or the account does not own it: " + detail
 		}
-
 		resp.Diagnostics.AddError(
 			"Error Reading DCI",
-			"Could not read DCI with ID "+state.UID.ValueString()+": "+err.Error(),
+			"Could not read DCI with ID "+state.UID.ValueString()+": "+detail,
 		)
 		return
 	}
 
-	// A Solution of another type has no Ports or VXC to report, so it cannot be managed as a DCI.
+	// A Solution of another type cannot be managed as a DCI.
 	if solution.Type != megaport.SolutionTypeDCI {
 		resp.Diagnostics.AddError(
 			"Error Reading DCI",
@@ -345,10 +339,5 @@ func (r *dciResource) Configure(_ context.Context, req resource.ConfigureRequest
 }
 
 func (r *dciResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
 	resource.ImportStatePassthroughID(ctx, path.Root("solution_uid"), req, resp)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }

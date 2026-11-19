@@ -31,14 +31,14 @@ resource "megaport_dci" "dci" {
 
 - `a_end_location_id` (Number) The numeric location ID of the A-End Port. This value can be retrieved from the data source megaport_location.
 - `b_end_location_id` (Number) The numeric location ID of the B-End Port. This value can be retrieved from the data source megaport_location.
-- `contract_term_months` (Number) The term of the contract in months. A DCI is available on a term of 12, 24 or 36 months.
+- `contract_term_months` (Number) The term of the contract in months. When the term ends without auto-renew, the DCI moves to a month-to-month term, and this attribute keeps the term that was ordered.
 - `name` (String) The name of the DCI. Both Ports and the VXC are ordered with this name.
 - `speed` (Number) The speed of the DCI in Mbps. Both Ports and the VXC are ordered at this speed, and both locations must offer it.
 
 ### Optional
 
 - `auto_renew` (Boolean) Whether the term renews when it ends. Defaults to false.
-- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. It appears on the DCI's invoice lines.
+- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number.
 
 ### Read-Only
 

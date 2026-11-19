@@ -25,6 +25,8 @@ const dciStubUID = "8da180e1-61ea-4961-a6e3-d80152ee9b14"
 type dciStub struct {
 	// solution overrides fields of the DCI the stub returns.
 	solution map[string]any
+	// billable overrides fields of the billing the stub returns.
+	billable map[string]any
 	// readStatus and readMessage, when set, fail every read of the DCI.
 	readStatus  int
 	readMessage string
@@ -87,14 +89,16 @@ func (s *dciStub) handler(t *testing.T) http.HandlerFunc {
 			maps.Copy(solution, s.solution)
 			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": solution})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/solutions/"+dciStubUID+"/billable":
-			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": map[string]any{
+			billable := map[string]any{
 				"autoRenewTerm":      true,
 				"canReterm":          false,
 				"contractStartDate":  nil,
 				"contractEndDate":    nil,
 				"contractTermMonths": 24,
 				"price":              nil,
-			}})
+			}
+			maps.Copy(billable, s.billable)
+			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok", "data": billable})
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -283,42 +287,75 @@ func TestDCIReadKeepsOrderedValuesBeforeVXC(t *testing.T) {
 	}
 }
 
-// TestDCIReadRemovesMissingDCI covers a DCI that was canceled outside Terraform.
-func TestDCIReadRemovesMissingDCI(t *testing.T) {
+// TestDCIReadContractTerm covers the term a read leaves in state.
+// The API rolls a DCI to a term of 1 when its term ends without auto-renew, which must not drift from the config.
+func TestDCIReadContractTerm(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]*dciStub{
-		"not found": {readStatus: http.StatusNotFound, readMessage: "Solution not found"},
-		"canceled":  {solution: map[string]any{"active": false}},
+	cases := map[string]struct {
+		ordered int64 // the term in state before the read, 0 for none
+		apiTerm int
+		want    int64
+	}{
+		"rolled to month-to-month keeps the ordered term": {ordered: 12, apiTerm: 1, want: 12},
+		"re-termed takes the new term":                    {ordered: 12, apiTerm: 24, want: 24},
+		"imported after the roll takes month-to-month":    {apiTerm: 1, want: 1},
 	}
-	for name, stub := range cases {
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
+			stub := &dciStub{billable: map[string]any{"autoRenewTerm": false, "contractTermMonths": tc.apiTerm}}
 			r, schemaResp, objType := newDCITestResource(t, stub)
-			state := dciState(schemaResp, objType)
+			attrs := nullValueMap(objType)
+			attrs["solution_uid"] = tftypes.NewValue(tftypes.String, dciStubUID)
+			if tc.ordered != 0 {
+				attrs["contract_term_months"] = tftypes.NewValue(tftypes.Number, tc.ordered)
+			}
+			state := tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, attrs)}
 
 			resp := fwresource.ReadResponse{State: state}
 			r.Read(t.Context(), fwresource.ReadRequest{State: state}, &resp)
 			if resp.Diagnostics.HasError() {
 				t.Fatalf("Read errors: %v", resp.Diagnostics.Errors())
 			}
-			if !resp.State.Raw.IsNull() {
-				t.Fatal("Read kept the DCI in state")
+
+			if got := dciModel(t, resp.State).ContractTermMonths.ValueInt64(); got != tc.want {
+				t.Errorf("contract_term_months = %d, want %d", got, tc.want)
 			}
 		})
 	}
 }
 
+// TestDCIReadRemovesCanceledDCI covers a DCI that was canceled outside Terraform.
+// The API keeps a canceled DCI and reads it back with active set to false.
+func TestDCIReadRemovesCanceledDCI(t *testing.T) {
+	t.Parallel()
+
+	r, schemaResp, objType := newDCITestResource(t, &dciStub{solution: map[string]any{"active": false}})
+	state := dciState(schemaResp, objType)
+
+	resp := fwresource.ReadResponse{State: state}
+	r.Read(t.Context(), fwresource.ReadRequest{State: state}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Read errors: %v", resp.Diagnostics.Errors())
+	}
+	if !resp.State.Raw.IsNull() {
+		t.Fatal("Read kept the DCI in state")
+	}
+}
+
 // TestDCIReadKeepsStateWhenReadFails covers the reads that must not drop a live DCI from state.
-// The API answers 404 on every DCI endpoint while DCI ordering is off for the account.
+// The API never deletes a DCI. It answers 404 while DCI ordering is off for the account,
+// or when the account does not own the DCI, with the same body as for a UID that does not exist.
 func TestDCIReadKeepsStateWhenReadFails(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]*dciStub{
-		"ordering off": {readStatus: http.StatusNotFound, readMessage: "The requested endpoint is not found."},
-		"server error": {readStatus: http.StatusInternalServerError, readMessage: "the stub fails the read"},
-		"not a DCI":    {solution: map[string]any{"type": "OTHER"}},
+		"all ordering off": {readStatus: http.StatusNotFound, readMessage: "The requested endpoint is not found."},
+		"not found":        {readStatus: http.StatusNotFound, readMessage: "Solution not found: " + dciStubUID},
+		"server error":     {readStatus: http.StatusInternalServerError, readMessage: "the stub fails the read"},
+		"not a DCI":        {solution: map[string]any{"type": "OTHER"}},
 	}
 	for name, stub := range cases {
 		t.Run(name, func(t *testing.T) {
