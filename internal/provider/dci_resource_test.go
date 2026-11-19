@@ -3,9 +3,11 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -14,7 +16,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -137,6 +142,69 @@ func dciState(schemaResp fwresource.SchemaResponse, objType tftypes.Object) tfsd
 	return tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, attrs)}
 }
 
+// dciPlan returns the plan of a new DCI.
+func dciPlan(objType tftypes.Object) tftypes.Value {
+	attrs := nullValueMap(objType)
+	attrs["name"] = tftypes.NewValue(tftypes.String, "test-dci")
+	attrs["a_end_location_id"] = tftypes.NewValue(tftypes.Number, 143)
+	attrs["b_end_location_id"] = tftypes.NewValue(tftypes.Number, 145)
+	attrs["speed"] = tftypes.NewValue(tftypes.Number, 10000)
+	attrs["contract_term_months"] = tftypes.NewValue(tftypes.Number, 24)
+	attrs["auto_renew"] = tftypes.NewValue(tftypes.Bool, true)
+	attrs["cost_centre"] = tftypes.NewValue(tftypes.String, "SL-001")
+	return tftypes.NewValue(objType, attrs)
+}
+
+// newDCIMockResource returns a DCI resource whose client is mock, with the resource's schema.
+// The mock answers at once, where the SDK waits 30 seconds between checks of a new DCI.
+func newDCIMockResource(t *testing.T, mock *MockSolutionService) (*dciResource, fwresource.SchemaResponse, tftypes.Object) {
+	t.Helper()
+
+	r := &dciResource{client: &megaport.Client{SolutionService: mock}}
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(t.Context(), fwresource.SchemaRequest{}, &schemaResp)
+	objType, ok := schemaResp.Schema.Type().TerraformType(t.Context()).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	return r, schemaResp, objType
+}
+
+// dciMock returns a mock that orders a DCI and reads it back live.
+func dciMock() *MockSolutionService {
+	return &MockSolutionService{
+		BuyDCIResult: &megaport.BuyDCIResponse{SolutionUID: dciStubUID},
+		GetSolutionResult: &megaport.Solution{
+			UID:                   dciStubUID,
+			Type:                  megaport.SolutionTypeDCI,
+			Name:                  "test-dci",
+			Active:                true,
+			ServiceLevelReference: "SL-001",
+			ProvisioningStatus:    "LIVE",
+			ALocationID:           143,
+			BLocationID:           145,
+			SpeedMbps:             10000,
+			Members: []megaport.SolutionMember{
+				{Role: megaport.SolutionMemberRoleAEndPort, ServiceUID: "a-end-uid", LocationID: 143},
+				{Role: megaport.SolutionMemberRoleBEndPort, ServiceUID: "b-end-uid", LocationID: 145},
+				{Role: megaport.SolutionMemberRoleVXC, ServiceUID: "vxc-uid"},
+			},
+		},
+		GetSolutionBillableResult: &megaport.SolutionBillable{ContractTermMonths: 24, AutoRenewTerm: true},
+	}
+}
+
+// dciNotFound returns the error the SDK gives for a 404 from the API.
+func dciNotFound(message string) error {
+	return &megaport.ErrorResponse{
+		Response: &http.Response{
+			StatusCode: http.StatusNotFound,
+			Request:    &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/v1/solutions/" + dciStubUID + "/billable"}},
+		},
+		Message: message,
+	}
+}
+
 func dciModel(t *testing.T, state tfsdk.State) dciResourceModel {
 	t.Helper()
 
@@ -163,16 +231,7 @@ func TestDCICreateOrdersOneDCI(t *testing.T) {
 
 	stub := &dciStub{}
 	r, schemaResp, objType := newDCITestResource(t, stub)
-
-	attrs := nullValueMap(objType)
-	attrs["name"] = tftypes.NewValue(tftypes.String, "test-dci")
-	attrs["a_end_location_id"] = tftypes.NewValue(tftypes.Number, 143)
-	attrs["b_end_location_id"] = tftypes.NewValue(tftypes.Number, 145)
-	attrs["speed"] = tftypes.NewValue(tftypes.Number, 10000)
-	attrs["contract_term_months"] = tftypes.NewValue(tftypes.Number, 24)
-	attrs["auto_renew"] = tftypes.NewValue(tftypes.Bool, true)
-	attrs["cost_centre"] = tftypes.NewValue(tftypes.String, "SL-001")
-	raw := tftypes.NewValue(objType, attrs)
+	raw := dciPlan(objType)
 
 	// The wait checks the status every 30 seconds, so the deadline ends the wait first.
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
@@ -222,6 +281,121 @@ func TestDCICreateOrdersOneDCI(t *testing.T) {
 		if member["solutionRef"] != solution["ref"] {
 			t.Errorf("the %s points to the solution %v, want %v", name, member["solutionRef"], solution["ref"])
 		}
+	}
+}
+
+// TestDCICreateFillsState covers a create whose DCI is ready in time.
+func TestDCICreateFillsState(t *testing.T) {
+	t.Parallel()
+
+	mock := dciMock()
+	r, schemaResp, objType := newDCIMockResource(t, mock)
+	raw := dciPlan(objType)
+
+	resp := fwresource.CreateResponse{State: tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, nil)}}
+	r.Create(t.Context(), fwresource.CreateRequest{
+		Plan:   tfsdk.Plan{Schema: schemaResp.Schema, Raw: raw},
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: raw},
+	}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Create errors: %v", resp.Diagnostics.Errors())
+	}
+
+	if req := mock.CapturedBuyDCIRequest; req == nil || !req.WaitForProvision {
+		t.Errorf("the order is %+v, want one that waits for the DCI", req)
+	}
+	got := dciModel(t, resp.State)
+	want := map[string][2]any{
+		"solution_uid":         {got.UID.ValueString(), dciStubUID},
+		"name":                 {got.Name.ValueString(), "test-dci"},
+		"a_end_location_id":    {got.AEndLocationID.ValueInt64(), int64(143)},
+		"b_end_location_id":    {got.BEndLocationID.ValueInt64(), int64(145)},
+		"speed":                {got.Speed.ValueInt64(), int64(10000)},
+		"contract_term_months": {got.ContractTermMonths.ValueInt64(), int64(24)},
+		"auto_renew":           {got.AutoRenew.ValueBool(), true},
+		"cost_centre":          {got.CostCentre.ValueString(), "SL-001"},
+		"provisioning_status":  {got.ProvisioningStatus.ValueString(), "LIVE"},
+		"a_end_port_uid":       {got.AEndPortUID.ValueString(), "a-end-uid"},
+		"b_end_port_uid":       {got.BEndPortUID.ValueString(), "b-end-uid"},
+		"vxc_uid":              {got.VXCUID.ValueString(), "vxc-uid"},
+	}
+	for name, v := range want {
+		if v[0] != v[1] {
+			t.Errorf("%s = %v, want %v", name, v[0], v[1])
+		}
+	}
+}
+
+// TestDCICreateFailures covers the creates that fail.
+// Once the DCI is ordered its UID must reach state, or Terraform would lose track of a billed DCI.
+func TestDCICreateFailures(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		fail    func(*MockSolutionService)
+		summary string
+		ordered bool
+	}{
+		"buy fails": {
+			fail:    func(m *MockSolutionService) { m.BuyDCIResult, m.BuyDCIErr = nil, errors.New("the mock fails the buy") },
+			summary: "Error buying DCI",
+		},
+		"read fails": {
+			fail:    func(m *MockSolutionService) { m.GetSolutionErr = errors.New("the mock fails the read") },
+			summary: "ordered but could not be read",
+			ordered: true,
+		},
+		"billable read fails": {
+			fail:    func(m *MockSolutionService) { m.GetSolutionBillableErr = dciNotFound("No billable was found") },
+			summary: "ordered but could not be read",
+			ordered: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := dciMock()
+			tc.fail(mock)
+			r, schemaResp, objType := newDCIMockResource(t, mock)
+			raw := dciPlan(objType)
+
+			resp := fwresource.CreateResponse{State: tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, nil)}}
+			r.Create(t.Context(), fwresource.CreateRequest{
+				Plan:   tfsdk.Plan{Schema: schemaResp.Schema, Raw: raw},
+				Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: raw},
+			}, &resp)
+
+			requireOneError(t, resp.Diagnostics, tc.summary)
+			if !tc.ordered {
+				if !resp.State.Raw.IsNull() {
+					t.Fatal("Create saved state for a DCI that was not ordered")
+				}
+				return
+			}
+			if got := dciModel(t, resp.State).UID.ValueString(); got != dciStubUID {
+				t.Fatalf("solution_uid in state = %q, want %q", got, dciStubUID)
+			}
+			if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, "terraform untaint") {
+				t.Errorf("the error does not say how to recover: %s", detail)
+			}
+		})
+	}
+}
+
+// TestDCIImportState covers an import, which starts state from the DCI's UID alone.
+func TestDCIImportState(t *testing.T) {
+	t.Parallel()
+
+	r, schemaResp, objType := newDCIMockResource(t, dciMock())
+
+	resp := fwresource.ImportStateResponse{State: tfsdk.State{Schema: schemaResp.Schema, Raw: tftypes.NewValue(objType, nullValueMap(objType))}}
+	r.ImportState(t.Context(), fwresource.ImportStateRequest{ID: dciStubUID}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("ImportState errors: %v", resp.Diagnostics.Errors())
+	}
+	if got := dciModel(t, resp.State).UID.ValueString(); got != dciStubUID {
+		t.Fatalf("solution_uid in state = %q, want %q", got, dciStubUID)
 	}
 }
 
@@ -374,6 +548,65 @@ func TestDCIReadKeepsStateWhenReadFails(t *testing.T) {
 	}
 }
 
+// TestDCIReadKeepsStateWhenBillableReadFails covers a DCI that reads back while its billing does not.
+func TestDCIReadKeepsStateWhenBillableReadFails(t *testing.T) {
+	t.Parallel()
+
+	mock := dciMock()
+	mock.GetSolutionBillableErr = dciNotFound("No billable was found")
+	r, schemaResp, objType := newDCIMockResource(t, mock)
+	state := dciState(schemaResp, objType)
+
+	resp := fwresource.ReadResponse{State: state}
+	r.Read(t.Context(), fwresource.ReadRequest{State: state}, &resp)
+	requireOneError(t, resp.Diagnostics, "Error Reading DCI")
+	if resp.State.Raw.IsNull() {
+		t.Fatal("Read removed the DCI from state")
+	}
+}
+
+// forcesReplace reports whether a change to attr makes Terraform replace the resource.
+func forcesReplace(t *testing.T, s schema.Schema, attr schema.Attribute) bool {
+	t.Helper()
+
+	objType, ok := s.Type().TerraformType(t.Context()).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not tftypes.Object")
+	}
+	raw := tftypes.NewValue(objType, nullValueMap(objType))
+	state, plan := tfsdk.State{Schema: s, Raw: raw}, tfsdk.Plan{Schema: s, Raw: raw}
+
+	switch a := attr.(type) {
+	case schema.StringAttribute:
+		for _, m := range a.PlanModifiers {
+			req := planmodifier.StringRequest{State: state, Plan: plan, StateValue: types.StringValue("old"), PlanValue: types.StringValue("new"), ConfigValue: types.StringValue("new")}
+			resp := planmodifier.StringResponse{PlanValue: req.PlanValue}
+			if m.PlanModifyString(t.Context(), req, &resp); resp.RequiresReplace {
+				return true
+			}
+		}
+	case schema.Int64Attribute:
+		for _, m := range a.PlanModifiers {
+			req := planmodifier.Int64Request{State: state, Plan: plan, StateValue: types.Int64Value(1), PlanValue: types.Int64Value(2), ConfigValue: types.Int64Value(2)}
+			resp := planmodifier.Int64Response{PlanValue: req.PlanValue}
+			if m.PlanModifyInt64(t.Context(), req, &resp); resp.RequiresReplace {
+				return true
+			}
+		}
+	case schema.BoolAttribute:
+		for _, m := range a.PlanModifiers {
+			req := planmodifier.BoolRequest{State: state, Plan: plan, StateValue: types.BoolValue(false), PlanValue: types.BoolValue(true), ConfigValue: types.BoolValue(true)}
+			resp := planmodifier.BoolResponse{PlanValue: req.PlanValue}
+			if m.PlanModifyBool(t.Context(), req, &resp); resp.RequiresReplace {
+				return true
+			}
+		}
+	default:
+		t.Fatalf("no replace check for an attribute of type %T", attr)
+	}
+	return false
+}
+
 // TestDCIUpdateAndDeleteAreRejected covers the two actions this version cannot do.
 // Neither may call the API or drop the DCI from state, because the DCI stays live and billed.
 func TestDCIUpdateAndDeleteAreRejected(t *testing.T) {
@@ -394,11 +627,15 @@ func TestDCIUpdateAndDeleteAreRejected(t *testing.T) {
 		t.Fatal("Delete removed the DCI from state")
 	}
 
-	// A change of location or speed must reach Update, not force a replace: a replace orders a second DCI.
+	// A change of any attribute must reach Update, not force a replace: a replace orders a second DCI.
 	for name, attr := range schemaResp.Schema.Attributes {
-		if a, ok := attr.(schema.Int64Attribute); ok && len(a.PlanModifiers) != 0 {
-			t.Errorf("%s has plan modifiers %v, want none", name, a.PlanModifiers)
+		if forcesReplace(t, schemaResp.Schema, attr) {
+			t.Errorf("a change of %s forces a replace", name)
 		}
+	}
+	replacing := schema.StringAttribute{PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}}
+	if !forcesReplace(t, schemaResp.Schema, replacing) {
+		t.Error("the replace check misses an attribute that forces a replace")
 	}
 
 	stub.mu.Lock()

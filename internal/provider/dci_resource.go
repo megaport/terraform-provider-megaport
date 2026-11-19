@@ -219,8 +219,8 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	solution, billable, err := r.readDCI(ctx, createdID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading newly created DCI",
-			"Could not read newly created DCI with ID "+createdID+": "+err.Error(),
+			"DCI ordered but could not be read",
+			fmt.Sprintf("DCI %s (%s) was ordered but could not be read: %s. Do not apply again: Terraform would try to replace the DCI. Run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
