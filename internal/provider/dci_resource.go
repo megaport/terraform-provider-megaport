@@ -125,7 +125,7 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"contract_term_months": schema.Int64Attribute{
-				Description: "The term of the contract in months. When the term ends without auto-renew, the DCI moves to a month-to-month term, and this attribute keeps the term that was ordered.",
+				Description: "The term of the contract in months. When the term ends without auto-renew, the DCI moves to a month-to-month term, and this attribute keeps the term that was ordered. After an import, it reads 1 if the DCI already moved to month-to-month.",
 				Required:    true,
 			},
 			"auto_renew": schema.BoolAttribute{
