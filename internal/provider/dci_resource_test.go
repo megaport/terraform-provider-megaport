@@ -918,7 +918,87 @@ func TestDCIUpdateSkipsValuesStateLacks(t *testing.T) {
 	}
 }
 
-// TestDCINameIsRequired covers an empty name, which the API refuses on an update.
+// TestDCIUpdateFillsUnknownUIDs covers a state that holds no Port or VXC UID yet, as after a create that timed out.
+// The plan does not know them, so Update must take them from the read: Terraform rejects an unknown value after apply.
+func TestDCIUpdateFillsUnknownUIDs(t *testing.T) {
+	t.Parallel()
+
+	r, schemaResp, objType := newDCIMockResource(t, dciMock())
+	uids := func(v any) map[string]tftypes.Value {
+		return map[string]tftypes.Value{
+			"a_end_port_uid": tftypes.NewValue(tftypes.String, v),
+			"b_end_port_uid": tftypes.NewValue(tftypes.String, v),
+			"vxc_uid":        tftypes.NewValue(tftypes.String, v),
+		}
+	}
+	state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, uids(nil))}
+	planned := uids(tftypes.UnknownValue)
+	planned["name"] = tftypes.NewValue(tftypes.String, "new-name")
+	plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, planned)}
+
+	resp := fwresource.UpdateResponse{State: state}
+	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+	}
+
+	model := dciModel(t, resp.State)
+	if model.AEndPortUID.ValueString() != "a-end-uid" || model.BEndPortUID.ValueString() != "b-end-uid" || model.VXCUID.ValueString() != "vxc-uid" {
+		t.Errorf("state UIDs = %s, %s and %s, want the ones read back", model.AEndPortUID, model.BEndPortUID, model.VXCUID)
+	}
+}
+
+// TestDCICostCentreRemovedFromConfigKeepsValue covers a cost centre removed from the configuration.
+// The plan must hold the value in state: an unknown one would show a change on every plan.
+func TestDCICostCentreRemovedFromConfigKeepsValue(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, objType := newDCIMockResource(t, dciMock())
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("cost_centre is not a string attribute")
+	}
+	raw := dciLiveValue(objType, nil)
+	req := planmodifier.StringRequest{
+		Path:        path.Root("cost_centre"),
+		State:       tfsdk.State{Schema: schemaResp.Schema, Raw: raw},
+		Plan:        tfsdk.Plan{Schema: schemaResp.Schema, Raw: raw},
+		StateValue:  types.StringValue("SL-001"),
+		PlanValue:   types.StringUnknown(),
+		ConfigValue: types.StringNull(),
+	}
+	resp := planmodifier.StringResponse{PlanValue: req.PlanValue}
+	for _, m := range costCentre.PlanModifiers {
+		m.PlanModifyString(t.Context(), req, &resp)
+	}
+	if !resp.PlanValue.Equal(req.StateValue) {
+		t.Errorf("planned cost centre = %s, want the one in state, %s", resp.PlanValue, req.StateValue)
+	}
+}
+
+// TestDCICostCentreIsNotBlank covers a cost centre of only spaces. The API stores it as none,
+// so the state would never match what is read back. An empty one is allowed: it clears the value.
+func TestDCICostCentreIsNotBlank(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, _ := newDCIMockResource(t, dciMock())
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("cost_centre is not a string attribute")
+	}
+	for value, wantErr := range map[string]bool{"SL-001": false, " SL 001 ": false, "": false, " ": true, "\t\n": true} {
+		req := validator.StringRequest{Path: path.Root("cost_centre"), ConfigValue: types.StringValue(value)}
+		resp := validator.StringResponse{}
+		for _, v := range costCentre.Validators {
+			v.ValidateString(t.Context(), req, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("cost centre %q: error = %v, want %v", value, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+// TestDCINameIsRequired covers a blank name, which the API refuses.
 func TestDCINameIsRequired(t *testing.T) {
 	t.Parallel()
 
@@ -927,7 +1007,7 @@ func TestDCINameIsRequired(t *testing.T) {
 	if !ok {
 		t.Fatal("name is not a string attribute")
 	}
-	for value, wantErr := range map[string]bool{"a": false, "": true} {
+	for value, wantErr := range map[string]bool{"a": false, " a ": false, "": true, " ": true, "\t\n": true} {
 		req := validator.StringRequest{Path: path.Root("name"), ConfigValue: types.StringValue(value)}
 		resp := validator.StringResponse{}
 		for _, v := range name.Validators {

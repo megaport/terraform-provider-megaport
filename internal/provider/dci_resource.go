@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -72,32 +73,20 @@ func (orm *dciResourceModel) fromAPI(solution *megaport.Solution, billable *mega
 	orm.AutoRenew = types.BoolValue(billable.AutoRenewTerm)
 }
 
-// fillUnknown takes from another model each value this one does not know yet.
+// fillUnknown takes from another model each value the plan of an update may not know.
+// These are the computed values: the status always, and the others when the state does not hold them yet.
+// The rest are required, have a default, or, for the DCI's UID, are always in state.
 func (orm *dciResourceModel) fillUnknown(from dciResourceModel) {
-	fillString := func(to *types.String, from types.String) {
+	fill := func(to *types.String, from types.String) {
 		if to.IsUnknown() {
 			*to = from
 		}
 	}
-	fillInt64 := func(to *types.Int64, from types.Int64) {
-		if to.IsUnknown() {
-			*to = from
-		}
-	}
-	fillString(&orm.UID, from.UID)
-	fillString(&orm.Name, from.Name)
-	fillInt64(&orm.AEndLocationID, from.AEndLocationID)
-	fillInt64(&orm.BEndLocationID, from.BEndLocationID)
-	fillInt64(&orm.Speed, from.Speed)
-	fillInt64(&orm.ContractTermMonths, from.ContractTermMonths)
-	if orm.AutoRenew.IsUnknown() {
-		orm.AutoRenew = from.AutoRenew
-	}
-	fillString(&orm.CostCentre, from.CostCentre)
-	fillString(&orm.ProvisioningStatus, from.ProvisioningStatus)
-	fillString(&orm.AEndPortUID, from.AEndPortUID)
-	fillString(&orm.BEndPortUID, from.BEndPortUID)
-	fillString(&orm.VXCUID, from.VXCUID)
+	fill(&orm.CostCentre, from.CostCentre)
+	fill(&orm.ProvisioningStatus, from.ProvisioningStatus)
+	fill(&orm.AEndPortUID, from.AEndPortUID)
+	fill(&orm.BEndPortUID, from.BEndPortUID)
+	fill(&orm.VXCUID, from.VXCUID)
 }
 
 // dciLocationID returns the location of one end of a DCI: the DCI's own, or else that of the Port at that end.
@@ -143,7 +132,7 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"name": schema.StringAttribute{
 				Description: "The name of the DCI. Both Ports and the VXC are ordered with this name.",
 				Required:    true,
-				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
+				Validators:  []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must contain at least one non-space character")},
 			},
 			"a_end_location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the A-End Port. This value can be retrieved from the data source megaport_location.",
@@ -171,7 +160,11 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. To clear it, set it to an empty string: removing the attribute keeps the current value.",
 				Optional:    true,
 				Computed:    true,
-				Validators:  []validator.String{stringvalidator.LengthAtMost(255)},
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+					// The API stores a blank reference as none, so one of only spaces would never match what is read back.
+					stringvalidator.RegexMatches(regexp.MustCompile(`^$|\S`), "must be empty or contain at least one non-space character"),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
