@@ -5,13 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -21,6 +25,7 @@ var (
 	_ resource.Resource                = &dciResource{}
 	_ resource.ResourceWithConfigure   = &dciResource{}
 	_ resource.ResourceWithImportState = &dciResource{}
+	_ resource.ResourceWithModifyPlan  = &dciResource{}
 )
 
 // dciResourceModel maps the resource schema data.
@@ -68,6 +73,22 @@ func (orm *dciResourceModel) fromAPI(solution *megaport.Solution, billable *mega
 	orm.AutoRenew = types.BoolValue(billable.AutoRenewTerm)
 }
 
+// fillUnknown takes from another model each value the plan of an update may not know.
+// These are the computed values: the status always, and the others when the state does not hold them yet.
+// The rest are required, have a default, or, for the DCI's UID, are always in state.
+func (orm *dciResourceModel) fillUnknown(from dciResourceModel) {
+	fill := func(to *types.String, from types.String) {
+		if to.IsUnknown() {
+			*to = from
+		}
+	}
+	fill(&orm.CostCentre, from.CostCentre)
+	fill(&orm.ProvisioningStatus, from.ProvisioningStatus)
+	fill(&orm.AEndPortUID, from.AEndPortUID)
+	fill(&orm.BEndPortUID, from.BEndPortUID)
+	fill(&orm.VXCUID, from.VXCUID)
+}
+
 // dciLocationID returns the location of one end of a DCI: the DCI's own, or else that of the Port at that end.
 func dciLocationID(s *megaport.Solution, locationID int, portRole string) int {
 	if locationID != 0 {
@@ -99,7 +120,7 @@ func (r *dciResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI and reads it. Changing or destroying a DCI with Terraform is not supported yet: change or cancel it in the Megaport Portal.",
+		Description: "Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.",
 		Attributes: map[string]schema.Attribute{
 			"solution_uid": schema.StringAttribute{
 				Description: "The unique identifier of the DCI.",
@@ -111,6 +132,7 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"name": schema.StringAttribute{
 				Description: "The name of the DCI. Both Ports and the VXC are ordered with this name.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must contain at least one non-space character")},
 			},
 			"a_end_location_id": schema.Int64Attribute{
 				Description: "The numeric location ID of the A-End Port. This value can be retrieved from the data source megaport_location.",
@@ -135,9 +157,14 @@ func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Default:     booldefault.StaticBool(false),
 			},
 			"cost_centre": schema.StringAttribute{
-				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number.",
+				Description: "A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. To clear it, set it to an empty string: removing the attribute keeps the current value.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+					// The API stores a blank reference as none, so one of only spaces would never match what is read back.
+					stringvalidator.RegexMatches(regexp.MustCompile(`^$|\S`), "must be empty or contain at least one non-space character"),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -302,13 +329,102 @@ func (r *dciResource) readDCI(ctx context.Context, uid string) (*megaport.Soluti
 	return solution, billable, nil
 }
 
-// Update is not supported yet. No attribute forces a replace, so every change ends up here.
-// A replace would order a second DCI under create_before_destroy, and Delete could not cancel the first.
-func (r *dciResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Changing a DCI is not supported",
-		"This version of the provider cannot change a DCI. Change it in the Megaport Portal, update the configuration to match, then run a refresh so the Terraform state matches. The locations and the speed of a DCI cannot be changed.",
-	)
+// ModifyPlan refuses, at plan time, the changes the API cannot make to a DCI.
+// No attribute forces a replace instead: a replace would order a second DCI under create_before_destroy,
+// and Delete could not cancel the first.
+func (r *dciResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state dciResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// A value the state does not hold yet, as after a create that timed out, is not a change.
+	// A value not known until apply is checked then, when Terraform plans the DCI again.
+	check := func(name string, planned, current attr.Value) {
+		if current.IsNull() || planned.IsUnknown() || planned.Equal(current) {
+			return
+		}
+		resp.Diagnostics.AddAttributeError(
+			path.Root(name),
+			"Changing a DCI is not supported",
+			fmt.Sprintf("Only the name and the cost centre of a DCI can be changed, and the configuration changes %s from %s to %s. The locations and the speed of a DCI cannot be changed, and this version of the provider cannot change the term or the auto-renew setting. Set %s back to %s.", name, current, planned, name, current),
+		)
+	}
+	check("a_end_location_id", plan.AEndLocationID, state.AEndLocationID)
+	check("b_end_location_id", plan.BEndLocationID, state.BEndLocationID)
+	check("speed", plan.Speed, state.Speed)
+	check("contract_term_months", plan.ContractTermMonths, state.ContractTermMonths)
+	check("auto_renew", plan.AutoRenew, state.AutoRenew)
+}
+
+// Update changes the name and the cost center of a DCI. ModifyPlan refuses every other change before it gets here.
+func (r *dciResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state dciResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	uid := state.UID.ValueString()
+	// As in ModifyPlan, a value the state does not hold yet, or one not known, is not a change:
+	// sending it would overwrite the value the DCI has, and an unknown cost centre would clear it.
+	changed := func(planned, current types.String) bool {
+		return !current.IsNull() && !planned.IsUnknown() && !planned.Equal(current)
+	}
+	updated := changed(plan.Name, state.Name) || changed(plan.CostCentre, state.CostCentre)
+	if updated {
+		// The API sets both on every update, and an empty reference clears it,
+		// so the cost centre is sent even when only the name changes.
+		err := r.client.SolutionService.UpdateSolution(ctx, &megaport.UpdateSolutionRequest{
+			SolutionUID:           uid,
+			Name:                  plan.Name.ValueString(),
+			ServiceLevelReference: plan.CostCentre.ValueString(),
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating DCI",
+				"Could not update DCI with ID "+uid+": "+err.Error(),
+			)
+			return
+		}
+	}
+
+	// get the updated DCI
+	solution, billable, err := r.readDCI(ctx, uid)
+	if err != nil {
+		if !updated {
+			resp.Diagnostics.AddError(
+				"Error Reading DCI",
+				"Could not read DCI with ID "+uid+": "+err.Error(),
+			)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"DCI updated but could not be read",
+			"DCI with ID "+uid+" was updated but could not be read: "+err.Error()+". Run `terraform apply -refresh-only` so the Terraform state matches.",
+		)
+		return
+	}
+
+	// Take from the read only what the plan left unknown: Terraform rejects a result that differs from what it planned,
+	// and the read can differ, as when the VXC is created after the refresh. The next refresh picks up the rest.
+	read := plan
+	read.fromAPI(solution, billable)
+	plan.fillUnknown(read)
+
+	// Set state to fully populated data
+	diags := resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete is not supported yet. It keeps the DCI in state, because the DCI is still live and billed.

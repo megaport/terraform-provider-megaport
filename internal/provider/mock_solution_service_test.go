@@ -8,13 +8,15 @@ import (
 
 // MockSolutionService is a mock of the Solution Service for testing.
 type MockSolutionService struct {
-	BuyDCIResult              *megaport.BuyDCIResponse
-	BuyDCIErr                 error
-	CapturedBuyDCIRequest     *megaport.BuyDCIRequest
-	GetSolutionResult         *megaport.Solution
-	GetSolutionErr            error
-	GetSolutionBillableResult *megaport.SolutionBillable
-	GetSolutionBillableErr    error
+	BuyDCIResult                   *megaport.BuyDCIResponse
+	BuyDCIErr                      error
+	CapturedBuyDCIRequest          *megaport.BuyDCIRequest
+	GetSolutionResult              *megaport.Solution
+	GetSolutionErr                 error
+	GetSolutionBillableResult      *megaport.SolutionBillable
+	GetSolutionBillableErr         error
+	UpdateSolutionErr              error
+	CapturedUpdateSolutionRequests []*megaport.UpdateSolutionRequest
 }
 
 var _ megaport.SolutionService = &MockSolutionService{}
@@ -37,4 +39,9 @@ func (m *MockSolutionService) GetSolutionBillable(_ context.Context, _ string) (
 		return nil, m.GetSolutionBillableErr
 	}
 	return m.GetSolutionBillableResult, nil
+}
+
+func (m *MockSolutionService) UpdateSolution(_ context.Context, req *megaport.UpdateSolutionRequest) error {
+	m.CapturedUpdateSolutionRequests = append(m.CapturedUpdateSolutionRequests, req)
+	return m.UpdateSolutionErr
 }

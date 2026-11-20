@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -27,6 +29,7 @@ import (
 const dciStubUID = "8da180e1-61ea-4961-a6e3-d80152ee9b14"
 
 // dciStub answers the calls the DCI resource makes for one DCI.
+// Set the fields above mu before the server starts: the handler reads them without the lock.
 type dciStub struct {
 	// solution overrides fields of the DCI the stub returns.
 	solution map[string]any
@@ -52,6 +55,8 @@ func (s *dciStub) handler(t *testing.T) http.HandlerFunc {
 			body := map[string]any{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Errorf("could not decode the order: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
 			}
 			s.mu.Lock()
 			s.buyBody = body
@@ -607,27 +612,475 @@ func forcesReplace(t *testing.T, s schema.Schema, attr schema.Attribute) bool {
 	return false
 }
 
-// TestDCIUpdateAndDeleteAreRejected covers the two actions this version cannot do.
-// Neither may call the API or drop the DCI from state, because the DCI stays live and billed.
-func TestDCIUpdateAndDeleteAreRejected(t *testing.T) {
+// dciLiveValue returns the state of a live DCI, as the mock from dciMock reads it back, with changes applied on top.
+func dciLiveValue(objType tftypes.Object, changes map[string]tftypes.Value) tftypes.Value {
+	attrs := map[string]tftypes.Value{}
+	if err := dciPlan(objType).As(&attrs); err != nil {
+		panic(err)
+	}
+	attrs["solution_uid"] = tftypes.NewValue(tftypes.String, dciStubUID)
+	attrs["provisioning_status"] = tftypes.NewValue(tftypes.String, "LIVE")
+	attrs["a_end_port_uid"] = tftypes.NewValue(tftypes.String, "a-end-uid")
+	attrs["b_end_port_uid"] = tftypes.NewValue(tftypes.String, "b-end-uid")
+	attrs["vxc_uid"] = tftypes.NewValue(tftypes.String, "vxc-uid")
+	maps.Copy(attrs, changes)
+	return tftypes.NewValue(objType, attrs)
+}
+
+// runDCIUpdate runs Update on a live DCI with the changes applied to its plan.
+func runDCIUpdate(t *testing.T, mock *MockSolutionService, changes map[string]tftypes.Value) fwresource.UpdateResponse {
+	t.Helper()
+
+	r, schemaResp, objType := newDCIMockResource(t, mock)
+	state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, nil)}
+	plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, changes)}
+
+	resp := fwresource.UpdateResponse{State: state}
+	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+	return resp
+}
+
+// TestDCIUpdateChangesNameAndCostCentre covers the two changes Update makes.
+// The API sets both values on every update, so the one that does not change must be sent too.
+func TestDCIUpdateChangesNameAndCostCentre(t *testing.T) {
 	t.Parallel()
 
-	stub := &dciStub{}
-	r, schemaResp, objType := newDCITestResource(t, stub)
-	state := dciState(schemaResp, objType)
+	cases := map[string]struct {
+		changes        map[string]tftypes.Value
+		wantName       string
+		wantCostCentre string
+	}{
+		"name": {
+			changes:        map[string]tftypes.Value{"name": tftypes.NewValue(tftypes.String, "new-name")},
+			wantName:       "new-name",
+			wantCostCentre: "SL-001",
+		},
+		"cost centre": {
+			changes:        map[string]tftypes.Value{"cost_centre": tftypes.NewValue(tftypes.String, "SL-002")},
+			wantName:       "test-dci",
+			wantCostCentre: "SL-002",
+		},
+		"both": {
+			changes: map[string]tftypes.Value{
+				"name":        tftypes.NewValue(tftypes.String, "new-name"),
+				"cost_centre": tftypes.NewValue(tftypes.String, "SL-002"),
+			},
+			wantName:       "new-name",
+			wantCostCentre: "SL-002",
+		},
+		"cleared cost centre": {
+			changes:        map[string]tftypes.Value{"cost_centre": tftypes.NewValue(tftypes.String, "")},
+			wantName:       "test-dci",
+			wantCostCentre: "",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	updateResp := fwresource.UpdateResponse{State: state}
-	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: tfsdk.Plan{Schema: schemaResp.Schema, Raw: state.Raw}}, &updateResp)
-	requireOneError(t, updateResp.Diagnostics, "Changing a DCI is not supported")
+			// The mock reads the DCI back as the API would after the update.
+			mock := dciMock()
+			mock.GetSolutionResult.Name = tc.wantName
+			mock.GetSolutionResult.ServiceLevelReference = tc.wantCostCentre
 
-	deleteResp := fwresource.DeleteResponse{State: state}
-	r.Delete(t.Context(), fwresource.DeleteRequest{State: state}, &deleteResp)
-	requireOneError(t, deleteResp.Diagnostics, "Canceling a DCI is not supported")
-	if deleteResp.State.Raw.IsNull() {
-		t.Fatal("Delete removed the DCI from state")
+			resp := runDCIUpdate(t, mock, tc.changes)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+			}
+
+			if len(mock.CapturedUpdateSolutionRequests) != 1 {
+				t.Fatalf("Update sent %d updates, want 1", len(mock.CapturedUpdateSolutionRequests))
+			}
+			want := megaport.UpdateSolutionRequest{SolutionUID: dciStubUID, Name: tc.wantName, ServiceLevelReference: tc.wantCostCentre}
+			if got := *mock.CapturedUpdateSolutionRequests[0]; got != want {
+				t.Errorf("update = %+v, want %+v", got, want)
+			}
+
+			model := dciModel(t, resp.State)
+			if model.Name.ValueString() != tc.wantName || model.CostCentre.ValueString() != tc.wantCostCentre {
+				t.Errorf("state name = %q, cost centre = %q, want %q and %q", model.Name.ValueString(), model.CostCentre.ValueString(), tc.wantName, tc.wantCostCentre)
+			}
+			if model.CostCentre.IsNull() {
+				t.Error("state cost centre is null")
+			}
+			if model.UID.ValueString() != dciStubUID || model.Speed.ValueInt64() != 10000 || model.ContractTermMonths.ValueInt64() != 24 {
+				t.Errorf("state lost the DCI's other values: %+v", model)
+			}
+		})
+	}
+}
+
+// runDCIModifyPlan plans a change from one DCI state to another.
+func runDCIModifyPlan(t *testing.T, stateRaw, planRaw func(tftypes.Object) tftypes.Value) fwresource.ModifyPlanResponse {
+	t.Helper()
+
+	r, schemaResp, objType := newDCIMockResource(t, dciMock())
+	null := tftypes.NewValue(objType, nil)
+	stateValue, planValue := null, null
+	if stateRaw != nil {
+		stateValue = stateRaw(objType)
+	}
+	if planRaw != nil {
+		planValue = planRaw(objType)
 	}
 
-	// A change of any attribute must reach Update, not force a replace: a replace orders a second DCI.
+	req := fwresource.ModifyPlanRequest{
+		State: tfsdk.State{Schema: schemaResp.Schema, Raw: stateValue},
+		Plan:  tfsdk.Plan{Schema: schemaResp.Schema, Raw: planValue},
+	}
+	resp := fwresource.ModifyPlanResponse{Plan: req.Plan}
+	r.ModifyPlan(t.Context(), req, &resp)
+	return resp
+}
+
+func dciLive(changes map[string]tftypes.Value) func(tftypes.Object) tftypes.Value {
+	return func(objType tftypes.Object) tftypes.Value { return dciLiveValue(objType, changes) }
+}
+
+// TestDCIPlanRejectsOtherChanges covers the changes the API cannot make.
+// The plan must fail, so the customer learns of it before an apply, and a rename in the same change is not half done.
+func TestDCIPlanRejectsOtherChanges(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]tftypes.Value{
+		"a_end_location_id":    tftypes.NewValue(tftypes.Number, 150),
+		"b_end_location_id":    tftypes.NewValue(tftypes.Number, 150),
+		"speed":                tftypes.NewValue(tftypes.Number, 1000),
+		"contract_term_months": tftypes.NewValue(tftypes.Number, 36),
+		"auto_renew":           tftypes.NewValue(tftypes.Bool, false),
+	}
+	for attr, value := range cases {
+		t.Run(attr, func(t *testing.T) {
+			t.Parallel()
+
+			resp := runDCIModifyPlan(t, dciLive(nil), dciLive(map[string]tftypes.Value{
+				attr:   value,
+				"name": tftypes.NewValue(tftypes.String, "new-name"),
+			}))
+			requireOneError(t, resp.Diagnostics, "Changing a DCI is not supported")
+			if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, attr) {
+				t.Errorf("error detail = %q, want it to name %s", detail, attr)
+			}
+		})
+	}
+}
+
+// TestDCIPlanAllowsOtherPlans covers the plans that must pass.
+func TestDCIPlanAllowsOtherPlans(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		state, plan func(tftypes.Object) tftypes.Value
+	}{
+		"create":  {plan: dciPlan},
+		"destroy": {state: dciLive(nil)},
+		"name and cost centre": {
+			state: dciLive(nil),
+			plan: dciLive(map[string]tftypes.Value{
+				"name":        tftypes.NewValue(tftypes.String, "new-name"),
+				"cost_centre": tftypes.NewValue(tftypes.String, "SL-002"),
+			}),
+		},
+		// After a create that timed out, the state holds no speed until the VXC is created.
+		"state without a speed": {
+			state: dciLive(map[string]tftypes.Value{"speed": tftypes.NewValue(tftypes.Number, nil)}),
+			plan:  dciLive(map[string]tftypes.Value{"name": tftypes.NewValue(tftypes.String, "new-name")}),
+		},
+		"speed not known until apply": {
+			state: dciLive(nil),
+			plan:  dciLive(map[string]tftypes.Value{"speed": tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)}),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			if resp := runDCIModifyPlan(t, tc.state, tc.plan); resp.Diagnostics.HasError() {
+				t.Fatalf("ModifyPlan errors: %v", resp.Diagnostics.Errors())
+			}
+		})
+	}
+}
+
+// TestDCIUpdateFailures covers an update the API refuses, such as one on a locked DCI,
+// and an update that cannot be read back. Both must keep the DCI in state.
+func TestDCIUpdateFailures(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		mock    func() *MockSolutionService
+		summary string
+	}{
+		"update refused": {
+			mock: func() *MockSolutionService {
+				mock := dciMock()
+				mock.UpdateSolutionErr = errors.New("the solution is locked")
+				return mock
+			},
+			summary: "Error updating DCI",
+		},
+		"read fails": {
+			mock: func() *MockSolutionService {
+				mock := dciMock()
+				mock.GetSolutionErr = errors.New("the mock fails the read")
+				return mock
+			},
+			summary: "DCI updated but could not be read",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			resp := runDCIUpdate(t, tc.mock(), map[string]tftypes.Value{"name": tftypes.NewValue(tftypes.String, "new-name")})
+			requireOneError(t, resp.Diagnostics, tc.summary)
+			if got := dciModel(t, resp.State).Name.ValueString(); got != "test-dci" {
+				t.Errorf("state name = %q, want the old name", got)
+			}
+		})
+	}
+}
+
+// TestDCIUpdateBillableReadFails covers an update whose billing cannot be read back. It must keep the DCI in state.
+func TestDCIUpdateBillableReadFails(t *testing.T) {
+	t.Parallel()
+
+	mock := dciMock()
+	mock.GetSolutionBillableErr = errors.New("the mock fails the billing read")
+
+	resp := runDCIUpdate(t, mock, map[string]tftypes.Value{"name": tftypes.NewValue(tftypes.String, "new-name")})
+	requireOneError(t, resp.Diagnostics, "DCI updated but could not be read")
+	if got := dciModel(t, resp.State).Name.ValueString(); got != "test-dci" {
+		t.Errorf("state name = %q, want the old name", got)
+	}
+}
+
+// TestDCIUpdateWithoutChange covers an update that changes neither the name nor the cost centre,
+// as when the state has no speed yet. It must not call the update API, which would set both again.
+func TestDCIUpdateWithoutChange(t *testing.T) {
+	t.Parallel()
+
+	noSpeed := map[string]tftypes.Value{"speed": tftypes.NewValue(tftypes.Number, nil)}
+	run := func(mock *MockSolutionService) fwresource.UpdateResponse {
+		r, schemaResp, objType := newDCIMockResource(t, mock)
+		state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, noSpeed)}
+		plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, nil)}
+
+		resp := fwresource.UpdateResponse{State: state}
+		r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+		return resp
+	}
+
+	mock := dciMock()
+	resp := run(mock)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+	}
+	if len(mock.CapturedUpdateSolutionRequests) != 0 {
+		t.Errorf("Update sent %d updates, want none", len(mock.CapturedUpdateSolutionRequests))
+	}
+	if got := dciModel(t, resp.State).Speed.ValueInt64(); got != 10000 {
+		t.Errorf("state speed = %d, want 10000", got)
+	}
+
+	// A failed read must not say the DCI was updated.
+	mock = dciMock()
+	mock.GetSolutionErr = errors.New("the mock fails the read")
+	requireOneError(t, run(mock).Diagnostics, "Error Reading DCI")
+}
+
+// TestDCIUpdateSkipsValuesStateLacks covers a state that holds no name or cost centre yet, as after a create
+// that timed out, and a cost centre not known. None is a change: an update would overwrite the DCI's own values.
+func TestDCIUpdateSkipsValuesStateLacks(t *testing.T) {
+	t.Parallel()
+
+	mock := dciMock()
+	r, schemaResp, objType := newDCIMockResource(t, mock)
+	state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, map[string]tftypes.Value{
+		"name":        tftypes.NewValue(tftypes.String, nil),
+		"cost_centre": tftypes.NewValue(tftypes.String, nil),
+	})}
+	plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, map[string]tftypes.Value{
+		"name":        tftypes.NewValue(tftypes.String, "new-name"),
+		"cost_centre": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+	})}
+
+	resp := fwresource.UpdateResponse{State: state}
+	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+	}
+	if len(mock.CapturedUpdateSolutionRequests) != 0 {
+		t.Errorf("Update sent %d updates, want none", len(mock.CapturedUpdateSolutionRequests))
+	}
+	if got := dciModel(t, resp.State).CostCentre.ValueString(); got != "SL-001" {
+		t.Errorf("state cost centre = %q, want the one read back", got)
+	}
+}
+
+// TestDCIUpdateFillsUnknownUIDs covers a state that holds no Port or VXC UID yet, as after a create that timed out.
+// The plan does not know them, so Update must take them from the read: Terraform rejects an unknown value after apply.
+func TestDCIUpdateFillsUnknownUIDs(t *testing.T) {
+	t.Parallel()
+
+	r, schemaResp, objType := newDCIMockResource(t, dciMock())
+	uids := func(v any) map[string]tftypes.Value {
+		return map[string]tftypes.Value{
+			"a_end_port_uid": tftypes.NewValue(tftypes.String, v),
+			"b_end_port_uid": tftypes.NewValue(tftypes.String, v),
+			"vxc_uid":        tftypes.NewValue(tftypes.String, v),
+		}
+	}
+	state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, uids(nil))}
+	planned := uids(tftypes.UnknownValue)
+	planned["name"] = tftypes.NewValue(tftypes.String, "new-name")
+	plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, planned)}
+
+	resp := fwresource.UpdateResponse{State: state}
+	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+	}
+
+	model := dciModel(t, resp.State)
+	if model.AEndPortUID.ValueString() != "a-end-uid" || model.BEndPortUID.ValueString() != "b-end-uid" || model.VXCUID.ValueString() != "vxc-uid" {
+		t.Errorf("state UIDs = %s, %s and %s, want the ones read back", model.AEndPortUID, model.BEndPortUID, model.VXCUID)
+	}
+}
+
+// TestDCICostCentreRemovedFromConfigKeepsValue covers a cost centre removed from the configuration.
+// The plan must hold the value in state: an unknown one would show a change on every plan.
+func TestDCICostCentreRemovedFromConfigKeepsValue(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, objType := newDCIMockResource(t, dciMock())
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("cost_centre is not a string attribute")
+	}
+	raw := dciLiveValue(objType, nil)
+	req := planmodifier.StringRequest{
+		Path:        path.Root("cost_centre"),
+		State:       tfsdk.State{Schema: schemaResp.Schema, Raw: raw},
+		Plan:        tfsdk.Plan{Schema: schemaResp.Schema, Raw: raw},
+		StateValue:  types.StringValue("SL-001"),
+		PlanValue:   types.StringUnknown(),
+		ConfigValue: types.StringNull(),
+	}
+	resp := planmodifier.StringResponse{PlanValue: req.PlanValue}
+	for _, m := range costCentre.PlanModifiers {
+		m.PlanModifyString(t.Context(), req, &resp)
+	}
+	if !resp.PlanValue.Equal(req.StateValue) {
+		t.Errorf("planned cost centre = %s, want the one in state, %s", resp.PlanValue, req.StateValue)
+	}
+}
+
+// TestDCICostCentreIsNotBlank covers a cost centre of only spaces. The API stores it as none,
+// so the state would never match what is read back. An empty one is allowed: it clears the value.
+func TestDCICostCentreIsNotBlank(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, _ := newDCIMockResource(t, dciMock())
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("cost_centre is not a string attribute")
+	}
+	for value, wantErr := range map[string]bool{"SL-001": false, " SL 001 ": false, "": false, " ": true, "\t\n": true} {
+		req := validator.StringRequest{Path: path.Root("cost_centre"), ConfigValue: types.StringValue(value)}
+		resp := validator.StringResponse{}
+		for _, v := range costCentre.Validators {
+			v.ValidateString(t.Context(), req, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("cost centre %q: error = %v, want %v", value, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+// TestDCINameIsRequired covers a blank name, which the API refuses.
+func TestDCINameIsRequired(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, _ := newDCIMockResource(t, dciMock())
+	name, ok := schemaResp.Schema.Attributes["name"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("name is not a string attribute")
+	}
+	for value, wantErr := range map[string]bool{"a": false, " a ": false, "": true, " ": true, "\t\n": true} {
+		req := validator.StringRequest{Path: path.Root("name"), ConfigValue: types.StringValue(value)}
+		resp := validator.StringResponse{}
+		for _, v := range name.Validators {
+			v.ValidateString(t.Context(), req, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("name %q: error = %v, want %v", value, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+// TestDCIUpdateKeepsPlannedValues covers a read-back that differs from the plan: a stale name,
+// and a VXC created since the refresh. Terraform rejects a result that differs from what it planned,
+// so the state must hold the planned values, and take from the read only what the plan did not know.
+func TestDCIUpdateKeepsPlannedValues(t *testing.T) {
+	t.Parallel()
+
+	// The mock still reads back the old name, and a VXC the state does not hold.
+	mock := dciMock()
+	r, schemaResp, objType := newDCIMockResource(t, mock)
+	noVXC := map[string]tftypes.Value{"vxc_uid": tftypes.NewValue(tftypes.String, "")}
+	state := tfsdk.State{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, noVXC)}
+	plan := tfsdk.Plan{Schema: schemaResp.Schema, Raw: dciLiveValue(objType, map[string]tftypes.Value{
+		"vxc_uid":             tftypes.NewValue(tftypes.String, ""),
+		"name":                tftypes.NewValue(tftypes.String, "new-name"),
+		"provisioning_status": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+	})}
+
+	resp := fwresource.UpdateResponse{State: state}
+	r.Update(t.Context(), fwresource.UpdateRequest{State: state, Plan: plan}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Update errors: %v", resp.Diagnostics.Errors())
+	}
+
+	model := dciModel(t, resp.State)
+	if got := model.Name.ValueString(); got != "new-name" {
+		t.Errorf("state name = %q, want the planned name", got)
+	}
+	if got := model.VXCUID.ValueString(); got != "" {
+		t.Errorf("state VXC UID = %q, want the planned empty value", got)
+	}
+	if got := model.ProvisioningStatus.ValueString(); got != "LIVE" {
+		t.Errorf("state provisioning status = %q, want the one read back", got)
+	}
+}
+
+// TestDCICostCentreLength covers the longest cost centre the API accepts.
+func TestDCICostCentreLength(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, _ := newDCIMockResource(t, dciMock())
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("cost_centre is not a string attribute")
+	}
+	for length, wantErr := range map[int]bool{255: false, 256: true} {
+		req := validator.StringRequest{Path: path.Root("cost_centre"), ConfigValue: types.StringValue(strings.Repeat("a", length))}
+		resp := validator.StringResponse{}
+		for _, v := range costCentre.Validators {
+			v.ValidateString(t.Context(), req, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("a cost centre of %d characters: error = %v, want %v", length, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+// TestDCINoAttributeForcesReplace covers the plan of a change. A change of any attribute must reach Update,
+// not force a replace: a replace orders a second DCI.
+func TestDCINoAttributeForcesReplace(t *testing.T) {
+	t.Parallel()
+
+	_, schemaResp, _ := newDCIMockResource(t, dciMock())
 	for name, attr := range schemaResp.Schema.Attributes {
 		if forcesReplace(t, schemaResp.Schema, attr) {
 			t.Errorf("a change of %s forces a replace", name)
@@ -637,10 +1090,27 @@ func TestDCIUpdateAndDeleteAreRejected(t *testing.T) {
 	if !forcesReplace(t, schemaResp.Schema, replacing) {
 		t.Error("the replace check misses an attribute that forces a replace")
 	}
+}
+
+// TestDCIDeleteIsRejected covers the action this version cannot do.
+// It may not call the API or drop the DCI from state, because the DCI stays live and billed.
+func TestDCIDeleteIsRejected(t *testing.T) {
+	t.Parallel()
+
+	stub := &dciStub{}
+	r, schemaResp, objType := newDCITestResource(t, stub)
+	state := dciState(schemaResp, objType)
+
+	deleteResp := fwresource.DeleteResponse{State: state}
+	r.Delete(t.Context(), fwresource.DeleteRequest{State: state}, &deleteResp)
+	requireOneError(t, deleteResp.Diagnostics, "Canceling a DCI is not supported")
+	if deleteResp.State.Raw.IsNull() {
+		t.Fatal("Delete removed the DCI from state")
+	}
 
 	stub.mu.Lock()
 	defer stub.mu.Unlock()
 	if len(stub.requests) != 0 {
-		t.Fatalf("Update and Delete called the API: %v", stub.requests)
+		t.Fatalf("Delete called the API: %v", stub.requests)
 	}
 }
