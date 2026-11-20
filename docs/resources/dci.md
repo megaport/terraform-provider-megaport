@@ -3,12 +3,12 @@
 page_title: "megaport_dci Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI and reads it. Changing or destroying a DCI with Terraform is not supported yet: change or cancel it in the Megaport Portal.
+  Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.
 ---
 
 # megaport_dci (Resource)
 
-Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI and reads it. Changing or destroying a DCI with Terraform is not supported yet: change or cancel it in the Megaport Portal.
+Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.
 
 ## Example Usage
 
@@ -38,7 +38,7 @@ resource "megaport_dci" "dci" {
 ### Optional
 
 - `auto_renew` (Boolean) Whether the term renews when it ends. Defaults to false.
-- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number.
+- `cost_centre` (String) A customer reference number to be included in billing information and invoices. Also known as the service level reference (SLR) number. To clear it, set it to an empty string: removing the attribute keeps the current value.
 
 ### Read-Only
 
