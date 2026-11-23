@@ -3,12 +3,12 @@
 page_title: "megaport_dci Resource - terraform-provider-megaport"
 subcategory: ""
 description: |-
-  Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.
+  Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, changes its name and cost centre, and cancels it on destroy. Canceling a DCI cancels both Ports and the VXC at once. Other changes are not supported yet.
 ---
 
 # megaport_dci (Resource)
 
-Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.
+Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, changes its name and cost centre, and cancels it on destroy. Canceling a DCI cancels both Ports and the VXC at once. Other changes are not supported yet.
 
 ## Example Usage
 

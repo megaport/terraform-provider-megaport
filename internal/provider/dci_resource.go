@@ -120,7 +120,7 @@ func (r *dciResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 // Schema defines the schema for the resource.
 func (r *dciResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, and changes its name and cost centre. Other changes and destroying a DCI with Terraform are not supported yet: cancel a DCI in the Megaport Portal.",
+		Description: "Data Centre Interconnect (DCI) Resource for the Megaport Terraform Provider. A DCI is a Port at each of two locations and a VXC between them, ordered, priced and billed as one item. This resource orders a DCI, reads it, changes its name and cost centre, and cancels it on destroy. Canceling a DCI cancels both Ports and the VXC at once. Other changes are not supported yet.",
 		Attributes: map[string]schema.Attribute{
 			"solution_uid": schema.StringAttribute{
 				Description: "The unique identifier of the DCI.",
@@ -237,7 +237,7 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"DCI ordered but not ready",
-			fmt.Sprintf("DCI %s (%s) was ordered but is not ready yet: %s. Do not apply again: Terraform would try to replace the DCI. Once it is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
+			fmt.Sprintf("DCI %s (%s) was ordered but is not ready yet: %s. Do not apply again: Terraform would cancel this DCI, with both Ports and the VXC, and order a new one. Once it is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
@@ -247,7 +247,7 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"DCI ordered but could not be read",
-			fmt.Sprintf("DCI %s (%s) was ordered but could not be read: %s. Do not apply again: Terraform would try to replace the DCI. Run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
+			fmt.Sprintf("DCI %s (%s) was ordered but could not be read: %s. Do not apply again: Terraform would cancel this DCI, with both Ports and the VXC, and order a new one. Run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
@@ -280,8 +280,7 @@ func (r *dciResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		// The API never deletes a DCI: a canceled one still reads back, with active set to false.
 		// It answers 404 when DCI ordering is off for the account or the account does not own the DCI,
 		// so a 404 keeps the DCI in state. Dropping it would leave a billed DCI that Terraform no longer tracks.
-		var mpErr *megaport.ErrorResponse
-		if errors.As(err, &mpErr) && mpErr.Response != nil && mpErr.Response.StatusCode == http.StatusNotFound {
+		if isDCINotFound(err) {
 			detail = "DCI is not available for this account, or the account does not own it: " + detail
 		}
 		resp.Diagnostics.AddError(
@@ -316,6 +315,12 @@ func (r *dciResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 }
 
+// isDCINotFound reports whether the API answered 404 for a DCI.
+func isDCINotFound(err error) bool {
+	var mpErr *megaport.ErrorResponse
+	return errors.As(err, &mpErr) && mpErr.Response != nil && mpErr.Response.StatusCode == http.StatusNotFound
+}
+
 // readDCI reads a DCI and its billing, which holds the term and the auto-renew setting.
 func (r *dciResource) readDCI(ctx context.Context, uid string) (*megaport.Solution, *megaport.SolutionBillable, error) {
 	solution, err := r.client.SolutionService.GetSolution(ctx, uid)
@@ -330,8 +335,8 @@ func (r *dciResource) readDCI(ctx context.Context, uid string) (*megaport.Soluti
 }
 
 // ModifyPlan refuses, at plan time, the changes the API cannot make to a DCI.
-// No attribute forces a replace instead: a replace would order a second DCI under create_before_destroy,
-// and Delete could not cancel the first.
+// No attribute forces a replace instead: a replace would cancel a live DCI and order a new one,
+// which a change of one attribute should not do without the user asking for it.
 func (r *dciResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -427,11 +432,39 @@ func (r *dciResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 }
 
-// Delete is not supported yet. It keeps the DCI in state, because the DCI is still live and billed.
-func (r *dciResource) Delete(_ context.Context, _ resource.DeleteRequest, resp *resource.DeleteResponse) {
+// Delete cancels a DCI now, with both its Ports and its VXC.
+func (r *dciResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state dciResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	uid := state.UID.ValueString()
+	err := r.client.SolutionService.CancelSolution(ctx, &megaport.CancelSolutionRequest{SolutionUID: uid})
+	if err == nil {
+		return
+	}
+
+	// The API refuses to cancel a DCI that is already canceled, as when it was canceled outside Terraform
+	// after the last refresh. That DCI is gone, so the destroy succeeds.
+	solution, readErr := r.client.SolutionService.GetSolution(ctx, uid)
+	if readErr == nil && !solution.Active {
+		return
+	}
+
+	detail := err.Error()
+	switch {
+	case isDCINotFound(err):
+		// As in Read, a 404 keeps the DCI in state: it may still be live and billed on another account.
+		detail = "DCI is not available for this account, or the account does not own it: " + detail +
+			". If this account no longer manages the DCI, remove it from the Terraform state with `terraform state rm`."
+	case readErr != nil:
+		detail += ". The DCI could not be read to check whether it is already canceled: " + readErr.Error()
+	}
 	resp.Diagnostics.AddError(
-		"Canceling a DCI is not supported",
-		"This version of the provider cannot cancel a DCI. Cancel it in the Megaport Portal, then remove it from the Terraform state with `terraform state rm`.",
+		"Error canceling DCI",
+		"Could not cancel DCI with ID "+uid+": "+detail,
 	)
 }
 
