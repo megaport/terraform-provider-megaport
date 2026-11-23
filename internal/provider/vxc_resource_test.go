@@ -447,8 +447,8 @@ func TestAccMegaportVXC_CostCentreRemoval(t *testing.T) {
 	})
 }
 
-// TestAccMegaportVXC_ShutdownUpdate toggles shutdown on a VXC created by the
-// latest released provider, then by this build.
+// TestAccMegaportVXC_ShutdownUpdate creates a VXC with the latest release,
+// then toggles shutdown with this build.
 func TestAccMegaportVXC_ShutdownUpdate(t *testing.T) {
 	t.Parallel()
 	defer acquireAccTestSlot(t)()

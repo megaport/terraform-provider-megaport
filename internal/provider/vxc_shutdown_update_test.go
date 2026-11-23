@@ -29,10 +29,7 @@ func TestVXCUpdate_Shutdown(t *testing.T) {
 			ps := newPreflightServer(t, nil)
 			// with mutates its input, so each value gets its own base.
 			state := b.with(t, b.liveVXC(t, vxcEndSpec{}, bEndAt(200, nil), nil, ""), map[string]tftypes.Value{"shutdown": tftypes.NewValue(tftypes.Bool, tc.state)})
-			plan := b.with(t, b.liveVXC(t, vxcEndSpec{}, bEndAt(200, nil), nil, ""), map[string]tftypes.Value{
-				"shutdown":   tftypes.NewValue(tftypes.Bool, tc.plan),
-				"rate_limit": tftypes.NewValue(tftypes.Number, 2000),
-			})
+			plan := b.with(t, b.liveVXC(t, vxcEndSpec{}, bEndAt(200, nil), nil, ""), map[string]tftypes.Value{"shutdown": tftypes.NewValue(tftypes.Bool, tc.plan)})
 
 			resp := fwresource.UpdateResponse{State: tfsdk.State{Schema: b.schema, Raw: state}}
 			ps.resource(t).Update(ctx, fwresource.UpdateRequest{
