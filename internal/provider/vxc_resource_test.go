@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -441,6 +442,101 @@ func TestAccMegaportVXC_CostCentreRemoval(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("megaport_vxc.vxc", "cost_centre", ""),
 				),
+			},
+		},
+	})
+}
+
+// TestAccMegaportVXC_ShutdownUpdate toggles shutdown on a VXC created by the
+// latest released provider, then by this build.
+func TestAccMegaportVXC_ShutdownUpdate(t *testing.T) {
+	t.Parallel()
+	defer acquireAccTestSlot(t)()
+	locs := findVXCPortTestLocations(t, 1)
+	portName1 := RandomTestName()
+	portName2 := RandomTestName()
+	vxcName := RandomTestName()
+
+	configFor := func(shutdown bool) string {
+		return providerConfig + fmt.Sprintf(`
+		data "megaport_location" "loc" {
+			id = %d
+		}
+		resource "megaport_port" "port_1" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_port" "port_2" {
+			product_name           = "%s"
+			port_speed             = 1000
+			location_id            = data.megaport_location.loc.id
+			contract_term_months   = 1
+			marketplace_visibility = false
+		}
+		resource "megaport_vxc" "vxc" {
+			product_name         = "%s"
+			rate_limit           = 200
+			contract_term_months = 1
+			shutdown             = %t
+			a_end = {
+				requested_product_uid = megaport_port.port_1.product_uid
+				ordered_vlan          = 100
+			}
+			b_end = {
+				requested_product_uid = megaport_port.port_2.product_uid
+				ordered_vlan          = 101
+			}
+		}`, locs[0], portName1, portName2, vxcName, shutdown)
+	}
+
+	resource.Test(t, resource.TestCase{
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"megaport": {Source: "megaport/megaport"},
+				},
+				Config: configFor(false),
+				Check:  resource.TestCheckResourceAttr("megaport_vxc.vxc", "shutdown", "false"),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   configFor(false),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   configFor(true),
+				Check:                    resource.TestCheckResourceAttr("megaport_vxc.vxc", "shutdown", "true"),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   configFor(false),
+				Check:                    resource.TestCheckResourceAttr("megaport_vxc.vxc", "shutdown", "false"),
+			},
+			{
+				ProtoV6ProviderFactories:             testAccProtoV6ProviderFactories,
+				ResourceName:                         "megaport_vxc.vxc",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "product_uid",
+				ImportStateIdFunc: func(state *terraform.State) (string, error) {
+					resourceName := "megaport_vxc.vxc"
+					var rawState map[string]string
+					for _, m := range state.Modules {
+						if len(m.Resources) > 0 {
+							if v, ok := m.Resources[resourceName]; ok {
+								rawState = v.Primary.Attributes
+							}
+						}
+					}
+					return rawState["product_uid"], nil
+				},
+				ImportStateVerifyIgnore: []string{"last_updated", "a_end.ordered_vlan", "b_end.ordered_vlan", "a_end.requested_product_uid", "b_end.requested_product_uid", "a_end_partner_config", "b_end_partner_config", "contract_start_date", "contract_end_date", "live_date", "resources", "provisioning_status"},
 			},
 		},
 	})

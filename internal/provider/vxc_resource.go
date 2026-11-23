@@ -2972,6 +2972,10 @@ func (r *vxcResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	costCentre := plan.CostCentre.ValueString()
 	updateReq.CostCentre = &costCentre
 
+	if !plan.Shutdown.IsNull() && !plan.Shutdown.Equal(state.Shutdown) {
+		updateReq.Shutdown = megaport.PtrTo(plan.Shutdown.ValueBool())
+	}
+
 	if !plan.ContractTermMonths.IsNull() && !plan.ContractTermMonths.Equal(state.ContractTermMonths) {
 		updateReq.Term = megaport.PtrTo(int(plan.ContractTermMonths.ValueInt64()))
 	}
