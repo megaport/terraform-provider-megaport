@@ -219,38 +219,69 @@ func TestIXModifyPlanRejectsClearingCostCentre(t *testing.T) {
 
 func TestIXModifyPlanReverseDNSFollowsASN(t *testing.T) {
 	t.Parallel()
-	state := ixTestModel()
-	state.ReverseDNS = types.StringValue("as12345.sydney.megaport.com.")
-	newASN := ixTestModel()
-	newASN.ASN = types.Int64Value(65000)
-	newASN.ReverseDNS = state.ReverseDNS
-
+	const megaportDefault = "as12345.sydney.megaport.com."
 	cases := []struct {
-		name      string
-		configDNS types.String
-		plan      ixResourceModel
-		unknown   bool
+		name       string
+		stateDNS   string
+		configDNS  types.String
+		asn        int64
+		wantDNS    types.String
+		wantErrors int
 	}{
-		{"new ASN with reverse_dns unset", types.StringNull(), newASN, true},
-		{"new ASN with reverse_dns set", types.StringValue("ix.example.com"), newASN, false},
-		{"same ASN", types.StringNull(), state, false},
+		{"new ASN with reverse_dns unset", megaportDefault, types.StringNull(), 65000, types.StringUnknown(), 0},
+		{"new ASN with a custom reverse_dns set", megaportDefault, types.StringValue("ix.example.com"), 65000, types.StringValue("ix.example.com"), 0},
+		{"new ASN with the default reverse_dns set", megaportDefault, types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), 65000, types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), 1},
+		{"new ASN with a custom reverse_dns in state", "ix.example.com.", types.StringNull(), 65000, types.StringValue("ix.example.com."), 0},
+		{"same ASN", megaportDefault, types.StringNull(), 12345, types.StringValue(megaportDefault), 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			config := tc.plan
+			state := ixTestModel()
+			state.ReverseDNS = types.StringValue(tc.stateDNS)
+			plan := state
+			plan.ASN = types.Int64Value(tc.asn)
+			if !tc.configDNS.IsNull() {
+				plan.ReverseDNS = tc.configDNS
+			}
+			config := plan
 			config.ReverseDNS = tc.configDNS
 
-			got, diags := modifyIXPlan(t, config, tc.plan, state)
+			got, diags := modifyIXPlan(t, config, plan, state)
 
-			require.False(t, diags.HasError())
-			assert.Equal(t, tc.unknown, got.ReverseDNS.IsUnknown())
+			require.Len(t, diags.Errors(), tc.wantErrors)
+			if tc.wantErrors > 0 {
+				withPath, ok := diags.Errors()[0].(diag.DiagnosticWithPath)
+				require.True(t, ok)
+				assert.Equal(t, path.Root("reverse_dns"), withPath.Path())
+			}
+			assert.Equal(t, tc.wantDNS, got.ReverseDNS)
 		})
 	}
 }
 
+func TestIXModifyPlanSkipsCreateAndDestroy(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := &ixResource{}
+	model := ixTestModel()
+
+	nullPlan, nullState := ixTestSchema(t, r)
+	plan, state := ixTestSchema(t, r)
+	require.False(t, plan.Set(ctx, &model).HasError())
+	require.False(t, state.Set(ctx, &model).HasError())
+
+	create := &fwresource.ModifyPlanResponse{Plan: plan}
+	r.ModifyPlan(ctx, fwresource.ModifyPlanRequest{Config: tfsdk.Config(plan), Plan: plan, State: nullState}, create)
+	assert.False(t, create.Diagnostics.HasError(), "create")
+
+	destroy := &fwresource.ModifyPlanResponse{Plan: nullPlan}
+	r.ModifyPlan(ctx, fwresource.ModifyPlanRequest{Config: tfsdk.Config(nullPlan), Plan: nullPlan, State: state}, destroy)
+	assert.False(t, destroy.Diagnostics.HasError(), "destroy")
+}
+
 // State from the previous release holds null for these attributes when the config leaves them unset.
-func TestIXSchemaPlansNullStateAsUnknown(t *testing.T) {
+func TestIXSchemaPlansOnlyNonNullState(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := &ixResource{}
@@ -260,25 +291,33 @@ func TestIXSchemaPlansNullStateAsUnknown(t *testing.T) {
 	state := ixTestModel()
 	require.False(t, tfState.Set(ctx, &state).HasError())
 
-	for _, name := range []string{"cost_centre", "reverse_dns"} {
-		req := planmodifier.StringRequest{State: tfState, StateValue: types.StringNull(), PlanValue: types.StringUnknown(), ConfigValue: types.StringNull()}
-		resp := &planmodifier.StringResponse{PlanValue: req.PlanValue}
+	planString := func(name string, stateValue types.String) types.String {
 		attr, ok := schemaResp.Schema.Attributes[name].(schema.StringAttribute)
 		require.True(t, ok, name)
+		req := planmodifier.StringRequest{State: tfState, StateValue: stateValue, PlanValue: types.StringUnknown(), ConfigValue: types.StringNull()}
+		resp := &planmodifier.StringResponse{PlanValue: req.PlanValue}
 		for _, m := range attr.PlanModifiers {
 			m.PlanModifyString(ctx, req, resp)
 		}
-		assert.True(t, resp.PlanValue.IsUnknown(), name)
+		return resp.PlanValue
+	}
+	for _, name := range []string{"cost_centre", "reverse_dns"} {
+		assert.True(t, planString(name, types.StringNull()).IsUnknown(), name)
+		assert.Equal(t, types.StringValue("live"), planString(name, types.StringValue("live")), name)
 	}
 
-	req := planmodifier.BoolRequest{State: tfState, StateValue: types.BoolNull(), PlanValue: types.BoolUnknown(), ConfigValue: types.BoolNull()}
-	resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
 	shutdown, ok := schemaResp.Schema.Attributes["shutdown"].(schema.BoolAttribute)
 	require.True(t, ok)
-	for _, m := range shutdown.PlanModifiers {
-		m.PlanModifyBool(ctx, req, resp)
+	planShutdown := func(stateValue types.Bool) types.Bool {
+		req := planmodifier.BoolRequest{State: tfState, StateValue: stateValue, PlanValue: types.BoolUnknown(), ConfigValue: types.BoolNull()}
+		resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
+		for _, m := range shutdown.PlanModifiers {
+			m.PlanModifyBool(ctx, req, resp)
+		}
+		return resp.PlanValue
 	}
-	assert.True(t, resp.PlanValue.IsUnknown(), "shutdown")
+	assert.True(t, planShutdown(types.BoolNull()).IsUnknown(), "shutdown")
+	assert.Equal(t, types.BoolValue(true), planShutdown(types.BoolValue(true)), "shutdown")
 }
 
 // The API sets a default reverse DNS when it gets none, so an empty value can never match it.

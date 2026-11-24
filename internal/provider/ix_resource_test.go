@@ -2,12 +2,14 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 // TestAccMegaportIX_Basic tests the basic lifecycle of an IX resource
@@ -189,7 +191,8 @@ func TestAccMegaportIX_Upgrade(t *testing.T) {
 	portName := RandomTestName()
 	ixMAC := RandomMACAddress()
 
-	config := providerConfig + fmt.Sprintf(`
+	configFor := func(asn int) string {
+		return providerConfig + fmt.Sprintf(`
 resource "megaport_port" "test_port" {
     product_name           = "%s"
     location_id            = %d
@@ -202,12 +205,13 @@ resource "megaport_ix" "test_ix" {
     product_name          = "%s"
     requested_product_uid = megaport_port.test_port.product_uid
     network_service_type  = "Sydney IX"
-    asn                   = 12345
+    asn                   = %d
     mac_address           = "%s"
     rate_limit            = 500
     vlan                  = 2001
 }
-`, portName, locationID, ixName, ixMAC)
+`, portName, locationID, ixName, asn, ixMAC)
+	}
 
 	resource.Test(t, resource.TestCase{
 		Steps: []resource.TestStep{
@@ -215,14 +219,23 @@ resource "megaport_ix" "test_ix" {
 				ExternalProviders: map[string]resource.ExternalProvider{
 					"megaport": {Source: "megaport/megaport"},
 				},
-				Config: config,
+				Config: configFor(12345),
 			},
 			{
 				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-				Config:                   config,
+				Config:                   configFor(12345),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
+			},
+			// The API rebuilds the default reverse DNS from the new ASN.
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   configFor(12346),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectUnknownValue("megaport_ix.test_ix", tfjsonpath.New("reverse_dns"))},
+				},
+				Check: resource.TestMatchResourceAttr("megaport_ix.test_ix", "reverse_dns", regexp.MustCompile(`^as12346\..*\.megaport\.com\.$`)),
 			},
 		},
 	})

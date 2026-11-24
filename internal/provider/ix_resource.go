@@ -419,7 +419,7 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				},
 			},
 			"reverse_dns": schema.StringAttribute{
-				Description: "Custom hostname for your IP address. Leave it unset to use the Megaport default, which follows the ASN.",
+				Description: "Custom hostname for your IP address. Leave it unset on create to use the Megaport default, which follows the ASN.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -755,8 +755,7 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
-// ModifyPlan refuses, at plan time, a cost_centre the provider cannot clear, and marks
-// the default reverse DNS unknown when the ASN changes.
+// ModifyPlan rejects a plan that clears cost_centre, and marks the default reverse DNS unknown when the ASN changes.
 func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -777,10 +776,19 @@ func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequ
 			"The provider cannot clear cost_centre. Set a new value, or remove cost_centre from the configuration to keep the current value.")
 	}
 
-	// The API builds the default reverse DNS from the ASN and rebuilds it when the ASN changes.
-	if configReverseDNS.IsNull() && !plan.ASN.Equal(state.ASN) {
-		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("reverse_dns"), types.StringUnknown())...)
+	// The API rebuilds a Megaport default reverse DNS when the ASN changes, and refuses any other megaport.com name.
+	if !plan.ASN.Equal(state.ASN) && isMegaportReverseDNS(state.ReverseDNS.ValueString()) {
+		if configReverseDNS.IsNull() {
+			resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("reverse_dns"), types.StringUnknown())...)
+		} else if isMegaportReverseDNS(configReverseDNS.ValueString()) {
+			resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot keep the default reverse_dns",
+				"The API rebuilds the default reverse_dns when the ASN changes. Remove reverse_dns from the configuration to use the new default.")
+		}
 	}
+}
+
+func isMegaportReverseDNS(name string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSuffix(name, ".")), ".megaport.com")
 }
 
 // Update the resource.
