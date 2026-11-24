@@ -224,15 +224,17 @@ func TestIXModifyPlanReverseDNSFollowsASN(t *testing.T) {
 		name       string
 		stateDNS   string
 		configDNS  types.String
-		asn        int64
+		asn        types.Int64
 		wantDNS    types.String
 		wantErrors int
 	}{
-		{"new ASN with reverse_dns unset", megaportDefault, types.StringNull(), 65000, types.StringUnknown(), 0},
-		{"new ASN with a custom reverse_dns set", megaportDefault, types.StringValue("ix.example.com"), 65000, types.StringValue("ix.example.com"), 0},
-		{"new ASN with the default reverse_dns set", megaportDefault, types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), 65000, types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), 1},
-		{"new ASN with a custom reverse_dns in state", "ix.example.com.", types.StringNull(), 65000, types.StringValue("ix.example.com."), 0},
-		{"same ASN", megaportDefault, types.StringNull(), 12345, types.StringValue(megaportDefault), 0},
+		{"new ASN with reverse_dns unset", megaportDefault, types.StringNull(), types.Int64Value(65000), types.StringUnknown(), 0},
+		{"new ASN with a custom reverse_dns set", megaportDefault, types.StringValue("ix.example.com"), types.Int64Value(65000), types.StringValue("ix.example.com"), 0},
+		{"new ASN with the default reverse_dns set", megaportDefault, types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), types.Int64Value(65000), types.StringValue("AS12345.SYDNEY.MEGAPORT.COM"), 1},
+		{"unknown ASN with the default reverse_dns set", megaportDefault, types.StringValue(megaportDefault), types.Int64Unknown(), types.StringValue(megaportDefault), 0},
+		{"new ASN with a custom reverse_dns in state", "ix.example.com.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.example.com."), 0},
+		{"new ASN with a custom name ending in megaport.com", "ix.notmegaport.com.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.notmegaport.com."), 0},
+		{"same ASN", megaportDefault, types.StringNull(), types.Int64Value(12345), types.StringValue(megaportDefault), 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -240,7 +242,7 @@ func TestIXModifyPlanReverseDNSFollowsASN(t *testing.T) {
 			state := ixTestModel()
 			state.ReverseDNS = types.StringValue(tc.stateDNS)
 			plan := state
-			plan.ASN = types.Int64Value(tc.asn)
+			plan.ASN = tc.asn
 			if !tc.configDNS.IsNull() {
 				plan.ReverseDNS = tc.configDNS
 			}

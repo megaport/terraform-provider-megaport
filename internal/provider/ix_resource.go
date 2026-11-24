@@ -755,7 +755,7 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
-// ModifyPlan rejects a plan that clears cost_centre, and marks the default reverse DNS unknown when the ASN changes.
+// ModifyPlan rejects a cleared cost_centre, and handles the default reverse DNS when the ASN changes.
 func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -780,8 +780,8 @@ func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequ
 	if !plan.ASN.Equal(state.ASN) && isMegaportReverseDNS(state.ReverseDNS.ValueString()) {
 		if configReverseDNS.IsNull() {
 			resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("reverse_dns"), types.StringUnknown())...)
-		} else if isMegaportReverseDNS(configReverseDNS.ValueString()) {
-			resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot keep the default reverse_dns",
+		} else if !plan.ASN.IsUnknown() && isMegaportReverseDNS(configReverseDNS.ValueString()) {
+			resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot set a Megaport reverse_dns when the ASN changes",
 				"The API rebuilds the default reverse_dns when the ASN changes. Remove reverse_dns from the configuration to use the new default.")
 		}
 	}
