@@ -755,7 +755,8 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
-// ModifyPlan rejects a cleared cost_centre, and handles the default reverse DNS when the ASN changes.
+// ModifyPlan rejects a cleared cost_centre. On an ASN change, it marks a default reverse_dns unknown,
+// or rejects a Megaport reverse_dns set in the configuration.
 func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
