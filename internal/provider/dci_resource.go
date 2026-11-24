@@ -237,7 +237,7 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"DCI ordered but not ready",
-			fmt.Sprintf("DCI %s (%s) was ordered but is not ready yet: %s. Do not apply again: Terraform would cancel this DCI, with both Ports and the VXC, and order a new one. Once it is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
+			fmt.Sprintf("DCI %s (%s) was ordered but is not ready yet: %s. Do not apply again: Terraform would try to cancel this DCI, with both Ports and the VXC, to replace it. A cancel that fails part-way, for example while a Port or the VXC is still provisioning, leaves the DCI partly canceled. Once it is ready, run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
@@ -247,7 +247,7 @@ func (r *dciResource) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"DCI ordered but could not be read",
-			fmt.Sprintf("DCI %s (%s) was ordered but could not be read: %s. Do not apply again: Terraform would cancel this DCI, with both Ports and the VXC, and order a new one. Run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
+			fmt.Sprintf("DCI %s (%s) was ordered but could not be read: %s. Do not apply again: Terraform would try to cancel this DCI, with both Ports and the VXC, to replace it. A cancel that fails part-way, for example while a Port or the VXC is still provisioning, leaves the DCI partly canceled. Run `terraform untaint` on the resource, then `terraform apply -refresh-only`.", plan.Name.ValueString(), createdID, err),
 		)
 		return
 	}
@@ -280,7 +280,7 @@ func (r *dciResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		// The API never deletes a DCI: a canceled one still reads back, with active set to false.
 		// It answers 404 when DCI ordering is off for the account or the account does not own the DCI,
 		// so a 404 keeps the DCI in state. Dropping it would leave a billed DCI that Terraform no longer tracks.
-		if isDCINotFound(err) {
+		if isDCIStatus(err, http.StatusNotFound) {
 			detail = "DCI is not available for this account, or the account does not own it: " + detail
 		}
 		resp.Diagnostics.AddError(
@@ -315,10 +315,10 @@ func (r *dciResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 }
 
-// isDCINotFound reports whether the API answered 404 for a DCI.
-func isDCINotFound(err error) bool {
+// isDCIStatus reports whether the API answered a request for a DCI with the given HTTP status.
+func isDCIStatus(err error, status int) bool {
 	var mpErr *megaport.ErrorResponse
-	return errors.As(err, &mpErr) && mpErr.Response != nil && mpErr.Response.StatusCode == http.StatusNotFound
+	return errors.As(err, &mpErr) && mpErr.Response != nil && mpErr.Response.StatusCode == status
 }
 
 // readDCI reads a DCI and its billing, which holds the term and the auto-renew setting.
@@ -455,7 +455,11 @@ func (r *dciResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	detail := err.Error()
 	switch {
-	case isDCINotFound(err):
+	case isDCIStatus(err, http.StatusConflict):
+		// The API cancels the Ports and the VXC one by one, and answers 409 when it cannot finish.
+		// It skips the ones already canceled on the next cancel, so a retry finishes the job.
+		detail += ". The cancel did not finish, so the DCI is still active, but some of its Ports or its VXC may already be canceled. Run the same Terraform command again to finish the cancel."
+	case isDCIStatus(err, http.StatusNotFound):
 		// As in Read, a 404 keeps the DCI in state: it may still be live and billed on another account.
 		detail = "DCI is not available for this account, or the account does not own it: " + detail +
 			". If this account no longer manages the DCI, remove it from the Terraform state with `terraform state rm`."

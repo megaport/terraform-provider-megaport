@@ -213,9 +213,14 @@ func dciMock() *MockSolutionService {
 
 // dciNotFound returns the error the SDK gives for a 404 from the API.
 func dciNotFound(message string) error {
+	return dciAPIError(http.StatusNotFound, message)
+}
+
+// dciAPIError returns the error the SDK gives for an error status from the API.
+func dciAPIError(status int, message string) error {
 	return &megaport.ErrorResponse{
 		Response: &http.Response{
-			StatusCode: http.StatusNotFound,
+			StatusCode: status,
 			Request:    &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/v1/solutions/" + dciStubUID + "/billable"}},
 		},
 		Message: message,
@@ -1147,8 +1152,12 @@ func TestDCIDeleteFailures(t *testing.T) {
 		// The read error says why the check for an already canceled DCI could not run.
 		"refused and read fails": {active: true, cancelErr: locked, readErr: errors.New("the mock fails the read"), wantErr: true, wantDetail: "the mock fails the read"},
 		// A DCI the account cannot see may still be live, so it stays in state and the user is told how to drop it.
+		// A cancel that stops part-way leaves the DCI active, and a retry finishes it.
+		"stopped part-way": {active: true, cancelErr: dciAPIError(http.StatusConflict, "Failed to decommission member services"), wantErr: true, wantDetail: "Run the same Terraform command again"},
 		"not found":        {active: true, cancelErr: dciNotFound("No solution was found"), readErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
-		"already canceled": {active: false, cancelErr: locked},
+		// The hint comes from the cancel's own 404, not from the read's.
+		"not found but read": {active: true, cancelErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
+		"already canceled":   {active: false, cancelErr: dciAPIError(http.StatusBadRequest, "Solution is already cancelled.")},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
