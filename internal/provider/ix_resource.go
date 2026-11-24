@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -23,6 +25,7 @@ var (
 	_ resource.Resource                = &ixResource{}
 	_ resource.ResourceWithConfigure   = &ixResource{}
 	_ resource.ResourceWithImportState = &ixResource{}
+	_ resource.ResourceWithModifyPlan  = &ixResource{}
 
 	interfaceAttrTypes = map[string]attr.Type{
 		"demarcation":   types.StringType,
@@ -392,7 +395,7 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
+					boolplanmodifier.UseNonNullStateForUnknown(),
 				},
 			},
 			"promo_code": schema.StringAttribute{
@@ -404,7 +407,7 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.UseNonNullStateForUnknown(),
 				},
 			},
 			"public_graph": schema.BoolAttribute{
@@ -416,11 +419,14 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				},
 			},
 			"reverse_dns": schema.StringAttribute{
-				Description: "Custom hostname for your IP address.",
+				Description: "Custom hostname for your IP address. Leave it unset to use the Megaport default, which follows the ASN.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.UseNonNullStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"provisioning_status": schema.StringAttribute{
@@ -749,6 +755,34 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
+// ModifyPlan refuses, at plan time, a cost_centre the provider cannot clear, and marks
+// the default reverse DNS unknown when the ASN changes.
+func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state ixResourceModel
+	var configReverseDNS types.String
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("reverse_dns"), &configReverseDNS)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The SDK drops an empty cost_centre from the update, so the API keeps the current value.
+	if !plan.CostCentre.IsUnknown() && plan.CostCentre.ValueString() == "" && state.CostCentre.ValueString() != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("cost_centre"), "Cannot clear cost_centre",
+			"The provider cannot clear cost_centre. Set a new value, or remove cost_centre from the configuration to keep the current value.")
+	}
+
+	// The API builds the default reverse DNS from the ASN and rebuilds it when the ASN changes.
+	if configReverseDNS.IsNull() && !plan.ASN.Equal(state.ASN) {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("reverse_dns"), types.StringUnknown())...)
+	}
+}
+
 // Update the resource.
 func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state ixResourceModel
@@ -789,19 +823,6 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	if !plan.Shutdown.IsUnknown() && !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown := plan.Shutdown.ValueBool()
 		updateReq.Shutdown = &shutdown
-	}
-
-	// The SDK drops an empty cost_centre or reverse_dns from the update, so the API keeps the current value.
-	if plan.CostCentre.ValueString() == "" && state.CostCentre.ValueString() != "" {
-		resp.Diagnostics.AddAttributeError(path.Root("cost_centre"), "Cannot clear cost_centre",
-			"The provider cannot clear cost_centre. Set a new value, or remove cost_centre from the configuration to keep the current value.")
-	}
-	if plan.ReverseDNS.ValueString() == "" && state.ReverseDNS.ValueString() != "" {
-		resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot clear reverse_dns",
-			"The provider cannot clear reverse_dns. Set a new value, or remove reverse_dns from the configuration to keep the current value.")
-	}
-	if resp.Diagnostics.HasError() {
-		return
 	}
 
 	settingsChanged := plan.addSettingChanges(updateReq, &state)
