@@ -1151,10 +1151,10 @@ func TestDCIDeleteFailures(t *testing.T) {
 		"refused while active": {active: true, cancelErr: locked, wantErr: true, wantDetail: "the solution is locked"},
 		// The read error says why the check for an already canceled DCI could not run.
 		"refused and read fails": {active: true, cancelErr: locked, readErr: errors.New("the mock fails the read"), wantErr: true, wantDetail: "the mock fails the read"},
-		// A DCI the account cannot see may still be live, so it stays in state and the user is told how to drop it.
 		// A cancel that stops part-way leaves the DCI active, and a retry finishes it.
 		"stopped part-way": {active: true, cancelErr: dciAPIError(http.StatusConflict, "Failed to decommission member services"), wantErr: true, wantDetail: "Run the same Terraform command again"},
-		"not found":        {active: true, cancelErr: dciNotFound("No solution was found"), readErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
+		// A DCI the account cannot see may still be live, so it stays in state and the user is told how to drop it.
+		"not found": {active: true, cancelErr: dciNotFound("No solution was found"), readErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
 		// The hint comes from the cancel's own 404, not from the read's.
 		"not found but read": {active: true, cancelErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
 		"already canceled":   {active: false, cancelErr: dciAPIError(http.StatusBadRequest, "Solution is already cancelled.")},
