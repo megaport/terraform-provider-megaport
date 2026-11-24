@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -157,9 +159,13 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	orm.ProductName = types.StringValue(ix.ProductName)
 	orm.NetworkServiceType = types.StringValue(ix.NetworkServiceType)
 	orm.ASN = types.Int64Value(int64(ix.ASN))
+	orm.MACAddress = types.StringValue(ix.MACAddress)
 	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
 	orm.VLAN = types.Int64Value(int64(ix.VLAN))
+	orm.Shutdown = types.BoolValue(ix.Shutdown)
+	orm.CostCentre = types.StringValue(ix.CostCentre)
 	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
+	orm.ReverseDNS = types.StringValue(ix.ReverseDNS)
 	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
 	orm.Term = types.Int64Value(int64(ix.Term))
 	orm.LocationID = types.Int64Value(int64(ix.LocationID))
@@ -282,6 +288,25 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	}
 }
 
+// addSettingChanges adds cost_centre, public_graph, and reverse_dns to req
+// where the plan sets a value that current does not have.
+func (orm *ixResourceModel) addSettingChanges(req *megaport.UpdateIXRequest, current *ixResourceModel) bool {
+	changed := false
+	if !orm.CostCentre.IsUnknown() && !orm.CostCentre.Equal(current.CostCentre) {
+		req.CostCentre = megaport.PtrTo(orm.CostCentre.ValueString())
+		changed = true
+	}
+	if !orm.PublicGraph.IsUnknown() && !orm.PublicGraph.Equal(current.PublicGraph) {
+		req.PublicGraph = megaport.PtrTo(orm.PublicGraph.ValueBool())
+		changed = true
+	}
+	if !orm.ReverseDNS.IsUnknown() && !orm.ReverseDNS.Equal(current.ReverseDNS) {
+		req.ReverseDns = megaport.PtrTo(orm.ReverseDNS.ValueString())
+		changed = true
+	}
+	return changed
+}
+
 // NewIXResource is a helper function to simplify the provider implementation.
 func NewIXResource() resource.Resource {
 	return &ixResource{}
@@ -316,6 +341,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"product_id": schema.Int64Attribute{
 				Description: "Numeric ID of the IX product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"product_name": schema.StringAttribute{
 				Description: "Name of the IX.",
@@ -329,6 +357,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "The ASN (Autonomous System Number) for the IX connection.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"mac_address": schema.StringAttribute{
 				Description: "The MAC address for the IX interface.",
@@ -345,6 +376,10 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"shutdown": schema.BoolAttribute{
 				Description: "Whether the IX connection is shut down. Default is false.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"promo_code": schema.StringAttribute{
 				Description: "Promo code to apply to the IX.",
@@ -353,15 +388,26 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"cost_centre": schema.StringAttribute{
 				Description: "Cost centre for invoicing purposes.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"public_graph": schema.BoolAttribute{
 				Description: "Whether the IX usage statistics are publicly viewable.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"reverse_dns": schema.StringAttribute{
 				Description: "Custom hostname for your IP address.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the IX. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the IX lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
@@ -370,14 +416,23 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"create_date": schema.StringAttribute{
 				Description: "The date the IX was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"term": schema.Int64Attribute{
 				Description: "The term of the IX in months.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The ID of the location where the IX is provisioned.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"attribute_tags": schema.MapAttribute{
 				Description: "Attribute tags associated with the IX.",
@@ -399,6 +454,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"usage_algorithm": schema.StringAttribute{
 				Description: "Usage algorithm for the IX.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources associated with the IX.",
@@ -600,6 +658,31 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	// The IX order cannot carry these settings, so set them with an update.
+	var created ixResourceModel
+	created.fromAPI(ctx, ix)
+	settingsReq := &megaport.UpdateIXRequest{
+		WaitForUpdate: true,
+		WaitForTime:   waitForTime,
+	}
+	if plan.addSettingChanges(settingsReq, &created) {
+		if _, err := r.client.IXService.UpdateIX(ctx, createdID, settingsReq); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating IX",
+				"Could not set cost_centre, public_graph, or reverse_dns after creation, unexpected error: "+err.Error(),
+			)
+			return
+		}
+		ix, err = r.client.IXService.GetIX(ctx, createdID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading IX",
+				"Could not read IX after creation, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
 	// Update the plan with the IX info
 	plan.fromAPI(ctx, ix)
 
@@ -694,8 +777,11 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		updateReq.Shutdown = &shutdown
 	}
 
+	settingsChanged := plan.addSettingChanges(updateReq, &state)
+
 	// Apply the update if any fields changed
-	if updateReq.Name != nil ||
+	if settingsChanged ||
+		updateReq.Name != nil ||
 		updateReq.RateLimit != nil ||
 		updateReq.VLAN != nil ||
 		updateReq.MACAddress != nil ||
@@ -724,6 +810,10 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// Update the state with the IX info
 	state.fromAPI(ctx, updatedIX)
 	state.PromoCode = plan.PromoCode
+	// The IX read has no parent product UID, so an import leaves it null.
+	if state.RequestedProductUID.IsNull() {
+		state.RequestedProductUID = plan.RequestedProductUID
+	}
 
 	// Persist the new state
 	diags := resp.State.Set(ctx, &state)
