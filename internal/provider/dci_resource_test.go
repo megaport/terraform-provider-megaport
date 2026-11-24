@@ -35,14 +35,20 @@ func (v dciAccValues) config() string {
 		optional += "auto_renew = true\n"
 	}
 	return providerConfig + fmt.Sprintf(`
+	data "megaport_location" "a_end" {
+		id = %d
+	}
+	data "megaport_location" "b_end" {
+		id = %d
+	}
 	resource "megaport_dci" "dci" {
 		name                 = %q
-		a_end_location_id    = %d
-		b_end_location_id    = %d
+		a_end_location_id    = data.megaport_location.a_end.id
+		b_end_location_id    = data.megaport_location.b_end.id
 		speed                = %d
 		contract_term_months = %d
 		%s
-	}`, v.name, v.aEnd, v.bEnd, v.speed, v.term, optional)
+	}`, v.aEnd, v.bEnd, v.name, v.speed, v.term, optional)
 }
 
 // TestAccMegaportDCI_Basic orders a DCI, imports it, changes its name and cost centre,
