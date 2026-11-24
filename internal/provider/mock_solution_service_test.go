@@ -17,6 +17,8 @@ type MockSolutionService struct {
 	GetSolutionBillableErr         error
 	UpdateSolutionErr              error
 	CapturedUpdateSolutionRequests []*megaport.UpdateSolutionRequest
+	CancelSolutionErr              error
+	CapturedCancelSolutionRequests []*megaport.CancelSolutionRequest
 }
 
 var _ megaport.SolutionService = &MockSolutionService{}
@@ -44,4 +46,9 @@ func (m *MockSolutionService) GetSolutionBillable(_ context.Context, _ string) (
 func (m *MockSolutionService) UpdateSolution(_ context.Context, req *megaport.UpdateSolutionRequest) error {
 	m.CapturedUpdateSolutionRequests = append(m.CapturedUpdateSolutionRequests, req)
 	return m.UpdateSolutionErr
+}
+
+func (m *MockSolutionService) CancelSolution(_ context.Context, req *megaport.CancelSolutionRequest) error {
+	m.CapturedCancelSolutionRequests = append(m.CapturedCancelSolutionRequests, req)
+	return m.CancelSolutionErr
 }

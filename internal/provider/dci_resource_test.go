@@ -39,9 +39,10 @@ type dciStub struct {
 	readStatus  int
 	readMessage string
 
-	mu       sync.Mutex
-	buyBody  map[string]any
-	requests []string
+	mu         sync.Mutex
+	buyBody    map[string]any
+	cancelBody map[string]any
+	requests   []string
 }
 
 func (s *dciStub) handler(t *testing.T) http.HandlerFunc {
@@ -73,6 +74,17 @@ func (s *dciStub) handler(t *testing.T) http.HandlerFunc {
 				"data":      []map[string]any{{"technicalServiceUid": "a-end-uid"}, {"technicalServiceUid": "b-end-uid"}},
 				"solutions": []map[string]any{{"uid": dciStubUID, "ref": declared["ref"], "type": "DCI", "name": declared["name"]}},
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/solutions/"+dciStubUID+"/cancel":
+			body := map[string]any{}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Errorf("could not decode the cancel: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			s.mu.Lock()
+			s.cancelBody = body
+			s.mu.Unlock()
+			writeStubJSON(t, w, http.StatusOK, map[string]any{"message": "ok"})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/solutions/"+dciStubUID:
 			if s.readStatus != 0 {
 				writeStubJSON(t, w, s.readStatus, map[string]any{"message": s.readMessage})
@@ -201,9 +213,14 @@ func dciMock() *MockSolutionService {
 
 // dciNotFound returns the error the SDK gives for a 404 from the API.
 func dciNotFound(message string) error {
+	return dciAPIError(http.StatusNotFound, message)
+}
+
+// dciAPIError returns the error the SDK gives for an error status from the API.
+func dciAPIError(status int, message string) error {
 	return &megaport.ErrorResponse{
 		Response: &http.Response{
-			StatusCode: http.StatusNotFound,
+			StatusCode: status,
 			Request:    &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/v1/solutions/" + dciStubUID + "/billable"}},
 		},
 		Message: message,
@@ -1092,9 +1109,9 @@ func TestDCINoAttributeForcesReplace(t *testing.T) {
 	}
 }
 
-// TestDCIDeleteIsRejected covers the action this version cannot do.
-// It may not call the API or drop the DCI from state, because the DCI stays live and billed.
-func TestDCIDeleteIsRejected(t *testing.T) {
+// TestDCIDeleteCancelsDCI covers a destroy. It cancels the DCI, which cancels both Ports and the VXC,
+// and sends no reason, as the other resources do when they cancel a service.
+func TestDCIDeleteCancelsDCI(t *testing.T) {
 	t.Parallel()
 
 	stub := &dciStub{}
@@ -1103,14 +1120,69 @@ func TestDCIDeleteIsRejected(t *testing.T) {
 
 	deleteResp := fwresource.DeleteResponse{State: state}
 	r.Delete(t.Context(), fwresource.DeleteRequest{State: state}, &deleteResp)
-	requireOneError(t, deleteResp.Diagnostics, "Canceling a DCI is not supported")
-	if deleteResp.State.Raw.IsNull() {
-		t.Fatal("Delete removed the DCI from state")
+	if deleteResp.Diagnostics.HasError() {
+		t.Fatalf("Delete errors: %v", deleteResp.Diagnostics.Errors())
 	}
 
 	stub.mu.Lock()
 	defer stub.mu.Unlock()
-	if len(stub.requests) != 0 {
-		t.Fatalf("Delete called the API: %v", stub.requests)
+	want := []string{"POST /v1/solutions/" + dciStubUID + "/cancel"}
+	if strings.Join(stub.requests, ",") != strings.Join(want, ",") {
+		t.Fatalf("requests = %v, want %v", stub.requests, want)
+	}
+	if len(stub.cancelBody) != 0 {
+		t.Errorf("cancel body = %v, want no reason or comment", stub.cancelBody)
+	}
+}
+
+// TestDCIDeleteFailures covers a cancel the API refuses. A DCI that is still active must stay in state,
+// because it is still live and billed. One that is already canceled is gone, so the destroy succeeds.
+func TestDCIDeleteFailures(t *testing.T) {
+	t.Parallel()
+
+	locked := errors.New("the solution is locked")
+	cases := map[string]struct {
+		active     bool
+		cancelErr  error
+		readErr    error
+		wantErr    bool
+		wantDetail string
+	}{
+		"refused while active": {active: true, cancelErr: locked, wantErr: true, wantDetail: "the solution is locked"},
+		// The read error says why the check for an already canceled DCI could not run.
+		"refused and read fails": {active: true, cancelErr: locked, readErr: errors.New("the mock fails the read"), wantErr: true, wantDetail: "the mock fails the read"},
+		// A cancel that stops part-way leaves the DCI active, and a retry finishes it.
+		"stopped part-way": {active: true, cancelErr: dciAPIError(http.StatusConflict, "Failed to decommission member services"), wantErr: true, wantDetail: "Run the same Terraform command again"},
+		// A DCI the account cannot see may still be live, so it stays in state and the user is told how to drop it.
+		"not found": {active: true, cancelErr: dciNotFound("No solution was found"), readErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
+		// The hint comes from the cancel's own 404, not from the read's.
+		"not found but read": {active: true, cancelErr: dciNotFound("No solution was found"), wantErr: true, wantDetail: "terraform state rm"},
+		"already canceled":   {active: false, cancelErr: dciAPIError(http.StatusBadRequest, "Solution is already cancelled.")},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := dciMock()
+			mock.CancelSolutionErr = tc.cancelErr
+			mock.GetSolutionResult.Active = tc.active
+			mock.GetSolutionErr = tc.readErr
+			r, schemaResp, objType := newDCIMockResource(t, mock)
+			state := dciState(schemaResp, objType)
+
+			deleteResp := fwresource.DeleteResponse{State: state}
+			r.Delete(t.Context(), fwresource.DeleteRequest{State: state}, &deleteResp)
+			if tc.wantErr {
+				requireOneError(t, deleteResp.Diagnostics, "Error canceling DCI")
+				if detail := deleteResp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, tc.wantDetail) {
+					t.Errorf("error detail = %q, want it to contain %q", detail, tc.wantDetail)
+				}
+			} else if deleteResp.Diagnostics.HasError() {
+				t.Fatalf("Delete errors: %v", deleteResp.Diagnostics.Errors())
+			}
+			if len(mock.CapturedCancelSolutionRequests) != 1 || mock.CapturedCancelSolutionRequests[0].SolutionUID != dciStubUID {
+				t.Errorf("cancel requests = %v, want one for %s", mock.CapturedCancelSolutionRequests, dciStubUID)
+			}
+		})
 	}
 }
