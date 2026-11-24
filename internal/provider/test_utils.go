@@ -10,11 +10,12 @@ import (
 const TestNamePrefix = "tf-acc-test-"
 
 func RandomTestName(additionalNames ...string) string {
-	prefix := TestNamePrefix
+	var prefix strings.Builder
+	prefix.WriteString(TestNamePrefix)
 	for _, n := range additionalNames {
-		prefix += "-" + strings.ReplaceAll(n, " ", "_")
+		prefix.WriteString("-" + strings.ReplaceAll(n, " ", "_"))
 	}
-	return randomName(prefix, 10)
+	return randomName(prefix.String(), 10)
 }
 
 func randomName(prefix string, length int) string {

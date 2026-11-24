@@ -899,7 +899,7 @@ func findAnyActiveLocationID(t *testing.T) int {
 //nolint:unparam // count is 1 today but callers may vary it
 func findVXCPortTestLocations(t *testing.T, count int) []int {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	client, err := getTestClient()
 	if err != nil {
 		t.Skipf("skipping: could not get test client: %v", err)

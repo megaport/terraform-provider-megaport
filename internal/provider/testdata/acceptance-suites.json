@@ -1,5 +1,9 @@
 {
   "suites": {
+    "dci": [
+      "TestAccMegaportDCI_Basic",
+      "TestAccMegaportDCI_CostCentreRemoval"
+    ],
     "ports": [
       "TestAccMegaportLAGPort_Basic",
       "TestAccMegaportLAGPort_ContractTermUpdate",
