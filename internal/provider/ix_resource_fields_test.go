@@ -235,7 +235,7 @@ func TestIXModifyPlanReverseDNSFollowsASN(t *testing.T) {
 		{"unknown ASN with the default reverse_dns set", megaportDefault, types.StringValue(megaportDefault), types.Int64Unknown(), types.StringValue(megaportDefault), 0},
 		{"new ASN with a custom reverse_dns in state", "ix.example.com.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.example.com."), 0},
 		{"new ASN with a custom name ending in megaport.com", "ix.notmegaport.com.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.notmegaport.com."), 0},
-		{"new ASN with megaport.com inside a custom name", "ix.megaport.com.example.net.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.megaport.com.example.net."), 0},
+		{"new ASN with megaport.com inside a custom name", "ix.MEGAPORT.COM.example.net.", types.StringNull(), types.Int64Value(65000), types.StringValue("ix.MEGAPORT.COM.example.net."), 0},
 		{"same ASN", megaportDefault, types.StringNull(), types.Int64Value(12345), types.StringValue(megaportDefault), 0},
 	}
 	for _, tc := range cases {
