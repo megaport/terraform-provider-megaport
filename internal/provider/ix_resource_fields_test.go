@@ -220,3 +220,43 @@ func TestIXCreateSetsSettingsTheOrderCannotCarry(t *testing.T) {
 		assert.Empty(t, mock.GotUpdateIXReqs)
 	})
 }
+
+// The API lowercases the MAC and adds a trailing dot to reverse DNS.
+func TestIXUpdateKeepsPlannedFormOfNormalizedValues(t *testing.T) {
+	t.Parallel()
+
+	t.Run("same_values_after_import", func(t *testing.T) {
+		t.Parallel()
+		plan := ixTestModel()
+		plan.MACAddress = types.StringValue("02:AB:CD:EF:00:01")
+		plan.ReverseDNS = types.StringValue("ix.example.com")
+		state := ixTestModel()
+		state.MACAddress = types.StringValue("02:ab:cd:ef:00:01")
+		state.ReverseDNS = types.StringValue("ix.example.com.")
+		live := ixTestAPI()
+		live.MACAddress, live.ReverseDNS = "02:ab:cd:ef:00:01", "ix.example.com."
+
+		got, mock := runIXUpdate(t, plan, state, live)
+
+		assert.Empty(t, mock.GotUpdateIXReqs)
+		assert.Equal(t, "02:AB:CD:EF:00:01", got.MACAddress.ValueString())
+		assert.Equal(t, "ix.example.com", got.ReverseDNS.ValueString())
+	})
+
+	t.Run("changed_values", func(t *testing.T) {
+		t.Parallel()
+		plan := ixTestModel()
+		plan.MACAddress = types.StringValue("02:AB:CD:EF:00:02")
+		plan.ReverseDNS = types.StringValue("ix2.example.com")
+		live := ixTestAPI()
+		live.MACAddress, live.ReverseDNS = "02:ab:cd:ef:00:02", "ix2.example.com."
+
+		got, mock := runIXUpdate(t, plan, ixTestModel(), live)
+
+		require.Len(t, mock.GotUpdateIXReqs, 1)
+		assert.NotNil(t, mock.GotUpdateIXReqs[0].MACAddress)
+		assert.NotNil(t, mock.GotUpdateIXReqs[0].ReverseDns)
+		assert.Equal(t, "02:AB:CD:EF:00:02", got.MACAddress.ValueString())
+		assert.Equal(t, "ix2.example.com", got.ReverseDNS.ValueString())
+	})
+}

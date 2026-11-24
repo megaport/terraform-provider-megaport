@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -16,8 +17,9 @@ func TestAccMegaportIX_Basic(t *testing.T) {
 	locationID, _ := findPortTestLocation(t, 1000)
 	ixName := RandomTestName()
 	portName := RandomTestName()
-	ixMAC := RandomMACAddress()
-	ixMACUpdated := RandomMACAddress()
+	// The import verify compares against the API, which lowercases the MAC and adds a trailing dot to reverse DNS.
+	ixMAC := strings.ToLower(RandomMACAddress())
+	ixMACUpdated := strings.ToLower(RandomMACAddress())
 	ixNameUpdated := ixName + "-updated"
 	ixRateLimit := 500
 	ixRateLimitUpdated := 750
@@ -46,7 +48,7 @@ resource "megaport_ix" "test_ix" {
     shutdown            = false
     cost_centre         = "tf-acc-cc-1"
     public_graph        = true
-    reverse_dns         = "ix1.tf-acc.example.com"
+    reverse_dns         = "ix1.tf-acc.example.com."
 }
 `, ixName, ixMAC, ixRateLimit, ixVLAN)
 
@@ -63,7 +65,7 @@ resource "megaport_ix" "test_ix" {
     shutdown            = false
     cost_centre         = "tf-acc-cc-2"
     public_graph        = false
-    reverse_dns         = "ix2.tf-acc.example.com"
+    reverse_dns         = "ix2.tf-acc.example.com."
 }
 `, ixNameUpdated, ixMACUpdated, ixRateLimitUpdated, ixVLANUpdated)
 
@@ -106,7 +108,7 @@ removed {
 					resource.TestCheckResourceAttr(resourceName, "mac_address", ixMAC),
 					resource.TestCheckResourceAttr(resourceName, "cost_centre", "tf-acc-cc-1"),
 					resource.TestCheckResourceAttr(resourceName, "public_graph", "true"),
-					resource.TestCheckResourceAttr(resourceName, "reverse_dns", "ix1.tf-acc.example.com"),
+					resource.TestCheckResourceAttr(resourceName, "reverse_dns", "ix1.tf-acc.example.com."),
 					captureUID,
 				),
 			},
@@ -139,7 +141,7 @@ removed {
 					resource.TestCheckResourceAttr(resourceName, "mac_address", ixMACUpdated),
 					resource.TestCheckResourceAttr(resourceName, "cost_centre", "tf-acc-cc-2"),
 					resource.TestCheckResourceAttr(resourceName, "public_graph", "false"),
-					resource.TestCheckResourceAttr(resourceName, "reverse_dns", "ix2.tf-acc.example.com"),
+					resource.TestCheckResourceAttr(resourceName, "reverse_dns", "ix2.tf-acc.example.com."),
 				),
 			},
 			{

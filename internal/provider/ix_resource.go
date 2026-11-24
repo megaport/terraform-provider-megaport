@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -159,13 +160,13 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	orm.ProductName = types.StringValue(ix.ProductName)
 	orm.NetworkServiceType = types.StringValue(ix.NetworkServiceType)
 	orm.ASN = types.Int64Value(int64(ix.ASN))
-	orm.MACAddress = types.StringValue(ix.MACAddress)
+	orm.MACAddress = readBack(orm.MACAddress, ix.MACAddress, strings.EqualFold)
 	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
 	orm.VLAN = types.Int64Value(int64(ix.VLAN))
 	orm.Shutdown = types.BoolValue(ix.Shutdown)
 	orm.CostCentre = types.StringValue(ix.CostCentre)
 	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
-	orm.ReverseDNS = types.StringValue(ix.ReverseDNS)
+	orm.ReverseDNS = readBack(orm.ReverseDNS, ix.ReverseDNS, sameReverseDNS)
 	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
 	orm.Term = types.Int64Value(int64(ix.Term))
 	orm.LocationID = types.Int64Value(int64(ix.LocationID))
@@ -288,6 +289,19 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	}
 }
 
+// readBack keeps the current value when the API returns the same value in
+// another form. The API lowercases the MAC and adds a trailing dot to reverse DNS.
+func readBack(current types.String, api string, same func(a, b string) bool) types.String {
+	if !current.IsNull() && !current.IsUnknown() && same(current.ValueString(), api) {
+		return current
+	}
+	return types.StringValue(api)
+}
+
+func sameReverseDNS(a, b string) bool {
+	return strings.TrimSuffix(a, ".") == strings.TrimSuffix(b, ".")
+}
+
 // addSettingChanges adds cost_centre, public_graph, and reverse_dns to req
 // where the plan sets a value that current does not have.
 func (orm *ixResourceModel) addSettingChanges(req *megaport.UpdateIXRequest, current *ixResourceModel) bool {
@@ -300,7 +314,7 @@ func (orm *ixResourceModel) addSettingChanges(req *megaport.UpdateIXRequest, cur
 		req.PublicGraph = megaport.PtrTo(orm.PublicGraph.ValueBool())
 		changed = true
 	}
-	if !orm.ReverseDNS.IsUnknown() && !orm.ReverseDNS.Equal(current.ReverseDNS) {
+	if !orm.ReverseDNS.IsUnknown() && !sameReverseDNS(orm.ReverseDNS.ValueString(), current.ReverseDNS.ValueString()) {
 		req.ReverseDns = megaport.PtrTo(orm.ReverseDNS.ValueString())
 		changed = true
 	}
@@ -764,7 +778,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		vlan := int(plan.VLAN.ValueInt64())
 		updateReq.VLAN = &vlan
 	}
-	if !plan.MACAddress.Equal(state.MACAddress) {
+	if !strings.EqualFold(plan.MACAddress.ValueString(), state.MACAddress.ValueString()) {
 		macAddress := plan.MACAddress.ValueString()
 		updateReq.MACAddress = &macAddress
 	}
@@ -807,7 +821,10 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// Update the state with the IX info
+	// Update the state with the IX info. The read-back keeps the planned form
+	// of the MAC and reverse DNS.
+	state.MACAddress = plan.MACAddress
+	state.ReverseDNS = plan.ReverseDNS
 	state.fromAPI(ctx, updatedIX)
 	state.PromoCode = plan.PromoCode
 	// The IX read has no parent product UID, so an import leaves it null.
