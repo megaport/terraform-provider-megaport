@@ -83,6 +83,7 @@
       "TestAccMegaportVXC_NATGatewayPrefixListBGP",
       "TestAccMegaportVXC_PartnerConfigBlockMismatch",
       "TestAccMegaportVXC_PromoCode",
+      "TestAccMegaportVXC_ShutdownUpdate",
       "TestAccMegaportVXC_TransitBEndVLANChangeRejected",
       "TestAccMegaportVXC_TransitInternetTagsUpdate"
     ],
