@@ -64,7 +64,7 @@ func ixTestSchema(t *testing.T, r *ixResource) (tfsdk.Plan, tfsdk.State) {
 	return tfsdk.Plan{Schema: s, Raw: tftypes.NewValue(objType, nil)}, tfsdk.State{Schema: s, Raw: tftypes.NewValue(objType, nil)}
 }
 
-func runIXUpdate(t *testing.T, plan, state ixResourceModel, live *megaport.IX) (ixResourceModel, *MockIXService) {
+func updateIX(t *testing.T, plan, state ixResourceModel, live *megaport.IX) (*fwresource.UpdateResponse, *MockIXService) {
 	t.Helper()
 	ctx := context.Background()
 	mock := &MockIXService{GetIXResult: live}
@@ -76,17 +76,24 @@ func runIXUpdate(t *testing.T, plan, state ixResourceModel, live *megaport.IX) (
 
 	resp := &fwresource.UpdateResponse{State: tfState}
 	r.Update(ctx, fwresource.UpdateRequest{Plan: tfPlan, State: tfState}, resp)
+	return resp, mock
+}
+
+func runIXUpdate(t *testing.T, plan, state ixResourceModel, live *megaport.IX) (ixResourceModel, *MockIXService) {
+	t.Helper()
+	resp, mock := updateIX(t, plan, state, live)
 	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
 
 	var got ixResourceModel
-	require.False(t, resp.State.Get(ctx, &got).HasError())
+	require.False(t, resp.State.Get(context.Background(), &got).HasError())
 	return got, mock
 }
 
-func runIXCreate(t *testing.T, plan ixResourceModel, live *megaport.IX) *MockIXService {
+// runIXCreate creates the IX against live, and against updated after a follow-up update when updated is set.
+func runIXCreate(t *testing.T, plan ixResourceModel, live, updated *megaport.IX) (ixResourceModel, *MockIXService) {
 	t.Helper()
 	ctx := context.Background()
-	mock := &MockIXService{GetIXResult: live, BuyIXResult: &megaport.BuyIXResponse{TechnicalServiceUID: ixReadTestUID}}
+	mock := &MockIXService{GetIXResult: live, UpdatedIX: updated, BuyIXResult: &megaport.BuyIXResponse{TechnicalServiceUID: ixReadTestUID}}
 	r := &ixResource{client: &megaport.Client{IXService: mock}}
 
 	tfPlan, tfState := ixTestSchema(t, r)
@@ -95,7 +102,10 @@ func runIXCreate(t *testing.T, plan ixResourceModel, live *megaport.IX) *MockIXS
 	resp := &fwresource.CreateResponse{State: tfState}
 	r.Create(ctx, fwresource.CreateRequest{Plan: tfPlan}, resp)
 	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
-	return mock
+
+	var got ixResourceModel
+	require.False(t, resp.State.Get(ctx, &got).HasError())
+	return got, mock
 }
 
 func TestIXFromAPIMapsTopLevelFields(t *testing.T) {
@@ -114,6 +124,10 @@ func TestIXFromAPIMapsTopLevelFields(t *testing.T) {
 	assert.Equal(t, "cc-1", got.CostCentre.ValueString())
 	assert.True(t, got.PublicGraph.ValueBool())
 	assert.Equal(t, "ix.example.com", got.ReverseDNS.ValueString())
+
+	var empty ixResourceModel
+	empty.fromAPI(context.Background(), ixTestAPI())
+	assert.Equal(t, types.StringValue(""), empty.ReverseDNS)
 }
 
 func TestIXUpdateSendsSettingChanges(t *testing.T) {
@@ -140,7 +154,58 @@ func TestIXUpdateSendsSettingChanges(t *testing.T) {
 	assert.Equal(t, "cc-2", got.CostCentre.ValueString())
 }
 
-// A MAC change used to leave the old MAC in state, so the apply failed as inconsistent.
+func TestIXUpdateSendsEachSettingAlone(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		set  func(*ixResourceModel)
+	}{
+		{"cost_centre", func(m *ixResourceModel) { m.CostCentre = types.StringValue("cc-2") }},
+		{"public_graph", func(m *ixResourceModel) { m.PublicGraph = types.BoolValue(true) }},
+		{"reverse_dns", func(m *ixResourceModel) { m.ReverseDNS = types.StringValue("ix.example.com") }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			plan := ixTestModel()
+			tc.set(&plan)
+
+			_, mock := runIXUpdate(t, plan, ixTestModel(), ixTestAPI())
+
+			assert.Len(t, mock.GotUpdateIXReqs, 1)
+		})
+	}
+}
+
+func TestIXUpdateRejectsClearingSettings(t *testing.T) {
+	t.Parallel()
+	state := ixTestModel()
+	state.CostCentre = types.StringValue("cc-1")
+	state.ReverseDNS = types.StringValue("ix.example.com.")
+
+	resp, mock := updateIX(t, ixTestModel(), state, ixTestAPI())
+
+	require.Len(t, resp.Diagnostics.Errors(), 2)
+	assert.Equal(t, "Cannot clear cost_centre", resp.Diagnostics.Errors()[0].Summary())
+	assert.Equal(t, "Cannot clear reverse_dns", resp.Diagnostics.Errors()[1].Summary())
+	assert.Empty(t, mock.GotUpdateIXReqs)
+}
+
+// An upgraded state can hold a null shutdown, which plans as unknown.
+func TestIXUpdateSkipsUnknownShutdown(t *testing.T) {
+	t.Parallel()
+	plan := ixTestModel()
+	plan.ProductName = types.StringValue("renamed")
+	plan.Shutdown = types.BoolUnknown()
+	state := ixTestModel()
+	state.Shutdown = types.BoolNull()
+
+	_, mock := runIXUpdate(t, plan, state, ixTestAPI())
+
+	require.Len(t, mock.GotUpdateIXReqs, 1)
+	assert.Nil(t, mock.GotUpdateIXReqs[0].Shutdown)
+}
+
 func TestIXUpdateRecordsNewMAC(t *testing.T) {
 	t.Parallel()
 	plan := ixTestModel()
@@ -180,7 +245,7 @@ func TestIXUpdateRequestedProductUID(t *testing.T) {
 	}
 }
 
-func TestIXCreateSetsSettingsTheOrderCannotCarry(t *testing.T) {
+func TestIXCreateSendsSettingsInFollowUpUpdate(t *testing.T) {
 	t.Parallel()
 	unset := ixTestModel()
 	unset.Shutdown = types.BoolUnknown()
@@ -189,19 +254,38 @@ func TestIXCreateSetsSettingsTheOrderCannotCarry(t *testing.T) {
 	unset.ReverseDNS = types.StringUnknown()
 
 	set := unset
+	set.MACAddress = types.StringValue("02:AB:CD:EF:00:01")
 	set.CostCentre = types.StringValue("cc-1")
 	set.PublicGraph = types.BoolValue(true)
 	set.ReverseDNS = types.StringValue("ix.example.com")
 
 	t.Run("unset sends no update", func(t *testing.T) {
 		t.Parallel()
-		mock := runIXCreate(t, unset, ixTestAPI())
+		got, mock := runIXCreate(t, unset, ixTestAPI(), nil)
 		assert.Empty(t, mock.GotUpdateIXReqs)
+		assert.Equal(t, types.StringValue(""), got.CostCentre)
+		assert.Equal(t, types.StringValue(""), got.ReverseDNS)
+	})
+
+	t.Run("unset keeps the live settings", func(t *testing.T) {
+		t.Parallel()
+		live := ixTestAPI()
+		live.CostCentre, live.PublicGraph, live.ReverseDNS = "cc-live", true, "live.example.com."
+		got, mock := runIXCreate(t, unset, live, nil)
+		assert.Empty(t, mock.GotUpdateIXReqs)
+		assert.Equal(t, "live.example.com.", got.ReverseDNS.ValueString())
 	})
 
 	t.Run("set sends one update", func(t *testing.T) {
 		t.Parallel()
-		mock := runIXCreate(t, set, ixTestAPI())
+		live := ixTestAPI()
+		live.MACAddress = "02:ab:cd:ef:00:01"
+		updated := ixTestAPI()
+		updated.MACAddress = "02:ab:cd:ef:00:01"
+		updated.CostCentre, updated.PublicGraph, updated.ReverseDNS = "cc-1", true, "ix.example.com."
+
+		got, mock := runIXCreate(t, set, live, updated)
+
 		require.Len(t, mock.GotUpdateIXReqs, 1)
 		req := mock.GotUpdateIXReqs[0]
 		require.NotNil(t, req.CostCentre)
@@ -210,13 +294,16 @@ func TestIXCreateSetsSettingsTheOrderCannotCarry(t *testing.T) {
 		assert.True(t, *req.PublicGraph)
 		require.NotNil(t, req.ReverseDns)
 		assert.Equal(t, "ix.example.com", *req.ReverseDns)
+		assert.Equal(t, "cc-1", got.CostCentre.ValueString())
+		assert.Equal(t, "02:AB:CD:EF:00:01", got.MACAddress.ValueString())
+		assert.Equal(t, "ix.example.com", got.ReverseDNS.ValueString())
 	})
 
 	t.Run("set to the live value sends no update", func(t *testing.T) {
 		t.Parallel()
 		live := ixTestAPI()
 		live.CostCentre, live.PublicGraph, live.ReverseDNS = "cc-1", true, "ix.example.com"
-		mock := runIXCreate(t, set, live)
+		_, mock := runIXCreate(t, set, live, nil)
 		assert.Empty(t, mock.GotUpdateIXReqs)
 	})
 }
@@ -229,7 +316,7 @@ func TestIXUpdateKeepsPlannedFormOfNormalizedValues(t *testing.T) {
 		t.Parallel()
 		plan := ixTestModel()
 		plan.MACAddress = types.StringValue("02:AB:CD:EF:00:01")
-		plan.ReverseDNS = types.StringValue("ix.example.com")
+		plan.ReverseDNS = types.StringValue("IX.example.com")
 		state := ixTestModel()
 		state.MACAddress = types.StringValue("02:ab:cd:ef:00:01")
 		state.ReverseDNS = types.StringValue("ix.example.com.")
@@ -240,7 +327,7 @@ func TestIXUpdateKeepsPlannedFormOfNormalizedValues(t *testing.T) {
 
 		assert.Empty(t, mock.GotUpdateIXReqs)
 		assert.Equal(t, "02:AB:CD:EF:00:01", got.MACAddress.ValueString())
-		assert.Equal(t, "ix.example.com", got.ReverseDNS.ValueString())
+		assert.Equal(t, "IX.example.com", got.ReverseDNS.ValueString())
 	})
 
 	t.Run("changed_values", func(t *testing.T) {

@@ -299,7 +299,7 @@ func readBack(current types.String, api string, same func(a, b string) bool) typ
 }
 
 func sameReverseDNS(a, b string) bool {
-	return strings.TrimSuffix(a, ".") == strings.TrimSuffix(b, ".")
+	return strings.EqualFold(strings.TrimSuffix(a, "."), strings.TrimSuffix(b, "."))
 }
 
 // addSettingChanges adds cost_centre, public_graph, and reverse_dns to req
@@ -672,7 +672,7 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	// The IX order cannot carry these settings, so set them with an update.
+	// The SDK buy request cannot carry these settings, so set them with an update.
 	var created ixResourceModel
 	created.fromAPI(ctx, ix)
 	settingsReq := &megaport.UpdateIXRequest{
@@ -682,8 +682,8 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 	if plan.addSettingChanges(settingsReq, &created) {
 		if _, err := r.client.IXService.UpdateIX(ctx, createdID, settingsReq); err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating IX",
-				"Could not set cost_centre, public_graph, or reverse_dns after creation, unexpected error: "+err.Error(),
+				"IX ordered but settings not applied",
+				fmt.Sprintf("IX %s (%s) was ordered successfully but cost_centre, public_graph, or reverse_dns could not be set: %s. Its UID has been saved to state.", plan.ProductName.ValueString(), createdID, err),
 			)
 			return
 		}
@@ -786,9 +786,22 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		asn := int(plan.ASN.ValueInt64())
 		updateReq.ASN = &asn
 	}
-	if !plan.Shutdown.Equal(state.Shutdown) {
+	if !plan.Shutdown.IsUnknown() && !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown := plan.Shutdown.ValueBool()
 		updateReq.Shutdown = &shutdown
+	}
+
+	// The SDK drops an empty cost_centre or reverse_dns from the update, so the API keeps the current value.
+	if plan.CostCentre.ValueString() == "" && state.CostCentre.ValueString() != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("cost_centre"), "Cannot clear cost_centre",
+			"The provider cannot clear cost_centre. Set a new value, or remove cost_centre from the configuration to keep the current value.")
+	}
+	if plan.ReverseDNS.ValueString() == "" && state.ReverseDNS.ValueString() != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot clear reverse_dns",
+			"The provider cannot clear reverse_dns. Set a new value, or remove reverse_dns from the configuration to keep the current value.")
+	}
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	settingsChanged := plan.addSettingChanges(updateReq, &state)

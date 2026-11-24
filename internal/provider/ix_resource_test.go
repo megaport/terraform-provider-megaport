@@ -82,7 +82,7 @@ removed {
 
 	resourceName := "megaport_ix.test_ix"
 
-	// The forget step clears the IX from state, so the UID is held here.
+	// Holds the UID across the forget step.
 	var ixUID string
 	captureUID := func(state *terraform.State) error {
 		rs, ok := state.RootModule().Resources[resourceName]
