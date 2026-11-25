@@ -406,6 +406,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "Cost centre for invoicing purposes.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseNonNullStateForUnknown(),
 				},

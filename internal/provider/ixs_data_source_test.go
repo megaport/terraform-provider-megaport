@@ -26,7 +26,8 @@ type MockIXService struct {
 	GetIXErr      error
 	BuyIXResult   *megaport.BuyIXResponse
 	// UpdatedIX, when set, replaces GetIXResult after an UpdateIX call.
-	UpdatedIX *megaport.IX
+	UpdatedIX   *megaport.IX
+	UpdateIXErr error
 
 	GotListIXsReq   *megaport.ListIXsRequest
 	GotGetIXID      string
@@ -63,6 +64,9 @@ func (m *MockIXService) ValidateIXOrder(ctx context.Context, req *megaport.BuyIX
 
 func (m *MockIXService) UpdateIX(ctx context.Context, id string, req *megaport.UpdateIXRequest) (*megaport.IX, error) {
 	m.GotUpdateIXReqs = append(m.GotUpdateIXReqs, req)
+	if m.UpdateIXErr != nil {
+		return nil, m.UpdateIXErr
+	}
 	if m.UpdatedIX != nil {
 		m.GetIXResult = m.UpdatedIX
 	}

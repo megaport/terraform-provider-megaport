@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -109,8 +111,19 @@ func modifyIXPlan(t *testing.T, config, plan, state ixResourceModel) (ixResource
 
 func runIXCreate(t *testing.T, plan ixResourceModel, live, updated *megaport.IX) (ixResourceModel, *MockIXService) {
 	t.Helper()
+	mock := &MockIXService{GetIXResult: live, UpdatedIX: updated}
+	resp := createIX(t, plan, mock)
+	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
+
+	var got ixResourceModel
+	require.False(t, resp.State.Get(context.Background(), &got).HasError())
+	return got, mock
+}
+
+func createIX(t *testing.T, plan ixResourceModel, mock *MockIXService) *fwresource.CreateResponse {
+	t.Helper()
 	ctx := context.Background()
-	mock := &MockIXService{GetIXResult: live, UpdatedIX: updated, BuyIXResult: &megaport.BuyIXResponse{TechnicalServiceUID: ixReadTestUID}}
+	mock.BuyIXResult = &megaport.BuyIXResponse{TechnicalServiceUID: ixReadTestUID}
 	r := &ixResource{client: &megaport.Client{IXService: mock}}
 
 	tfPlan, tfState := ixTestSchema(t, r)
@@ -118,11 +131,7 @@ func runIXCreate(t *testing.T, plan ixResourceModel, live, updated *megaport.IX)
 
 	resp := &fwresource.CreateResponse{State: tfState}
 	r.Create(ctx, fwresource.CreateRequest{Plan: tfPlan}, resp)
-	require.False(t, resp.Diagnostics.HasError(), "unexpected diagnostics: %v", resp.Diagnostics.Errors())
-
-	var got ixResourceModel
-	require.False(t, resp.State.Get(ctx, &got).HasError())
-	return got, mock
+	return resp
 }
 
 func TestIXFromAPIMapsTopLevelFields(t *testing.T) {
@@ -469,6 +478,36 @@ func TestIXCreateSendsSettingsInFollowUpUpdate(t *testing.T) {
 		_, mock := runIXCreate(t, set, live, nil)
 		assert.Empty(t, mock.GotUpdateIXReqs)
 	})
+
+	t.Run("failed update keeps the UID", func(t *testing.T) {
+		t.Parallel()
+		resp := createIX(t, set, &MockIXService{GetIXResult: ixTestAPI(), UpdateIXErr: errors.New("update failed")})
+
+		require.Len(t, resp.Diagnostics.Errors(), 1)
+		assert.Equal(t, "IX ordered but settings not applied", resp.Diagnostics.Errors()[0].Summary())
+		var uid types.String
+		require.False(t, resp.State.GetAttribute(context.Background(), path.Root("product_uid"), &uid).HasError())
+		assert.Equal(t, ixReadTestUID, uid.ValueString())
+	})
+}
+
+// The SDK refuses a longer cost_centre, which would fail the update after Create orders the IX.
+func TestIXSchemaLimitsCostCentre(t *testing.T) {
+	t.Parallel()
+	schemaResp := fwresource.SchemaResponse{}
+	(&ixResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, &schemaResp)
+	costCentre, ok := schemaResp.Schema.Attributes["cost_centre"].(schema.StringAttribute)
+	require.True(t, ok)
+
+	validate := func(value string) diag.Diagnostics {
+		resp := &validator.StringResponse{}
+		for _, v := range costCentre.Validators {
+			v.ValidateString(context.Background(), validator.StringRequest{Path: path.Root("cost_centre"), ConfigValue: types.StringValue(value)}, resp)
+		}
+		return resp.Diagnostics
+	}
+	assert.False(t, validate(strings.Repeat("a", 255)).HasError())
+	assert.True(t, validate(strings.Repeat("a", 256)).HasError())
 }
 
 // The API lowercases the MAC and adds a trailing dot to reverse DNS.
