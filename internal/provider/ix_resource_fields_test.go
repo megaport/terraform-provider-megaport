@@ -203,27 +203,17 @@ func TestIXUpdateSendsEachSettingAlone(t *testing.T) {
 	}
 }
 
-func TestIXModifyPlanRejectsClearingCostCentre(t *testing.T) {
+func TestIXUpdateSendsClearedCostCentre(t *testing.T) {
 	t.Parallel()
 	state := ixTestModel()
 	state.CostCentre = types.StringValue("cc-1")
 
-	_, diags := modifyIXPlan(t, ixTestModel(), ixTestModel(), state)
-	require.Len(t, diags.Errors(), 1)
-	assert.Equal(t, "Cannot clear cost_centre", diags.Errors()[0].Summary())
-	withPath, ok := diags.Errors()[0].(diag.DiagnosticWithPath)
-	require.True(t, ok)
-	assert.Equal(t, path.Root("cost_centre"), withPath.Path())
+	got, mock := runIXUpdate(t, ixTestModel(), state, ixTestAPI())
 
-	changed := ixTestModel()
-	changed.CostCentre = types.StringValue("cc-2")
-	_, diags = modifyIXPlan(t, changed, changed, state)
-	assert.False(t, diags.HasError())
-
-	unknown := ixTestModel()
-	unknown.CostCentre = types.StringUnknown()
-	_, diags = modifyIXPlan(t, unknown, unknown, state)
-	assert.False(t, diags.HasError())
+	require.Len(t, mock.GotUpdateIXReqs, 1)
+	require.NotNil(t, mock.GotUpdateIXReqs[0].CostCentre)
+	assert.Equal(t, "", *mock.GotUpdateIXReqs[0].CostCentre)
+	assert.Equal(t, types.StringValue(""), got.CostCentre)
 }
 
 func TestIXModifyPlanReverseDNSFollowsASN(t *testing.T) {

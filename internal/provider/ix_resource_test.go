@@ -177,6 +177,10 @@ removed {
 					}),
 				),
 			},
+			{
+				Config: strings.Replace(configUpdated, `"tf-acc-cc-2"`, `""`, 1),
+				Check:  resource.TestCheckResourceAttr(resourceName, "cost_centre", ""),
+			},
 		},
 	})
 }

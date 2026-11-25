@@ -758,8 +758,8 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
-// ModifyPlan rejects a cleared cost_centre. When the ASN changes and state holds a default reverse_dns,
-// it marks an unset reverse_dns unknown, or rejects a Megaport reverse_dns in the configuration.
+// ModifyPlan handles an ASN change when state holds a default reverse_dns. It marks an unset
+// reverse_dns unknown, or rejects a Megaport reverse_dns in the configuration.
 func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -772,12 +772,6 @@ func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequ
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("reverse_dns"), &configReverseDNS)...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	// The SDK drops an empty cost_centre from the update, so the API keeps the current value.
-	if !plan.CostCentre.IsUnknown() && plan.CostCentre.ValueString() == "" && state.CostCentre.ValueString() != "" {
-		resp.Diagnostics.AddAttributeError(path.Root("cost_centre"), "Cannot clear cost_centre",
-			"The provider cannot clear cost_centre. Set a new value, or remove cost_centre from the configuration to keep the current value.")
 	}
 
 	// The API rebuilds a Megaport default reverse DNS when the ASN changes, and refuses any other megaport.com name.
