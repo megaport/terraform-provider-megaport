@@ -52,7 +52,7 @@ resource "megaport_ix" "test_ix" {
 - `cost_centre` (String) Cost centre for invoicing purposes.
 - `promo_code` (String) Promo code to apply to the IX.
 - `public_graph` (Boolean) Whether the IX usage statistics are publicly viewable.
-- `reverse_dns` (String) Custom hostname for your IP address.
+- `reverse_dns` (String) Custom hostname for your IP address. Leave it unset on create to use the Megaport default, which follows the ASN.
 - `shutdown` (Boolean) Whether the IX connection is shut down. Default is false.
 
 ### Read-Only

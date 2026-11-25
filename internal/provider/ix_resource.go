@@ -3,14 +3,19 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	megaport "github.com/megaport/megaportgo"
 )
@@ -20,6 +25,7 @@ var (
 	_ resource.Resource                = &ixResource{}
 	_ resource.ResourceWithConfigure   = &ixResource{}
 	_ resource.ResourceWithImportState = &ixResource{}
+	_ resource.ResourceWithModifyPlan  = &ixResource{}
 
 	interfaceAttrTypes = map[string]attr.Type{
 		"demarcation":   types.StringType,
@@ -157,9 +163,13 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	orm.ProductName = types.StringValue(ix.ProductName)
 	orm.NetworkServiceType = types.StringValue(ix.NetworkServiceType)
 	orm.ASN = types.Int64Value(int64(ix.ASN))
+	orm.MACAddress = readBack(orm.MACAddress, ix.MACAddress, strings.EqualFold)
 	orm.RateLimit = types.Int64Value(int64(ix.RateLimit))
 	orm.VLAN = types.Int64Value(int64(ix.VLAN))
+	orm.Shutdown = types.BoolValue(ix.Shutdown)
+	orm.CostCentre = types.StringValue(ix.CostCentre)
 	orm.PublicGraph = types.BoolValue(ix.PublicGraph)
+	orm.ReverseDNS = readBack(orm.ReverseDNS, ix.ReverseDNS, sameReverseDNS)
 	orm.ProvisioningStatus = types.StringValue(ix.ProvisioningStatus)
 	orm.Term = types.Int64Value(int64(ix.Term))
 	orm.LocationID = types.Int64Value(int64(ix.LocationID))
@@ -282,6 +292,38 @@ func (orm *ixResourceModel) fromAPI(ctx context.Context, ix *megaport.IX) {
 	}
 }
 
+// readBack keeps the current value when the API returns the same value in
+// another form. The API lowercases the MAC and adds a trailing dot to reverse DNS.
+func readBack(current types.String, api string, same func(a, b string) bool) types.String {
+	if !current.IsNull() && !current.IsUnknown() && same(current.ValueString(), api) {
+		return current
+	}
+	return types.StringValue(api)
+}
+
+func sameReverseDNS(a, b string) bool {
+	return strings.EqualFold(strings.TrimSuffix(a, "."), strings.TrimSuffix(b, "."))
+}
+
+// addSettingChanges adds cost_centre, public_graph, and reverse_dns to req
+// where the plan sets a value that current does not have.
+func (orm *ixResourceModel) addSettingChanges(req *megaport.UpdateIXRequest, current *ixResourceModel) bool {
+	changed := false
+	if !orm.CostCentre.IsUnknown() && !orm.CostCentre.Equal(current.CostCentre) {
+		req.CostCentre = megaport.PtrTo(orm.CostCentre.ValueString())
+		changed = true
+	}
+	if !orm.PublicGraph.IsUnknown() && !orm.PublicGraph.Equal(current.PublicGraph) {
+		req.PublicGraph = megaport.PtrTo(orm.PublicGraph.ValueBool())
+		changed = true
+	}
+	if !orm.ReverseDNS.IsUnknown() && !sameReverseDNS(orm.ReverseDNS.ValueString(), current.ReverseDNS.ValueString()) {
+		req.ReverseDns = megaport.PtrTo(orm.ReverseDNS.ValueString())
+		changed = true
+	}
+	return changed
+}
+
 // NewIXResource is a helper function to simplify the provider implementation.
 func NewIXResource() resource.Resource {
 	return &ixResource{}
@@ -316,6 +358,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"product_id": schema.Int64Attribute{
 				Description: "Numeric ID of the IX product.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"product_name": schema.StringAttribute{
 				Description: "Name of the IX.",
@@ -329,6 +374,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 				Description: "The ASN (Autonomous System Number) for the IX connection.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"mac_address": schema.StringAttribute{
 				Description: "The MAC address for the IX interface.",
@@ -345,6 +393,10 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"shutdown": schema.BoolAttribute{
 				Description: "Whether the IX connection is shut down. Default is false.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseNonNullStateForUnknown(),
+				},
 			},
 			"promo_code": schema.StringAttribute{
 				Description: "Promo code to apply to the IX.",
@@ -353,15 +405,32 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"cost_centre": schema.StringAttribute{
 				Description: "Cost centre for invoicing purposes.",
 				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseNonNullStateForUnknown(),
+				},
 			},
 			"public_graph": schema.BoolAttribute{
 				Description: "Whether the IX usage statistics are publicly viewable.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"reverse_dns": schema.StringAttribute{
-				Description: "Custom hostname for your IP address.",
+				Description: "Custom hostname for your IP address. Leave it unset on create to use the Megaport default, which follows the ASN.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseNonNullStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"provisioning_status": schema.StringAttribute{
 				Description: "The provisioning status of the IX. This field represents the current state (e.g., CONFIGURED, LIVE, DECOMMISSIONED) and may transition through multiple states during the IX lifecycle. During import, this field will populate from the API and may show as changing from unknown to its actual value on first apply - this is expected behavior.",
@@ -370,14 +439,23 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"create_date": schema.StringAttribute{
 				Description: "The date the IX was created. This timestamp is set by the Megaport API at creation time. During import, this field may show as changing from unknown to its actual value - this is expected behavior.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"term": schema.Int64Attribute{
 				Description: "The term of the IX in months.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"location_id": schema.Int64Attribute{
 				Description: "The ID of the location where the IX is provisioned.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"attribute_tags": schema.MapAttribute{
 				Description: "Attribute tags associated with the IX.",
@@ -399,6 +477,9 @@ func (r *ixResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *r
 			"usage_algorithm": schema.StringAttribute{
 				Description: "Usage algorithm for the IX.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"resources": schema.SingleNestedAttribute{
 				Description: "Resources associated with the IX.",
@@ -600,6 +681,31 @@ func (r *ixResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	// The SDK buy request cannot carry these settings, so set them with an update.
+	var created ixResourceModel
+	created.fromAPI(ctx, ix)
+	settingsReq := &megaport.UpdateIXRequest{
+		WaitForUpdate: true,
+		WaitForTime:   waitForTime,
+	}
+	if plan.addSettingChanges(settingsReq, &created) {
+		if _, err := r.client.IXService.UpdateIX(ctx, createdID, settingsReq); err != nil {
+			resp.Diagnostics.AddError(
+				"IX ordered but settings not applied",
+				fmt.Sprintf("IX %s (%s) was ordered successfully but cost_centre, public_graph, or reverse_dns could not be set: %s. Its UID has been saved to state.", plan.ProductName.ValueString(), createdID, err),
+			)
+			return
+		}
+		ix, err = r.client.IXService.GetIX(ctx, createdID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading IX",
+				"Could not read IX after creation, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
 	// Update the plan with the IX info
 	plan.fromAPI(ctx, ix)
 
@@ -652,6 +758,37 @@ func (r *ixResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 }
 
+// ModifyPlan handles an ASN change when state holds a default reverse_dns. It marks an unset
+// reverse_dns unknown, or rejects a Megaport reverse_dns in the configuration.
+func (r *ixResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state ixResourceModel
+	var configReverseDNS types.String
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("reverse_dns"), &configReverseDNS)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The API rebuilds a Megaport default reverse DNS when the ASN changes, and refuses any other megaport.com name.
+	if !plan.ASN.Equal(state.ASN) && isMegaportReverseDNS(state.ReverseDNS.ValueString()) {
+		if configReverseDNS.IsNull() {
+			resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("reverse_dns"), types.StringUnknown())...)
+		} else if !plan.ASN.IsUnknown() && isMegaportReverseDNS(configReverseDNS.ValueString()) {
+			resp.Diagnostics.AddAttributeError(path.Root("reverse_dns"), "Cannot set a Megaport reverse_dns when the ASN changes",
+				"The API rebuilds the default reverse_dns when the ASN changes. Remove reverse_dns from the configuration to use the new default.")
+		}
+	}
+}
+
+func isMegaportReverseDNS(name string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSuffix(name, ".")), ".megaport.com")
+}
+
 // Update the resource.
 func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state ixResourceModel
@@ -681,7 +818,7 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		vlan := int(plan.VLAN.ValueInt64())
 		updateReq.VLAN = &vlan
 	}
-	if !plan.MACAddress.Equal(state.MACAddress) {
+	if !strings.EqualFold(plan.MACAddress.ValueString(), state.MACAddress.ValueString()) {
 		macAddress := plan.MACAddress.ValueString()
 		updateReq.MACAddress = &macAddress
 	}
@@ -689,13 +826,16 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		asn := int(plan.ASN.ValueInt64())
 		updateReq.ASN = &asn
 	}
-	if !plan.Shutdown.Equal(state.Shutdown) {
+	if !plan.Shutdown.IsUnknown() && !plan.Shutdown.Equal(state.Shutdown) {
 		shutdown := plan.Shutdown.ValueBool()
 		updateReq.Shutdown = &shutdown
 	}
 
+	settingsChanged := plan.addSettingChanges(updateReq, &state)
+
 	// Apply the update if any fields changed
-	if updateReq.Name != nil ||
+	if settingsChanged ||
+		updateReq.Name != nil ||
 		updateReq.RateLimit != nil ||
 		updateReq.VLAN != nil ||
 		updateReq.MACAddress != nil ||
@@ -721,9 +861,16 @@ func (r *ixResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// Update the state with the IX info
+	// Update the state with the IX info. The read-back keeps the planned form
+	// of the MAC and reverse DNS.
+	state.MACAddress = plan.MACAddress
+	state.ReverseDNS = plan.ReverseDNS
 	state.fromAPI(ctx, updatedIX)
 	state.PromoCode = plan.PromoCode
+	// The IX read has no parent product UID, so an import leaves it null.
+	if state.RequestedProductUID.IsNull() {
+		state.RequestedProductUID = plan.RequestedProductUID
+	}
 
 	// Persist the new state
 	diags := resp.State.Set(ctx, &state)

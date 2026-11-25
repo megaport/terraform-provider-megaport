@@ -107,7 +107,8 @@
     ],
     "ix": [
       "TestAccMegaportIX_Basic",
-      "TestAccMegaportIX_PromoCode"
+      "TestAccMegaportIX_PromoCode",
+      "TestAccMegaportIX_Upgrade"
     ]
   },
   "excluded": {
