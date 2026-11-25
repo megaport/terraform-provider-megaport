@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	mrand "math/rand"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -896,7 +897,6 @@ func findAnyActiveLocationID(t *testing.T) int {
 	return 0
 }
 
-//nolint:unparam // count is 1 today but callers may vary it
 func findVXCPortTestLocations(t *testing.T, count int) []int {
 	t.Helper()
 	ctx := t.Context()
@@ -1591,7 +1591,8 @@ func TestListPortCapacity(t *testing.T) {
 var cleanupDelete = flag.Bool("cleanup-delete", false, "delete orphaned test resources in TestCleanupOrphanedResources")
 
 // TestCleanupOrphanedResources lists (and optionally deletes) staging resources
-// whose name starts with "tf-acc-test-". VXCs are deleted first (before their
+// whose name starts with "tf-acc-test-". DCIs are canceled first, because a DCI
+// cancels its own Ports and VXC. VXCs are deleted next (before their
 // endpoints). Never fails — always skips at the end.
 //
 //	# List only:
@@ -1615,19 +1616,77 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		return !strings.EqualFold(status, "DECOMMISSIONED")
 	}
 
-	// VXCs first — must be deleted before their A/B-end resources
+	// DCIs first — a DCI is canceled as a whole, which decommissions both its Ports and its VXC.
+	// megaportgo has no list call for Solutions, so this reads GET /v1/solutions directly.
+	// The API returns only active Solutions by default.
+	var dciLive int
+	// dciMembers holds the Ports and VXCs of the DCIs found here. The sections below skip them:
+	// deleting a member on its own would leave a DCI that is partly canceled.
+	dciMembers := map[string]bool{}
+	var solutions struct {
+		Data []struct {
+			UID               string   `json:"uid"`
+			Type              string   `json:"type"`
+			Name              string   `json:"name"`
+			Locked            bool     `json:"locked"`
+			MemberServiceUIDs []string `json:"memberServiceUids"`
+		} `json:"data"`
+	}
+	// dciListed is false when the DCI list could not be read. dciMembers may then miss members,
+	// so the sections below list VXCs and Ports but do not delete them.
+	dciListed := true
+	if listReq, reqErr := client.NewRequest(ctx, http.MethodGet, "/v1/solutions", nil); reqErr != nil {
+		dciListed = false
+		t.Logf("WARN: could not list DCIs: %v", reqErr)
+	} else if listResp, doErr := client.Do(ctx, listReq, nil); doErr != nil {
+		// A 404 means DCI ordering is off for the account, so it has no DCIs.
+		if !isDCIStatus(doErr, http.StatusNotFound) {
+			dciListed = false
+			t.Logf("WARN: could not list DCIs: %v", doErr)
+		}
+	} else {
+		if decErr := json.NewDecoder(listResp.Body).Decode(&solutions); decErr != nil {
+			dciListed = false
+			t.Logf("WARN: could not decode the DCI list: %v", decErr)
+		}
+		_ = listResp.Body.Close()
+	}
+	deleteDCIKinds := *cleanupDelete && dciListed
+	if *cleanupDelete && !dciListed {
+		t.Logf("WARN: VXCs and Ports will not be deleted, because one may belong to a live DCI")
+	}
+	for _, dci := range solutions.Data {
+		if dci.Type != megaport.SolutionTypeDCI || !strings.HasPrefix(dci.Name, prefix) {
+			continue
+		}
+		dciLive++
+		for _, memberUID := range dci.MemberServiceUIDs {
+			dciMembers[memberUID] = true
+		}
+		t.Logf("DCI  %s (%s) locked=%t", dci.Name, dci.UID, dci.Locked)
+		if *cleanupDelete {
+			// The API refuses to cancel a locked DCI, and answers 409 when a member cannot be decommissioned yet.
+			if delErr := client.SolutionService.CancelSolution(ctx, &megaport.CancelSolutionRequest{SolutionUID: dci.UID}); delErr != nil {
+				t.Logf("  cancel failed: %v", delErr)
+			} else {
+				t.Logf("  canceled")
+			}
+		}
+	}
+
+	// VXCs next — must be deleted before their A/B-end resources
 	var vxcLive int
 	vxcs, err := client.VXCService.ListVXCs(ctx, &megaport.ListVXCsRequest{})
 	if err != nil {
 		t.Logf("WARN: could not list VXCs: %v", err)
 	}
 	for _, vxc := range vxcs {
-		if !strings.HasPrefix(vxc.Name, prefix) || !isLive(vxc.ProvisioningStatus) {
+		if !strings.HasPrefix(vxc.Name, prefix) || !isLive(vxc.ProvisioningStatus) || dciMembers[vxc.UID] {
 			continue
 		}
 		vxcLive++
 		t.Logf("VXC  %s (%s) status=%s", vxc.Name, vxc.UID, vxc.ProvisioningStatus)
-		if *cleanupDelete {
+		if deleteDCIKinds {
 			if delErr := client.VXCService.DeleteVXC(ctx, vxc.UID, &megaport.DeleteVXCRequest{DeleteNow: true}); delErr != nil {
 				t.Logf("  delete failed: %v", delErr)
 			} else {
@@ -1685,12 +1744,12 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		t.Logf("WARN: could not list ports: %v", err)
 	}
 	for _, port := range ports {
-		if !strings.HasPrefix(port.Name, prefix) || !isLive(port.ProvisioningStatus) {
+		if !strings.HasPrefix(port.Name, prefix) || !isLive(port.ProvisioningStatus) || dciMembers[port.UID] {
 			continue
 		}
 		portLive++
 		t.Logf("Port %s (%s) status=%s", port.Name, port.UID, port.ProvisioningStatus)
-		if *cleanupDelete {
+		if deleteDCIKinds {
 			if _, delErr := client.PortService.DeletePort(ctx, &megaport.DeletePortRequest{PortID: port.UID, DeleteNow: true}); delErr != nil {
 				t.Logf("  delete failed: %v", delErr)
 			} else {
@@ -1699,7 +1758,7 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		}
 	}
 
-	t.Logf("orphaned test resources (live): %d VXC, %d MVE, %d MCR, %d Port", vxcLive, mveLive, mcrLive, portLive)
+	t.Logf("orphaned test resources (live): %d DCI, %d VXC, %d MVE, %d MCR, %d Port", dciLive, vxcLive, mveLive, mcrLive, portLive)
 	t.Skip("cleanup scan complete")
 }
 

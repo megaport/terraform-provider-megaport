@@ -249,7 +249,7 @@ func checkDCIHolds(name, costCentre string) resource.TestCheckFunc {
 	}
 }
 
-// testAccCheckDCICanceled checks that every DCI in state is inactive, with both its Ports and its VXC canceled.
+// testAccCheckDCICanceled checks that every DCI in state is inactive, with both its Ports and its VXC decommissioned.
 // GetSolution still reads a canceled DCI.
 func testAccCheckDCICanceled(state *terraform.State) error {
 	client, err := getTestClient()
@@ -257,9 +257,6 @@ func testAccCheckDCICanceled(state *terraform.State) error {
 		return err
 	}
 	ctx := context.Background()
-	canceled := func(status string) bool {
-		return status == megaport.STATUS_CANCELLED || status == megaport.STATUS_DECOMMISSIONED
-	}
 
 	for _, rs := range state.RootModule().Resources {
 		if rs.Type != "megaport_dci" {
@@ -274,7 +271,8 @@ func testAccCheckDCICanceled(state *terraform.State) error {
 			return fmt.Errorf("DCI %s is still active after destroy", uid)
 		}
 
-		// A cancel that stops part-way can leave a member live while the DCI reads inactive.
+		// The cancel decommissions every member before it answers. A member left CANCELLED is still live:
+		// its network-side terminate failed, while the DCI reads inactive.
 		for _, attr := range []string{"a_end_port_uid", "b_end_port_uid"} {
 			portUID := rs.Primary.Attributes[attr]
 			if portUID == "" {
@@ -284,8 +282,8 @@ func testAccCheckDCICanceled(state *terraform.State) error {
 			if err != nil {
 				return fmt.Errorf("could not read Port %s of DCI %s after destroy: %w", portUID, uid, err)
 			}
-			if !canceled(port.ProvisioningStatus) {
-				return fmt.Errorf("Port %s of DCI %s has status %s after destroy", portUID, uid, port.ProvisioningStatus)
+			if port.ProvisioningStatus != megaport.STATUS_DECOMMISSIONED {
+				return fmt.Errorf("Port %s of DCI %s has status %s after destroy, want %s", portUID, uid, port.ProvisioningStatus, megaport.STATUS_DECOMMISSIONED)
 			}
 		}
 		if vxcUID := rs.Primary.Attributes["vxc_uid"]; vxcUID != "" {
@@ -293,8 +291,8 @@ func testAccCheckDCICanceled(state *terraform.State) error {
 			if err != nil {
 				return fmt.Errorf("could not read VXC %s of DCI %s after destroy: %w", vxcUID, uid, err)
 			}
-			if !canceled(vxc.ProvisioningStatus) {
-				return fmt.Errorf("VXC %s of DCI %s has status %s after destroy", vxcUID, uid, vxc.ProvisioningStatus)
+			if vxc.ProvisioningStatus != megaport.STATUS_DECOMMISSIONED {
+				return fmt.Errorf("VXC %s of DCI %s has status %s after destroy, want %s", vxcUID, uid, vxc.ProvisioningStatus, megaport.STATUS_DECOMMISSIONED)
 			}
 		}
 	}

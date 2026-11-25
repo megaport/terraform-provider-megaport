@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lists orphaned tf-acc-test-* resources in staging.
-# VXCs are listed/deleted first to free up their A/B-end endpoints.
+# DCIs are canceled first, then VXCs are listed/deleted to free up their A/B-end endpoints.
 #
 # Usage:
 #   # List only (safe):
